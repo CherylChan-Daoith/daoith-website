@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="/css/styles.css?v=20260708i">
 </head>
 <body>
 
@@ -25,12 +25,17 @@
       <nav class="nav" id="nav">
         <a href="#hero" class="active">首页</a>
         <a href="#ai-solution">AI解决方案</a>
-        <a href="#expert">专家解读</a>
         <a href="#services">财税服务</a>
         <a href="#hub">服务管理</a>
+        <a href="#expert">专家解读</a>
+        <a href="#tax-systems">各地区税制</a>
         <a href="#policy">政策速递</a>
         <a href="#about">关于我们</a>
       </nav>
+      <div class="lang-switcher" role="group" aria-label="Language">
+        <button type="button" class="lang-btn active" data-lang="zh" aria-pressed="true">中文</button>
+        <button type="button" class="lang-btn" data-lang="en" aria-pressed="false">EN</button>
+      </div>
       <a href="#ai-solution" class="btn btn-primary btn-sm">免费生成方案</a>
       <button class="mobile-toggle" id="mobileToggle" aria-label="菜单">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -124,7 +129,7 @@
 
       <div class="ai-grid">
         <div class="form-panel">
-          <h3>跨境电商业务信息 <span class="tag">AI</span></h3>
+          <h3>业务信息 <span class="tag">AI</span></h3>
           <form id="aiForm">
             <div class="form-group">
               <label>从事的电商平台</label>
@@ -220,41 +225,40 @@
           <div class="result-placeholder" id="resultPlaceholder">
             <div class="icon icon-muted">AI</div>
             <h4>AI方案生成区</h4>
-            <p>左侧填写跨境电商业务信息后<br>点击"AI智能生成方案"获取专属方案</p>
+            <p>填写左侧业务信息后<br>点击「AI智能生成方案」获取专属方案</p>
           </div>
           <div class="result-content" id="resultContent">
             <h4>您的专属合规方案</h4>
             <div id="resultItems"></div>
           </div>
         </div>
-      </div>
 
-      <!-- FAQ -->
-      <div class="faq-section">
-        <h3>方案相关常见问题</h3>
-        <div class="faq-item">
-          <button class="faq-question">AI生成的方案具有法律效力吗？<span class="faq-arrow">▼</span></button>
-          <div class="faq-answer"><div class="faq-answer-inner">AI生成的方案基于公开税收政策和行业经验，仅供参考。具体实施前建议预约专家1v1深度解读（¥2,999/小时），由资深跨境财税专家结合您企业的实际情况出具可落地的合规方案。</div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">HS编码（海关编码）怎么查？<span class="faq-arrow">▼</span></button>
-          <div class="faq-answer"><div class="faq-answer-inner">您可以在"中国海关商品信息查询系统"（http://www.customs.gov.cn）输入产品名称查询对应的HS编码。填入HS编码后，系统会自动查询该商品的出口退税率，这是计算合规税负的重要依据。</div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">"无票免税"政策适用于所有跨境卖家吗？<span class="faq-arrow">▼</span></button>
-          <div class="faq-answer"><div class="faq-answer-inner">不适用。该政策仅适用于在跨境电商综合试验区内注册的企业，且需通过综试区线上综合服务平台登记商品信息，并按规定向主管税务机关办理免税申报。企业需注册在综试区内才可享受。</div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">欧洲VAT需要多少钱？必须注册吗？<span class="faq-arrow">▼</span></button>
-          <div class="faq-answer"><div class="faq-answer-inner">欧盟规定远程销售阈值一般为€10,000，超过该阈值或仓储在该国的卖家必须注册VAT。注册费用因国家而异，英国约£250-£400，德国约€300-€500。我们提供欧洲VAT注册申报服务，详见"财税服务"版块。</div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">9810和9610出口模式有什么区别？<span class="faq-arrow">▼</span></button>
-          <div class="faq-answer"><div class="faq-answer-inner">9810是跨境电商出口海外仓模式（B2B2C），适用于先备货至海外仓再销售；9610是跨境电商零售出口模式（B2C），适用于小包直邮消费者。两种模式的退税申报流程和凭证要求不同，系统会根据您选择的发货模式自动匹配对应方案。</div></div>
-        </div>
-        <div class="faq-item">
-          <button class="faq-question">什么是"自动化计算合规税负"？<span class="faq-arrow">▼</span></button>
-          <div class="faq-answer"><div class="faq-answer-inner">在AI生成方案后，您可以点击"进入合规税负计算"按钮，系统将基于方案中的关键参数（退税率、目的国税率、销售额等），自动计算您企业应缴纳的合规税负总额，涵盖出口退税、VAT、所得税等多税种联动测算，帮助您精准预估合规成本。</div></div>
+        <div class="faq-panel faq-section">
+          <h3>常见问题</h3>
+          <div class="faq-item">
+            <button class="faq-question">AI方案有法律效力吗？<span class="faq-arrow">▼</span></button>
+            <div class="faq-answer"><div class="faq-answer-inner">AI方案基于公开政策与行业经验，仅供参考。实施前建议预约专家1v1解读（¥2,999/小时），由资深专家结合企业实际出具可落地方案。</div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">HS编码怎么查？<span class="faq-arrow">▼</span></button>
+            <div class="faq-answer"><div class="faq-answer-inner">可在「中国海关商品信息查询系统」（http://www.customs.gov.cn）输入产品名称查询 HS 编码。填入后系统可查询出口退税率，用于税负测算。</div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">无票免税适用所有卖家吗？<span class="faq-arrow">▼</span></button>
+            <div class="faq-answer"><div class="faq-answer-inner">不适用。仅适用于综试区内注册企业，需通过综试区平台登记商品信息并办理免税申报。</div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">欧洲VAT必须注册吗？<span class="faq-arrow">▼</span></button>
+            <div class="faq-answer"><div class="faq-answer-inner">远程销售超€10,000阈值或仓储在该国的卖家通常须注册 VAT。英国约£250–£400，德国约€300–€500。</div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">9810和9610有何区别？<span class="faq-arrow">▼</span></button>
+            <div class="faq-answer"><div class="faq-answer-inner">9810 为海外仓模式（B2B2C），9610 为小包直邮（B2C）。退税申报流程与凭证要求不同，系统会按发货模式匹配方案。</div></div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question">合规税负如何计算？<span class="faq-arrow">▼</span></button>
+            <div class="faq-answer"><div class="faq-answer-inner">生成方案后可在下方「合规税负计算」模块，基于退税率、目的国税率、销售额等参数自动测算多税种联动税负。</div></div>
+          </div>
         </div>
       </div>
 
@@ -290,101 +294,6 @@
           <div class="tax-result-value" id="taxResult">—</div>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Expert Insights -->
-  <section class="section section-cream" id="expert">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-badge">Expert Insight</span>
-        <h2>专家解读</h2>
-        <p>跨境电商行业最新财税洞察</p>
-      </div>
-      <div class="articles-grid">
-        <article class="article-card">
-          <div class="article-date">2026-06-16</div>
-          <h4>境外架构阳光化大背景下，ODI如何选择？</h4>
-          <p>ODI备案是法定义务。国令第837号出台后境外投资监管升级，本文详解ODI备案流程、不做ODI的后果，以及服务贸易项下利润回流的合规替代方案。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/OgHxK1F-tHqbNAQfdmvv_g" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2026-05-11</div>
-          <h4>税局统一跨境电商处理口径：企业所得税按2%和4%核定征收？（下）</h4>
-          <p>2026年跨境电商企业该如何做好财税合规规划？守住风险底线，同步探索完全合规路径。涵盖倒逼供应商规范化、建立出口退税型供应链、完成利润回流闭环三大策略。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/YfOscUqbWXAkW6omMubgsg" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2026-04-24</div>
-          <h4>税局统一跨境电商处理口径：企业所得税按2%和4%核定征收？（上）</h4>
-          <p>2025年跨境电商企业所得税处理基本有定论：第三季度2%核定、第四季度4%核定。赛维模式是否还能继续？本文深度拆解两地税局实际执行口径。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/eioqN4deDTrUOaQSVPxehA" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2026-03-26</div>
-          <h4>自然人店铺vs.个体户店铺vs.公司店铺，怎么选？</h4>
-          <p>三种主体形式本质区别：法律性质、税务登记、增值税和所得税规则。120万以下个体户最优，120-500万公司店铺税负最低，2000万以上必须有限责任公司。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/uqyglDaAEo7XodHcfcxR1A" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2026-03-17</div>
-          <h4>自然人店铺怎么交税？</h4>
-          <p>经营所得汇算清缴截止3月31日！多平台开店必须合并收入，成本费用可以扣除，没做临时税务登记无法享受月10万增值税免税。一文讲清自然人电商如何合规交税。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/t81Ctnh9AIdCxflv8d8GFw" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2025-12-31</div>
-          <h4>跨境快递小包合规最优解：9610出口？</h4>
-          <p>9610是目前跨境快递小包合规的最优解，但在海关数据还原、税收优惠享受和物流成本上存在诸多卡点。本文呼吁平台、物流、海关和税局联合建设9610出口通道。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/ezhSEZCM8pGDsk4KijTCbw" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2025-12-22</div>
-          <h4>9810出口海外仓模式的困局</h4>
-          <p>9810出口海外仓为何推了五年少有企业使用？退税难是核心困局。虽然2025年明确'离境即退税'，但频现的骗税案例让地方税局望而却步。备货海外仓企业注册境外公司或是更优选择。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/rvfzxoBi89tXvZ4Tmw7PZw" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2025-12-15</div>
-          <h4>大部分企业并非'赛维模式'</h4>
-          <p>税局要求填写'是否赛维模式'，多数企业一头雾水。本文拆解赛维模式的股权架构和业务模式核心，指出每个企业应构建属于自己的合规模式，而非盲目套用模板。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/SYywIG86oEFgSHwdyL8-SQ" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-        <article class="article-card">
-          <div class="article-date">2025-12-08</div>
-          <h4>跨境电商财税合规无法一蹴而就</h4>
-          <p>强行要求跨境电商企业马上合规必然导致行业重创。供应链、关务物流等基础建设尚未完全准备好。本文分析各通关模式税收政策与难点，给出企业和税局的建议。</p>
-          <div class="article-meta">
-            <span>Cheryl CHEN</span>
-            <a href="https://mp.weixin.qq.com/s/1ekkrght5UuAtHT4OG_sFg" class="article-link" target="_blank" rel="noopener noreferrer">阅读原文</a>
-          </div>
-        </article>
-      </div>
-      <div class="view-all"><button type="button" class="btn-load-more" id="loadMoreArticles">查看更多</button></div>
     </div>
   </section>
 
@@ -535,6 +444,114 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Expert Insights -->
+  <section class="section section-cream" id="expert">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">Expert Insight</span>
+        <h2>专家解读</h2>
+        <p>跨境电商行业最新财税洞察</p>
+      </div>
+      <div class="articles-grid">
+        <article class="article-card" data-article-id="odi-architecture">
+          <div class="article-date">2026-06-16</div>
+          <h4><a href="/article.html?id=odi-architecture" class="article-title-link">境外架构阳光化大背景下，ODI如何选择？</a></h4>
+          <p>ODI备案是法定义务。国令第837号出台后境外投资监管升级，本文详解ODI备案流程、不做ODI的后果，以及服务贸易项下利润回流的合规替代方案。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=odi-architecture" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="cit-rate-part2">
+          <div class="article-date">2026-05-11</div>
+          <h4><a href="/article.html?id=cit-rate-part2" class="article-title-link">税局统一跨境电商处理口径：企业所得税按2%和4%核定征收？（下）</a></h4>
+          <p>2026年跨境电商企业该如何做好财税合规规划？守住风险底线，同步探索完全合规路径。涵盖倒逼供应商规范化、建立出口退税型供应链、完成利润回流闭环三大策略。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=cit-rate-part2" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="cit-rate-part1">
+          <div class="article-date">2026-04-24</div>
+          <h4><a href="/article.html?id=cit-rate-part1" class="article-title-link">税局统一跨境电商处理口径：企业所得税按2%和4%核定征收？（上）</a></h4>
+          <p>2025年跨境电商企业所得税处理基本有定论：第三季度2%核定、第四季度4%核定。赛维模式是否还能继续？本文深度拆解两地税局实际执行口径。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=cit-rate-part1" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="shop-type-comparison">
+          <div class="article-date">2026-03-26</div>
+          <h4><a href="/article.html?id=shop-type-comparison" class="article-title-link">自然人店铺vs.个体户店铺vs.公司店铺，怎么选？</a></h4>
+          <p>三种主体形式本质区别：法律性质、税务登记、增值税和所得税规则。120万以下个体户最优，120-500万公司店铺税负最低，2000万以上必须有限责任公司。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=shop-type-comparison" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="natural-person-tax">
+          <div class="article-date">2026-03-17</div>
+          <h4><a href="/article.html?id=natural-person-tax" class="article-title-link">自然人店铺怎么交税？</a></h4>
+          <p>经营所得汇算清缴截止3月31日！多平台开店必须合并收入，成本费用可以扣除，没做临时税务登记无法享受月10万增值税免税。一文讲清自然人电商如何合规交税。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=natural-person-tax" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="9610-export">
+          <div class="article-date">2025-12-31</div>
+          <h4><a href="/article.html?id=9610-export" class="article-title-link">跨境快递小包合规最优解：9610出口？</a></h4>
+          <p>9610是目前跨境快递小包合规的最优解，但在海关数据还原、税收优惠享受和物流成本上存在诸多卡点。本文呼吁平台、物流、海关和税局联合建设9610出口通道。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=9610-export" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="9810-warehouse">
+          <div class="article-date">2025-12-22</div>
+          <h4><a href="/article.html?id=9810-warehouse" class="article-title-link">9810出口海外仓模式的困局</a></h4>
+          <p>9810出口海外仓为何推了五年少有企业使用？退税难是核心困局。虽然2025年明确'离境即退税'，但频现的骗税案例让地方税局望而却步。备货海外仓企业注册境外公司或是更优选择。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=9810-warehouse" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="not-saiwei-mode">
+          <div class="article-date">2025-12-15</div>
+          <h4><a href="/article.html?id=not-saiwei-mode" class="article-title-link">大部分企业并非'赛维模式'</a></h4>
+          <p>税局要求填写'是否赛维模式'，多数企业一头雾水。本文拆解赛维模式的股权架构和业务模式核心，指出每个企业应构建属于自己的合规模式，而非盲目套用模板。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=not-saiwei-mode" class="article-link">阅读原文</a>
+          </div>
+        </article>
+        <article class="article-card" data-article-id="compliance-journey">
+          <div class="article-date">2025-12-08</div>
+          <h4><a href="/article.html?id=compliance-journey" class="article-title-link">跨境电商财税合规无法一蹴而就</a></h4>
+          <p>强行要求跨境电商企业马上合规必然导致行业重创。供应链、关务物流等基础建设尚未完全准备好。本文分析各通关模式税收政策与难点，给出企业和税局的建议。</p>
+          <div class="article-meta">
+            <span>Cheryl CHEN</span>
+            <a href="/article.html?id=compliance-journey" class="article-link">阅读原文</a>
+          </div>
+        </article>
+      </div>
+      <div class="view-all"><button type="button" class="btn-load-more" id="loadMoreArticles">查看更多</button></div>
+    </div>
+  </section>
+
+  <!-- Tax Systems -->
+  <section class="section section-white" id="tax-systems">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">Global Tax</span>
+        <h2>各地区税制介绍</h2>
+      </div>
+      <p class="tax-systems-disclaimer">贸易额数据来自海关总署2025年1—12月统计；税制要点供跨境合规参考，详细规则请查阅<a href="https://www.chinatax.gov.cn/chinatax/n810219/n810744/index.html" target="_blank" rel="noopener noreferrer">税路通官方专栏</a>最新版指南。</p>
+      <div class="tax-systems-grid" id="taxSystemsGrid"></div>
+      <div class="view-all"><button type="button" class="btn-load-more" id="loadMoreTaxSystems">查看更多</button></div>
     </div>
   </section>
 
@@ -809,6 +826,7 @@
           <div class="footer-links">
             <a href="#ai-solution">AI方案生成</a>
             <a href="#expert">专家解读</a>
+            <a href="#tax-systems">各地区税制</a>
             <a href="#services">服务交易</a>
             <a href="#hub">服务管理</a>
             <a href="#policy">政策速递</a>
@@ -838,7 +856,11 @@
     </div>
   </footer>
 
-  <script src="/js/config.js?v=20260708b"></script>
-  <script src="/js/main.js?v=20260708b"></script>
+  <script src="/js/locales/en.js?v=20260708j"></script>
+  <script src="/js/i18n.js?v=20260708f"></script>
+  <script src="/js/config.js?v=20260708f"></script>
+  <script src="/js/tax-systems.js?v=20260708f"></script>
+  <script src="/js/articles.js?v=20260708f"></script>
+  <script src="/js/main.js?v=20260708j"></script>
 </body>
 </html>

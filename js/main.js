@@ -1,8 +1,10 @@
 /* DAOITH Consulting - Main JavaScript */
 
 const PAGE_SIZE = 10;
+const TAX_SYSTEMS_PAGE_SIZE = 6;
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.DAOITH_initI18n) window.DAOITH_initI18n();
   initHeader();
   initNavigation();
   initMobileMenu();
@@ -16,7 +18,17 @@ document.addEventListener('DOMContentLoaded', () => {
   initWechatToggle();
   initFeedbackForm();
   initLoadMore();
+  initTaxSystemsGrid();
   initPolicyFilters();
+  updateExpertArticles();
+
+  window.addEventListener('localechange', () => {
+    initTaxSystemsGrid();
+    updateExpertArticles();
+    refreshPaginationLabels();
+    refreshShowMoreServicesLabel();
+    if (window.DAOITH_refreshPolicyPagination) window.DAOITH_refreshPolicyPagination();
+  });
 });
 
 /* Header scroll effect */
@@ -99,32 +111,80 @@ function initHeroFeatures() {
 }
 
 /* Paginated lists */
+function refreshPaginationLabels() {
+  document.querySelectorAll('.btn-load-more').forEach((btn) => {
+    if (btn.id === 'loadMoreArticles' && !btn.classList.contains('is-hidden')) {
+      btn.textContent = window.DAOITH_t('loadMore.articles');
+    }
+    if (btn.id === 'loadMoreTaxSystems' && !btn.classList.contains('is-hidden')) {
+      btn.textContent = window.DAOITH_t('loadMore.taxSystems');
+    }
+  });
+}
+
+function refreshShowMoreServicesLabel() {
+  const btn = document.getElementById('showMoreServices');
+  if (!btn) return;
+  const expanded = btn.dataset.expanded === 'true';
+  btn.textContent = expanded ? window.DAOITH_t('services.collapse') : window.DAOITH_t('services.showAll');
+}
+
+function updateExpertArticles() {
+  const locale = window.DAOITH_getLocale?.() || 'zh';
+  const enMap = window.DAOITH_I18N_EN?.articleTexts || {};
+  document.querySelectorAll('.article-card[data-article-id]').forEach((card) => {
+    const id = card.dataset.articleId;
+    const article = typeof window.getArticleById === 'function' ? window.getArticleById(id) : null;
+    const en = enMap[id];
+    const titleLink = card.querySelector('.article-title-link');
+    const excerpt = card.querySelector('p');
+    const readLink = card.querySelector('.article-link');
+    if (titleLink) {
+      titleLink.textContent = locale === 'en' && en?.title ? en.title : (article?.title || titleLink.textContent);
+    }
+    if (excerpt) {
+      excerpt.textContent = locale === 'en' && en?.excerpt ? en.excerpt : (article?.excerpt || excerpt.textContent);
+    }
+    if (readLink) readLink.textContent = window.DAOITH_t('article.readMore');
+  });
+}
+
 function initLoadMore() {
   setupPagination({
     itemsSelector: '#expert .article-card',
     buttonId: 'loadMoreArticles',
-    label: '篇文章',
+    labelKey: 'loadMore.articles',
   });
 }
 
-function setupPagination({ itemsSelector, buttonId, label, onUpdate }) {
+function setupPagination({ itemsSelector, buttonId, labelKey, label, onUpdate, pageSize = PAGE_SIZE }) {
   const items = Array.from(document.querySelectorAll(itemsSelector));
   const button = document.getElementById(buttonId);
   if (!items.length || !button) return;
 
-  let visibleCount = PAGE_SIZE;
+  let visibleCount = pageSize;
 
   function updateButton() {
     const shown = items.filter((item) => !item.classList.contains('is-paginated-hidden')).length;
     const matchable = items.filter((item) => item.style.display !== 'none').length;
     button.classList.toggle('is-hidden', shown >= items.length || matchable === 0);
     const remaining = items.length - shown;
-    button.textContent = remaining > 0 ? `查看更多（还有 ${Math.min(remaining, PAGE_SIZE)} ${label}）` : '查看更多';
+    if (labelKey === 'loadMore.articles' || labelKey === 'loadMore.taxSystems') {
+      button.textContent = window.DAOITH_t(labelKey);
+    } else if (labelKey) {
+      button.textContent = remaining > 0
+        ? window.DAOITH_t('loadMore.policiesRemaining').replace('{n}', String(Math.min(remaining, pageSize)))
+        : window.DAOITH_t('loadMore.policies');
+    } else {
+      button.textContent = remaining > 0
+        ? `查看更多（还有 ${Math.min(remaining, pageSize)} ${label}）`
+        : '查看更多';
+    }
   }
 
   function applyPagination() {
     let shown = 0;
-    items.forEach((item, index) => {
+    items.forEach((item) => {
       const filteredOut = item.style.display === 'none';
       if (filteredOut) return;
       shown += 1;
@@ -136,17 +196,17 @@ function setupPagination({ itemsSelector, buttonId, label, onUpdate }) {
 
   items.forEach((item, index) => {
     item.dataset.index = String(index);
-    if (index >= PAGE_SIZE) item.classList.add('is-paginated-hidden');
+    if (index >= pageSize) item.classList.add('is-paginated-hidden');
   });
 
-  button.addEventListener('click', () => {
-    visibleCount += PAGE_SIZE;
+  button.onclick = () => {
+    visibleCount += pageSize;
     items.forEach((item, index) => {
       if (index < visibleCount) item.classList.remove('is-paginated-hidden');
     });
     updateButton();
     onUpdate?.();
-  });
+  };
 
   updateButton();
   return { applyPagination, items, getVisibleCount: () => visibleCount };
@@ -485,11 +545,11 @@ function initAIForm() {
   queryBtn.addEventListener('click', async () => {
     const hsCode = document.getElementById('hsCode').value.trim();
     if (!hsCode) {
-      alert('请先输入HS编码');
+      alert(window.DAOITH_t('alert.hsCode'));
       return;
     }
 
-    setButtonLoading(queryBtn, true, '查询中…');
+    setButtonLoading(queryBtn, true, window.DAOITH_t('ai.querying'));
     try {
       const text = await callDifyHsRate(hsCode);
 
@@ -510,7 +570,7 @@ function initAIForm() {
 
     const ctx = getFormContext();
     if (!ctx.platform || !ctx.country) {
-      alert('请至少选择电商平台和目的国/地区');
+      alert(window.DAOITH_t('alert.platformCountry'));
       return;
     }
 
@@ -520,9 +580,9 @@ function initAIForm() {
 
     placeholder.style.display = 'none';
     content.classList.add('active');
-    items.innerHTML = '<div class="result-loading">道一 AI 正在生成专属合规方案…</div>';
+    items.innerHTML = `<div class="result-loading">${window.DAOITH_t('ai.loading')}</div>`;
 
-    setButtonLoading(submitBtn, true, '生成中…');
+    setButtonLoading(submitBtn, true, window.DAOITH_t('ai.generating'));
 
     try {
       const text = await callDifyDiagnosis(ctx);
@@ -548,8 +608,8 @@ function initTaxCalculator() {
     const inputTax = parseFloat(document.getElementById('taxInput').value) || 0;
     const resultEl = document.getElementById('taxResult');
 
-    resultEl.textContent = '计算中…';
-    setButtonLoading(calcBtn, true, '计算中…');
+    resultEl.textContent = window.DAOITH_t('tax.calcLoading');
+    setButtonLoading(calcBtn, true, window.DAOITH_t('tax.calcLoading'));
 
     const params = { revenue, refundRate, vatRate, incomeRate, inputTax };
 
@@ -578,7 +638,7 @@ function initTaxCalculator() {
       const total = netVAT + foreignVAT + incomeTax;
 
       resultEl.textContent = `¥${total.toFixed(2)} 万元/年`;
-      alert(`道一 AI 暂不可用，已使用本地公式估算：${err.message}`);
+      alert(`${window.DAOITH_t('tax.fallback')}${err.message}`);
     } finally {
       setButtonLoading(calcBtn, false);
     }
@@ -632,7 +692,8 @@ function initShowMoreServices() {
       });
     }
 
-    btn.textContent = expanded ? '收起服务列表 ↑' : '查看全部 12 个服务 ↓';
+    btn.textContent = expanded ? window.DAOITH_t('services.collapse') : window.DAOITH_t('services.showAll');
+    btn.dataset.expanded = expanded ? 'true' : 'false';
   });
 }
 
@@ -657,7 +718,7 @@ function initWechatToggle() {
   toggle.addEventListener('click', () => {
     toggle.classList.toggle('active');
     const on = toggle.classList.contains('active');
-    if (on) alert('微信通知已开启（演示模式）');
+    if (on) alert(window.DAOITH_t('alert.wechatOn'));
   });
 }
 
@@ -676,11 +737,53 @@ function initFeedbackForm() {
   submitBtn.addEventListener('click', () => {
     const text = document.getElementById('feedbackText').value.trim();
     if (!text) {
-      alert('请输入内容');
+      alert(window.DAOITH_t('alert.feedbackEmpty'));
       return;
     }
-    alert('感谢您的反馈，我们会尽快处理！');
+    alert(window.DAOITH_t('alert.feedbackThanks'));
     document.getElementById('feedbackText').value = '';
+  });
+}
+
+/* Tax Systems Grid */
+function initTaxSystemsGrid() {
+  const grid = document.getElementById('taxSystemsGrid');
+  const systems = window.DAOITH_TAX_SYSTEMS;
+  if (!grid || !Array.isArray(systems)) return;
+
+  const locale = window.DAOITH_getLocale?.() || 'zh';
+  const tradeUnit = locale === 'en' ? 'USD bn' : '亿美元';
+  const tradePrefix = window.DAOITH_t('tax.trade');
+
+  grid.innerHTML = systems.map((c) => {
+    const name = locale === 'en' ? (c.nameEn || c.name) : c.name;
+    const summary = locale === 'en'
+      ? (window.DAOITH_I18N_EN?.taxSummaries?.[c.id] || c.summary)
+      : c.summary;
+    const mainTax = c.taxes?.[0];
+    const mainTaxLabel = mainTax
+      ? `${locale === 'en' ? (mainTax.labelEn || mainTax.label) : mainTax.label} ${mainTax.value.split('（')[0].split('(')[0]}`
+      : '';
+    return `
+      <article class="tax-system-card">
+        <div class="tax-system-card-head">
+          <span class="tax-system-rank">#${c.rank}</span>
+          <span class="tax-system-flag" aria-hidden="true">${c.flag}</span>
+        </div>
+        <h4><a href="/tax-system.html?id=${encodeURIComponent(c.id)}" class="tax-system-title-link">${name}</a></h4>
+        <p class="tax-system-trade">${tradePrefix} ${c.trade2025} ${tradeUnit}</p>
+        <p class="tax-system-summary">${summary}</p>
+        ${mainTaxLabel ? `<p class="tax-system-highlight">${mainTaxLabel}</p>` : ''}
+        <a href="/tax-system.html?id=${encodeURIComponent(c.id)}" class="article-link">${window.DAOITH_t('tax.viewDetail')}</a>
+      </article>
+    `;
+  }).join('');
+
+  setupPagination({
+    itemsSelector: '#tax-systems .tax-system-card',
+    buttonId: 'loadMoreTaxSystems',
+    labelKey: 'loadMore.taxSystems',
+    pageSize: TAX_SYSTEMS_PAGE_SIZE,
   });
 }
 
@@ -718,10 +821,12 @@ function initPolicyFilters() {
       const remaining = matched.length - Math.min(visibleCount, matched.length);
       loadBtn.classList.toggle('is-hidden', remaining <= 0 || matched.length === 0);
       loadBtn.textContent = remaining > 0
-        ? `查看更多（还有 ${Math.min(remaining, PAGE_SIZE)} 条政策）`
-        : '查看更多';
+        ? window.DAOITH_t('loadMore.policiesRemaining').replace('{n}', String(Math.min(remaining, PAGE_SIZE)))
+        : window.DAOITH_t('loadMore.policies');
     }
   }
+
+  window.DAOITH_refreshPolicyPagination = filterPolicies;
 
   document.querySelectorAll('#regionChips .chip').forEach((chip) => {
     chip.addEventListener('click', () => {
