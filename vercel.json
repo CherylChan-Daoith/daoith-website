@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "name": "daoith-website",
+  "rewrites": [
+    { "source": "/api/deepseek", "destination": "/api/deepseek" },
+    { "source": "/api/health", "destination": "/api/health" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ]
+}

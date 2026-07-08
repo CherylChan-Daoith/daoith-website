@@ -1,0 +1,17 @@
+[Unit]
+Description=DAOITH Website API (DeepSeek proxy)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/daoith-website
+EnvironmentFile=/var/www/daoith-website/.env
+Environment=PORT=8787
+ExecStart=/usr/bin/python3 /var/www/daoith-website/server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
