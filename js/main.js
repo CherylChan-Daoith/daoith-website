@@ -165,47 +165,159 @@ function initFAQ() {
   });
 }
 
-/* DeepSeek API */
-async function callDeepSeek(messages, options = {}) {
-  let res;
-  try {
-    res = await fetch('/api/deepseek', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages,
-        temperature: options.temperature ?? 0.3,
-        max_tokens: options.max_tokens ?? 2000,
-      }),
-    });
-  } catch {
-    throw new Error('无法连接 AI 服务。请确认已运行 python3 server.py，并访问 http://localhost:8080');
+/* Dify API (api.daoith.com) — no API keys in frontend */
+function getDifyUserId() {
+  const key = 'daoith_dify_user_id';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = `web-${crypto.randomUUID()}`;
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+function getDifyConfig() {
+  return window.DAOITH_CONFIG || {
+    difyApiBase: 'https://api.daoith.com',
+    difyEndpoint: '/v1/chat-messages',
+    difyDiagnosisEndpoint: '/v1/chat-messages',
+    difyHsRateEndpoint: '/v1/chat-messages',
+    difyTaxCalcEndpoint: '/v1/chat-messages',
+  };
+}
+
+function buildDifyInputs(ctx) {
+  return {
+    task: 'compliance_diagnosis',
+    platform: ctx.platformLabel,
+    country: ctx.countryLabel,
+    hs_code: ctx.hsCode || '',
+    revenue: ctx.revenueLabel,
+    team_size: ctx.teamSizeLabel,
+    invoice: ctx.invoiceLabel,
+    shipping_mode: ctx.shippingLabel,
+    notes: ctx.notes || '',
+  };
+}
+
+function extractDifyAnswer(data) {
+  if (typeof data.answer === 'string' && data.answer.trim()) {
+    return data.answer.trim();
   }
 
-  const contentType = res.headers.get('content-type') || '';
+  const outputs = data.data?.outputs;
+  if (outputs) {
+    if (typeof outputs === 'string' && outputs.trim()) return outputs.trim();
+    const keys = ['text', 'result', 'answer', 'output', 'report'];
+    for (const key of keys) {
+      if (typeof outputs[key] === 'string' && outputs[key].trim()) {
+        return outputs[key].trim();
+      }
+    }
+  }
+
+  if (typeof data.message === 'string' && data.message.trim()) {
+    return data.message.trim();
+  }
+
+  return '';
+}
+
+async function callDify({ endpoint, inputs, query }) {
+  const cfg = getDifyConfig();
+  const path = endpoint || cfg.difyEndpoint || '/v1/chat-messages';
+  const url = `${cfg.difyApiBase}${path}`;
+
+  const payload = {
+    inputs,
+    query,
+    response_mode: 'blocking',
+    user: getDifyUserId(),
+  };
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error('无法连接道一 AI 服务（api.daoith.com），请检查网络或稍后重试');
+  }
+
   let data;
-  if (contentType.includes('application/json')) {
+  try {
     data = await res.json();
-  } else {
-    throw new Error(
-      res.status === 404
-        ? 'AI 接口不可用。请用 python3 server.py 启动（不要用 python3 -m http.server）'
-        : `AI 服务返回异常（HTTP ${res.status}）`
-    );
+  } catch {
+    throw new Error(`AI 服务返回异常（HTTP ${res.status}）`);
   }
 
   if (!res.ok) {
-    const hint = data.hint ? `\n${data.hint}` : '';
-    const detail = data.detail ? `\n${typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail)}` : '';
-    throw new Error((data.error || 'AI 服务请求失败') + hint + detail);
+    const msg = data.message || data.error || data.code || `请求失败（HTTP ${res.status}）`;
+    throw new Error(msg);
   }
 
-  const text = data.choices?.[0]?.message?.content?.trim();
+  const text = extractDifyAnswer(data);
   if (!text) {
-    throw new Error('AI 返回内容为空，请稍后重试');
+    throw new Error('AI 返回内容为空，请检查 Dify 应用输出配置');
   }
 
   return text;
+}
+
+function callDifyDiagnosis(ctx) {
+  const { difyDiagnosisEndpoint } = getDifyConfig();
+  return callDify({
+    endpoint: difyDiagnosisEndpoint,
+    inputs: buildDifyInputs(ctx),
+    query: buildSolutionPrompt(ctx),
+  });
+}
+
+function callDifyHsRate(hsCode) {
+  const { difyHsRateEndpoint } = getDifyConfig();
+  return callDify({
+    endpoint: difyHsRateEndpoint,
+    inputs: {
+      task: 'hs_refund_rate',
+      hs_code: hsCode,
+    },
+    query: `请查询海关编码 ${hsCode} 的出口退税率，仅返回一行：退税率：X%（简要说明，不超过40字）`,
+  });
+}
+
+function buildTaxCalcPrompt(params) {
+  return `你是跨境财税专家。根据以下参数估算年度合规税负（单位：万元人民币），给出总额和分项。
+
+年出口销售额：${params.revenue} 万元
+出口退税率：${params.refundRate}%
+目的国VAT税率：${params.vatRate}%
+企业所得税率：${params.incomeRate}%
+进项税额：${params.inputTax} 万元
+
+请按以下格式回复（数字保留两位小数）：
+年度合规税负总额：X 万元/年
+国内增值税净额：X 万元
+海外VAT预估：X 万元
+企业所得税：X 万元
+测算说明：（2-3句简要说明假设）`;
+}
+
+function callDifyTaxCalc(params) {
+  const { difyTaxCalcEndpoint } = getDifyConfig();
+  return callDify({
+    endpoint: difyTaxCalcEndpoint,
+    inputs: {
+      task: 'tax_calculation',
+      annual_revenue: String(params.revenue),
+      refund_rate: String(params.refundRate),
+      vat_rate: String(params.vatRate),
+      income_tax_rate: String(params.incomeRate),
+      input_tax: String(params.inputTax),
+    },
+    query: buildTaxCalcPrompt(params),
+  });
 }
 
 function setButtonLoading(btn, loading, loadingText) {
@@ -379,13 +491,7 @@ function initAIForm() {
 
     setButtonLoading(queryBtn, true, '查询中…');
     try {
-      const text = await callDeepSeek([
-        {
-          role: 'system',
-          content: '你是中国出口退税与海关商品归类专家。根据HS编码给出出口退税率估计，仅返回一行格式：退税率：X%（简要说明，不超过40字）',
-        },
-        { role: 'user', content: `HS编码：${hsCode}` },
-      ], { max_tokens: 200 });
+      const text = await callDifyHsRate(hsCode);
 
       const rateMatch = text.match(/([\d.]+)\s*%/);
       if (rateMatch) {
@@ -414,21 +520,12 @@ function initAIForm() {
 
     placeholder.style.display = 'none';
     content.classList.add('active');
-    items.innerHTML = '<div class="result-loading">DeepSeek 正在生成专属合规方案…</div>';
+    items.innerHTML = '<div class="result-loading">道一 AI 正在生成专属合规方案…</div>';
 
     setButtonLoading(submitBtn, true, '生成中…');
 
-    const userPrompt = buildSolutionPrompt(ctx);
-
     try {
-      const text = await callDeepSeek([
-        {
-          role: 'system',
-          content: '你是道一跨境咨询 DAOITH 的创始级跨境财税专家，拥有15年德勤及跨境电商上市集团实务经验。你的方案须专业、具体、可执行，像给客户的正式咨询备忘录，而非简单要点列表。',
-        },
-        { role: 'user', content: userPrompt },
-      ], { max_tokens: 4096, temperature: 0.4 });
-
+      const text = await callDifyDiagnosis(ctx);
       items.innerHTML = `<div class="result-body">${renderAIPlanHtml(text)}</div>`;
     } catch (err) {
       items.innerHTML = `<div class="result-error"><strong>生成失败：</strong>${err.message}</div>`;
@@ -454,29 +551,10 @@ function initTaxCalculator() {
     resultEl.textContent = '计算中…';
     setButtonLoading(calcBtn, true, '计算中…');
 
-    const prompt = `你是跨境财税专家。根据以下参数估算年度合规税负（单位：万元人民币），给出总额和分项。
-
-年出口销售额：${revenue} 万元
-出口退税率：${refundRate}%
-目的国VAT税率：${vatRate}%
-企业所得税率：${incomeRate}%
-进项税额：${inputTax} 万元
-
-请按以下格式回复（数字保留两位小数）：
-年度合规税负总额：X 万元/年
-国内增值税净额：X 万元
-海外VAT预估：X 万元
-企业所得税：X 万元
-测算说明：（2-3句简要说明假设）`;
+    const params = { revenue, refundRate, vatRate, incomeRate, inputTax };
 
     try {
-      const text = await callDeepSeek([
-        {
-          role: 'system',
-          content: '你是跨境电商税负测算专家。基于常见假设进行测算，结果仅供参考。',
-        },
-        { role: 'user', content: prompt },
-      ], { max_tokens: 600 });
+      const text = await callDifyTaxCalc(params);
 
       const totalMatch = text.match(/年度合规税负总额[：:]\s*([¥￥]?[\d,.]+)\s*万元/);
       resultEl.textContent = totalMatch ? `¥${totalMatch[1].replace(/[¥￥]/g, '')} 万元/年` : text.split('\n')[0];
@@ -500,7 +578,7 @@ function initTaxCalculator() {
       const total = netVAT + foreignVAT + incomeTax;
 
       resultEl.textContent = `¥${total.toFixed(2)} 万元/年`;
-      alert(`AI 计算不可用，已使用本地公式估算：${err.message}`);
+      alert(`道一 AI 暂不可用，已使用本地公式估算：${err.message}`);
     } finally {
       setButtonLoading(calcBtn, false);
     }
