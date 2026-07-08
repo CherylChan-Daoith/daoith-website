@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initFeedbackForm();
   initLoadMore();
   initTaxSystemsGrid();
-  initPolicyFilters();
   updateExpertArticles();
 
   window.addEventListener('localechange', () => {
@@ -27,7 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateExpertArticles();
     refreshPaginationLabels();
     refreshShowMoreServicesLabel();
-    if (window.DAOITH_refreshPolicyPagination) window.DAOITH_refreshPolicyPagination();
   });
 });
 
@@ -119,6 +117,9 @@ function refreshPaginationLabels() {
     if (btn.id === 'loadMoreTaxSystems' && !btn.classList.contains('is-hidden')) {
       btn.textContent = window.DAOITH_t('loadMore.taxSystems');
     }
+    if (btn.id === 'loadMoreTaxPolicies' && !btn.classList.contains('is-hidden')) {
+      btn.textContent = window.DAOITH_t('loadMore.taxPolicies');
+    }
   });
 }
 
@@ -151,9 +152,15 @@ function updateExpertArticles() {
 
 function initLoadMore() {
   setupPagination({
-    itemsSelector: '#expert .article-card',
+    itemsSelector: '#policy-expert .article-card',
     buttonId: 'loadMoreArticles',
     labelKey: 'loadMore.articles',
+  });
+  setupPagination({
+    itemsSelector: '#policyTaxList .policy-item',
+    buttonId: 'loadMoreTaxPolicies',
+    labelKey: 'loadMore.taxPolicies',
+    pageSize: 6,
   });
 }
 
@@ -169,7 +176,7 @@ function setupPagination({ itemsSelector, buttonId, labelKey, label, onUpdate, p
     const matchable = items.filter((item) => item.style.display !== 'none').length;
     button.classList.toggle('is-hidden', shown >= items.length || matchable === 0);
     const remaining = items.length - shown;
-    if (labelKey === 'loadMore.articles' || labelKey === 'loadMore.taxSystems') {
+    if (labelKey === 'loadMore.articles' || labelKey === 'loadMore.taxSystems' || labelKey === 'loadMore.taxPolicies') {
       button.textContent = window.DAOITH_t(labelKey);
     } else if (labelKey) {
       button.textContent = remaining > 0
@@ -787,79 +794,4 @@ function initTaxSystemsGrid() {
   });
 }
 
-/* Policy Filters */
-function initPolicyFilters() {
-  let activeRegion = 'all';
-  let activeSource = 'all';
-  let searchTerm = '';
-
-  const items = Array.from(document.querySelectorAll('.policy-item'));
-  const loadBtn = document.getElementById('loadMorePolicies');
-  let visibleCount = PAGE_SIZE;
-
-  function filterPolicies() {
-    const matched = items.filter((item) => {
-      const matchRegion = activeRegion === 'all' || item.dataset.region === activeRegion;
-      const matchSource = activeSource === 'all' || item.dataset.source === activeSource;
-      const matchSearch = !searchTerm || item.textContent.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchRegion && matchSource && matchSearch;
-    });
-
-    items.forEach((item) => {
-      item.style.display = 'none';
-      item.classList.add('is-paginated-hidden');
-    });
-
-    matched.forEach((item, index) => {
-      if (index < visibleCount) {
-        item.style.display = '';
-        item.classList.remove('is-paginated-hidden');
-      }
-    });
-
-    if (loadBtn) {
-      const remaining = matched.length - Math.min(visibleCount, matched.length);
-      loadBtn.classList.toggle('is-hidden', remaining <= 0 || matched.length === 0);
-      loadBtn.textContent = remaining > 0
-        ? window.DAOITH_t('loadMore.policiesRemaining').replace('{n}', String(Math.min(remaining, PAGE_SIZE)))
-        : window.DAOITH_t('loadMore.policies');
-    }
-  }
-
-  window.DAOITH_refreshPolicyPagination = filterPolicies;
-
-  document.querySelectorAll('#regionChips .chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('#regionChips .chip').forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      activeRegion = chip.dataset.region;
-      visibleCount = PAGE_SIZE;
-      filterPolicies();
-    });
-  });
-
-  document.querySelectorAll('#sourceChips .chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('#sourceChips .chip').forEach((c) => c.classList.remove('active'));
-      chip.classList.add('active');
-      activeSource = chip.dataset.source;
-      visibleCount = PAGE_SIZE;
-      filterPolicies();
-    });
-  });
-
-  document.getElementById('policySearch').addEventListener('input', (e) => {
-    searchTerm = e.target.value;
-    visibleCount = PAGE_SIZE;
-    filterPolicies();
-  });
-
-  if (loadBtn) {
-    loadBtn.addEventListener('click', () => {
-      visibleCount += PAGE_SIZE;
-      filterPolicies();
-    });
-  }
-
-  filterPolicies();
-}
+/* Policy Filters - removed; policy section uses three static blocks */

@@ -142,7 +142,6 @@
     const phKeys = [
       ['#hsCode', 'form.hsPlaceholder'],
       ['#notes', 'form.notesPlaceholder'],
-      ['#policySearch', 'policy.searchPlaceholder'],
       ['#feedbackText', 'feedback.placeholder'],
     ];
     phKeys.forEach(([sel, key]) => {
@@ -157,9 +156,26 @@
     const en = window.DAOITH_I18N_EN;
     if (!en) return;
 
-    if (en.policies) {
-      document.querySelectorAll('.policy-item').forEach((item, i) => {
-        const p = en.policies[i];
+    if (en.taxPolicies) {
+      document.querySelectorAll('#policyTaxList .policy-item').forEach((item, i) => {
+        const p = en.taxPolicies[i];
+        if (!p) return;
+        const h4 = item.querySelector('h4');
+        const sum = item.querySelector('.policy-summary');
+        if (h4) {
+          captureOriginal(h4, false);
+          setText(h4, locale === 'en' ? p.title : originalText.get(h4), false);
+        }
+        if (sum) {
+          captureOriginal(sum, false);
+          setText(sum, locale === 'en' ? p.summary : originalText.get(sum), false);
+        }
+      });
+    }
+
+    if (en.platformPolicies) {
+      document.querySelectorAll('#policyPlatformList .policy-item').forEach((item, i) => {
+        const p = en.platformPolicies[i];
         if (!p) return;
         const h4 = item.querySelector('h4');
         const sum = item.querySelector('.policy-summary');

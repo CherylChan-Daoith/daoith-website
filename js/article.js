@@ -49,7 +49,7 @@
       </header>
       <div class="article-view-body">${sections}</div>
       <footer class="article-view-footer">
-        <a href="/#expert" class="btn btn-outline btn-sm">${window.DAOITH_t('article.back')}</a>
+        <a href="/#policy-expert" class="btn btn-outline btn-sm">${window.DAOITH_t('article.back')}</a>
         <a href="/#ai-solution" class="btn btn-primary btn-sm">${window.DAOITH_t('article.ctaPlan')}</a>
       </footer>
     `;
