@@ -125,8 +125,17 @@
         let textSpan = label.querySelector('.radio-text');
         if (!textSpan) {
           const raw = label.textContent.trim();
+          const mark = label.querySelector('.radio-mark');
           label.textContent = '';
           label.appendChild(input);
+          if (mark) {
+            label.appendChild(mark);
+          } else {
+            const newMark = document.createElement('span');
+            newMark.className = 'radio-mark';
+            newMark.setAttribute('aria-hidden', 'true');
+            label.appendChild(newMark);
+          }
           textSpan = document.createElement('span');
           textSpan.className = 'radio-text';
           textSpan.textContent = raw;

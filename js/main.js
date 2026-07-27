@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateExpertArticles();
     refreshPaginationLabels();
     refreshShowMoreServicesLabel();
+    syncRadioCheckedClasses(document.getElementById('aiForm'));
   });
 });
 
@@ -613,7 +614,26 @@ function extractRatePercent(text) {
 function syncRadioCheckedClasses(root = document) {
   root.querySelectorAll('.radio-item').forEach((item) => {
     const input = item.querySelector('input[type="radio"]');
-    item.classList.toggle('is-checked', !!(input && input.checked));
+    const checked = !!(input && input.checked);
+    item.classList.toggle('is-checked', checked);
+    item.setAttribute('data-checked', checked ? 'true' : 'false');
+  });
+}
+
+function initShippingRadios(form) {
+  if (!form) return;
+  const group = form.querySelector('.radio-group');
+  if (!group) return;
+
+  syncRadioCheckedClasses(form);
+
+  group.addEventListener('click', () => {
+    window.requestAnimationFrame(() => syncRadioCheckedClasses(form));
+  });
+
+  form.querySelectorAll('input[name="shipping"]').forEach((input) => {
+    input.addEventListener('change', () => syncRadioCheckedClasses(form));
+    input.addEventListener('input', () => syncRadioCheckedClasses(form));
   });
 }
 
@@ -624,9 +644,7 @@ function initAIForm() {
   const submitBtn = form.querySelector('button[type="submit"]');
 
   syncRadioCheckedClasses(form);
-  form.querySelectorAll('input[name="shipping"]').forEach((input) => {
-    input.addEventListener('change', () => syncRadioCheckedClasses(form));
-  });
+  initShippingRadios(form);
   queryBtn.addEventListener('click', async () => {
     const hsCode = document.getElementById('hsCode').value.trim();
     if (!hsCode) {
