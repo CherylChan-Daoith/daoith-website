@@ -150,8 +150,9 @@ ul {
   gap: 0;
 }
 
-.nav a {
-  padding: 8px 16px;
+.nav > a,
+.nav-dropdown-trigger {
+  padding: 8px 14px;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-secondary);
@@ -159,22 +160,93 @@ ul {
   transition: color var(--transition);
   white-space: nowrap;
   position: relative;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.nav a:hover,
-.nav a.active {
+.nav > a:hover,
+.nav > a.active,
+.nav-dropdown-trigger:hover,
+.nav-dropdown.open .nav-dropdown-trigger,
+.nav-dropdown-trigger.active {
   color: var(--ink);
   background: transparent;
 }
 
-.nav a.active::after {
+.nav > a.active::after,
+.nav-dropdown-trigger.active::after {
   content: "";
   position: absolute;
-  left: 16px;
-  right: 16px;
+  left: 14px;
+  right: 14px;
   bottom: 4px;
   height: 2px;
   background: var(--accent);
+}
+
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown-caret {
+  flex-shrink: 0;
+  transition: transform var(--transition);
+}
+
+.nav-dropdown.open .nav-dropdown-caret {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  padding: 8px 0;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 1100;
+}
+
+.nav-dropdown.open .nav-dropdown-menu {
+  display: block;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav-dropdown:hover .nav-dropdown-menu {
+    display: block;
+  }
+
+  .nav-dropdown:hover .nav-dropdown-caret {
+    transform: rotate(180deg);
+  }
+}
+
+.nav-dropdown-menu a {
+  display: block;
+  padding: 10px 16px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.nav-dropdown-menu a:hover,
+.nav-dropdown-menu a.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nav-dropdown-menu a.active::after {
+  display: none;
 }
 
 .lang-switcher {
@@ -3236,6 +3308,36 @@ body.modal-open {
 
   .nav.open {
     display: flex;
+  }
+
+  .nav-dropdown {
+    width: 100%;
+  }
+
+  .nav-dropdown-trigger {
+    width: 100%;
+    justify-content: space-between;
+    padding: 12px 8px;
+  }
+
+  .nav-dropdown-menu {
+    position: static;
+    display: none;
+    min-width: 0;
+    width: 100%;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    padding: 0 0 8px 12px;
+    background: transparent;
+  }
+
+  .nav-dropdown.open .nav-dropdown-menu {
+    display: block;
+  }
+
+  .nav-dropdown-menu a {
+    padding: 10px 8px;
   }
 
   .header .btn-primary,

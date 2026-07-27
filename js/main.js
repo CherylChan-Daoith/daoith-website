@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeader();
   initNavigation();
   initMobileMenu();
+  initNavDropdown();
   initHeroFeatures();
   initFAQ();
   initAIForm();
@@ -56,15 +57,21 @@ function initHeader() {
 /* Active nav link on scroll */
 function initNavigation() {
   const sections = document.querySelectorAll('section[id]');
-  const navLinks = document.querySelectorAll('.nav a');
+  const navLinks = document.querySelectorAll('.nav > a[href^="#"], .nav-dropdown-menu a[href^="#"]');
+  const policyTrigger = document.querySelector('.nav-dropdown-trigger[data-nav-parent="policy"]');
+  const policyIds = new Set(['policy', 'tax-systems', 'policy-expert', 'policy-tax', 'policy-platform']);
 
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
+          const id = entry.target.id;
           navLinks.forEach((link) => {
-            link.classList.toggle('active', link.getAttribute('href') === `#${entry.target.id}`);
+            link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
           });
+          if (policyTrigger) {
+            policyTrigger.classList.toggle('active', policyIds.has(id));
+          }
         }
       });
     },
@@ -72,19 +79,63 @@ function initNavigation() {
   );
 
   sections.forEach((section) => observer.observe(section));
+
+  // Also observe in-page policy blocks for submenu highlighting
+  ['tax-systems', 'policy-expert', 'policy-tax', 'policy-platform'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
 }
 
 /* Mobile menu */
 function initMobileMenu() {
   const toggle = document.getElementById('mobileToggle');
   const nav = document.getElementById('nav');
+  if (!toggle || !nav) return;
 
   toggle.addEventListener('click', () => {
     nav.classList.toggle('open');
   });
 
-  nav.querySelectorAll('a').forEach((link) => {
-    link.addEventListener('click', () => nav.classList.remove('open'));
+  nav.querySelectorAll('a[href^="#"]').forEach((link) => {
+    link.addEventListener('click', () => {
+      nav.classList.remove('open');
+      document.querySelectorAll('.nav-dropdown.open').forEach((d) => {
+        d.classList.remove('open');
+        d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+      });
+    });
+  });
+}
+
+function initNavDropdown() {
+  const dropdowns = document.querySelectorAll('.nav-dropdown');
+  if (!dropdowns.length) return;
+
+  dropdowns.forEach((dropdown) => {
+    const trigger = dropdown.querySelector('.nav-dropdown-trigger');
+    if (!trigger) return;
+
+    trigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      const willOpen = !dropdown.classList.contains('open');
+      document.querySelectorAll('.nav-dropdown.open').forEach((d) => {
+        if (d !== dropdown) {
+          d.classList.remove('open');
+          d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+        }
+      });
+      dropdown.classList.toggle('open', willOpen);
+      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('.nav-dropdown')) return;
+    document.querySelectorAll('.nav-dropdown.open').forEach((d) => {
+      d.classList.remove('open');
+      d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+    });
   });
 }
 
