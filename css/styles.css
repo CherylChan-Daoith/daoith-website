@@ -2561,16 +2561,20 @@ body.modal-open {
 
 /* ===== POLICY ===== */
 .policy-block {
-  margin-bottom: 36px;
-}
-
-.policy-block:last-of-type {
   margin-bottom: 28px;
 }
 
+.policy-block:last-of-type {
+  margin-bottom: 20px;
+}
+
+.policy-block .view-all {
+  margin-top: 16px;
+}
+
 .policy-block-header {
-  margin-bottom: 14px;
-  padding-bottom: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--border-light);
 }
 
@@ -2706,10 +2710,10 @@ body.modal-open {
 }
 
 .policy-item .meta {
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -3046,6 +3050,10 @@ body.modal-open {
 }
 
 @media (max-width: 1024px) {
+  .articles-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .ai-grid {
     grid-template-columns: 1fr;
   }
