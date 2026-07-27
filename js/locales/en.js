@@ -59,6 +59,7 @@ window.DAOITH_I18N_EN = {
     'loadMore.policiesRemaining': 'Load more ({n} more policies)',
     'services.showAll': 'View all 12 services ↓',
     'services.collapse': 'Collapse list ↑',
+    'nav.cart': 'Cart',
     'tax.viewDetail': 'View tax profile',
     'tax.trade': '2025 trade volume',
     'article.readMore': 'Read article',
@@ -179,7 +180,6 @@ window.DAOITH_I18N_EN = {
     '#services .section-header p': {
       text: 'Verified cross-border tax services — transparent pricing; add to cart and request a preferential quote.',
     },
-    '.cart-link-text': { text: 'Cart' },
     '.filter-btn[data-filter="all"]': { text: 'All' },
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
     '.filter-btn[data-filter="domestic"]': { text: 'China Compliance' },
