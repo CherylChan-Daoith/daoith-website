@@ -808,6 +808,10 @@ function initAIForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    if (!window.DAOITH_AUTH?.requireLogin?.('ai-generate', '/#ai-solution')) {
+      return;
+    }
+
     const ctx = getFormContext();
     if (!ctx.platform || !ctx.entity || !ctx.country) {
       alert(window.DAOITH_t('alert.platformCountry'));
@@ -856,6 +860,10 @@ function initTaxCalculator() {
   });
 
   calcBtn.addEventListener('click', async () => {
+    if (!window.DAOITH_AUTH?.requireLogin?.('tax-calc', '/#ai-solution')) {
+      return;
+    }
+
     const revenue = parseFloat(document.getElementById('taxRevenue').value) || 0;
     const refundRate = parseFloat(document.getElementById('taxRefund').value) || 0;
     const productCostRate = parseFloat(document.getElementById('taxProductCostRate').value) || 0;

@@ -4,6 +4,8 @@
   const USER_KEY = 'daoith_auth_user';
   const STATE_KEY = 'daoith_wechat_oauth_state';
   const RETURN_KEY = 'daoith_wechat_return_url';
+  const PENDING_KEY = 'daoith_pending_action';
+  const FORM_STATE_KEY = 'daoith_pending_form_state';
 
   const DEFAULT_CONFIG = {
     wechatAppId: 'wx_placeholder_app_id',
@@ -54,11 +56,68 @@
     return window.DAOITH_t?.(key) || key;
   }
 
+  function isLoggedIn() {
+    return Boolean(getToken() && getUser());
+  }
+
+  function saveFormState() {
+    const ids = [
+      'platform', 'entity', 'country', 'hsCode', 'revenue', 'teamSize', 'invoice', 'shipping', 'notes',
+      'taxRevenue', 'taxRefund', 'taxEntity', 'taxEntityCountry', 'taxIncome',
+      'taxProductCostRate', 'taxMarketingRate', 'taxShippingRate', 'taxStaffRate', 'taxOtherRate',
+      'taxCifPrice', 'taxDutyRate', 'taxVat',
+    ];
+    const state = {};
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) state[id] = el.value;
+    });
+    sessionStorage.setItem(FORM_STATE_KEY, JSON.stringify(state));
+  }
+
+  function restoreFormState() {
+    const raw = sessionStorage.getItem(FORM_STATE_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(FORM_STATE_KEY);
+    try {
+      const state = JSON.parse(raw);
+      Object.entries(state).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.value = value;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function requireLogin(action, returnUrl) {
+    if (isLoggedIn()) return true;
+    if (action) sessionStorage.setItem(PENDING_KEY, action);
+    saveFormState();
+    sessionStorage.setItem(RETURN_KEY, returnUrl || `${window.location.pathname}${window.location.search}${window.location.hash || '#ai-solution'}`);
+    alert(t('auth.loginRequired'));
+    startWeChatLogin();
+    return false;
+  }
+
+  function consumePendingAction() {
+    const action = sessionStorage.getItem(PENDING_KEY);
+    if (!action || !isLoggedIn()) return null;
+    sessionStorage.removeItem(PENDING_KEY);
+    restoreFormState();
+    return action;
+  }
+
   function buildWeChatAuthUrl() {
     const cfg = config();
     const state = crypto.randomUUID();
     sessionStorage.setItem(STATE_KEY, state);
-    sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search + window.location.hash);
+    if (!sessionStorage.getItem(RETURN_KEY)) {
+      sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search + window.location.hash);
+    }
 
     const params = new URLSearchParams({
       appid: cfg.wechatAppId,
@@ -146,8 +205,8 @@
 
     slot.innerHTML = `
       <button type="button" class="btn-wechat-login" id="wechatLoginBtn" aria-label="${escapeHtml(t('auth.wechatLogin'))}">
-        <svg class="btn-wechat-login-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="currentColor" d="M8.5 4C4.91 4 2 6.24 2 9.08c0 1.57.84 2.97 2.16 3.89l-.55 2.05 2.36-1.18c.66.18 1.36.28 2.08.28.22 0 .44-.01.65-.03C8.2 12.98 8 11.55 8 10.08 8 6.7 11.13 4 15 4c.34 0 .67.02 1 .06C15.2 3.4 13.95 3 12.5 3 10.07 3 8.5 4 8.5 4zm-3 3.25c-.55 0-1-.38-1-.85s.45-.85 1-.85.99.38.99.85-.44.85-.99.85zm4 0c-.55 0-1-.38-1-.85s.45-.85 1-.85 1 .38 1 .85-.45.85-1 .85zM22 14.42c0-2.49-2.46-4.5-5.5-4.5S11 11.93 11 14.42c0 2.49 2.46 4.5 5.5 4.5.88 0 1.7-.18 2.43-.5l2.07 1.04-.48-1.78c1.1-.86 1.98-2.12 1.98-3.26zM14.75 13.5c-.41 0-.75-.28-.75-.62s.34-.62.75-.62.74.28.74.62-.33.62-.74.62zm3 0c-.41 0-.75-.28-.75-.62s.34-.62.75-.62.74.28.74.62-.33.62-.74.62z"/>
+        <svg class="btn-wechat-login-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+          <path fill="currentColor" d="M12.5 3C7.81 3 4 6.13 4 10c0 2.2 1.21 4.15 3.1 5.4L6.4 18.5l3.35-1.68c.85.24 1.76.38 2.75.38.28 0 .55-.01.82-.04C12.9 16.05 12.5 14.6 12.5 13c0-4.14 3.92-7.5 8.75-7.5.38 0 .75.02 1.11.06C21.2 3.9 17.2 3 12.5 3zm-3.25 4.25a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm4.5 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM21.25 7.25C17.6 7.25 14.5 9.7 14.5 12.75S17.6 18.25 21.25 18.25c.76 0 1.49-.12 2.16-.34l2.34 1.17-.52-1.95c1.1-.93 1.77-2.25 1.77-3.74 0-3.05-3.1-5.5-6.75-5.5zm-1.9 3.35a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7zm3.8 0a.85.85 0 1 1 0 1.7.85.85 0 0 1 0-1.7z"/>
         </svg>
         <span>${escapeHtml(t('auth.wechatLogin'))}</span>
       </button>

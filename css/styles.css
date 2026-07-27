@@ -1615,6 +1615,10 @@ ul {
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition);
   white-space: nowrap;
+  box-shadow: none;
+  text-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .btn-wechat-login:hover {
@@ -1623,7 +1627,15 @@ ul {
 }
 
 .btn-wechat-login-icon {
+  display: block;
   flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
+}
+
+.btn-wechat-login-icon path {
+  fill: currentColor;
 }
 
 .auth-user {
