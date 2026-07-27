@@ -73,6 +73,9 @@ class Handler(SimpleHTTPRequestHandler):
                         load_env_value("WECHAT_APP_ID") and load_env_value("WECHAT_APP_SECRET")
                     ),
                     "jwt_configured": bool(load_env_value("JWT_SECRET")),
+                    "database_configured": bool(
+                        load_env_value("DATABASE_URL") or load_env_value("POSTGRES_URL")
+                    ),
                 },
             )
             return

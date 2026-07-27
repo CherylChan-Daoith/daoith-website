@@ -5,6 +5,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import sqlite3
 import time
 import urllib.error
@@ -19,9 +20,17 @@ DB_PATH = ROOT / "data" / "daoith-auth.db"
 WECHAT_TOKEN_URL = "https://api.weixin.qq.com/sns/oauth2/access_token"
 WECHAT_USERINFO_URL = "https://api.weixin.qq.com/sns/userinfo"
 
+_env_loader = lambda name: os.environ.get(name, "").strip()
 
-def load_env_value(name, loader):
-    val = loader(name)
+
+def set_env_loader(loader):
+    global _env_loader
+    _env_loader = loader
+
+
+def load_env_value(name, loader=None):
+    fn = loader or _env_loader
+    val = fn(name)
     if val:
         return val
     env_file = ROOT / ".env"
@@ -31,6 +40,10 @@ def load_env_value(name, loader):
             if line.startswith(f"{name}="):
                 return line.split("=", 1)[1].strip().strip('"').strip("'")
     return ""
+
+
+def get_database_url():
+    return load_env_value("DATABASE_URL") or load_env_value("POSTGRES_URL")
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -79,7 +92,49 @@ def verify_jwt(token: str, secret: str):
     return payload
 
 
+def _import_psycopg():
+    try:
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+
+        return psycopg2, RealDictCursor
+    except ImportError as err:
+        raise RuntimeError(
+            "已配置 DATABASE_URL，但未安装 psycopg2。请执行: pip install psycopg2-binary"
+        ) from err
+
+
+def _pg_connect():
+    psycopg2, _ = _import_psycopg()
+    url = get_database_url()
+    if not url:
+        raise RuntimeError("DATABASE_URL is not configured")
+    return psycopg2.connect(url)
+
+
 def ensure_db():
+    database_url = get_database_url()
+    if database_url:
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS users (
+                      id SERIAL PRIMARY KEY,
+                      openid TEXT NOT NULL UNIQUE,
+                      unionid TEXT,
+                      nickname TEXT,
+                      avatar_url TEXT,
+                      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)")
+            conn.commit()
+        return
+
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
@@ -99,9 +154,55 @@ def ensure_db():
         conn.commit()
 
 
+def _row_to_user(row):
+    if not row:
+        return None
+    if isinstance(row, dict):
+        return {
+            "id": row["id"],
+            "openid": row["openid"],
+            "unionid": row.get("unionid"),
+            "nickname": row.get("nickname"),
+            "avatarUrl": row.get("avatar_url"),
+            "createdAt": row.get("created_at"),
+            "updatedAt": row.get("updated_at"),
+        }
+    return {
+        "id": row[0],
+        "openid": row[1],
+        "unionid": row[2],
+        "nickname": row[3],
+        "avatarUrl": row[4],
+        "createdAt": row[5],
+        "updatedAt": row[6],
+    }
+
+
 def upsert_wechat_user(openid, unionid=None, nickname=None, avatar_url=None):
     ensure_db()
     now = datetime.now(timezone.utc).isoformat()
+
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO users (openid, unionid, nickname, avatar_url, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (openid) DO UPDATE SET
+                      unionid = EXCLUDED.unionid,
+                      nickname = EXCLUDED.nickname,
+                      avatar_url = EXCLUDED.avatar_url,
+                      updated_at = EXCLUDED.updated_at
+                    RETURNING id, openid, unionid, nickname, avatar_url, created_at, updated_at
+                    """,
+                    (openid, unionid, nickname, avatar_url, now, now),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return _row_to_user(row)
+
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -120,36 +221,33 @@ def upsert_wechat_user(openid, unionid=None, nickname=None, avatar_url=None):
             (openid,),
         ).fetchone()
         conn.commit()
-
-    return {
-        "id": row[0],
-        "openid": row[1],
-        "unionid": row[2],
-        "nickname": row[3],
-        "avatarUrl": row[4],
-        "createdAt": row[5],
-        "updatedAt": row[6],
-    }
+    return _row_to_user(row)
 
 
 def get_user_by_id(user_id: int):
     ensure_db()
+
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at
+                    FROM users
+                    WHERE id = %s
+                    """,
+                    (user_id,),
+                )
+                row = cur.fetchone()
+        return _row_to_user(row)
+
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
             "SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
-    if not row:
-        return None
-    return {
-        "id": row[0],
-        "openid": row[1],
-        "unionid": row[2],
-        "nickname": row[3],
-        "avatarUrl": row[4],
-        "createdAt": row[5],
-        "updatedAt": row[6],
-    }
+    return _row_to_user(row)
 
 
 def _fetch_json(url: str):
@@ -185,6 +283,7 @@ def fetch_wechat_userinfo(access_token: str, openid: str):
 
 
 def handle_wechat_login(body: dict, env_loader):
+    set_env_loader(env_loader)
     code = (body.get("code") or "").strip()
     if not code:
         return 400, {"error": "缺少微信授权 code"}
@@ -230,6 +329,7 @@ def handle_wechat_login(body: dict, env_loader):
 
 
 def handle_wechat_me(auth_header: str, env_loader):
+    set_env_loader(env_loader)
     jwt_secret = load_env_value("JWT_SECRET", env_loader)
     if not jwt_secret:
         return 503, {"error": "未配置 JWT_SECRET"}

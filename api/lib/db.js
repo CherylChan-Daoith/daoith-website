@@ -1,45 +1,52 @@
-import { createClient } from '@libsql/client';
-import fs from 'fs';
-import path from 'path';
+import pg from 'pg';
 
-let client;
+const { Pool } = pg;
+
+let pool;
 let initPromise;
 
-function getClient() {
-  if (!client) {
-    const url = process.env.LIBSQL_URL?.trim() || 'file:data/daoith-auth.db';
-    const authToken = process.env.LIBSQL_AUTH_TOKEN?.trim();
+function getDatabaseUrl() {
+  return (
+    process.env.DATABASE_URL?.trim() ||
+    process.env.POSTGRES_URL?.trim() ||
+    ''
+  );
+}
 
-    if (url.startsWith('file:')) {
-      const filePath = url.replace(/^file:/, '');
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
+function getPool() {
+  if (!pool) {
+    const connectionString = getDatabaseUrl();
+    if (!connectionString) {
+      throw new Error(
+        'DATABASE_URL is not configured. Point it to the Dify PostgreSQL database (e.g. daoith_users).',
+      );
     }
 
-    client = createClient({
-      url,
-      authToken: authToken || undefined,
+    pool = new Pool({
+      connectionString,
+      ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      max: 5,
+      idleTimeoutMillis: 10_000,
+      connectionTimeoutMillis: 10_000,
     });
   }
-  return client;
+  return pool;
 }
 
 async function ensureSchema() {
-  const db = getClient();
-  await db.execute(`
+  const db = getPool();
+  await db.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       openid TEXT NOT NULL UNIQUE,
       unionid TEXT,
       nickname TEXT,
       avatar_url TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await db.execute('CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)');
+  await db.query('CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)');
 }
 
 export async function initDb() {
@@ -49,30 +56,8 @@ export async function initDb() {
   return initPromise;
 }
 
-export async function upsertWeChatUser({ openid, unionid, nickname, avatarUrl }) {
-  await initDb();
-  const db = getClient();
-  const now = new Date().toISOString();
-
-  await db.execute({
-    sql: `
-      INSERT INTO users (openid, unionid, nickname, avatar_url, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(openid) DO UPDATE SET
-        unionid = excluded.unionid,
-        nickname = excluded.nickname,
-        avatar_url = excluded.avatar_url,
-        updated_at = excluded.updated_at
-    `,
-    args: [openid, unionid || null, nickname || null, avatarUrl || null, now, now],
-  });
-
-  const result = await db.execute({
-    sql: 'SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at FROM users WHERE openid = ?',
-    args: [openid],
-  });
-
-  const row = result.rows[0];
+function mapUser(row) {
+  if (!row) return null;
   return {
     id: Number(row.id),
     openid: row.openid,
@@ -84,24 +69,39 @@ export async function upsertWeChatUser({ openid, unionid, nickname, avatarUrl })
   };
 }
 
+export async function upsertWeChatUser({ openid, unionid, nickname, avatarUrl }) {
+  await initDb();
+  const db = getPool();
+  const now = new Date().toISOString();
+
+  const result = await db.query(
+    `
+      INSERT INTO users (openid, unionid, nickname, avatar_url, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (openid) DO UPDATE SET
+        unionid = EXCLUDED.unionid,
+        nickname = EXCLUDED.nickname,
+        avatar_url = EXCLUDED.avatar_url,
+        updated_at = EXCLUDED.updated_at
+      RETURNING id, openid, unionid, nickname, avatar_url, created_at, updated_at
+    `,
+    [openid, unionid || null, nickname || null, avatarUrl || null, now, now],
+  );
+
+  return mapUser(result.rows[0]);
+}
+
 export async function getUserById(userId) {
   await initDb();
-  const db = getClient();
-  const result = await db.execute({
-    sql: 'SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at FROM users WHERE id = ?',
-    args: [userId],
-  });
+  const db = getPool();
+  const result = await db.query(
+    `
+      SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at
+      FROM users
+      WHERE id = $1
+    `,
+    [userId],
+  );
 
-  const row = result.rows[0];
-  if (!row) return null;
-
-  return {
-    id: Number(row.id),
-    openid: row.openid,
-    unionid: row.unionid,
-    nickname: row.nickname,
-    avatarUrl: row.avatar_url,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
+  return mapUser(result.rows[0]);
 }

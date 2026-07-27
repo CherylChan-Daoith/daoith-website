@@ -16,5 +16,8 @@ export default async function handler(req, res) {
       process.env.WECHAT_APP_ID?.trim() && process.env.WECHAT_APP_SECRET?.trim(),
     ),
     jwt_configured: Boolean(process.env.JWT_SECRET?.trim()),
+    database_configured: Boolean(
+      process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim(),
+    ),
   });
 }
