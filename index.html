@@ -26,10 +26,10 @@
         <a href="#hero" class="active">首页</a>
         <a href="#ai-solution">AI解决方案</a>
         <a href="#services">财税服务</a>
-        <a href="#hub">服务管理</a>
         <a href="#policy">政策速递</a>
         <a href="#tax-systems">各地区税制</a>
         <a href="#about">关于我们</a>
+        <a href="#hub">服务管理</a>
       </nav>
       <div class="lang-switcher" role="group" aria-label="Language">
         <button type="button" class="lang-btn active" data-lang="zh" aria-pressed="true">中文</button>
@@ -538,62 +538,6 @@
     </div>
   </section>
 
-  <!-- Service Hub -->
-  <section class="section section-cream" id="hub">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-badge">Service Hub</span>
-        <h2>服务管理</h2>
-        <p>查看已购服务、追踪服务进度、提交投诉建议，支持微信通知订阅</p>
-      </div>
-      <div class="hub-grid">
-        <div class="hub-panel">
-          <div class="wechat-notify">
-            <div>
-              <h4>微信通知订阅</h4>
-              <p style="font-size:0.85rem;color:var(--text-muted)">开启后，服务进展将自动推送到您的微信</p>
-            </div>
-            <button class="toggle-switch" id="wechatToggle" aria-label="微信通知"></button>
-          </div>
-          <div class="hub-tabs">
-            <button class="hub-tab active" data-tab="orders">我的订单</button>
-            <button class="hub-tab" data-tab="feedback">投诉与建议</button>
-          </div>
-          <div class="hub-tab-content" id="ordersTab">
-            <div class="empty-state">
-              <div class="icon">📋</div>
-              <h4>暂无订单</h4>
-              <p>您还没有购买任何服务<br>前往"财税服务"版块选购</p>
-            </div>
-          </div>
-          <div class="hub-tab-content" id="feedbackTab" style="display:none">
-            <div class="feedback-form">
-              <h4>提交投诉或建议</h4>
-              <div class="type-btns">
-                <button class="type-btn active" data-type="complaint">投诉</button>
-                <button class="type-btn" data-type="suggestion">建议</button>
-                <button class="type-btn" data-type="praise">表扬</button>
-                <button class="type-btn" data-type="inquiry">咨询</button>
-              </div>
-              <div class="form-group">
-                <textarea id="feedbackText" placeholder="请描述您的问题或建议..." rows="4"></textarea>
-              </div>
-              <button class="btn btn-primary btn-sm" id="submitFeedback">提交</button>
-            </div>
-          </div>
-        </div>
-        <div class="hub-panel">
-          <h4>服务进度追踪</h4>
-          <div class="empty-state">
-            <div class="icon icon-muted">—</div>
-            <h4>暂无进行中的服务</h4>
-            <p>购买服务后，进度将在此实时更新</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Policy Hub -->
   <section class="section section-cream" id="policy">
     <div class="container">
@@ -928,6 +872,62 @@
             <li>曾任大型跨境电商公司财税负责人，负责公司相关的境内外财税事项，包括公司整体商业结构优化和税收优惠规划，主导公司股权架构优化，拥有丰富的实务操作经验</li>
           </ul>
           <div class="team-edu">丰富的跨境电商财税实操与运营管理经验</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Service Hub -->
+  <section class="section section-cream" id="hub">
+    <div class="container">
+      <div class="section-header">
+        <span class="section-badge">Service Hub</span>
+        <h2>服务管理</h2>
+        <p>查看已购服务、追踪服务进度、提交投诉建议，支持微信通知订阅</p>
+      </div>
+      <div class="hub-grid">
+        <div class="hub-panel">
+          <div class="wechat-notify">
+            <div>
+              <h4>微信通知订阅</h4>
+              <p style="font-size:0.85rem;color:var(--text-muted)">开启后，服务进展将自动推送到您的微信</p>
+            </div>
+            <button class="toggle-switch" id="wechatToggle" aria-label="微信通知"></button>
+          </div>
+          <div class="hub-tabs">
+            <button class="hub-tab active" data-tab="orders">我的订单</button>
+            <button class="hub-tab" data-tab="feedback">投诉与建议</button>
+          </div>
+          <div class="hub-tab-content" id="ordersTab">
+            <div class="empty-state">
+              <div class="icon">📋</div>
+              <h4>暂无订单</h4>
+              <p>您还没有购买任何服务<br>前往"财税服务"版块选购</p>
+            </div>
+          </div>
+          <div class="hub-tab-content" id="feedbackTab" style="display:none">
+            <div class="feedback-form">
+              <h4>提交投诉或建议</h4>
+              <div class="type-btns">
+                <button class="type-btn active" data-type="complaint">投诉</button>
+                <button class="type-btn" data-type="suggestion">建议</button>
+                <button class="type-btn" data-type="praise">表扬</button>
+                <button class="type-btn" data-type="inquiry">咨询</button>
+              </div>
+              <div class="form-group">
+                <textarea id="feedbackText" placeholder="请描述您的问题或建议..." rows="4"></textarea>
+              </div>
+              <button class="btn btn-primary btn-sm" id="submitFeedback">提交</button>
+            </div>
+          </div>
+        </div>
+        <div class="hub-panel">
+          <h4>服务进度追踪</h4>
+          <div class="empty-state">
+            <div class="icon icon-muted">—</div>
+            <h4>暂无进行中的服务</h4>
+            <p>购买服务后，进度将在此实时更新</p>
+          </div>
         </div>
       </div>
     </div>
