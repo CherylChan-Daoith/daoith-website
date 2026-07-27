@@ -196,7 +196,8 @@
         if (!s) return;
         const h4 = card.querySelector('h4');
         const desc = card.querySelector('p');
-        const btn = card.querySelector('.btn');
+        const detailBtn = card.querySelector('[data-action="detail"]');
+        const addBtn = card.querySelector('[data-action="add"]');
         const priceSpan = card.querySelector('.service-price span');
         if (h4) {
           captureOriginal(h4, false);
@@ -206,9 +207,13 @@
           captureOriginal(desc, false);
           setText(desc, locale === 'en' ? s.desc : originalText.get(desc), false);
         }
-        if (btn) {
-          captureOriginal(btn, false);
-          setText(btn, locale === 'en' ? s.btn : originalText.get(btn), false);
+        if (detailBtn) {
+          captureOriginal(detailBtn, false);
+          setText(detailBtn, locale === 'en' ? (s.detailBtn || 'Service details') : originalText.get(detailBtn), false);
+        }
+        if (addBtn) {
+          captureOriginal(addBtn, false);
+          setText(addBtn, locale === 'en' ? (s.cartBtn || 'Add to cart') : originalText.get(addBtn), false);
         }
         if (priceSpan && s.unit) {
           captureOriginal(priceSpan, false);
