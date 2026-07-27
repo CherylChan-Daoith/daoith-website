@@ -584,8 +584,8 @@ const taxEntityRateOptions = {
   cn: [5, 15, 25],
   cn_individual: [5, 10, 20, 30, 35],
   hk: [8.25, 16.5],
-  us: [25],
-  uk: [25],
+  us: [21],
+  uk: [19, 25],
   de: [25],
   nl: [25],
   mx: [25],
@@ -597,6 +597,12 @@ const taxEntityRateOptions = {
   in: [25],
   sa: [25],
   other_overseas: [25],
+};
+
+/** Income-tax tiers for “其他海外公司” by jurisdiction */
+const taxOtherOverseasCountryRates = {
+  us: [21],
+  uk: [19, 25],
 };
 
 function getFormContext() {
@@ -643,17 +649,42 @@ function formatWan(value) {
   return `${(Number(value) || 0).toFixed(2)} 万元`;
 }
 
-function buildTaxRateOptions(entity) {
+function buildTaxRateOptions(entity, entityCountry) {
+  if (entity === 'other_overseas') {
+    if (entityCountry && taxOtherOverseasCountryRates[entityCountry]) {
+      return taxOtherOverseasCountryRates[entityCountry];
+    }
+    return [];
+  }
   return taxEntityRateOptions[entity] || [25];
+}
+
+function syncTaxEntityCountryVisibility() {
+  const entitySelect = document.getElementById('taxEntity');
+  const countryGroup = document.getElementById('taxEntityCountryGroup');
+  if (!entitySelect || !countryGroup) return;
+  const show = entitySelect.value === 'other_overseas';
+  countryGroup.classList.toggle('is-hidden', !show);
 }
 
 function syncTaxIncomeOptions() {
   const entitySelect = document.getElementById('taxEntity');
+  const countrySelect = document.getElementById('taxEntityCountry');
   const incomeSelect = document.getElementById('taxIncome');
   if (!entitySelect || !incomeSelect) return;
 
+  syncTaxEntityCountryVisibility();
+
+  const entity = entitySelect.value || 'cn';
+  const entityCountry = countrySelect?.value || '';
   const current = incomeSelect.value;
-  const options = buildTaxRateOptions(entitySelect.value || 'cn');
+  const options = buildTaxRateOptions(entity, entityCountry);
+
+  if (!options.length) {
+    incomeSelect.innerHTML = '<option value="">请先选择店铺主体国家/地区</option>';
+    return;
+  }
+
   incomeSelect.innerHTML = options
     .map((rate) => `<option value="${rate}">${rate}%</option>`)
     .join('');
@@ -785,9 +816,12 @@ function initTaxCalculator() {
   const resultEl = document.getElementById('taxResult');
   if (!calcBtn || !entitySelect || !resultEl) return;
 
+  const countrySelect = document.getElementById('taxEntityCountry');
+
   entitySelect.value = aiEntitySelect?.value || entitySelect.value || 'cn';
   syncTaxIncomeOptions();
   entitySelect.addEventListener('change', syncTaxIncomeOptions);
+  countrySelect?.addEventListener('change', syncTaxIncomeOptions);
   aiEntitySelect?.addEventListener('change', () => {
     entitySelect.value = aiEntitySelect.value || 'cn';
     syncTaxIncomeOptions();
