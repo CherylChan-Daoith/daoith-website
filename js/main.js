@@ -1,6 +1,8 @@
 /* DAOITH Consulting - Main JavaScript */
 
 const PAGE_SIZE = 10;
+const ARTICLES_PAGE_SIZE = 6;
+const POLICY_PAGE_SIZE = 4;
 const TAX_SYSTEMS_PAGE_SIZE = 6;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -122,6 +124,9 @@ function refreshPaginationLabels() {
     if (btn.id === 'loadMoreTaxPolicies' && !btn.classList.contains('is-hidden')) {
       btn.textContent = window.DAOITH_t('loadMore.taxPolicies');
     }
+    if (btn.id === 'loadMorePlatformPolicies' && !btn.classList.contains('is-hidden')) {
+      btn.textContent = window.DAOITH_t('loadMore.platformPolicies');
+    }
   });
 }
 
@@ -157,12 +162,19 @@ function initLoadMore() {
     itemsSelector: '#policy-expert .article-card',
     buttonId: 'loadMoreArticles',
     labelKey: 'loadMore.articles',
+    pageSize: ARTICLES_PAGE_SIZE,
   });
   setupPagination({
     itemsSelector: '#policyTaxList .policy-item',
     buttonId: 'loadMoreTaxPolicies',
     labelKey: 'loadMore.taxPolicies',
-    pageSize: 6,
+    pageSize: POLICY_PAGE_SIZE,
+  });
+  setupPagination({
+    itemsSelector: '#policyPlatformList .policy-item',
+    buttonId: 'loadMorePlatformPolicies',
+    labelKey: 'loadMore.platformPolicies',
+    pageSize: POLICY_PAGE_SIZE,
   });
 }
 
@@ -178,7 +190,7 @@ function setupPagination({ itemsSelector, buttonId, labelKey, label, onUpdate, p
     const matchable = items.filter((item) => item.style.display !== 'none').length;
     button.classList.toggle('is-hidden', shown >= items.length || matchable === 0);
     const remaining = items.length - shown;
-    if (labelKey === 'loadMore.articles' || labelKey === 'loadMore.taxSystems' || labelKey === 'loadMore.taxPolicies') {
+    if (labelKey === 'loadMore.articles' || labelKey === 'loadMore.taxSystems' || labelKey === 'loadMore.taxPolicies' || labelKey === 'loadMore.platformPolicies') {
       button.textContent = window.DAOITH_t(labelKey);
     } else if (labelKey) {
       button.textContent = remaining > 0

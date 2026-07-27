@@ -8,6 +8,7 @@ window.DAOITH_I18N_ZH = {
     'loadMore.policies': '查看更多',
     'loadMore.taxSystems': '查看更多',
     'loadMore.taxPolicies': '查看更多',
+    'loadMore.platformPolicies': '查看更多',
     'loadMore.policiesRemaining': '查看更多（还有 {n} 条政策）',
     'services.showAll': '查看全部 12 个服务 ↓',
     'services.collapse': '收起服务列表 ↑',
@@ -56,6 +57,7 @@ window.DAOITH_I18N_EN = {
     'loadMore.policies': 'Load more',
     'loadMore.taxSystems': 'Load more',
     'loadMore.taxPolicies': 'Load more',
+    'loadMore.platformPolicies': 'Load more',
     'loadMore.policiesRemaining': 'Load more ({n} more policies)',
     'services.showAll': 'View all 12 services ↓',
     'services.collapse': 'Collapse list ↑',
@@ -231,6 +233,7 @@ window.DAOITH_I18N_EN = {
     '.policy-link-tag': { text: 'Official source' },
     '#loadMoreArticles': { text: 'Load more' },
     '#loadMoreTaxPolicies': { text: 'Load more' },
+    '#loadMorePlatformPolicies': { text: 'Load more' },
     '#loadMoreTaxSystems': { text: 'Load more' },
     '#tax-systems .section-header h2': { text: 'Regional Tax Systems' },
     '.tax-systems-disclaimer': {
