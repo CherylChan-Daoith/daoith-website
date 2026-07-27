@@ -249,6 +249,9 @@ function initFAQ() {
 
 /* Dify API (api.daoith.com) — no API keys in frontend */
 function getDifyUserId() {
+  const authUser = window.DAOITH_AUTH?.getUser?.();
+  if (authUser?.openid) return `wx-${authUser.openid}`;
+
   const key = 'daoith_dify_user_id';
   let id = localStorage.getItem(key);
   if (!id) {

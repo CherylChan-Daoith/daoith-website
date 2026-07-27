@@ -3,7 +3,9 @@
   "name": "daoith-website",
   "rewrites": [
     { "source": "/api/deepseek", "destination": "/api/deepseek" },
-    { "source": "/api/health", "destination": "/api/health" }
+    { "source": "/api/health", "destination": "/api/health" },
+    { "source": "/api/auth/wechat/login", "destination": "/api/auth/wechat/login" },
+    { "source": "/api/auth/wechat/me", "destination": "/api/auth/wechat/me" }
   ],
   "headers": [
     {

@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Static file server with DeepSeek and Dify API proxies for DAOITH website."""
 
-import json
 import os
+import json
 import urllib.error
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+
+import server_auth
 
 ROOT = Path(__file__).resolve().parent
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
@@ -51,7 +53,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header(
             "Access-Control-Allow-Headers",
-            "Content-Type, X-Dify-API-Key, X-Dify-API-Base, X-Dify-Endpoint",
+            "Content-Type, X-Dify-API-Key, X-Dify-API-Base, X-Dify-Endpoint, Authorization",
         )
         super().end_headers()
 
@@ -67,8 +69,19 @@ class Handler(SimpleHTTPRequestHandler):
                     "ok": True,
                     "deepseek_configured": bool(load_api_key()),
                     "dify_configured": bool(load_dify_key()),
+                    "wechat_configured": bool(
+                        load_env_value("WECHAT_APP_ID") and load_env_value("WECHAT_APP_SECRET")
+                    ),
+                    "jwt_configured": bool(load_env_value("JWT_SECRET")),
                 },
             )
+            return
+        if self.path == "/api/auth/wechat/me":
+            status, data = server_auth.handle_wechat_me(
+                self.headers.get("Authorization", ""),
+                load_env_value,
+            )
+            self.send_json(status, data)
             return
         return super().do_GET()
 
@@ -78,6 +91,16 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/dify":
             self.handle_dify()
+            return
+        if self.path == "/api/auth/wechat/login":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_wechat_login(body, load_env_value)
+            self.send_json(status, data)
             return
         self.send_error(404)
 

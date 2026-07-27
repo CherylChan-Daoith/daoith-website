@@ -1596,6 +1596,120 @@ ul {
   background: var(--accent-soft);
 }
 
+.auth-slot {
+  flex-shrink: 0;
+}
+
+.btn-wechat-login {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  border: 1px solid #07c160;
+  background: #07c160;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  white-space: nowrap;
+}
+
+.btn-wechat-login:hover {
+  background: #06ad56;
+  border-color: #06ad56;
+}
+
+.btn-wechat-login-icon {
+  flex-shrink: 0;
+}
+
+.auth-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 200px;
+}
+
+.auth-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.auth-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #07c160;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.auth-name {
+  font-size: 0.8125rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 88px;
+}
+
+.auth-logout {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.auth-logout:hover {
+  color: var(--accent);
+}
+
+.auth-callback-main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-subtle);
+}
+
+.auth-callback-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 40px 32px;
+  text-align: center;
+}
+
+.auth-callback-logo {
+  border-radius: 50%;
+  margin-bottom: 16px;
+}
+
+.auth-callback-card h1 {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.auth-callback-card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
 .cart-badge {
   position: absolute;
   top: 2px;
@@ -3121,6 +3235,19 @@ body.modal-open {
     margin-right: 6px;
     width: 36px;
     height: 36px;
+  }
+
+  .auth-name,
+  .auth-logout {
+    display: none;
+  }
+
+  .btn-wechat-login span {
+    display: none;
+  }
+
+  .btn-wechat-login {
+    padding: 7px 9px;
   }
 
   .mobile-toggle {

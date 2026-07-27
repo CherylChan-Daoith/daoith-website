@@ -9,6 +9,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const configured = Boolean(process.env.DEEPSEEK_API_KEY?.trim());
-  return res.status(200).json({ ok: true, deepseek_configured: configured });
+  return res.status(200).json({
+    ok: true,
+    deepseek_configured: Boolean(process.env.DEEPSEEK_API_KEY?.trim()),
+    wechat_configured: Boolean(
+      process.env.WECHAT_APP_ID?.trim() && process.env.WECHAT_APP_SECRET?.trim(),
+    ),
+    jwt_configured: Boolean(process.env.JWT_SECRET?.trim()),
+  });
 }
