@@ -32,6 +32,17 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshShowMoreServicesLabel();
     syncTaxIncomeOptions();
   });
+
+  window.addEventListener('daoith-auth-pending', (event) => {
+    const action = event.detail?.action;
+    setTimeout(() => {
+      if (action === 'ai-generate') {
+        document.getElementById('aiForm')?.requestSubmit();
+      } else if (action === 'tax-calc') {
+        document.getElementById('calcTax')?.click();
+      }
+    }, 400);
+  });
 });
 
 /* Header scroll effect */

@@ -233,6 +233,11 @@
     renderAuthSlot();
 
     window.addEventListener('localechange', renderAuthSlot);
+
+    const pending = consumePendingAction();
+    if (pending) {
+      window.dispatchEvent(new CustomEvent('daoith-auth-pending', { detail: { action: pending } }));
+    }
   }
 
   async function handleCallbackPage() {
@@ -240,7 +245,7 @@
     const code = params.get('code');
     const state = params.get('state');
     const savedState = sessionStorage.getItem(STATE_KEY);
-    const returnUrl = sessionStorage.getItem(RETURN_KEY) || '/';
+    const returnUrl = sessionStorage.getItem(RETURN_KEY) || '/#ai-solution';
 
     sessionStorage.removeItem(STATE_KEY);
     sessionStorage.removeItem(RETURN_KEY);
@@ -265,7 +270,7 @@
       const data = await exchangeCode(code);
       setSession(data.token, data.user);
       setStatus(t('auth.loginSuccess'));
-      window.location.replace(returnUrl.startsWith('/') ? returnUrl : '/');
+      window.location.replace(returnUrl.startsWith('/') ? returnUrl : '/#ai-solution');
     } catch (err) {
       setStatus(err.message || t('auth.loginFailed'));
     }
@@ -277,6 +282,9 @@
     handleCallbackPage,
     getToken,
     getUser,
+    isLoggedIn,
+    requireLogin,
+    consumePendingAction,
     logout,
     fetchCurrentUser,
   };
