@@ -16,6 +16,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '联邦与州/local 三级税制。跨境卖家需关注联邦企业所得税、州销售税（无全国统一 VAT）及预提所得税。',
+    incomeTaxRates: [21],
     taxes: [
       { label: '联邦企业所得税', value: '21%（2018年税改后法定税率）' },
       { label: '州及地方税', value: '因州而异；州企业所得税 0—11%+ 不等' },
@@ -43,6 +44,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '地域来源原则征税，无 VAT/GST。利得税两级制，跨境资金流动相对便利。',
+    incomeTaxRates: [8.25, 16.5],
     taxes: [
       { label: '利得税（公司）', value: '8.25%（首200万港元应评税利润）/ 16.5%（其余）' },
       { label: '利得税（独资/合伙）', value: '7.5% / 15% 两级制' },
@@ -68,6 +70,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '法人税与增值税并重，跨境平台销售需关注本地消费与常设机构规则。',
+    incomeTaxRates: [24],
     taxes: [
       { label: '法人税', value: '标准 24%（含地方附加，综合税负约 24.2%）' },
       { label: '增值税', value: '10%' },
@@ -92,6 +95,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '法人税、消费税（增值税）双支柱，地方税附加使实际税负高于名义税率。',
+    incomeTaxRates: [23, 30],
     taxes: [
       { label: '法人税（实际税负）', value: '约 23—30%（含地方法人税、事业税等）' },
       { label: '消费税', value: '10%（标准税率）' },
@@ -114,6 +118,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '营利事业所得税与营业税（增值税型）并行，对大陆企业投资有专门规定。',
+    incomeTaxRates: [20],
     taxes: [
       { label: '营利事业所得税', value: '20%（2023年起一般企业）' },
       { label: '营业税', value: '5%（加值型及非加值型）' },
@@ -136,6 +141,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '企业所得税与增值税为主，加工贸易与跨境电商增长带动合规需求上升。',
+    incomeTaxRates: [20],
     taxes: [
       { label: '企业所得税（CIT）', value: '标准 20%；优惠行业可 10—17%' },
       { label: '增值税', value: '标准 10%；部分商品 5% 或 0%' },
@@ -158,6 +164,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '联邦统一税制，利润税与增值税为核心，近年受国际制裁与汇率波动影响较大。',
+    incomeTaxRates: [20],
     taxes: [
       { label: '利润税', value: '标准 20%（联邦 3% + 地方 17%）' },
       { label: '增值税', value: '标准 20%；部分商品 10% 或 0%' },
@@ -180,6 +187,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '欧盟 VAT 体系核心成员国，企业所得税加贸易税使实际税负接近 30%。',
+    incomeTaxRates: [30],
     taxes: [
       { label: '企业所得税', value: '联邦 15% + 团结附加 5.5% + 市政贸易税（约 7—17%）' },
       { label: '增值税', value: '标准 19%；降低税率 7%' },
@@ -202,6 +210,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '公司所得税与 GST 为主，低价值进口商品 GST 规则影响跨境电商。',
+    incomeTaxRates: [25, 30],
     taxes: [
       { label: '公司所得税', value: '30%（基准税率实体 25%）' },
       { label: 'GST', value: '10%' },
@@ -224,6 +233,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '企业所得税与 SST（销售与服务税）并行，部分行业仍适用服务税规则。',
+    incomeTaxRates: [24],
     taxes: [
       { label: '企业所得税', value: '标准 24%（中小企业可享阶梯优惠）' },
       { label: 'SST', value: '销售税 5—10%；服务税 6—8%（行业差异）' },
@@ -246,6 +256,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '税制复杂，联邦/州/市多级流转税并存，电商合规成本较高。',
+    incomeTaxRates: [34],
     taxes: [
       { label: 'IRPJ/CSLL（企业所得税）', value: '合计约 34%（含附加，因制度而异）' },
       { label: 'ICMS（州流转税）', value: '州际 7—18% 不等，规则复杂' },
@@ -268,6 +279,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '企业所得税与增值税（PPN）为主，数字服务与电商监管趋严。',
+    incomeTaxRates: [22],
     taxes: [
       { label: '企业所得税', value: '标准 22%（2022年起）' },
       { label: '增值税（PPN）', value: '11%（逐步提高至 12% 路径）' },
@@ -290,6 +302,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: 'GST 统一间接税体系，企业所得税因企业类型与优惠不同差异较大。',
+    incomeTaxRates: [25, 30],
     taxes: [
       { label: '企业所得税', value: '一般 25—30%；新制造等可享 15—22% 优惠' },
       { label: 'GST', value: '5% / 12% / 18% / 28% 多档' },
@@ -312,6 +325,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '企业所得税与 VAT 为主，BOI 优惠吸引制造业与区域总部。',
+    incomeTaxRates: [20],
     taxes: [
       { label: '企业所得税', value: '标准 20%' },
       { label: '增值税', value: '7%（法定 10%，目前减按 7% 执行）' },
@@ -334,6 +348,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '低税率枢纽，属地征税，无资本利得税，GST 近期上调。',
+    incomeTaxRates: [17],
     taxes: [
       { label: '企业所得税', value: '17%（多种初创及研发优惠）' },
       { label: 'GST', value: '9%（2024年起）' },
@@ -356,6 +371,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '欧盟物流门户，企业所得税与 VAT 规则与欧盟体系一致。',
+    incomeTaxRates: [25.8],
     taxes: [
       { label: '企业所得税', value: '标准 25.8%（2023年起）' },
       { label: '增值税', value: '标准 21%；降低 9%' },
@@ -378,6 +394,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '联邦企业所得税与 VAT 为主，USMCA 框架下供应链联系紧密。',
+    incomeTaxRates: [30],
     taxes: [
       { label: '企业所得税', value: '30%' },
       { label: '增值税（IVA）', value: '标准 16%；边境地区 8%' },
@@ -400,6 +417,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '伊斯兰金融背景下的现代 VAT 体系，2030 愿景带动外资准入。',
+    incomeTaxRates: [20],
     taxes: [
       { label: '企业所得税', value: '非石油行业 20%；石油天然气 50—85%' },
       { label: '增值税', value: '15%' },
@@ -422,6 +440,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '2023 年起引入联邦企业所得税，自由区与 mainland 规则差异大。',
+    incomeTaxRates: [9],
     taxes: [
       { label: '企业所得税', value: '9%（应税所得超过 37.5 万迪拉姆部分；2023年6月起）' },
       { label: '增值税', value: '5%' },
@@ -444,6 +463,7 @@ window.DAOITH_TAX_SYSTEMS = [
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
     summary: '脱欧后独立 VAT 体系，企业所得税与海关规则与欧盟脱钩。',
+    incomeTaxRates: [19, 25],
     taxes: [
       { label: '企业所得税', value: '25%（2023年4月起主税率；小企业阶梯税率）' },
       { label: '增值税', value: '标准 20%；降低 5% / 零税率' },
@@ -460,4 +480,16 @@ window.DAOITH_TAX_SYSTEMS = [
 
 window.getTaxSystemById = function getTaxSystemById(id) {
   return window.DAOITH_TAX_SYSTEMS.find((c) => c.id === id);
+};
+
+window.getTaxSystemIncomeRates = function getTaxSystemIncomeRates(id) {
+  if (!id) return [];
+  const aliases = { uk: 'gb' };
+  const systemId = aliases[id] || id;
+  const country = window.getTaxSystemById(systemId);
+  if (!country) return [];
+  if (Array.isArray(country.incomeTaxRates) && country.incomeTaxRates.length) {
+    return country.incomeTaxRates.slice();
+  }
+  return [];
 };

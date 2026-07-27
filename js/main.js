@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateExpertArticles();
     refreshPaginationLabels();
     refreshShowMoreServicesLabel();
+    syncTaxIncomeOptions();
   });
 });
 
@@ -591,30 +592,19 @@ const shippingModes = {
   platform_overseas: '平台海外仓（如FBA）',
 };
 
+/** User-specified income-tax tiers; other jurisdictions use 各地区税制介绍 */
 const taxEntityRateOptions = {
   cn: [5, 15, 25],
   cn_individual: [5, 10, 20, 30, 35],
   hk: [8.25, 16.5],
   us: [21],
   uk: [19, 25],
-  de: [25],
-  nl: [25],
-  mx: [25],
-  sg: [25],
-  ru: [25],
-  br: [25],
-  jp: [25],
-  vn: [25],
-  in: [25],
-  sa: [25],
-  other_overseas: [25],
 };
 
-/** Income-tax tiers for “其他海外公司” by jurisdiction */
-const taxOtherOverseasCountryRates = {
-  us: [21],
-  uk: [19, 25],
-};
+/** Entity keys that already have a dedicated shop-entity option */
+const taxDedicatedEntityCountries = new Set([
+  'us', 'uk', 'de', 'nl', 'mx', 'sg', 'ru', 'br', 'jp', 'vn', 'in', 'sa', 'hk',
+]);
 
 function getFormContext() {
   const platform = document.getElementById('platform').value;
@@ -651,14 +641,56 @@ function formatWan(value) {
   return `${(Number(value) || 0).toFixed(2)} 万元`;
 }
 
-function buildTaxRateOptions(entity, entityCountry) {
-  if (entity === 'other_overseas') {
-    if (entityCountry && taxOtherOverseasCountryRates[entityCountry]) {
-      return taxOtherOverseasCountryRates[entityCountry];
-    }
-    return [];
+function resolveTaxSystemRates(countryId) {
+  if (!countryId) return [];
+  if (taxEntityRateOptions[countryId]) return taxEntityRateOptions[countryId].slice();
+  if (typeof window.getTaxSystemIncomeRates === 'function') {
+    return window.getTaxSystemIncomeRates(countryId);
   }
-  return taxEntityRateOptions[entity] || [25];
+  const aliases = { uk: 'gb' };
+  const system = window.getTaxSystemById?.(aliases[countryId] || countryId);
+  return system?.incomeTaxRates ? system.incomeTaxRates.slice() : [];
+}
+
+function buildTaxRateOptions(entity, entityCountry) {
+  if (!entity) return [];
+  if (entity === 'other_overseas') {
+    return resolveTaxSystemRates(entityCountry);
+  }
+  if (taxEntityRateOptions[entity]) {
+    return taxEntityRateOptions[entity].slice();
+  }
+  return resolveTaxSystemRates(entity);
+}
+
+function syncTaxEntityCountryOptions() {
+  const countrySelect = document.getElementById('taxEntityCountry');
+  if (!countrySelect) return;
+
+  const locale = window.DAOITH_getLocale?.() || 'zh';
+  const systems = window.DAOITH_TAX_SYSTEMS || [];
+  const current = countrySelect.value;
+  const placeholder = locale === 'en' ? 'Select…' : '请选择';
+
+  const options = systems
+    .filter((c) => {
+      const entityKey = c.id === 'gb' ? 'uk' : c.id;
+      return !taxDedicatedEntityCountries.has(entityKey);
+    })
+    .map((c) => {
+      const value = c.id === 'gb' ? 'uk' : c.id;
+      const label = locale === 'en' ? (c.nameEn || c.name) : c.name;
+      return { value, label };
+    });
+
+  countrySelect.innerHTML = [
+    `<option value="">${placeholder}</option>`,
+    ...options.map((o) => `<option value="${o.value}">${o.label}</option>`),
+  ].join('');
+
+  if (options.some((o) => o.value === current)) {
+    countrySelect.value = current;
+  }
 }
 
 function syncTaxEntityCountryVisibility() {
@@ -667,6 +699,7 @@ function syncTaxEntityCountryVisibility() {
   if (!entitySelect || !countryGroup) return;
   const show = entitySelect.value === 'other_overseas';
   countryGroup.classList.toggle('is-hidden', !show);
+  if (show) syncTaxEntityCountryOptions();
 }
 
 function syncTaxIncomeOptions() {
@@ -677,13 +710,22 @@ function syncTaxIncomeOptions() {
 
   syncTaxEntityCountryVisibility();
 
-  const entity = entitySelect.value || 'cn';
+  const entity = entitySelect.value || '';
   const entityCountry = countrySelect?.value || '';
   const current = incomeSelect.value;
   const options = buildTaxRateOptions(entity, entityCountry);
+  const locale = window.DAOITH_getLocale?.() || 'zh';
+
+  if (!entity) {
+    incomeSelect.innerHTML = `<option value="">${locale === 'en' ? 'Select entity first' : '请先选择店铺主体'}</option>`;
+    return;
+  }
 
   if (!options.length) {
-    incomeSelect.innerHTML = '<option value="">请先选择店铺主体国家/地区</option>';
+    const msg = entity === 'other_overseas'
+      ? (locale === 'en' ? 'Select country/region first' : '请先选择店铺主体国家/地区')
+      : (locale === 'en' ? 'No rate found in regional tax guide' : '未在各地区税制介绍中找到税率');
+    incomeSelect.innerHTML = `<option value="">${msg}</option>`;
     return;
   }
 

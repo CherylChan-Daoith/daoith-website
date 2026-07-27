@@ -358,8 +358,13 @@ window.DAOITH_I18N_EN = {
     },
     taxEntityCountry: {
       '': 'Select…',
-      us: 'United States',
-      uk: 'United Kingdom',
+      kr: 'South Korea',
+      tw: 'Taiwan, China',
+      au: 'Australia',
+      my: 'Malaysia',
+      id: 'Indonesia',
+      th: 'Thailand',
+      ae: 'United Arab Emirates',
     },
     country: {
       '': 'Select…',
