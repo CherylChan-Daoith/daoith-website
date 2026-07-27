@@ -11,5 +11,5 @@ window.DAOITH_CONFIG = {
   wechatAppId: 'wx1706a25af11cde09',
   wechatRedirectUri: 'https://www.daoith.com/auth/wechat-callback.html',
   wechatScope: 'snsapi_login',
-  authApiBase: '',
+  authApiBase: 'https://api.daoith.com',
 };
