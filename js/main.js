@@ -257,6 +257,7 @@ function buildDifyInputs(ctx) {
   return {
     task: 'compliance_diagnosis',
     platform: ctx.platformLabel,
+    entity: ctx.entityLabel,
     country: ctx.countryLabel,
     hs_code: ctx.hsCode || '',
     revenue: ctx.revenueLabel,
@@ -350,7 +351,32 @@ function callDifyHsRate(hsCode) {
       task: 'hs_refund_rate',
       hs_code: hsCode,
     },
-    query: `请查询海关编码 ${hsCode} 的出口退税率，仅返回一行：退税率：X%（简要说明，不超过40字）`,
+    query: `你是中国出口退税政策助手。请依据国家税务总局、海关总署公开发布的出口退税税则/商品编码退税率信息，查询海关编码 ${hsCode} 的现行出口退税率。
+
+输出要求（中文，简洁）：
+1. 第一行：出口退税率：X%
+2. 第二行：数据来源：国家税务总局 / 海关总署（注明依据类型，如出口退税率文库或税则公告）
+3. 第三行：简要说明（不超过40字；若编码不完整或无法精确匹配，说明需核对完整编码）
+不要编造无法核实的税率；不确定时明确写「需人工核对官方税则」。`,
+  });
+}
+
+function callDifyDutyRate(hsCode, countryLabel) {
+  const { difyHsRateEndpoint } = getDifyConfig();
+  return callDify({
+    endpoint: difyHsRateEndpoint,
+    inputs: {
+      task: 'hs_import_duty',
+      hs_code: hsCode,
+      country: countryLabel,
+    },
+    query: `你是跨境关税政策助手。请依据【${countryLabel}】海关/关税主管部门官方税则（如海关官网、关税委员会、WTO绑定税率公开信息），查询海关编码 ${hsCode}（或其对应本国税号）在【${countryLabel}】的进口关税税率。
+
+输出要求（中文，简洁）：
+1. 第一行：目的国关税税率：X%（若有优惠税率/普通税率，分行注明）
+2. 第二行：数据来源：${countryLabel}海关官方税则（尽量写出可核对的官网类型或税则名称）
+3. 第三行：适用说明（不超过50字；注明是否可能另有反倾销税、附加税、增值税/消费税，不计入关税时请说明）
+不要编造无法核实的税率；不确定时明确写「需登录该国海关官网人工核对」。`,
   });
 }
 
@@ -462,6 +488,7 @@ function buildSolutionPrompt(ctx) {
 
 ## 客户信息
 - 电商平台：${ctx.platformLabel}
+- 店铺主体：${ctx.entityLabel}
 - 目的国/地区：${ctx.countryLabel}
 - HS编码：${ctx.hsCode || '未提供'}
 - 年销售额：${ctx.revenueLabel}
@@ -492,23 +519,51 @@ function buildSolutionPrompt(ctx) {
 const platformNames = {
   amazon: '亚马逊', walmart: '沃尔玛', shopify: 'Shopify独立站',
   ebay: 'eBay', aliexpress: '速卖通', temu: 'Temu',
-  tiktok: 'TikTok Shop', other: '其他平台',
+  tiktok: 'TikTok Shop', mercadolibre: '美客多 Mercado Libre',
+  alibaba: '阿里国际站 Alibaba.com', other: '其他平台',
+};
+
+const entityNames = {
+  cn: '中国公司',
+  cn_individual: '中国个人',
+  hk: '香港公司',
+  us: '美国公司',
+  uk: '英国公司',
+  de: '德国公司',
+  nl: '荷兰公司',
+  mx: '墨西哥公司',
+  sg: '新加坡公司',
+  ru: '俄罗斯公司',
+  br: '巴西公司',
+  jp: '日本公司',
+  vn: '越南公司',
+  in: '印度公司',
+  sa: '沙特阿拉伯公司',
+  other_overseas: '其他海外公司',
 };
 
 const countryNames = {
   us: '美国', uk: '英国', de: '德国', fr: '法国',
   jp: '日本', ca: '加拿大', au: '澳大利亚',
+  it: '意大利', es: '西班牙', kr: '韩国', mx: '墨西哥', ru: '俄罗斯',
   sea: '东南亚', me: '中东', other: '其他',
 };
 
 const revenueNames = {
-  under500: '500万以下', '500-2000': '500-2000万', '2000-5000': '2000-5000万',
-  '5000-10000': '5000-10000万', above10000: '10000万以上',
+  under500: '500万人民币以下',
+  '500-2000': '500-2000万人民币',
+  '2000-5000': '2000-5000万人民币',
+  '5000-10000': '5000-10000万人民币',
+  above10000: '10000万人民币以上',
 };
 
 const invoiceNames = {
-  special: '增值税专用发票', general: '增值税普通发票',
-  mixed: '部分专票+部分普票', none: '无法提供发票',
+  special: '增值税专票',
+  general: '增值税普票',
+  none: '无法提供发票',
+  mixed: '部分专票+部分普票',
+  special_none: '部分专票+部分无票',
+  general_none: '部分普票+部分无票',
 };
 
 const teamSizeNames = {
@@ -516,18 +571,21 @@ const teamSizeNames = {
 };
 
 const shippingModes = {
-  fba: '9810 海运备货FBA仓模式',
-  overseas: '9810 海运备货海外仓模式',
-  direct: '9610 快递小包直邮模式',
+  self_overseas: '自发货（海外仓）',
+  self_domestic: '自发货（国内直发）',
+  platform_domestic: '平台国内仓',
+  platform_overseas: '平台海外仓（如FBA）',
 };
 
 function getFormContext() {
   const platform = document.getElementById('platform').value;
+  const entity = document.getElementById('entity').value;
   const country = document.getElementById('country').value;
   const shipping = document.querySelector('input[name="shipping"]:checked')?.value;
 
   return {
     platform,
+    entity,
     country,
     shipping,
     hsCode: document.getElementById('hsCode').value.trim(),
@@ -536,6 +594,7 @@ function getFormContext() {
     invoice: document.getElementById('invoice').value,
     notes: document.getElementById('notes').value.trim(),
     platformLabel: platformNames[platform] || platform,
+    entityLabel: entityNames[entity] || entity,
     countryLabel: countryNames[country] || country,
     shippingLabel: shippingModes[shipping] || shipping,
     revenueLabel: revenueNames[document.getElementById('revenue').value] || '未填写',
@@ -544,11 +603,28 @@ function getFormContext() {
   };
 }
 
+function extractRatePercent(text) {
+  const match = text.match(/([\d.]+)\s*%/);
+  return match ? `${match[1]}%` : '';
+}
+
+function syncRadioCheckedClasses(root = document) {
+  root.querySelectorAll('.radio-item').forEach((item) => {
+    const input = item.querySelector('input[type="radio"]');
+    item.classList.toggle('is-checked', !!(input && input.checked));
+  });
+}
+
 function initAIForm() {
   const form = document.getElementById('aiForm');
   const queryBtn = document.getElementById('queryTax');
+  const dutyBtn = document.getElementById('queryDuty');
   const submitBtn = form.querySelector('button[type="submit"]');
 
+  syncRadioCheckedClasses(form);
+  form.querySelectorAll('input[name="shipping"]').forEach((input) => {
+    input.addEventListener('change', () => syncRadioCheckedClasses(form));
+  });
   queryBtn.addEventListener('click', async () => {
     const hsCode = document.getElementById('hsCode').value.trim();
     if (!hsCode) {
@@ -556,19 +632,54 @@ function initAIForm() {
       return;
     }
 
+    const rateBox = document.getElementById('refundRateBox');
+    if (rateBox) rateBox.value = '';
+
     setButtonLoading(queryBtn, true, window.DAOITH_t('ai.querying'));
     try {
       const text = await callDifyHsRate(hsCode);
+      const rate = extractRatePercent(text);
+      if (rateBox) rateBox.value = rate || '—';
 
       const rateMatch = text.match(/([\d.]+)\s*%/);
       if (rateMatch) {
-        document.getElementById('taxRefund').value = rateMatch[1];
+        const refundInput = document.getElementById('taxRefund');
+        if (refundInput) refundInput.value = rateMatch[1];
       }
-      alert(text);
     } catch (err) {
+      if (rateBox) rateBox.value = '';
       alert(err.message);
     } finally {
       setButtonLoading(queryBtn, false);
+    }
+  });
+
+  dutyBtn.addEventListener('click', async () => {
+    const hsCode = document.getElementById('hsCode').value.trim();
+    const country = document.getElementById('country').value;
+    if (!hsCode) {
+      alert(window.DAOITH_t('alert.hsCode'));
+      return;
+    }
+    if (!country) {
+      alert(window.DAOITH_t('alert.countryForDuty'));
+      return;
+    }
+
+    const rateBox = document.getElementById('dutyRateBox');
+    if (rateBox) rateBox.value = '';
+
+    const countryLabel = countryNames[country] || country;
+    setButtonLoading(dutyBtn, true, window.DAOITH_t('ai.querying'));
+    try {
+      const text = await callDifyDutyRate(hsCode, countryLabel);
+      const rate = extractRatePercent(text);
+      if (rateBox) rateBox.value = rate || '—';
+    } catch (err) {
+      if (rateBox) rateBox.value = '';
+      alert(err.message);
+    } finally {
+      setButtonLoading(dutyBtn, false);
     }
   });
 
@@ -576,7 +687,7 @@ function initAIForm() {
     e.preventDefault();
 
     const ctx = getFormContext();
-    if (!ctx.platform || !ctx.country) {
+    if (!ctx.platform || !ctx.entity || !ctx.country) {
       alert(window.DAOITH_t('alert.platformCountry'));
       return;
     }
