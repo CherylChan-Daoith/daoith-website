@@ -2928,3 +2928,40 @@ body.modal-open {
     padding: 96px 0 48px;
   }
 }
+
+/* AI form — shipping mode selected state */
+#aiForm .radio-group .radio-item {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+#aiForm .radio-group .radio-item.is-checked,
+#aiForm .radio-group .radio-item[data-checked="true"],
+#aiForm .radio-group .radio-item:has(input[type="radio"]:checked) {
+  border-color: #b8ccff;
+  background: #2251ff;
+  box-shadow: 0 0 0 2px rgba(155, 188, 255, 0.65), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+#aiForm .radio-group .radio-item.is-checked .radio-text,
+#aiForm .radio-group .radio-item[data-checked="true"] .radio-text,
+#aiForm .radio-group .radio-item:has(input[type="radio"]:checked) .radio-text {
+  color: #fff;
+  font-weight: 700;
+}
+
+#aiForm .radio-group .radio-item.is-checked .radio-mark,
+#aiForm .radio-group .radio-item[data-checked="true"] .radio-mark,
+#aiForm .radio-group .radio-item input[type="radio"]:checked + .radio-mark {
+  background: #fff;
+  border-color: #fff;
+}
+
+#aiForm .radio-group .radio-item.is-checked .radio-mark::after,
+#aiForm .radio-group .radio-item[data-checked="true"] .radio-mark::after,
+#aiForm .radio-group .radio-item input[type="radio"]:checked + .radio-mark::after {
+  opacity: 1;
+  border-left-color: #2251ff;
+  border-bottom-color: #2251ff;
+}
