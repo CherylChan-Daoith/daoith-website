@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260727o">
+  <link rel="stylesheet" href="/css/styles.css?v=20260727p">
 </head>
 <body>
 
@@ -310,7 +310,7 @@
         <p>基于业务参数，自动测算跨境电商业务的流转税成本与所得税税负。您也可以手动调整参数重新计算。</p>
         <div class="tax-form-grid">
           <div class="form-group">
-            <label>年出口销售额（万元人民币）</label>
+            <label>年出口销售额<span class="label-sub">（万元人民币）</span></label>
             <input type="number" id="taxRevenue" value="1000" min="0">
           </div>
           <div class="form-group">
@@ -361,7 +361,7 @@
             <input type="number" id="taxProductCostRate" value="55" min="0" max="100" step="0.1">
           </div>
           <div class="form-group">
-            <label>营销费率（%）（含所有平台收费）</label>
+            <label>营销费率（%）<span class="label-sub">（含所有平台收费）</span></label>
             <input type="number" id="taxMarketingRate" value="12" min="0" max="100" step="0.1">
           </div>
           <div class="form-group">
@@ -377,7 +377,7 @@
             <input type="number" id="taxOtherRate" value="4" min="0" max="100" step="0.1">
           </div>
           <div class="form-group">
-            <label>目的国进口CIF价（万元人民币）</label>
+            <label>目的国进口CIF价<span class="label-sub">（万元人民币）</span></label>
             <input type="number" id="taxCifPrice" value="700" min="0" step="0.1">
           </div>
           <div class="form-group">
