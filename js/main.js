@@ -752,10 +752,21 @@ function syncTaxIncomeOptions() {
   }
 }
 
+function ensureWeChatLogin(action) {
+  const auth = window.DAOITH_AUTH;
+  if (!auth || typeof auth.requireLogin !== 'function') {
+    alert('登录组件尚未加载，请刷新页面后重试');
+    return false;
+  }
+  if (auth.isLoggedIn?.()) return true;
+  return auth.requireLogin(action, '/#ai-solution');
+}
+
 function initAIForm() {
   const form = document.getElementById('aiForm');
   const queryBtn = document.getElementById('queryTax');
   const dutyBtn = document.getElementById('queryDuty');
+  if (!form) return;
   const submitBtn = form.querySelector('button[type="submit"]');
 
   queryBtn.addEventListener('click', async () => {
@@ -819,9 +830,7 @@ function initAIForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    if (!window.DAOITH_AUTH?.requireLogin?.('ai-generate', '/#ai-solution')) {
-      return;
-    }
+    if (!ensureWeChatLogin('ai-generate')) return;
 
     const ctx = getFormContext();
     if (!ctx.platform || !ctx.entity || !ctx.country) {
@@ -871,9 +880,7 @@ function initTaxCalculator() {
   });
 
   calcBtn.addEventListener('click', async () => {
-    if (!window.DAOITH_AUTH?.requireLogin?.('tax-calc', '/#ai-solution')) {
-      return;
-    }
+    if (!ensureWeChatLogin('tax-calc')) return;
 
     const revenue = parseFloat(document.getElementById('taxRevenue').value) || 0;
     const refundRate = parseFloat(document.getElementById('taxRefund').value) || 0;

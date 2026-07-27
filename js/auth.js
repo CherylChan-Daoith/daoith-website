@@ -94,13 +94,21 @@
   }
 
   function requireLogin(action, returnUrl) {
-    if (isLoggedIn()) return true;
-    if (action) sessionStorage.setItem(PENDING_KEY, action);
-    saveFormState();
-    sessionStorage.setItem(RETURN_KEY, returnUrl || `${window.location.pathname}${window.location.search}${window.location.hash || '#ai-solution'}`);
-    alert(t('auth.loginRequired'));
-    startWeChatLogin();
-    return false;
+    try {
+      if (isLoggedIn()) return true;
+      if (action) sessionStorage.setItem(PENDING_KEY, action);
+      saveFormState();
+      const fallbackReturn = `${window.location.pathname}${window.location.search}${window.location.hash || '#ai-solution'}`;
+      sessionStorage.setItem(RETURN_KEY, returnUrl || fallbackReturn);
+      window.alert(t('auth.loginRequired') || '请先微信登录后再使用该功能，登录后将自动继续。');
+      startWeChatLogin();
+      return false;
+    } catch (err) {
+      console.error('requireLogin failed', err);
+      window.alert('请先微信登录后再使用该功能');
+      try { startWeChatLogin(); } catch (_) { /* ignore */ }
+      return false;
+    }
   }
 
   function consumePendingAction() {
