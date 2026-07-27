@@ -49,12 +49,8 @@ class Handler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
     def end_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header(
-            "Access-Control-Allow-Headers",
-            "Content-Type, X-Dify-API-Key, X-Dify-API-Base, X-Dify-Endpoint, Authorization",
-        )
+        # CORS is handled by the public reverse proxy (api.daoith.com).
+        # Do not emit Access-Control-* here, or browsers will see duplicate headers.
         super().end_headers()
 
     def do_OPTIONS(self):
