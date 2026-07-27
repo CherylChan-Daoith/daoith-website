@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>香港税务师 · 30天打卡备考</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --error: #dc2626;
+      --error-bg: #fee2e2;
+      --orange: #f97316;
+      --orange-light: #fff7ed;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --radius: 12px;
+      --shadow: 0 4px 24px rgba(0,0,0,.12);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+      color: #fff;
+      padding: 2rem 1.5rem 2.5rem;
+      text-align: center;
+    }
+
+    .header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: .5rem; }
+    .header .subtitle { opacity: .9; font-size: .9rem; margin-bottom: 1rem; }
+
+    .tags { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-bottom: 1rem; }
+    .tag {
+      background: rgba(255,255,255,.2);
+      padding: .25rem .75rem;
+      border-radius: 999px;
+      font-size: .8rem;
+    }
+
+    .stats {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      background: rgba(255,255,255,.15);
+      padding: .5rem 1.25rem;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: center;
+      gap: .75rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .35rem;
+      padding: .55rem 1.25rem;
+      border: none;
+      border-radius: 999px;
+      font-size: .875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-outline {
+      background: rgba(255,255,255,.15);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.4);
+    }
+    .btn-outline:hover { background: rgba(255,255,255,.25); }
+    .btn-danger { background: var(--error); color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-secondary { background: var(--gray-200); color: var(--gray-700); }
+    .btn-secondary:hover { background: var(--gray-100); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .day-card {
+      background: #fff;
+      border: 2px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color .2s, box-shadow .2s, transform .1s;
+      position: relative;
+      min-height: 100px;
+    }
+    .day-card:hover {
+      border-color: var(--primary);
+      box-shadow: 0 2px 12px rgba(37,99,235,.15);
+      transform: translateY(-2px);
+    }
+    .day-card.completed { border-color: var(--success); background: #f0fdf4; }
+    .day-card .day-num {
+      font-size: .75rem;
+      color: var(--gray-500);
+      font-weight: 600;
+      margin-bottom: .35rem;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .35rem;
+    }
+    .day-card .paper-tag {
+      font-size: .65rem;
+      font-weight: 800;
+      padding: .12rem .42rem;
+      border-radius: 4px;
+      letter-spacing: .03em;
+      line-height: 1;
+    }
+    .day-card .paper-tag.p2 { background: #dbeafe; color: #1d4ed8; }
+    .day-card .paper-tag.p3 { background: #ede9fe; color: #6d28d9; }
+    .day-card .paper-tag.p5 { background: #ffedd5; color: #c2410c; }
+    .day-card.paper-p2 { border-left: 3px solid #3b82f6; }
+    .day-card.paper-p3 { border-left: 3px solid #8b5cf6; }
+    .day-card.paper-p5 { border-left: 3px solid #f97316; }
+    .day-card .day-topic {
+      font-size: .85rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      line-height: 1.4;
+    }
+    .day-card .check {
+      position: absolute;
+      top: .5rem;
+      right: .5rem;
+      width: 22px;
+      height: 22px;
+      background: var(--success);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .7rem;
+    }
+
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .overlay.active { display: flex; }
+
+    .modal {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 640px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .modal-header h2 { font-size: 1.1rem; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--gray-500);
+      line-height: 1;
+      padding: .25rem;
+    }
+    .modal-close:hover { color: var(--gray-900); }
+
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .tab {
+      flex: 1;
+      padding: .85rem;
+      background: none;
+      border: none;
+      font-size: .9rem;
+      font-weight: 600;
+      color: var(--gray-500);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color .2s, border-color .2s;
+    }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .content-text {
+      font-size: .95rem;
+      color: var(--gray-700);
+      line-height: 1.8;
+    }
+
+    .content-lead {
+      font-size: 1rem;
+      color: var(--gray-700);
+      line-height: 1.8;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .paper-badge {
+      display: inline-block;
+      background: #eff6ff;
+      color: var(--primary);
+      font-size: .75rem;
+      font-weight: 700;
+      padding: .2rem .65rem;
+      border-radius: 999px;
+      margin-bottom: .75rem;
+    }
+
+    .content-section {
+      margin-bottom: 1.5rem;
+    }
+
+    .section-heading {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: .6rem;
+      padding-left: .75rem;
+      border-left: 3px solid var(--primary);
+    }
+
+    .section-list {
+      padding-left: 1.25rem;
+      font-size: .9rem;
+      color: var(--gray-700);
+    }
+    .section-list li { margin-bottom: .35rem; }
+
+    .section-body {
+      font-size: .9rem;
+      color: var(--gray-700);
+      line-height: 1.75;
+      white-space: pre-wrap;
+    }
+
+    .ref-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      margin-top: .5rem;
+    }
+    .ref-links a {
+      font-size: .8rem;
+      color: var(--primary);
+      text-decoration: none;
+      background: #eff6ff;
+      padding: .3rem .7rem;
+      border-radius: 6px;
+    }
+    .ref-links a:hover { text-decoration: underline; }
+
+    .dify-supplement {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+    }
+    .dify-supplement h3 {
+      font-size: .9rem;
+      color: var(--success);
+      margin-bottom: .75rem;
+    }
+    .dify-text {
+      font-size: .9rem;
+      color: var(--gray-700);
+      line-height: 1.75;
+      white-space: pre-wrap;
+    }
+
+    .dify-loading {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      color: var(--gray-500);
+      font-size: .875rem;
+      padding: 1rem 0;
+    }
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--gray-200);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .settings-form { display: flex; flex-direction: column; gap: 1rem; }
+    .form-group label {
+      display: block;
+      font-size: .85rem;
+      font-weight: 600;
+      margin-bottom: .35rem;
+      color: var(--gray-700);
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: .6rem .85rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      font-size: .9rem;
+    }
+    .form-hint {
+      font-size: .78rem;
+      color: var(--gray-500);
+      margin-top: .25rem;
+      line-height: 1.5;
+    }
+    .form-hint code {
+      background: var(--gray-100);
+      padding: .1rem .35rem;
+      border-radius: 4px;
+      font-size: .75rem;
+    }
+
+    .question-block { margin-bottom: 1.75rem; }
+    .question-block:last-child { margin-bottom: 0; }
+    .q-title {
+      font-weight: 600;
+      margin-bottom: .75rem;
+      font-size: .95rem;
+    }
+    .q-num { color: var(--primary); }
+
+    .options { display: flex; flex-direction: column; gap: .5rem; }
+    .option {
+      display: flex;
+      align-items: flex-start;
+      gap: .6rem;
+      padding: .75rem 1rem;
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      font-size: .9rem;
+    }
+    .option:hover:not(.disabled) { border-color: var(--primary); }
+    .option.selected { border-color: var(--primary); background: #eff6ff; }
+    .option.correct { border-color: var(--success); background: var(--success-bg); }
+    .option.wrong { border-color: var(--error); background: var(--error-bg); }
+    .option.disabled { cursor: default; }
+    .option-label {
+      flex-shrink: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--gray-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--gray-500);
+    }
+    .option.selected .option-label { background: var(--primary); color: #fff; }
+    .option.correct .option-label { background: var(--success); color: #fff; }
+    .option.wrong .option-label { background: var(--error); color: #fff; }
+
+    .explanation {
+      margin-top: .75rem;
+      padding: .75rem 1rem;
+      background: var(--orange-light);
+      border-left: 4px solid var(--orange);
+      border-radius: 0 8px 8px 0;
+      font-size: .85rem;
+      color: var(--gray-700);
+      display: none;
+    }
+    .explanation.show { display: block; }
+
+    .modal-footer {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--gray-200);
+      display: flex;
+      gap: .75rem;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .kb-cache-box {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: var(--radius);
+    }
+    .kb-cache-box h4 {
+      font-size: .9rem;
+      color: #991b1b;
+      margin-bottom: .35rem;
+    }
+    .kb-cache-box p {
+      font-size: .8rem;
+      color: var(--gray-600);
+      margin-bottom: .75rem;
+      line-height: 1.5;
+    }
+    .kb-cache-box .btn { width: 100%; }
+
+    .toast {
+      position: fixed;
+      bottom: 5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--gray-900);
+      color: #fff;
+      padding: .75rem 1.5rem;
+      border-radius: 999px;
+      font-size: .875rem;
+      z-index: 200;
+      opacity: 0;
+      transition: opacity .3s, transform .3s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .fab {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--error);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: .85rem 1.5rem;
+      font-size: .95rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(220,38,38,.4);
+      z-index: 50;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .fab:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 28px rgba(220,38,38,.5);
+    }
+
+    .confirm-dialog .modal-body { text-align: center; }
+    .confirm-dialog p { margin-bottom: 1rem; color: var(--gray-700); }
+
+    .lang-switcher {
+      display: inline-flex;
+      background: rgba(255,255,255,.15);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+      margin-bottom: .75rem;
+    }
+    .lang-btn {
+      padding: .35rem .85rem;
+      border: none;
+      border-radius: 999px;
+      font-size: .8rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: rgba(255,255,255,.75);
+      transition: background .15s, color .15s;
+    }
+    .lang-btn.active { background: #fff; color: var(--primary); }
+
+    .kb-content-block {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      white-space: pre-wrap;
+      font-size: .9rem;
+      line-height: 1.75;
+    }
+    .kb-badge {
+      display: inline-block;
+      background: #16a34a;
+      color: #fff;
+      font-size: .7rem;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      margin-bottom: .5rem;
+    }
+    .content-basis {
+      display: inline-block;
+      background: #eff6ff;
+      color: var(--primary);
+      font-size: .75rem;
+      font-weight: 700;
+      padding: .2rem .65rem;
+      border-radius: 999px;
+      margin-bottom: .5rem;
+    }
+    .past-paper-section { background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius); padding: 1rem; }
+    .quiz-hint { font-size: .85rem; color: var(--gray-600); margin-bottom: .5rem; }
+    .static-fallback { opacity: .85; font-size: .85rem; color: var(--gray-500); margin-bottom: .75rem; }
+
+    .sync-progress { text-align: center; padding: 1.5rem; }
+    .sync-progress .spinner { margin: 0 auto 1rem; }
+
+    @media (max-width: 480px) {
+      .header h1 { font-size: 1.25rem; }
+      .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: .75rem; }
+      .day-card { padding: .75rem; min-height: 85px; }
+      .fab { bottom: 1rem; right: 1rem; padding: .75rem 1.25rem; font-size: .875rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="lang-switcher">
+      <button class="lang-btn active" id="langZh" type="button">中文</button>
+      <button class="lang-btn" id="langEn" type="button">English</button>
+    </div>
+    <h1 id="i18nTitle">香港税务师 · 30天打卡备考</h1>
+    <p class="subtitle" id="i18nSubtitle">科目二 · 科目三 · 科目五 系统复习计划</p>
+    <div class="tags">
+      <span class="tag" id="i18nTag2">科目二：香港税务</span>
+      <span class="tag" id="i18nTag3">科目三：国际税务</span>
+      <span class="tag" id="i18nTag5">科目五：高级税务实务</span>
+    </div>
+    <div class="stats" id="stats">✅ 0/30 天</div>
+    <div class="toolbar">
+      <button class="btn btn-outline" id="resetAllBtn">重置全部进度</button>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="grid" id="dayGrid"></div>
+  </main>
+
+  <button class="fab" id="weaknessFab">🎯 弱点攻破</button>
+
+  <!-- Day Modal -->
+  <div class="overlay" id="dayOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="dayModalTitle">第 1 天</h2>
+        <button class="modal-close" id="dayModalClose">&times;</button>
+      </div>
+      <div class="tabs">
+        <button class="tab active" data-tab="content" id="tabContent">📖 学习内容</button>
+        <button class="tab" data-tab="quiz" id="tabQuiz">📝 随堂测验</button>
+      </div>
+      <div class="modal-body" id="dayModalBody"></div>
+      <div class="modal-footer" id="dayModalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Weakness Modal -->
+  <div class="overlay" id="weaknessOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="weaknessModalTitle">🎯 弱点攻破练习</h2>
+        <button class="modal-close" id="weaknessModalClose">&times;</button>
+      </div>
+      <div class="modal-body" id="weaknessModalBody"></div>
+      <div class="modal-footer" id="weaknessModalFooter"></div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="overlay" id="confirmOverlay">
+    <div class="modal confirm-dialog" style="max-width:400px">
+      <div class="modal-header">
+        <h2 id="confirmTitle">确认操作</h2>
+        <button class="modal-close" id="confirmModalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage">确定要重置全部进度吗？此操作不可撤销。</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="confirmCancel">取消</button>
+        <button class="btn btn-danger" id="confirmOk">确定重置</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="exam-i18n.js"></script>
+  <script src="exam-content.js"></script>
+  <script src="exam-content-en.js"></script>
+  <script src="exam-questions.js"></script>
+  <script src="exam-questions-en.js"></script>
+  <script src="exam-locale.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    const STORAGE_KEY = 'hkTaxExam30Day';
+
+    const t = (...args) => ExamLocale.t(...args);
+    const getLocale = () => ExamLocale.getLocale();
+
+    // ─── Question Bank (locale-aware) ───
+    function getQuestionBank() {
+      return ExamLocale.getQuestionBank(getLocale());
+    }
+    function rebuildQuestionMap() {
+      const bank = getQuestionBank();
+      return Object.fromEntries(bank.map(q => [q.id, q]));
+    }
+    let questionMap = rebuildQuestionMap();
+
+    // ─── 30-Day Content (locale-aware) ───
+    function getDailyContent(day) {
+      return ExamLocale.getDailyContent(day, getLocale());
+    }
+
+    // ─── Daily Quiz Mapping (5-10 questions per day) ───
+    const dailyQuizzes = window.EXAM_DAILY_QUIZZES || {};
+
+    // ─── State ───
+    let state = loadState();
+    let currentDay = null;
+    let currentTab = 'content';
+    let weaknessQuestions = [];
+    let weaknessAnswers = {};
+    let weaknessSubmitted = false;
+
+    function getDayQuestions(day) {
+      return ExamLocale.getDayQuestions(day, getLocale());
+    }
+
+    function getQuestionCount(day) {
+      return (dailyQuizzes[day] || []).length;
+    }
+
+    function applyLocale() {
+      const locale = getLocale();
+      document.documentElement.lang = locale === 'en' ? 'en' : 'zh-HK';
+      document.getElementById('i18nTitle').textContent = t('title');
+      document.getElementById('i18nSubtitle').textContent = t('subtitle');
+      document.getElementById('i18nTag2').textContent = t('tag2');
+      document.getElementById('i18nTag3').textContent = t('tag3');
+      document.getElementById('i18nTag5').textContent = t('tag5');
+      document.getElementById('tabContent').textContent = t('tabContent');
+      document.getElementById('tabQuiz').textContent = t('tabQuiz');
+      document.getElementById('weaknessFab').textContent = t('weakness');
+      document.getElementById('resetAllBtn').textContent = t('resetAll');
+      document.getElementById('weaknessModalTitle').textContent = t('weaknessTitle');
+      document.getElementById('confirmTitle').textContent = t('confirmTitle');
+      document.getElementById('confirmCancel').textContent = t('cancel');
+      document.getElementById('confirmOk').textContent = t('confirmOk');
+      document.getElementById('langZh').classList.toggle('active', locale === 'zh');
+      document.getElementById('langEn').classList.toggle('active', locale === 'en');
+      questionMap = rebuildQuestionMap();
+      renderGrid();
+      if (currentDay) {
+        document.getElementById('dayModalTitle').textContent = t('dayTitle', { d: currentDay, topic: ExamLocale.getDayTopic(currentDay) });
+        renderDayModalBody();
+        renderDayModalFooter();
+      }
+    }
+
+    function defaultState() {
+      return {
+        completedDays: [],
+        dayAnswers: {},
+        mistakeLog: [],
+        weaknessAttempted: []
+      };
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return { ...defaultState(), ...JSON.parse(raw) };
+      } catch (e) { /* ignore */ }
+      return defaultState();
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function getAttemptedIds() {
+      const ids = new Set(state.weaknessAttempted);
+      state.completedDays.forEach(day => {
+        (dailyQuizzes[day] || []).forEach(id => ids.add(id));
+      });
+      return ids;
+    }
+
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    function getPaperShort(day) {
+      const paper = getDailyContent(day)?.paper || '';
+      const m = paper.match(/(\d+)/);
+      return m ? 'P' + m[1] : '';
+    }
+
+    function getPaperClass(day) {
+      const p = getPaperShort(day).toLowerCase();
+      return p ? 'paper-' + p : '';
+    }
+
+    // ─── Render Grid ───
+    function renderGrid() {
+      const grid = document.getElementById('dayGrid');
+      const completed = new Set(state.completedDays);
+      document.getElementById('stats').textContent = t('stats', { n: completed.size });
+
+      grid.innerHTML = '';
+      for (let d = 1; d <= 30; d++) {
+        const topic = ExamLocale.getDayTopic(d);
+        const paperShort = getPaperShort(d);
+        const paperCls = getPaperClass(d);
+        const card = document.createElement('div');
+        card.className = 'day-card' + (paperCls ? ' ' + paperCls : '') + (completed.has(d) ? ' completed' : '');
+        card.innerHTML = `
+          <div class="day-num">
+            ${paperShort ? `<span class="paper-tag ${paperCls.replace('paper-', '')}">${paperShort}</span>` : ''}
+            <span>Day ${d} · ${t('questions', { n: getQuestionCount(d) })}</span>
+          </div>
+          <div class="day-topic">${topic}</div>
+          ${completed.has(d) ? '<div class="check">✓</div>' : ''}
+        `;
+        card.addEventListener('click', () => openDayModal(d));
+        grid.appendChild(card);
+      }
+    }
+
+    // ─── Day Modal ───
+    function openDayModal(day) {
+      currentDay = day;
+      currentTab = 'content';
+      document.getElementById('dayModalTitle').textContent = t('dayTitle', { d: day, topic: ExamLocale.getDayTopic(day) });
+      updateDayTabs();
+      renderDayModalBody();
+      renderDayModalFooter();
+      document.getElementById('dayOverlay').classList.add('active');
+    }
+
+    function closeDayModal() {
+      document.getElementById('dayOverlay').classList.remove('active');
+      currentDay = null;
+    }
+
+    function updateDayTabs() {
+      document.querySelectorAll('#dayOverlay .tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === currentTab);
+      });
+    }
+
+    function isDayCompleted(day) {
+      return state.completedDays.includes(day);
+    }
+
+    function renderDayModalBody() {
+      const body = document.getElementById('dayModalBody');
+      if (currentTab === 'content') {
+        body.innerHTML = renderContentHTML(currentDay);
+        return;
+      }
+
+      const questions = getDayQuestions(currentDay);
+      const completed = isDayCompleted(currentDay);
+      const answers = state.dayAnswers[currentDay] || {};
+
+      let html = '';
+      questions.forEach((q, idx) => {
+        if (!q) return;
+        const src = q.source || '';
+        html += `<div class="question-block" data-idx="${idx}">
+          <div class="q-title"><span class="q-num">Q${idx + 1}.</span> ${q.question}${src ? `<span style="font-size:.75rem;color:var(--gray-500);margin-left:.5rem">[${src}]</span>` : ''}</div>
+          <div class="options">`;
+        q.options.forEach((opt, oi) => {
+          let cls = 'option';
+          if (completed) {
+            cls += ' disabled';
+            if (oi === q.answer) cls += ' correct';
+            else if (answers[idx] === oi) cls += ' wrong';
+          } else if (answers[idx] === oi) {
+            cls += ' selected';
+          }
+          const labels = ['A', 'B', 'C', 'D'];
+          html += `<div class="${cls}" data-idx="${idx}" data-opt="${oi}">
+            <span class="option-label">${labels[oi]}</span>
+            <span>${opt}</span>
+          </div>`;
+        });
+        html += `</div>
+          <div class="explanation${completed ? ' show' : ''}">${t('explain')} ${q.explanation}</div>
+        </div>`;
+      });
+      body.innerHTML = html;
+
+      if (!completed) {
+        body.querySelectorAll('.option').forEach(el => {
+          el.addEventListener('click', () => {
+            const idx = +el.dataset.idx;
+            const opt = +el.dataset.opt;
+            if (!state.dayAnswers[currentDay]) state.dayAnswers[currentDay] = {};
+            state.dayAnswers[currentDay][idx] = opt;
+            renderDayModalBody();
+          });
+        });
+      }
+    }
+
+    function renderDayModalFooter() {
+      const footer = document.getElementById('dayModalFooter');
+      if (currentTab === 'content') {
+        footer.innerHTML = '';
+        return;
+      }
+
+      if (currentTab !== 'quiz') {
+        footer.innerHTML = '';
+        return;
+      }
+
+      if (isDayCompleted(currentDay)) {
+        footer.innerHTML = `<button class="btn btn-secondary" id="resetDayBtn">${t('resetDay')}</button>`;
+        document.getElementById('resetDayBtn').addEventListener('click', resetDay);
+      } else {
+        footer.innerHTML = `<button class="btn btn-primary" id="submitQuizBtn">${t('submitQuiz')}</button>`;
+        document.getElementById('submitQuizBtn').addEventListener('click', submitDayQuiz);
+      }
+    }
+
+    function submitDayQuiz() {
+      const questions = getDayQuestions(currentDay);
+      const answers = state.dayAnswers[currentDay] || {};
+
+      for (let i = 0; i < questions.length; i++) {
+        if (answers[i] === undefined) {
+          showToast(t('answerAll'));
+          return;
+        }
+      }
+
+      questions.forEach((q, idx) => {
+        if (answers[idx] !== q.answer) {
+          const qid = q.id || `kb-${currentDay}-${idx}`;
+          state.mistakeLog.push({ id: qid, day: currentDay, wrongOption: answers[idx] });
+        }
+      });
+
+      if (!state.completedDays.includes(currentDay)) {
+        state.completedDays.push(currentDay);
+        state.completedDays.sort((a, b) => a - b);
+      }
+      saveState();
+      renderGrid();
+      renderDayModalBody();
+      renderDayModalFooter();
+    }
+
+    function resetDay(day) {
+      const d = day || currentDay;
+      state.completedDays = state.completedDays.filter(x => x !== d);
+      delete state.dayAnswers[d];
+      state.mistakeLog = state.mistakeLog.filter(m => m.day !== d);
+      saveState();
+      renderGrid();
+      if (currentDay === d) {
+        renderDayModalBody();
+        renderDayModalFooter();
+      }
+    }
+
+    // ─── Weakness Attack ───
+    function getMistakeTopics() {
+      const topics = new Set();
+      state.mistakeLog.forEach(m => {
+        const q = questionMap[m.id];
+        if (q) topics.add(q.topic);
+        else if (m.day) topics.add(ExamLocale.getDayTopic(m.day));
+      });
+      return topics;
+    }
+
+    function pickWeaknessQuestions() {
+      const mistakeDays = new Set(state.mistakeLog.map(m => m.day).filter(Boolean));
+      const topics = getMistakeTopics();
+      if (topics.size === 0 && mistakeDays.size === 0) return [];
+
+      const attempted = getAttemptedIds();
+      const pool = [];
+
+      getQuestionBank().forEach(q => {
+        if (topics.has(q.topic) && !attempted.has(q.id)) pool.push(q);
+      });
+
+      shuffle(pool);
+      return pool.slice(0, 5);
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+    }
+
+    function openWeaknessModal() {
+      if (state.mistakeLog.length === 0) {
+        showToast(t('weaknessEmpty'));
+        return;
+      }
+
+      weaknessQuestions = pickWeaknessQuestions();
+      weaknessAnswers = {};
+      weaknessSubmitted = false;
+
+      if (weaknessQuestions.length === 0) {
+        showToast(t('weaknessDone'));
+        return;
+      }
+
+      renderWeaknessModal();
+      document.getElementById('weaknessOverlay').classList.add('active');
+    }
+
+    function closeWeaknessModal() {
+      document.getElementById('weaknessOverlay').classList.remove('active');
+    }
+
+    function renderWeaknessModal() {
+      const body = document.getElementById('weaknessModalBody');
+      const footer = document.getElementById('weaknessModalFooter');
+
+      const topics = [...getMistakeTopics()].join(getLocale() === 'en' ? ', ' : '、');
+      let html = `<p style="font-size:.85rem;color:var(--gray-500);margin-bottom:1rem">${t('weakTopics')}${topics}</p>`;
+
+      weaknessQuestions.forEach((q, idx) => {
+        html += `<div class="question-block" data-widx="${idx}">
+          <div class="q-title"><span class="q-num">Q${idx + 1}.</span> ${q.question}</div>
+          <div class="options">`;
+        q.options.forEach((opt, oi) => {
+          let cls = 'option';
+          if (weaknessSubmitted) {
+            cls += ' disabled';
+            if (oi === q.answer) cls += ' correct';
+            else if (weaknessAnswers[idx] === oi) cls += ' wrong';
+          } else if (weaknessAnswers[idx] === oi) {
+            cls += ' selected';
+          }
+          const labels = ['A', 'B', 'C', 'D'];
+          html += `<div class="${cls}" data-widx="${idx}" data-opt="${oi}">
+            <span class="option-label">${labels[oi]}</span>
+            <span>${opt}</span>
+          </div>`;
+        });
+        html += `</div>
+          <div class="explanation${weaknessSubmitted ? ' show' : ''}">${t('explain')} ${q.explanation}</div>
+        </div>`;
+      });
+      body.innerHTML = html;
+
+      if (!weaknessSubmitted) {
+        body.querySelectorAll('.option').forEach(el => {
+          el.addEventListener('click', () => {
+            weaknessAnswers[+el.dataset.widx] = +el.dataset.opt;
+            renderWeaknessModal();
+          });
+        });
+        footer.innerHTML = `<button class="btn btn-primary" id="submitWeaknessBtn">${t('submitQuiz')}</button>`;
+        document.getElementById('submitWeaknessBtn').addEventListener('click', submitWeakness);
+      } else {
+        footer.innerHTML = `
+          <button class="btn btn-secondary" id="weaknessCloseBtn">${t('close')}</button>
+          <button class="btn btn-danger" id="weaknessAgainBtn">${t('weaknessAgain')}</button>
+        `;
+        document.getElementById('weaknessCloseBtn').addEventListener('click', closeWeaknessModal);
+        document.getElementById('weaknessAgainBtn').addEventListener('click', weaknessAgain);
+      }
+    }
+
+    function submitWeakness() {
+      for (let i = 0; i < weaknessQuestions.length; i++) {
+        if (weaknessAnswers[i] === undefined) {
+          showToast(t('answerAll'));
+          return;
+        }
+      }
+
+      weaknessQuestions.forEach((q, idx) => {
+        if (!state.weaknessAttempted.includes(q.id)) {
+          state.weaknessAttempted.push(q.id);
+        }
+        if (weaknessAnswers[idx] !== q.answer) {
+          state.mistakeLog.push({ id: q.id, day: null, wrongOption: weaknessAnswers[idx] });
+        }
+      });
+
+      weaknessSubmitted = true;
+      saveState();
+      renderWeaknessModal();
+    }
+
+    function weaknessAgain() {
+      weaknessQuestions = pickWeaknessQuestions();
+      weaknessAnswers = {};
+      weaknessSubmitted = false;
+
+      if (weaknessQuestions.length === 0) {
+        showToast(t('weaknessDone'));
+        closeWeaknessModal();
+        return;
+      }
+      renderWeaknessModal();
+    }
+
+    // ─── Rich Content Rendering ───
+    function renderPastPaperSection(day) {
+      const questions = getDayQuestions(day);
+      if (!questions.length) return '';
+      const sources = [...new Set(questions.map(q => q.source))];
+      let html = `<div class="content-section past-paper-section"><h3 class="section-heading">${t('pastPaperSection')}</h3>`;
+      html += `<p class="quiz-hint">${t('quizHint', { n: questions.length })}</p>`;
+      html += `<p style="font-size:.8rem;color:var(--gray-500);margin-bottom:.5rem">${sources.join(' · ')}</p><ul class="section-list">`;
+      questions.forEach((q, i) => {
+        const preview = q.question.length > 72 ? q.question.slice(0, 72) + '…' : q.question;
+        html += `<li><strong>Q${i + 1}.</strong> ${escapeHtml(preview)}</li>`;
+      });
+      html += '</ul></div>';
+      return html;
+    }
+
+    function renderContentHTML(day) {
+      const data = getDailyContent(day);
+      let html = '';
+
+      if (data?.paper) html += `<span class="paper-badge">${data.paper}</span>`;
+      html += `<p class="content-basis">${t('contentBasis')}</p>`;
+      html += `<p class="static-fallback">${t('contentBasisDesc')}</p>`;
+      html += `<p class="content-lead">${data?.summary || ''}</p>`;
+
+      (data?.sections || []).forEach(sec => {
+        html += `<div class="content-section"><h3 class="section-heading">${sec.heading}</h3>`;
+        if (sec.items) {
+          html += '<ul class="section-list">';
+          sec.items.forEach(item => { html += `<li>${item}</li>`; });
+          html += '</ul>';
+        }
+        if (sec.body) html += `<div class="section-body">${sec.body}</div>`;
+        if (sec.links) {
+          html += '<div class="ref-links">';
+          sec.links.forEach(l => {
+            html += `<a href="${l.url}" target="_blank" rel="noopener noreferrer">${l.text}</a>`;
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+
+      html += renderPastPaperSection(day);
+      return html;
+    }
+
+    function escapeHtml(text) {
+      const d = document.createElement('div');
+      d.textContent = text;
+      return d.innerHTML;
+    }
+
+    // ─── Confirm Dialog ───
+    let confirmCallback = null;
+
+    function showConfirm(msg, callback) {
+      document.getElementById('confirmMessage').textContent = msg;
+      confirmCallback = callback;
+      document.getElementById('confirmOverlay').classList.add('active');
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirmOverlay').classList.remove('active');
+      confirmCallback = null;
+    }
+
+    // ─── Event Bindings ───
+    document.querySelectorAll('#dayOverlay .tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        currentTab = tab.dataset.tab;
+        updateDayTabs();
+        renderDayModalBody();
+        renderDayModalFooter();
+      });
+    });
+
+    document.getElementById('dayModalClose').addEventListener('click', closeDayModal);
+    document.getElementById('dayOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeDayModal();
+    });
+
+    document.getElementById('weaknessFab').addEventListener('click', openWeaknessModal);
+    document.getElementById('weaknessModalClose').addEventListener('click', closeWeaknessModal);
+    document.getElementById('weaknessOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeWeaknessModal();
+    });
+
+    document.getElementById('resetAllBtn').addEventListener('click', () => {
+      showConfirm(t('confirmReset'), () => {
+        state = defaultState();
+        saveState();
+        renderGrid();
+        closeConfirm();
+        showToast(t('resetDone'));
+      });
+    });
+
+    document.getElementById('langZh').addEventListener('click', () => {
+      ExamLocale.setLocale('zh');
+      applyLocale();
+    });
+    document.getElementById('langEn').addEventListener('click', () => {
+      ExamLocale.setLocale('en');
+      applyLocale();
+    });
+
+    document.getElementById('confirmCancel').addEventListener('click', closeConfirm);
+    document.getElementById('confirmModalClose').addEventListener('click', closeConfirm);
+    document.getElementById('confirmOk').addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+    });
+    document.getElementById('confirmOverlay').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeConfirm();
+    });
+
+    // ─── Init ───
+    applyLocale();
+  })();
+  </script>
+</body>
+</html>
