@@ -938,14 +938,126 @@ function initShowMoreServices() {
 /* Hub Tabs */
 function initHubTabs() {
   const tabs = document.querySelectorAll('.hub-tab');
+  const tabPanes = {
+    orders: document.getElementById('ordersTab'),
+    quotes: document.getElementById('quotesTab'),
+    feedback: document.getElementById('feedbackTab'),
+  };
+
+  function showTab(name) {
+    Object.entries(tabPanes).forEach(([k, el]) => {
+      if (el) el.style.display = k === name ? '' : 'none';
+    });
+    if (name === 'quotes') renderQuotesList();
+  if (name === 'orders') renderHubProgress();
+  }
+
   tabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       tabs.forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
-
-      document.getElementById('ordersTab').style.display = tab.dataset.tab === 'orders' ? '' : 'none';
-      document.getElementById('feedbackTab').style.display = tab.dataset.tab === 'feedback' ? '' : 'none';
+      showTab(tab.dataset.tab);
     });
+  });
+
+  renderHubProgress();
+}
+
+function getQuotes() {
+  try {
+    const raw = localStorage.getItem('daoith_quotes');
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch { return []; }
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatWanHub(v) {
+  return `¥${(Number(v) || 0).toFixed(2)} 万元`;
+}
+
+function renderQuotesList() {
+  const wrap = document.getElementById('quotesListWrap');
+  if (!wrap) return;
+  const quotes = getQuotes();
+  if (!quotes.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📬</div><h4>暂无询价记录</h4><p>在购物车提交询价后，记录将显示在这里</p></div>`;
+    return;
+  }
+  wrap.innerHTML = quotes.map((q, i) => {
+    const services = (q.items || []).map((it) => `${it.title} × ${it.qty}`).join('、');
+    return `
+      <div class="quote-record">
+        <div class="quote-record-head">
+          <span class="quote-record-no">询价 #${quotes.length - i}</span>
+          <span class="quote-record-date">${formatDate(q.createdAt)}</span>
+          <span class="quote-record-status">待跟进</span>
+        </div>
+        <div class="quote-record-body">
+          <div><strong>公司：</strong>${q.company || '—'} &nbsp; <strong>联系人：</strong>${q.contact || '—'} &nbsp; <strong>电话：</strong>${q.phone || '—'}</div>
+          <div class="quote-record-services">${services || '—'}</div>
+          <div class="quote-record-total">预计总价：${formatWanHub(q.total)}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderHubProgress() {
+  const wrap = document.getElementById('hubProgressWrap') || document.getElementById('quoteProgressWrap');
+  if (!wrap) return;
+  const quotes = getQuotes();
+  if (!quotes.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="icon icon-muted">—</div><h4>暂未提交询价</h4><p>在购物车提交询价后，顾问会跟进并在此更新进度</p><a href="/cart.html" class="btn btn-primary btn-sm" style="margin-top:12px">前往购物车</a></div>`;
+    return;
+  }
+  const latest = quotes[0];
+  const services = (latest.items || []).map((it) => it.title).join('、');
+  wrap.innerHTML = `
+    <div class="quote-progress">
+      <div class="quote-progress-step done">
+        <div class="step-dot"></div>
+        <div class="step-body">
+          <strong>询价已提交</strong>
+          <span>${formatDate(latest.createdAt)}</span>
+        </div>
+      </div>
+      <div class="quote-progress-step">
+        <div class="step-dot"></div>
+        <div class="step-body">
+          <strong>顾问跟进中</strong>
+          <span>顾问将在1-2个工作日内联系您</span>
+        </div>
+      </div>
+      <div class="quote-progress-step">
+        <div class="step-dot"></div>
+        <div class="step-body">
+          <strong>方案确认</strong>
+          <span>—</span>
+        </div>
+      </div>
+      <div class="quote-progress-step">
+        <div class="step-dot"></div>
+        <div class="step-body">
+          <strong>服务进行中</strong>
+          <span>—</span>
+        </div>
+      </div>
+    </div>
+    <div class="quote-progress-meta">
+      <span>最新询价：${services}</span>
+      &nbsp;·&nbsp;
+      <a href="#" class="hub-tab-link" data-tab="quotes">查看全部询价记录 →</a>
+    </div>
+  `;
+  wrap.querySelector('.hub-tab-link')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    const tab = document.querySelector('.hub-tab[data-tab="quotes"]');
+    tab?.click();
   });
 }
 

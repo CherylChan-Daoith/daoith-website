@@ -176,9 +176,11 @@
       items: items.map((i) => ({ id: i.id, title: i.title, qty: i.qty, priceValue: i.priceValue })),
     });
 
+    cartApi.clearCart();
     closeModal();
     document.getElementById('quoteForm')?.reset();
     cartApi.showToast(t('已提交，顾问将尽快联系您', 'Submitted — an advisor will contact you soon.'));
+    renderCart();
   });
 
   renderCart();

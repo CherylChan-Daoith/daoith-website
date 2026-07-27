@@ -2016,6 +2016,146 @@ body.modal-open {
   font-weight: 600;
 }
 
+/* Quote records list */
+.quote-record {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.quote-record:last-child {
+  margin-bottom: 0;
+}
+
+.quote-record-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--cream);
+  font-size: 0.8rem;
+}
+
+.quote-record-no {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.quote-record-date {
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.quote-record-status {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 100px;
+  padding: 2px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.quote-record-body {
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.quote-record-services {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.quote-record-total {
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 2px;
+}
+
+/* Quote progress timeline */
+.quote-progress {
+  padding: 8px 0;
+  display: grid;
+  gap: 0;
+}
+
+.quote-progress-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 0 16px 0;
+  position: relative;
+}
+
+.quote-progress-step::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border-light);
+}
+
+.quote-progress-step:last-child::before {
+  display: none;
+}
+
+.step-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--white);
+  flex-shrink: 0;
+  margin-top: 2px;
+  position: relative;
+  z-index: 1;
+}
+
+.quote-progress-step.done .step-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.step-body strong {
+  font-size: 0.85rem;
+  color: var(--ink);
+}
+
+.step-body span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.quote-progress-step.done .step-body strong {
+  color: var(--accent);
+}
+
+.quote-progress-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.hub-tab-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.hub-tab-link:hover {
+  text-decoration: underline;
+}
+
 .empty-state {
   text-align: center;
   padding: 48px 24px;

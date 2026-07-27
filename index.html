@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260727p">
+  <link rel="stylesheet" href="/css/styles.css?v=20260727q">
 </head>
 <body>
 
@@ -895,15 +895,15 @@
             <button class="toggle-switch" id="wechatToggle" aria-label="微信通知"></button>
           </div>
           <div class="hub-tabs">
-            <button class="hub-tab active" data-tab="orders">我的订单</button>
+            <button class="hub-tab active" data-tab="orders">询价进度</button>
+            <button class="hub-tab" data-tab="quotes">询价记录</button>
             <button class="hub-tab" data-tab="feedback">投诉与建议</button>
           </div>
           <div class="hub-tab-content" id="ordersTab">
-            <div class="empty-state">
-              <div class="icon">📋</div>
-              <h4>暂无订单</h4>
-              <p>您还没有购买任何服务<br>前往"财税服务"版块选购</p>
-            </div>
+            <div id="hubProgressWrap"></div>
+          </div>
+          <div class="hub-tab-content" id="quotesTab" style="display:none">
+            <div id="quotesListWrap"></div>
           </div>
           <div class="hub-tab-content" id="feedbackTab" style="display:none">
             <div class="feedback-form">
@@ -923,10 +923,12 @@
         </div>
         <div class="hub-panel">
           <h4>服务进度追踪</h4>
-          <div class="empty-state">
-            <div class="icon icon-muted">—</div>
-            <h4>暂无进行中的服务</h4>
-            <p>购买服务后，进度将在此实时更新</p>
+          <div id="quoteProgressWrap">
+            <div class="empty-state">
+              <div class="icon icon-muted">—</div>
+              <h4>暂无进行中的服务</h4>
+              <p>提交询价后，顾问会跟进并在此更新进度</p>
+            </div>
           </div>
         </div>
       </div>
@@ -994,13 +996,13 @@
     </div>
   </footer>
 
-  <script src="/js/locales/en.js?v=20260727o"></script>
+  <script src="/js/locales/en.js?v=20260727q"></script>
   <script src="/js/i18n.js?v=20260727n"></script>
   <script src="/js/config.js?v=20260708j"></script>
   <script src="/js/tax-systems.js?v=20260708j"></script>
   <script src="/js/articles.js?v=20260708j"></script>
   <script src="/js/services.js?v=20260727i"></script>
   <script src="/js/cart.js?v=20260727i"></script>
-  <script src="/js/main.js?v=20260727o"></script>
+  <script src="/js/main.js?v=20260727q"></script>
 </body>
 </html>
