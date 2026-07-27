@@ -394,12 +394,12 @@ window.DAOITH_I18N_EN = {
       special_none: 'Partial special + partial no invoice',
       general_none: 'Partial general + partial no invoice',
     },
-  },
-  radioLabels: {
-    self_overseas: 'Self-fulfillment (overseas warehouse)',
-    self_domestic: 'Self-fulfillment (ship from China)',
-    platform_domestic: 'Platform domestic warehouse',
-    platform_overseas: 'Platform overseas warehouse (e.g. FBA)',
+    shipping: {
+      self_overseas: 'Self-fulfillment (overseas warehouse)',
+      self_domestic: 'Self-fulfillment (ship from China)',
+      platform_domestic: 'Platform domestic warehouse',
+      platform_overseas: 'Platform overseas warehouse (e.g. FBA)',
+    },
   },
   faqs: [
     {

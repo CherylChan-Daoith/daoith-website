@@ -117,37 +117,6 @@
       });
     }
 
-    const radios = window.DAOITH_I18N_EN?.radioLabels;
-    if (radios) {
-      document.querySelectorAll('.radio-item').forEach((label) => {
-        const input = label.querySelector('input[type="radio"]');
-        if (!input) return;
-        let textSpan = label.querySelector('.radio-text');
-        if (!textSpan) {
-          const raw = label.textContent.trim();
-          const mark = label.querySelector('.radio-mark');
-          label.textContent = '';
-          label.appendChild(input);
-          if (mark) {
-            label.appendChild(mark);
-          } else {
-            const newMark = document.createElement('span');
-            newMark.className = 'radio-mark';
-            newMark.setAttribute('aria-hidden', 'true');
-            label.appendChild(newMark);
-          }
-          textSpan = document.createElement('span');
-          textSpan.className = 'radio-text';
-          textSpan.textContent = raw;
-          label.appendChild(textSpan);
-        }
-        if (!textSpan.dataset.i18nDefault) textSpan.dataset.i18nDefault = textSpan.textContent.trim();
-        textSpan.textContent = locale === 'en' && radios[input.value]
-          ? radios[input.value]
-          : textSpan.dataset.i18nDefault;
-      });
-    }
-
     const phKeys = [
       ['#hsCode', 'form.hsPlaceholder'],
       ['#notes', 'form.notesPlaceholder'],

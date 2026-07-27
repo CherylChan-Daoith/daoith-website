@@ -248,28 +248,12 @@
             </div>
             <div class="form-group">
               <label>发货模式</label>
-              <div class="radio-group">
-                <label class="radio-item">
-                  <input type="radio" name="shipping" value="self_overseas" checked>
-                  <span class="radio-mark" aria-hidden="true"></span>
-                  <span class="radio-text">自发货（海外仓）</span>
-                </label>
-                <label class="radio-item">
-                  <input type="radio" name="shipping" value="self_domestic">
-                  <span class="radio-mark" aria-hidden="true"></span>
-                  <span class="radio-text">自发货（国内直发）</span>
-                </label>
-                <label class="radio-item">
-                  <input type="radio" name="shipping" value="platform_domestic">
-                  <span class="radio-mark" aria-hidden="true"></span>
-                  <span class="radio-text">平台国内仓</span>
-                </label>
-                <label class="radio-item">
-                  <input type="radio" name="shipping" value="platform_overseas">
-                  <span class="radio-mark" aria-hidden="true"></span>
-                  <span class="radio-text">平台海外仓（如FBA）</span>
-                </label>
-              </div>
+              <select id="shipping">
+                <option value="self_overseas" selected>自发货（海外仓）</option>
+                <option value="self_domestic">自发货（国内直发）</option>
+                <option value="platform_domestic">平台国内仓</option>
+                <option value="platform_overseas">平台海外仓（如FBA）</option>
+              </select>
             </div>
             <div class="form-group">
               <label>补充说明（可选）</label>

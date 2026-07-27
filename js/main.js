@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateExpertArticles();
     refreshPaginationLabels();
     refreshShowMoreServicesLabel();
-    syncRadioCheckedClasses(document.getElementById('aiForm'));
   });
 });
 
@@ -609,7 +608,7 @@ function getFormContext() {
   const platform = document.getElementById('platform').value;
   const entity = document.getElementById('entity').value;
   const country = document.getElementById('country').value;
-  const shipping = document.querySelector('input[name="shipping"]:checked')?.value;
+  const shipping = document.getElementById('shipping')?.value;
 
   return {
     platform,
@@ -634,15 +633,6 @@ function getFormContext() {
 function extractRatePercent(text) {
   const match = text.match(/([\d.]+)\s*%/);
   return match ? `${match[1]}%` : '';
-}
-
-function syncRadioCheckedClasses(root = document) {
-  root.querySelectorAll('.radio-item').forEach((item) => {
-    const input = item.querySelector('input[type="radio"]');
-    const checked = !!(input && input.checked);
-    item.classList.toggle('is-checked', checked);
-    item.setAttribute('data-checked', checked ? 'true' : 'false');
-  });
 }
 
 function formatWan(value) {
@@ -694,31 +684,12 @@ function syncTaxIncomeOptions() {
   }
 }
 
-function initShippingRadios(form) {
-  if (!form) return;
-  const group = form.querySelector('.radio-group');
-  if (!group) return;
-
-  syncRadioCheckedClasses(form);
-
-  group.addEventListener('click', () => {
-    window.requestAnimationFrame(() => syncRadioCheckedClasses(form));
-  });
-
-  form.querySelectorAll('input[name="shipping"]').forEach((input) => {
-    input.addEventListener('change', () => syncRadioCheckedClasses(form));
-    input.addEventListener('input', () => syncRadioCheckedClasses(form));
-  });
-}
-
 function initAIForm() {
   const form = document.getElementById('aiForm');
   const queryBtn = document.getElementById('queryTax');
   const dutyBtn = document.getElementById('queryDuty');
   const submitBtn = form.querySelector('button[type="submit"]');
 
-  syncRadioCheckedClasses(form);
-  initShippingRadios(form);
   queryBtn.addEventListener('click', async () => {
     const hsCode = document.getElementById('hsCode').value.trim();
     if (!hsCode) {
