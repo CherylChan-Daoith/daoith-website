@@ -20,6 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initLoadMore();
   initTaxSystemsGrid();
   updateExpertArticles();
+  window.DAOITH_CART?.updateCartBadge();
+  window.DAOITH_CART?.bindAddButtons();
 
   window.addEventListener('localechange', () => {
     initTaxSystemsGrid();
