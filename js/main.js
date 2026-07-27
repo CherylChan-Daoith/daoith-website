@@ -832,24 +832,24 @@ function initTaxCalculator() {
         - (staffRate / 100)
         - (otherRate / 100);
       const incomeTax = revenue * profitRate * (incomeRate / 100);
-      const total = exportRebate + dutyCost + destinationVat + incomeTax;
+      const total = dutyCost + destinationVat + incomeTax;
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const copy = locale === 'en'
         ? {
             circulation: 'I. Turnover-tax related costs',
-            rebate: '1) Export rebate',
-            duty: '2) Destination duty cost',
-            vat: '3) Destination VAT',
-            income: 'II. Income tax burden',
+            duty: '1) Destination duty cost',
+            vat: '2) Destination VAT',
+            income: 'II. Corporate income tax burden',
+            rebateNote: 'Export rebate (reference only, not counted as tax cost)',
             total: 'Total',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
         : {
             circulation: '（一）流转税成本',
-            rebate: '1）出口退税',
-            duty: '2）目的国关税成本',
-            vat: '3）目的国VAT',
-            income: '（二）企业所得税税负率',
+            duty: '1）目的国关税成本',
+            vat: '2）目的国VAT',
+            income: '（二）企业所得税税负',
+            rebateNote: '出口退税（参考，不计入税负成本）',
             total: '合计',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
@@ -859,13 +859,15 @@ function initTaxCalculator() {
         <div class="tax-breakdown">
           <div class="tax-breakdown-section">
             <strong>${copy.circulation}</strong>
-            <div>${copy.rebate}：${formatWan(exportRebate)}（销售额 × 产品成本率 × 出口退税率）</div>
             <div>${copy.duty}：${formatWan(dutyCost)}（目的国进口CIF价 × 关税税率）</div>
             <div>${copy.vat}：${formatWan(destinationVat)}（销售额 × 目的国VAT税率）</div>
           </div>
           <div class="tax-breakdown-section">
             <strong>${copy.income}</strong>
             <div>${formatWan(incomeTax)}（销售额 × (1 - 产品成本率 - 营销费率 - 运输费率 - 员工成本率 - 其他费用率) × 适用税率）</div>
+          </div>
+          <div class="tax-breakdown-section tax-breakdown-ref">
+            <div>${copy.rebateNote}：${formatWan(exportRebate)}（销售额 × 产品成本率 × 出口退税率）</div>
           </div>
           <div class="tax-breakdown-summary">
             <strong>${copy.total}：${formatWan(total)}</strong>

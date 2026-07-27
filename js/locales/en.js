@@ -60,6 +60,7 @@ window.DAOITH_I18N_EN = {
     'services.showAll': 'View all 12 services ↓',
     'services.collapse': 'Collapse list ↑',
     'nav.cart': 'Cart',
+    'nav.cartExpert': 'Add expert 1-on-1 to cart',
     'tax.viewDetail': 'View tax profile',
     'tax.trade': '2025 trade volume',
     'article.readMore': 'Read article',
@@ -185,7 +186,7 @@ window.DAOITH_I18N_EN = {
     '.tax-form-note': { text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue.' },
     '#calcTax': { text: 'Calculate tax burden' },
     '.tax-result-label': { text: 'Estimated annual compliance tax' },
-    '.tax-actions .btn': { text: 'Add expert 1-on-1 to cart' },
+    '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {
       text: 'Verified cross-border tax services — transparent pricing; add to cart and request a preferential quote.',
