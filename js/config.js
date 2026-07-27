@@ -8,7 +8,7 @@ window.DAOITH_CONFIG = {
   difyHsRateEndpoint: '/v1/chat-messages',
   difyTaxCalcEndpoint: '/v1/chat-messages',
   // WeChat Open Platform — AppID is public; AppSecret stays server-side only
-  wechatAppId: 'wx_placeholder_app_id',
+  wechatAppId: 'wx1706a25af11cde09',
   wechatRedirectUri: 'https://www.daoith.com/auth/wechat-callback.html',
   wechatScope: 'snsapi_login',
   authApiBase: '',
