@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260727k">
+  <link rel="stylesheet" href="/css/styles.css?v=20260727l">
 </head>
 <body>
 
@@ -323,33 +323,88 @@
       <!-- Tax Calculator -->
       <div class="tax-calc">
         <h3>自动化计算合规税负</h3>
-        <p>基于AI方案结果，自动计算您的跨境电商业务合规税负。您也可以手动调整参数重新计算。</p>
+        <p>基于业务参数，自动测算跨境电商业务的流转税成本与所得税税负。您也可以手动调整参数重新计算。</p>
         <div class="tax-form-grid">
           <div class="form-group">
-            <label>年出口销售额（万元）</label>
+            <label>年出口销售额（万元人民币）</label>
             <input type="number" id="taxRevenue" value="1000" min="0">
           </div>
           <div class="form-group">
             <label>出口退税率（%）</label>
-            <input type="number" id="taxRefund" value="13" min="0" max="100" step="0.1">
+            <select id="taxRefund">
+              <option value="13" selected>13%</option>
+              <option value="9">9%</option>
+              <option value="6">6%</option>
+              <option value="0">0%</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>店铺主体</label>
+            <select id="taxEntity">
+              <option value="">请选择</option>
+              <option value="cn">中国公司</option>
+              <option value="cn_individual">中国个人</option>
+              <option value="hk">香港公司</option>
+              <option value="us">美国公司</option>
+              <option value="uk">英国公司</option>
+              <option value="de">德国公司</option>
+              <option value="nl">荷兰公司</option>
+              <option value="mx">墨西哥公司</option>
+              <option value="sg">新加坡公司</option>
+              <option value="ru">俄罗斯公司</option>
+              <option value="br">巴西公司</option>
+              <option value="jp">日本公司</option>
+              <option value="vn">越南公司</option>
+              <option value="in">印度公司</option>
+              <option value="sa">沙特阿拉伯公司</option>
+              <option value="other_overseas">其他海外公司</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>适用所得税税率（%）</label>
+            <select id="taxIncome"></select>
+          </div>
+          <div class="form-group">
+            <label>产品成本率（%）</label>
+            <input type="number" id="taxProductCostRate" value="55" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>营销费率（%）（含所有平台收费）</label>
+            <input type="number" id="taxMarketingRate" value="12" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>运输费率（%）</label>
+            <input type="number" id="taxShippingRate" value="8" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>员工成本率（%）</label>
+            <input type="number" id="taxStaffRate" value="6" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>其他费用率（%）</label>
+            <input type="number" id="taxOtherRate" value="4" min="0" max="100" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>目的国进口CIF价（万元人民币）</label>
+            <input type="number" id="taxCifPrice" value="700" min="0" step="0.1">
+          </div>
+          <div class="form-group">
+            <label>目的国关税税率（%）</label>
+            <input type="number" id="taxDutyRate" value="8" min="0" max="100" step="0.1">
           </div>
           <div class="form-group">
             <label>目的国VAT税率（%）</label>
             <input type="number" id="taxVat" value="20" min="0" max="100" step="0.1">
           </div>
-          <div class="form-group">
-            <label>企业所得税率（%）</label>
-            <input type="number" id="taxIncome" value="25" min="0" max="100" step="0.1">
-          </div>
-          <div class="form-group">
-            <label>进项税额（万元/年）</label>
-            <input type="number" id="taxInput" value="600" min="0">
-          </div>
         </div>
+        <p class="tax-form-note">以上费率指一年的成本费用占销售收入的比例。</p>
         <button class="btn btn-primary" id="calcTax">计算合规税负</button>
         <div class="tax-result">
           <div class="tax-result-label">年度合规税负预估</div>
           <div class="tax-result-value" id="taxResult">—</div>
+        </div>
+        <div class="tax-actions">
+          <button type="button" class="btn btn-outline" data-action="add" data-service-id="consult-1v1">专家1v1加入购物车</button>
         </div>
       </div>
     </div>
@@ -941,13 +996,13 @@
     </div>
   </footer>
 
-  <script src="/js/locales/en.js?v=20260727j"></script>
+  <script src="/js/locales/en.js?v=20260727l"></script>
   <script src="/js/i18n.js?v=20260727k"></script>
   <script src="/js/config.js?v=20260708j"></script>
   <script src="/js/tax-systems.js?v=20260708j"></script>
   <script src="/js/articles.js?v=20260708j"></script>
   <script src="/js/services.js?v=20260727i"></script>
   <script src="/js/cart.js?v=20260727i"></script>
-  <script src="/js/main.js?v=20260727k"></script>
+  <script src="/js/main.js?v=20260727l"></script>
 </body>
 </html>

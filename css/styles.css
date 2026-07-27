@@ -1231,11 +1231,18 @@ ul {
   margin-bottom: 24px;
 }
 
+.tax-form-note {
+  margin-top: -10px;
+  margin-bottom: 18px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .tax-result {
   background: var(--cream);
   border-radius: var(--radius);
   padding: 24px;
-  text-align: center;
+  text-align: left;
   margin-top: 16px;
 }
 
@@ -1249,6 +1256,44 @@ ul {
   font-size: 2rem;
   font-weight: 800;
   color: var(--navy);
+  margin-bottom: 8px;
+}
+
+.tax-result-note {
+  margin-top: 16px;
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.75;
+}
+
+.tax-breakdown {
+  display: grid;
+  gap: 14px;
+}
+
+.tax-breakdown-section,
+.tax-breakdown-summary,
+.tax-breakdown-disclaimer {
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.tax-breakdown-section strong,
+.tax-breakdown-summary strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+
+.tax-breakdown-disclaimer {
+  color: var(--text-muted);
+}
+
+.tax-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-start;
 }
 
 /* ===== EXPERT INSIGHTS ===== */

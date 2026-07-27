@@ -580,6 +580,25 @@ const shippingModes = {
   platform_overseas: '平台海外仓（如FBA）',
 };
 
+const taxEntityRateOptions = {
+  cn: [5, 15, 25],
+  cn_individual: [5, 10, 20, 30, 35],
+  hk: [8.25, 16.5],
+  us: [25],
+  uk: [25],
+  de: [25],
+  nl: [25],
+  mx: [25],
+  sg: [25],
+  ru: [25],
+  br: [25],
+  jp: [25],
+  vn: [25],
+  in: [25],
+  sa: [25],
+  other_overseas: [25],
+};
+
 function getFormContext() {
   const platform = document.getElementById('platform').value;
   const entity = document.getElementById('entity').value;
@@ -618,6 +637,30 @@ function syncRadioCheckedClasses(root = document) {
     item.classList.toggle('is-checked', checked);
     item.setAttribute('data-checked', checked ? 'true' : 'false');
   });
+}
+
+function formatWan(value) {
+  return `${(Number(value) || 0).toFixed(2)} 万元`;
+}
+
+function buildTaxRateOptions(entity) {
+  return taxEntityRateOptions[entity] || [25];
+}
+
+function syncTaxIncomeOptions() {
+  const entitySelect = document.getElementById('taxEntity');
+  const incomeSelect = document.getElementById('taxIncome');
+  if (!entitySelect || !incomeSelect) return;
+
+  const current = incomeSelect.value;
+  const options = buildTaxRateOptions(entitySelect.value || 'cn');
+  incomeSelect.innerHTML = options
+    .map((rate) => `<option value="${rate}">${rate}%</option>`)
+    .join('');
+
+  if (options.map(String).includes(current)) {
+    incomeSelect.value = current;
+  }
 }
 
 function initShippingRadios(form) {
@@ -737,26 +780,36 @@ function initAIForm() {
 /* Tax Calculator */
 function initTaxCalculator() {
   const calcBtn = document.getElementById('calcTax');
+  const entitySelect = document.getElementById('taxEntity');
+  const aiEntitySelect = document.getElementById('entity');
+  const resultEl = document.getElementById('taxResult');
+  if (!calcBtn || !entitySelect || !resultEl) return;
+
+  entitySelect.value = aiEntitySelect?.value || entitySelect.value || 'cn';
+  syncTaxIncomeOptions();
+  entitySelect.addEventListener('change', syncTaxIncomeOptions);
+  aiEntitySelect?.addEventListener('change', () => {
+    entitySelect.value = aiEntitySelect.value || 'cn';
+    syncTaxIncomeOptions();
+  });
 
   calcBtn.addEventListener('click', async () => {
     const revenue = parseFloat(document.getElementById('taxRevenue').value) || 0;
     const refundRate = parseFloat(document.getElementById('taxRefund').value) || 0;
+    const productCostRate = parseFloat(document.getElementById('taxProductCostRate').value) || 0;
+    const marketingRate = parseFloat(document.getElementById('taxMarketingRate').value) || 0;
+    const shippingRate = parseFloat(document.getElementById('taxShippingRate').value) || 0;
+    const staffRate = parseFloat(document.getElementById('taxStaffRate').value) || 0;
+    const otherRate = parseFloat(document.getElementById('taxOtherRate').value) || 0;
+    const cifPrice = parseFloat(document.getElementById('taxCifPrice').value) || 0;
+    const dutyRate = parseFloat(document.getElementById('taxDutyRate').value) || 0;
     const vatRate = parseFloat(document.getElementById('taxVat').value) || 0;
     const incomeRate = parseFloat(document.getElementById('taxIncome').value) || 0;
-    const inputTax = parseFloat(document.getElementById('taxInput').value) || 0;
-    const resultEl = document.getElementById('taxResult');
 
     resultEl.textContent = window.DAOITH_t('tax.calcLoading');
     setButtonLoading(calcBtn, true, window.DAOITH_t('tax.calcLoading'));
 
-    const params = { revenue, refundRate, vatRate, incomeRate, inputTax };
-
     try {
-      const text = await callDifyTaxCalc(params);
-
-      const totalMatch = text.match(/年度合规税负总额[：:]\s*([¥￥]?[\d,.]+)\s*万元/);
-      resultEl.textContent = totalMatch ? `¥${totalMatch[1].replace(/[¥￥]/g, '')} 万元/年` : text.split('\n')[0];
-
       let note = document.getElementById('taxResultNote');
       if (!note) {
         note = document.createElement('div');
@@ -764,19 +817,59 @@ function initTaxCalculator() {
         note.className = 'tax-result-note';
         resultEl.parentElement.appendChild(note);
       }
-      note.textContent = text;
-      note.style.cssText = 'margin-top:16px;font-size:0.85rem;color:var(--text-muted);text-align:left;line-height:1.7;white-space:pre-wrap;';
-    } catch (err) {
-      const outputVAT = revenue * 0.13;
-      const refundAmount = revenue * (refundRate / 100);
-      const netVAT = Math.max(0, outputVAT - inputTax - refundAmount);
-      const foreignVAT = revenue * (vatRate / 100) * 0.3;
-      const taxableIncome = revenue - inputTax - netVAT;
-      const incomeTax = Math.max(0, taxableIncome * (incomeRate / 100));
-      const total = netVAT + foreignVAT + incomeTax;
+      const exportRebate = revenue * (productCostRate / 100) * (refundRate / 100);
+      const dutyCost = cifPrice * (dutyRate / 100);
+      const destinationVat = revenue * (vatRate / 100);
+      const profitRate = 1
+        - (productCostRate / 100)
+        - (marketingRate / 100)
+        - (shippingRate / 100)
+        - (staffRate / 100)
+        - (otherRate / 100);
+      const incomeTax = revenue * profitRate * (incomeRate / 100);
+      const total = exportRebate + dutyCost + destinationVat + incomeTax;
+      const locale = window.DAOITH_getLocale?.() || 'zh';
+      const copy = locale === 'en'
+        ? {
+            circulation: 'I. Turnover-tax related costs',
+            rebate: '1) Export rebate',
+            duty: '2) Destination duty cost',
+            vat: '3) Destination VAT',
+            income: 'II. Income tax burden',
+            total: 'Total',
+            disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
+          }
+        : {
+            circulation: '（一）流转税成本',
+            rebate: '1）出口退税',
+            duty: '2）目的国关税成本',
+            vat: '3）目的国VAT',
+            income: '（二）企业所得税税负率',
+            total: '合计',
+            disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
+          };
 
-      resultEl.textContent = `¥${total.toFixed(2)} 万元/年`;
-      alert(`${window.DAOITH_t('tax.fallback')}${err.message}`);
+      resultEl.textContent = formatWan(total);
+      note.innerHTML = `
+        <div class="tax-breakdown">
+          <div class="tax-breakdown-section">
+            <strong>${copy.circulation}</strong>
+            <div>${copy.rebate}：${formatWan(exportRebate)}（销售额 × 产品成本率 × 出口退税率）</div>
+            <div>${copy.duty}：${formatWan(dutyCost)}（目的国进口CIF价 × 关税税率）</div>
+            <div>${copy.vat}：${formatWan(destinationVat)}（销售额 × 目的国VAT税率）</div>
+          </div>
+          <div class="tax-breakdown-section">
+            <strong>${copy.income}</strong>
+            <div>${formatWan(incomeTax)}（销售额 × (1 - 产品成本率 - 营销费率 - 运输费率 - 员工成本率 - 其他费用率) × 适用税率）</div>
+          </div>
+          <div class="tax-breakdown-summary">
+            <strong>${copy.total}：${formatWan(total)}</strong>
+          </div>
+          <div class="tax-breakdown-disclaimer">
+            ${copy.disclaimer}
+          </div>
+        </div>
+      `;
     } finally {
       setButtonLoading(calcBtn, false);
     }
