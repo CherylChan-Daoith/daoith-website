@@ -622,10 +622,13 @@ function buildLocalSolutionMarkdown(ctx) {
     ...flow.map((s, i) => `${i + 1}. ${s}`),
     '',
     '### 2）合规税负影响分析',
+    '',
     '**国内增值税**',
     ...vatLines.map((s) => `- ${s}`),
+    '',
     '**国内企业所得税**',
     ...citLines.map((s) => `- ${s}`),
+    '',
     '**目的国关税**',
     ...dutyLines.map((s) => `- ${s}`),
     '',
@@ -638,12 +641,21 @@ function renderAIPlanHtml(text) {
   const lines = String(text || '').split('\n');
   let html = '';
   let inList = false;
+  let listTag = 'ul';
+  let listClass = 'result-list';
 
   const closeList = () => {
     if (inList) {
-      html += '</ul>';
+      html += `</${listTag}>`;
       inList = false;
     }
+  };
+
+  const openList = (ordered) => {
+    listTag = ordered ? 'ol' : 'ul';
+    listClass = ordered ? 'result-list result-list-ordered' : 'result-list';
+    html += `<${listTag} class="${listClass}">`;
+    inList = true;
   };
 
   for (const rawLine of lines) {
@@ -668,15 +680,16 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    if (/^[-*•]\s+/.test(line) || /^\d+[.)、]\s+/.test(line)) {
-      if (!inList) {
-        html += '<ul class="result-list">';
-        inList = true;
+    const orderedMatch = line.match(/^\d+[.)、]\s+(.*)$/);
+    const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
+    if (orderedMatch || bulletMatch) {
+      const ordered = Boolean(orderedMatch);
+      const content = ordered ? orderedMatch[1] : bulletMatch[1];
+      if (!inList || (ordered && listTag !== 'ol') || (!ordered && listTag !== 'ul')) {
+        closeList();
+        openList(ordered);
       }
-      const item = formatInline(
-        line.replace(/^[-*•]\s+/, '').replace(/^\d+[.)、]\s+/, '')
-      );
-      html += `<li>${item}</li>`;
+      html += `<li>${formatInline(content)}</li>`;
       continue;
     }
 

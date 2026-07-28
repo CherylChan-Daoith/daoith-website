@@ -1090,56 +1090,93 @@ ul {
 .result-facts {
   list-style: none;
   margin: 0 0 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-light, rgba(0, 0, 0, 0.08));
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e5e7eb);
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #f7f9fc;
 }
 
 .result-facts li {
   display: flex;
   gap: 8px;
+  align-items: baseline;
   font-size: 0.75rem;
   line-height: 1.55;
-  color: var(--text-secondary);
-  padding: 2px 0;
+  color: #4b5563;
+  padding: 3px 0;
 }
 
 .result-facts .fact-key {
-  flex: 0 0 5.5em;
-  color: var(--ink);
+  flex: 0 0 5.8em;
+  color: #111827;
   font-weight: 600;
+}
+
+.result-facts .fact-key::after {
+  content: '：';
 }
 
 .result-facts .fact-val {
   flex: 1;
   min-width: 0;
   word-break: break-word;
+  color: #1f2937;
 }
 
-.section-dark .result-facts {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+/* result-panel is white even inside section-dark — keep dark readable text */
+#ai-solution .result-panel .result-facts {
+  border-color: #e5e7eb;
+  background: #f7f9fc;
 }
 
-.section-dark .result-facts .fact-key {
-  color: rgba(255, 255, 255, 0.92);
+#ai-solution .result-panel .result-facts li,
+#ai-solution .result-panel .result-facts .fact-key,
+#ai-solution .result-panel .result-facts .fact-val {
+  color: #1f2937;
 }
 
-.section-dark .result-facts li {
-  color: rgba(255, 255, 255, 0.78);
+#ai-solution .result-panel .result-facts .fact-key {
+  color: #111827;
+  font-weight: 600;
 }
 
 .result-list {
-  margin: 0 0 10px 16px;
-  padding: 0;
+  list-style: disc !important;
+  margin: 0 0 12px 1.1rem;
+  padding: 0 0 0 0.35rem;
 }
 
 .result-list li {
+  list-style: disc !important;
+  display: list-item;
   font-size: 0.75rem;
   color: var(--text-secondary);
-  line-height: 1.6;
-  margin-bottom: 4px;
+  line-height: 1.65;
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+#ai-solution .result-panel .result-list li {
+  color: #374151;
+}
+
+#ai-solution .result-panel .result-list {
+  color: #374151;
+}
+
+.result-list-ordered {
+  list-style: decimal !important;
+  margin: 0 0 12px 1.1rem;
+  padding: 0 0 0 0.35rem;
+}
+
+.result-list-ordered li {
+  list-style: decimal !important;
+  display: list-item;
+  font-size: 0.75rem;
+  color: #374151;
+  line-height: 1.65;
+  margin-bottom: 6px;
 }
 
 .result-error {
