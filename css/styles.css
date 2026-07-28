@@ -1648,9 +1648,9 @@ ul {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  margin-right: 10px;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
   padding: 0;
   border-radius: var(--radius);
   border: 1px solid var(--border);
@@ -1661,6 +1661,8 @@ ul {
 
 .cart-link-icon {
   display: block;
+  width: 15px;
+  height: 15px;
 }
 
 .cart-link:hover {
@@ -1675,13 +1677,13 @@ ul {
 .btn-wechat-login {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
+  gap: 4px;
+  padding: 5px 9px;
   border-radius: var(--radius);
   border: 1px solid #07c160;
   background: #07c160;
   color: #fff;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
@@ -1701,13 +1703,21 @@ ul {
 .btn-wechat-login-icon {
   display: block;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   overflow: hidden;
 }
 
 .btn-wechat-login-icon path {
   fill: currentColor;
+}
+
+/* 顶部：免费生成方案 — 略小于通用 btn-sm */
+.header-inner > .btn-primary.btn-sm,
+.header .btn-primary.btn-sm {
+  padding: 5px 12px;
+  font-size: 0.75rem;
+  line-height: 1.2;
 }
 
 .auth-user {
@@ -1718,8 +1728,8 @@ ul {
 }
 
 .auth-avatar {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   object-fit: cover;
   flex-shrink: 0;
@@ -1736,12 +1746,12 @@ ul {
 }
 
 .auth-name {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 88px;
+  max-width: 72px;
 }
 
 .auth-logout {
@@ -1796,16 +1806,16 @@ ul {
 
 .cart-badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
+  top: 0;
+  right: 0;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
   border-radius: 999px;
   background: var(--accent);
   color: #fff;
-  font-size: 0.65rem;
-  line-height: 16px;
+  font-size: 0.6rem;
+  line-height: 14px;
   text-align: center;
   font-weight: 700;
 }
@@ -3347,8 +3357,13 @@ body.modal-open {
 
   .cart-link {
     margin-right: 6px;
-    width: 36px;
-    height: 36px;
+    width: 30px;
+    height: 30px;
+  }
+
+  .cart-link-icon {
+    width: 14px;
+    height: 14px;
   }
 
   .auth-name,
@@ -3361,7 +3376,7 @@ body.modal-open {
   }
 
   .btn-wechat-login {
-    padding: 7px 9px;
+    padding: 5px 7px;
   }
 
   .mobile-toggle {
