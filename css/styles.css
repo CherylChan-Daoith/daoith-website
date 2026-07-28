@@ -1128,7 +1128,7 @@ ul {
 }
 
 .result-facts .fact-key {
-  flex: 0 0 7.5em;
+  flex: 0 0 8.5em;
   white-space: nowrap;
   color: #111827;
   font-weight: 600;
@@ -1158,7 +1158,7 @@ ul {
 }
 
 #ai-solution .result-panel .result-facts .fact-key {
-  flex: 0 0 7.5em;
+  flex: 0 0 8.5em;
   white-space: nowrap;
   color: #111827;
   font-weight: 600;

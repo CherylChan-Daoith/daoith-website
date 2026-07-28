@@ -344,6 +344,7 @@ function buildDifyInputs(ctx) {
     team_size: ctx.teamSizeLabel,
     invoice: ctx.invoiceLabel,
     shipping_mode: ctx.shippingLabel,
+    export_mode: ctx.exportModeLabel,
     notes: ctx.notes || '',
   };
 }
@@ -554,6 +555,7 @@ function buildBusinessFactsListHtml(ctx) {
     ['团队人数', ctx.teamSizeLabel],
     ['供应商发票', ctx.invoiceLabel],
     ['发货模式', ctx.shippingLabel],
+    ['目前出口方式', ctx.exportModeLabel],
   ];
   if (ctx.notes) rows.push(['补充说明', ctx.notes]);
 
@@ -579,21 +581,21 @@ function buildLocalSolutionMarkdown(ctx) {
   const flow = [
     `采购备货（供应商 → ${ctx.entityLabel}）：核对合同、装箱单、发票（当前发票情况：${ctx.invoiceLabel}）`,
     usesOverseasWarehouse
-      ? `出库报关/跨境调拨：按 HS「${ctx.hsCode}」归类申报，货值与物流单一致后发往「${ctx.countryLabel}」海外仓/平台仓`
-      : `国内直发履约：按订单拣货打包，跨境小包/专线发往「${ctx.countryLabel}」买家`,
+      ? `出库报关/跨境调拨：按出口方式「${ctx.exportModeLabel}」、HS「${ctx.hsCode}」归类申报，货值与物流单一致后发往「${ctx.countryLabel}」海外仓/平台仓`
+      : `国内直发履约：按出口方式「${ctx.exportModeLabel}」办理通关/放行，跨境小包/专线发往「${ctx.countryLabel}」买家`,
     `平台销售回款：在「${ctx.platformLabel}」完成销售、结算与平台费用核算（年销售额区间：${ctx.revenueLabel}）`,
     `税务申报闭环：国内增值税/企业所得税（如适用）+ 目的国进口/流转税相关义务按期处理`,
   ];
 
   const vatLines = isCnEntity
     ? [
-        `国内增值税：主体为「${ctx.entityLabel}」，需区分出口免税/退税适用条件；发货模式「${ctx.shippingLabel}」决定报关与进项匹配路径。`,
+        `国内增值税：主体为「${ctx.entityLabel}」，出口方式「${ctx.exportModeLabel}」决定免税/退税路径与单证要求；发货模式「${ctx.shippingLabel}」影响报关与进项匹配。`,
         invoiceRisk
           ? `发票风险偏高（${ctx.invoiceLabel}）：无票或普票占比会影响进项抵扣与出口退税资料链，建议优先梳理可取得专票的供应商。`
           : `发票情况「${ctx.invoiceLabel}」相对有利于进项与退税资料齐套，仍需保证票货款一致、HS 与报关一致。`,
       ]
     : [
-        `国内增值税：店铺主体为「${ctx.entityLabel}」，中国侧增值税链条可能较弱或仅涉及关联采购；需单独梳理境内采购主体的开票与报关安排。`,
+        `国内增值税：店铺主体为「${ctx.entityLabel}」，中国侧增值税链条可能较弱或仅涉及关联采购；出口方式「${ctx.exportModeLabel}」需与境内采购/报关主体安排对齐。`,
         `关注关联采购定价与发票流是否能支撑目的国进口申报完税价格。`,
       ];
 
@@ -610,7 +612,7 @@ function buildLocalSolutionMarkdown(ctx) {
   ];
 
   const actions = [
-    `30天内：固化业务档案——平台「${ctx.platformLabel}」、主体「${ctx.entityLabel}」、目的国「${ctx.countryLabel}」、HS「${ctx.hsCode}」、发货模式「${ctx.shippingLabel}」一页纸台账`,
+    `30天内：固化业务档案——平台「${ctx.platformLabel}」、主体「${ctx.entityLabel}」、目的国「${ctx.countryLabel}」、HS「${ctx.hsCode}」、发货模式「${ctx.shippingLabel}」、出口方式「${ctx.exportModeLabel}」一页纸台账`,
     `30天内：按「${ctx.invoiceLabel}」盘点供应商开票缺口，能改专票的优先改；无票采购单独标注风险 SKU`,
     `30天内：在「${ctx.platformLabel}」后台核对税务信息/税号上传与结算报表导出路径`,
     `90天内：完成「${ctx.countryLabel}」进口/流转税义务评估（仓储、阈值、平台代扣代缴边界）并列出注册/申报日历`,
@@ -725,6 +727,7 @@ function buildSolutionPrompt(ctx) {
 主要产品HS编码：${ctx.hsCode}
 企业主体所在地：${ctx.entityLabel}
 仓储模式：${ctx.shippingLabel}
+目前出口方式：${ctx.exportModeLabel}
 供应商发票情况：${ctx.invoiceLabel}
 团队人数：${ctx.teamSizeLabel}
 补充说明：${ctx.notes || '无'}
@@ -796,6 +799,17 @@ const shippingModes = {
   platform_overseas: '平台海外仓（如FBA）',
 };
 
+const exportModeNames = {
+  trade_0110: '0110一般贸易',
+  market_1039: '1039市场采购出口',
+  cbec_9610: '9610跨境电商零售出口',
+  cbec_9710: '9710跨境电商B2B出口',
+  cbec_9810: '9810出口海外仓',
+  bonded_1210: '1210报税出口',
+  freight_forwarder: '委托货代出口',
+  other: '其他',
+};
+
 /** User-specified income-tax tiers; other jurisdictions use 各地区税制介绍 */
 const taxEntityRateOptions = {
   cn: [5, 15, 25],
@@ -815,12 +829,14 @@ function getFormContext() {
   const entity = document.getElementById('entity').value;
   const country = document.getElementById('country').value;
   const shipping = document.getElementById('shipping')?.value;
+  const exportMode = document.getElementById('exportMode')?.value;
 
   return {
     platform,
     entity,
     country,
     shipping,
+    exportMode,
     hsCode: document.getElementById('hsCode').value.trim(),
     revenue: document.getElementById('revenue').value,
     teamSize: document.getElementById('teamSize').value,
@@ -830,6 +846,7 @@ function getFormContext() {
     entityLabel: entityNames[entity] || entity,
     countryLabel: countryNames[country] || country,
     shippingLabel: shippingModes[shipping] || shipping,
+    exportModeLabel: exportModeNames[exportMode] || exportMode || '未填写',
     revenueLabel: revenueNames[document.getElementById('revenue').value] || '未填写',
     teamSizeLabel: teamSizeNames[document.getElementById('teamSize').value] || '未填写',
     invoiceLabel: invoiceNames[document.getElementById('invoice').value] || '未填写',
@@ -985,6 +1002,7 @@ const AI_REQUIRED_FIELDS = [
   { id: 'teamSize', empty: (el) => !el.value },
   { id: 'invoice', empty: (el) => !el.value },
   { id: 'shipping', empty: (el) => !el.value },
+  { id: 'exportMode', empty: (el) => !el.value },
 ];
 
 function clearAiFieldInvalid(el) {
