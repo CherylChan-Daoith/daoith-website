@@ -837,8 +837,32 @@ function getFormContext() {
 }
 
 function extractRatePercent(text) {
-  const match = text.match(/([\d.]+)\s*%/);
+  const preferred = String(text || '').match(
+    /(?:出口退税率|目的国关税税率|关税税率|退税率)\s*[:：]?\s*([\d.]+)\s*%/
+  );
+  if (preferred) return `${preferred[1]}%`;
+  const match = String(text || '').match(/([\d.]+)\s*%/);
   return match ? `${match[1]}%` : '';
+}
+
+function setHsRateSource(kind, result) {
+  const el = document.getElementById('hsRateSource');
+  if (!el) return;
+  if (!result) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  const title = kind === 'refund' ? '出口退税率' : '目的国关税';
+  const link = result.sourceUrl
+    ? ` <a href="${escapeHtml(result.sourceUrl)}" target="_blank" rel="noopener noreferrer">官方查询</a>`
+    : '';
+  el.hidden = false;
+  el.innerHTML =
+    `<strong>${escapeHtml(title)}</strong>：${escapeHtml(result.display)}` +
+    `｜${escapeHtml(result.message || '')}` +
+    `｜来源：${escapeHtml(result.source || '')}` +
+    link;
 }
 
 function formatWan(value) {
@@ -1027,20 +1051,29 @@ function initAIForm() {
 
     const rateBox = document.getElementById('refundRateBox');
     if (rateBox) rateBox.value = '';
+    setHsRateSource('refund', null);
 
     setButtonLoading(queryBtn, true, window.DAOITH_t('ai.querying'));
     try {
-      const text = await callDifyHsRate(hsCode);
-      const rate = extractRatePercent(text);
-      if (rateBox) rateBox.value = rate || '—';
+      const api = window.DAOITH_HS_RATES;
+      if (!api?.lookupRefundRate) {
+        throw new Error('税率查询组件未加载，请刷新页面后重试');
+      }
+      const result = api.lookupRefundRate(hsCode);
+      if (rateBox) rateBox.value = result.display || '—';
+      setHsRateSource('refund', result);
 
-      const rateMatch = text.match(/([\d.]+)\s*%/);
-      if (rateMatch) {
+      if (result.ok && result.rate != null) {
         const refundInput = document.getElementById('taxRefund');
-        if (refundInput) refundInput.value = rateMatch[1];
+        if (refundInput) refundInput.value = String(result.rate);
+      }
+
+      if (!result.ok) {
+        alert(result.message || '未查到参考退税率，请核对 HS 编码后重试');
       }
     } catch (err) {
       if (rateBox) rateBox.value = '';
+      setHsRateSource('refund', null);
       alert(err.message);
     } finally {
       setButtonLoading(queryBtn, false);
@@ -1061,15 +1094,29 @@ function initAIForm() {
 
     const rateBox = document.getElementById('dutyRateBox');
     if (rateBox) rateBox.value = '';
+    setHsRateSource('duty', null);
 
-    const countryLabel = countryNames[country] || country;
     setButtonLoading(dutyBtn, true, window.DAOITH_t('ai.querying'));
     try {
-      const text = await callDifyDutyRate(hsCode, countryLabel);
-      const rate = extractRatePercent(text);
-      if (rateBox) rateBox.value = rate || '—';
+      const api = window.DAOITH_HS_RATES;
+      if (!api?.lookupDutyRate) {
+        throw new Error('税率查询组件未加载，请刷新页面后重试');
+      }
+      const result = api.lookupDutyRate(hsCode, country);
+      if (rateBox) rateBox.value = result.display || '—';
+      setHsRateSource('duty', result);
+
+      if (result.ok && result.rate != null) {
+        const dutyInput = document.getElementById('taxDutyRate');
+        if (dutyInput) dutyInput.value = String(result.rate);
+      }
+
+      if (!result.ok) {
+        alert(result.message || '未查到参考关税税率，请核对 HS 与目的国后重试');
+      }
     } catch (err) {
       if (rateBox) rateBox.value = '';
+      setHsRateSource('duty', null);
       alert(err.message);
     } finally {
       setButtonLoading(dutyBtn, false);

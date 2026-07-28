@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260728i">
+  <link rel="stylesheet" href="/css/styles.css?v=20260728j">
 </head>
 <body>
 
@@ -224,7 +224,8 @@
                   <input type="text" class="hs-rate-box" id="dutyRateBox" readonly placeholder="—" aria-label="目的国关税税率">
                 </div>
               </div>
-              <p class="hs-hint">出口退税率参考国家税务总局 / 海关总署公布税则；目的国关税参考该国海关官方税则（请先选择目的国）</p>
+              <p class="hs-hint" id="hsHint">出口退税率参考国家税务总局 / 海关总署公布税则；目的国关税参考该国海关官方税则（请先选择目的国）</p>
+              <p class="hs-rate-source" id="hsRateSource" hidden></p>
             </div>
             <div class="form-group">
               <label>年销售额（万元人民币）</label>
@@ -1015,6 +1016,7 @@
   <script src="/js/services.js?v=20260727i"></script>
   <script src="/js/cart.js?v=20260727i"></script>
   <script src="/js/auth.js?v=20260728b"></script>
-  <script src="/js/main.js?v=20260728h"></script>
+  <script src="/js/hs-rates.js?v=20260728i"></script>
+  <script src="/js/main.js?v=20260728i"></script>
 </body>
 </html>
