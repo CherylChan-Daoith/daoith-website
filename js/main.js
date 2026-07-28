@@ -805,7 +805,7 @@ const exportModeNames = {
   cbec_9610: '9610跨境电商零售出口',
   cbec_9710: '9710跨境电商B2B出口',
   cbec_9810: '9810出口海外仓',
-  bonded_1210: '1210报税出口',
+  bonded_1210: '1210保税出口',
   freight_forwarder: '委托货代出口',
   other: '其他',
 };

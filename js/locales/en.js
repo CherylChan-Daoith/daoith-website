@@ -451,7 +451,7 @@ window.DAOITH_I18N_EN = {
       cbec_9610: '9610 Cross-border retail export',
       cbec_9710: '9710 Cross-border B2B export',
       cbec_9810: '9810 Overseas warehouse export',
-      bonded_1210: '1210 Bonded / declared export',
+      bonded_1210: '1210 Bonded export',
       freight_forwarder: 'Export via freight forwarder',
       other: 'Other',
     },
