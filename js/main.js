@@ -522,24 +522,40 @@ function formatInline(text) {
 const SOLUTION_GREETING =
   '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
 
-/** Strip unwanted model self-intros (e.g. Dify system default). */
-function stripUnwantedGreetings(text) {
-  return String(text || '')
+/** Strip unwanted model self-intros and “please provide info / generic framework” dumps. */
+function sanitizeAiSolutionText(text) {
+  let raw = String(text || '');
+
+  raw = raw
     .replace(/好的[，,]\s*我是道一（Daoith）[，,]?跨境财税合规专家[。.]?\s*很高兴为您提供专业的合规方案[。.]?\s*/g, '')
     .replace(/我是道一（Daoith）[，,]?跨境财税合规专家[。.]?\s*很高兴为您提供专业的合规方案[。.]?\s*/g, '')
-    .replace(/^(好的[，,]\s*)?我是道一[（(]Daoith[）)][^\n]*\n+/gm, '')
-    .trim();
+    .replace(/^(好的[，,]\s*)?我是道一[（(]Daoith[）)][^\n]*\n+/gm, '');
+
+  // Drop “请您提供以下信息 … ---” intake questionnaires
+  raw = raw.replace(/请您提供以下信息[：:][\s\S]*?(?=#{1,3}\s|###\s|1）|二、|解决方案|$)/g, '');
+  raw = raw.replace(/请您提供具体信息[\s\S]*$/g, '');
+  raw = raw.replace(/在您提供信息前[\s\S]*?(?=#{1,3}\s|###\s|1）|二、|解决方案|$)/g, '');
+  // Drop generic framework dumps
+  raw = raw.replace(/跨境财税合规通用框架[\s\S]*?(?=#{1,3}\s|###\s|1）|二、|解决方案|$)/g, '');
+  raw = raw.replace(/我将为您定制方案[。.]?\s*/g, '');
+
+  // If model still echoed our greeting / background headings, drop duplicates later in render
+  return raw.trim();
 }
 
-function ensureSolutionGreeting(text) {
-  const raw = stripUnwantedGreetings(text);
-  if (!raw) return SOLUTION_GREETING;
-  if (raw.includes('道一合规小助手')) return raw;
-  return `${SOLUTION_GREETING}\n\n${raw}`;
+function buildBusinessBackgroundSummary(ctx) {
+  const notes = ctx.notes ? `；补充说明：${ctx.notes}` : '';
+  return (
+    `根据您在页面已选择的业务信息：客户通过「${ctx.platformLabel}」开展跨境电商，` +
+    `店铺主体为「${ctx.entityLabel}」，主要销售目的国/地区为「${ctx.countryLabel}」，` +
+    `产品HS编码为「${ctx.hsCode}」，年销售额区间为「${ctx.revenueLabel}」，` +
+    `团队规模为「${ctx.teamSizeLabel}」，供应商发票情况为「${ctx.invoiceLabel}」，` +
+    `发货模式为「${ctx.shippingLabel}」${notes}。以下方案基于上述信息直接生成，不再另行收集信息。`
+  );
 }
 
 function renderAIPlanHtml(text) {
-  const lines = ensureSolutionGreeting(text).split('\n');
+  const lines = String(text || '').split('\n');
   let html = '';
   let inList = false;
 
@@ -557,10 +573,13 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    // Drop leftover Daoith expert intro lines
-    if (/道一（Daoith）/.test(line) && /合规专家/.test(line)) {
-      continue;
-    }
+    // Drop leftover intros / ask-again lines
+    if (/道一（Daoith）/.test(line) && /合规专家/.test(line)) continue;
+    if (/道一合规小助手/.test(line)) continue;
+    if (/请您提供/.test(line) || /请提供以下信息/.test(line)) continue;
+    if (/通用框架/.test(line) || /定制方案/.test(line) && /提供信息/.test(line)) continue;
+    if (/^##?\s*一[、.．]?\s*业务背景/.test(line)) continue;
+    if (/^##?\s*二[、.．]?\s*解决方案\s*$/.test(line)) continue;
 
     if (/^#{1,4}\s+/.test(line)) {
       closeList();
@@ -585,20 +604,31 @@ function renderAIPlanHtml(text) {
     }
 
     closeList();
-    const isGreeting = line.includes('道一合规小助手');
-    html += `<p class="result-paragraph${isGreeting ? ' result-greeting' : ''}">${formatInline(line)}</p>`;
+    html += `<p class="result-paragraph">${formatInline(line)}</p>`;
   }
 
   closeList();
-  return html || `<p class="result-paragraph">${formatInline(text)}</p>`;
+  return html;
+}
+
+/** Greeting + form-based background are fixed in UI; AI only fills solution body. */
+function assembleSolutionHtml(ctx, aiText) {
+  const cleaned = sanitizeAiSolutionText(aiText);
+  const body = renderAIPlanHtml(cleaned);
+  return (
+    `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
+    `<h5 class="result-section-title">一、业务背景信息总结</h5>` +
+    `<p class="result-paragraph">${escapeHtml(buildBusinessBackgroundSummary(ctx))}</p>` +
+    `<h5 class="result-section-title">二、解决方案</h5>` +
+    (body ||
+      `<p class="result-paragraph">方案正文生成不完整，请重试。若持续出现，请联系道一财税合规专家。</p>`)
+  );
 }
 
 function buildSolutionPrompt(ctx) {
-  const greeting = SOLUTION_GREETING;
+  return `你是跨境财税合规方案撰写助手。用户已在网页表单中完整填写业务信息（见下方）。你必须【立即】输出定制化解决方案，禁止再索要任何信息，禁止输出通用框架。
 
-  return `请为以下跨境电商企业撰写一份【详细、可落地】的财税合规方案。
-
-## 客户信息（已由用户在页面完整填写，视为最终事实，禁止再追问）
+## 已确认的客户信息（最终事实，禁止追问、禁止请用户补充）
 - 电商平台：${ctx.platformLabel}
 - 店铺主体：${ctx.entityLabel}
 - 目的国/地区：${ctx.countryLabel}
@@ -609,40 +639,32 @@ function buildSolutionPrompt(ctx) {
 - 发货模式：${ctx.shippingLabel}
 - 补充说明：${ctx.notes || '无'}
 
-## 输出结构（必须严格按此顺序，用中文 Markdown；章节标题用 ## ）
+## 严格禁止（出现即错误）
+- 禁止写「请您提供以下信息」「请提供具体信息」「在您提供信息前」「我将为您定制方案」等话术
+- 禁止输出「跨境财税合规通用框架」或任何未结合上述客户信息的通用模板长文
+- 禁止自我介绍（包括「我是道一（Daoith）」等）
+- 禁止开场白、禁止复述「业务背景信息总结」章节（前端已固定展示）
 
-正文开头必须原样输出下面这段开场白（单独成段，不要改写、不要翻译、不要加引号）：
-${greeting}
-
-然后按下列章节输出：
-
-## 一、业务背景信息总结
-仅基于上方「客户信息」用 1 段话归纳业务背景（平台、主体、目的国、HS、销售额、团队、发票、发货模式、补充说明），突出与合规相关的关键事实。
-禁止向客户提问、禁止索要补充信息、禁止写「请确认」「请问」等话术。
-
-## 二、解决方案
-本节下必须包含三个小节（用 ### 标题）：
+## 仅输出以下三个小节（用中文 Markdown，标题用 ### ）
 
 ### 1）业务流程图
-用清晰的分步流程描述从采购/备货 → 出库/报关（如适用）→ 跨境物流 → 目的国入仓/履约 → 销售回款 → 税务申报的链路。
-可用有序列表或「步骤A → 步骤B → 步骤C」形式；标明关键责任主体（店铺主体、货代、平台、税务机关）。
+结合该客户的平台、主体、目的国、发货模式，用分步流程描述：采购/备货 → 出库/报关（如适用）→ 跨境物流 → 目的国入仓/履约 → 销售回款 → 税务申报。
+标明关键责任主体（店铺主体、货代、平台、税务机关）。
 
 ### 2）合规税负影响分析
-重点分析（结合客户平台、主体、目的国与发货模式）：
-- 国内增值税（进项、销项、出口退税/免税不退、无法退税风险等）
-- 国内企业所得税（利润归属、核定/查账、关联交易等注意点）
-- 目的国关税（HS 对应关税逻辑、完税价格、优惠税率/豁免可能性；信息不足时基于已给字段说明假设，仍不要追问用户）
-可补充目的国 VAT/销售税若与履约直接相关，但三大税负以上三项为必写。
+必须结合上述客户信息具体分析（不要写泛泛常识）：
+- 国内增值税（进项、销项、出口退税/免税不退、与发票情况相关的风险）
+- 国内企业所得税（利润归属、查账/核定、关联交易注意点）
+- 目的国关税（结合 HS「${ctx.hsCode}」与目的国「${ctx.countryLabel}」说明归类、完税价格、税率逻辑；信息不足时写明假设，仍不要追问）
+可补充目的国 VAT/销售税若与「${ctx.shippingLabel}」履约直接相关。
 
 ### 3）行动建议
-给出可执行清单（条目列表），按优先级或时间顺序（如 30天内 / 90天内），写明「谁做什么、准备哪些单证、在哪个系统操作」。
+给出可执行清单（条目列表），按 30天内 / 90天内 优先级，写明谁做什么、准备哪些单证、在哪个系统操作。
 
 ## 写作要求
-1. 禁止只写提纲或一句话带过；禁止空泛表述如「建议合规经营」。
-2. 禁止使用「好的，我是道一（Daoith），跨境财税合规专家…」或任何其他自我介绍；开场白以外不要再自我介绍。
-3. 禁止向用户反问或要求补充业务信息；全部结论必须基于上方已给客户信息直接给出。
-4. 尽量引用具体政策/模式表述（如 9810/9610、报关单与销售清单、Marketplace Facilitator 等），信息不足时明确写出假设即可。
-5. 全文面向跨境卖家，表述专业、简洁、可落地。`;
+1. 直接从「### 1）业务流程图」开始输出，不要任何前言。
+2. 内容必须点名该客户的平台、主体、目的国、发货模式与发票情况，禁止空泛套话。
+3. 尽量引用具体政策/模式（如 9810/9610、报关单与销售清单、Marketplace Facilitator 等）。`;
 }
 
 const platformNames = {
@@ -1006,7 +1028,7 @@ function initAIForm() {
 
     try {
       const text = await callDifyDiagnosis(ctx);
-      items.innerHTML = `<div class="result-body">${renderAIPlanHtml(text)}</div>`;
+      items.innerHTML = `<div class="result-body">${assembleSolutionHtml(ctx, text)}</div>`;
     } catch (err) {
       items.innerHTML = `<div class="result-error"><strong>生成失败：</strong>${err.message}</div>`;
     } finally {
