@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260728d">
+  <link rel="stylesheet" href="/css/styles.css?v=20260728e">
 </head>
 <body>
 
@@ -149,7 +149,7 @@
       <div class="ai-grid">
         <div class="form-panel">
           <h3>业务信息 <span class="tag">AI</span></h3>
-          <form id="aiForm">
+          <form id="aiForm" novalidate>
             <div class="form-group">
               <label>从事的电商平台</label>
               <select id="platform" required>
@@ -212,7 +212,7 @@
             <div class="form-group">
               <label>产品海关编码（HS Code）</label>
               <div class="hs-input-group">
-                <input type="text" id="hsCode" placeholder="如 9504.50.00" autocomplete="off">
+                <input type="text" id="hsCode" placeholder="如 9504.50.00" autocomplete="off" required>
               </div>
               <div class="hs-actions">
                 <div class="hs-action-row">
@@ -228,7 +228,7 @@
             </div>
             <div class="form-group">
               <label>年销售额（万元人民币）</label>
-              <select id="revenue">
+              <select id="revenue" required>
                 <option value="">请选择</option>
                 <option value="under500">500以下</option>
                 <option value="500-2000">500-2000</option>
@@ -239,7 +239,7 @@
             </div>
             <div class="form-group">
               <label>团队人数</label>
-              <select id="teamSize">
+              <select id="teamSize" required>
                 <option value="">请选择</option>
                 <option value="under10">10人以下</option>
                 <option value="10-50">10-50人</option>
@@ -249,7 +249,7 @@
             </div>
             <div class="form-group">
               <label>供应商发票情况</label>
-              <select id="invoice">
+              <select id="invoice" required>
                 <option value="">请选择</option>
                 <option value="special">增值税专票</option>
                 <option value="general">增值税普票</option>
@@ -261,8 +261,9 @@
             </div>
             <div class="form-group">
               <label>发货模式</label>
-              <select id="shipping">
-                <option value="self_overseas" selected>自发货（海外仓）</option>
+              <select id="shipping" required>
+                <option value="">请选择</option>
+                <option value="self_overseas">自发货（海外仓）</option>
                 <option value="self_domestic">自发货（国内直发）</option>
                 <option value="platform_domestic">平台国内仓</option>
                 <option value="platform_overseas">平台海外仓（如FBA）</option>
@@ -1014,6 +1015,6 @@
   <script src="/js/services.js?v=20260727i"></script>
   <script src="/js/cart.js?v=20260727i"></script>
   <script src="/js/auth.js?v=20260728b"></script>
-  <script src="/js/main.js?v=20260728d"></script>
+  <script src="/js/main.js?v=20260728e"></script>
 </body>
 </html>

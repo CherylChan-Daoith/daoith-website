@@ -839,6 +839,24 @@ ul {
   font-family: inherit;
 }
 
+.form-group.is-invalid select,
+.form-group.is-invalid input:not([type="radio"]):not([type="checkbox"]),
+.form-group.is-invalid .hs-input-group input {
+  border-color: #e11d48 !important;
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.22);
+}
+
+.form-group .field-error {
+  margin: 5px 0 0;
+  font-size: 0.7rem;
+  color: #e11d48;
+  line-height: 1.35;
+}
+
+.section-dark .form-panel .form-group .field-error {
+  color: #fb7185;
+}
+
 .form-group select:focus,
 .form-group input:not([type="radio"]):not([type="checkbox"]):focus,
 .form-group textarea:focus {

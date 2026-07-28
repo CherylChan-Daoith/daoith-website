@@ -522,8 +522,17 @@ function formatInline(text) {
 const SOLUTION_GREETING =
   '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
 
+/** Strip unwanted model self-intros (e.g. Dify system default). */
+function stripUnwantedGreetings(text) {
+  return String(text || '')
+    .replace(/好的[，,]\s*我是道一（Daoith）[，,]?跨境财税合规专家[。.]?\s*很高兴为您提供专业的合规方案[。.]?\s*/g, '')
+    .replace(/我是道一（Daoith）[，,]?跨境财税合规专家[。.]?\s*很高兴为您提供专业的合规方案[。.]?\s*/g, '')
+    .replace(/^(好的[，,]\s*)?我是道一[（(]Daoith[）)][^\n]*\n+/gm, '')
+    .trim();
+}
+
 function ensureSolutionGreeting(text) {
-  const raw = String(text || '').trim();
+  const raw = stripUnwantedGreetings(text);
   if (!raw) return SOLUTION_GREETING;
   if (raw.includes('道一合规小助手')) return raw;
   return `${SOLUTION_GREETING}\n\n${raw}`;
@@ -545,6 +554,11 @@ function renderAIPlanHtml(text) {
     const line = rawLine.trim();
     if (!line) {
       closeList();
+      continue;
+    }
+
+    // Drop leftover Daoith expert intro lines
+    if (/道一（Daoith）/.test(line) && /合规专家/.test(line)) {
       continue;
     }
 
@@ -580,16 +594,15 @@ function renderAIPlanHtml(text) {
 }
 
 function buildSolutionPrompt(ctx) {
-  const greeting =
-    '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
+  const greeting = SOLUTION_GREETING;
 
   return `请为以下跨境电商企业撰写一份【详细、可落地】的财税合规方案。
 
-## 客户信息
+## 客户信息（已由用户在页面完整填写，视为最终事实，禁止再追问）
 - 电商平台：${ctx.platformLabel}
 - 店铺主体：${ctx.entityLabel}
 - 目的国/地区：${ctx.countryLabel}
-- HS编码：${ctx.hsCode || '未提供'}
+- HS编码：${ctx.hsCode}
 - 年销售额：${ctx.revenueLabel}
 - 团队人数：${ctx.teamSizeLabel}
 - 供应商发票：${ctx.invoiceLabel}
@@ -604,7 +617,8 @@ ${greeting}
 然后按下列章节输出：
 
 ## 一、业务背景信息总结
-用 1 段话复述并归纳客户填写的业务背景（平台、主体、目的国、销售额区间、发票与发货模式、补充说明等），突出与合规相关的关键事实。不要遗漏已填写字段。
+仅基于上方「客户信息」用 1 段话归纳业务背景（平台、主体、目的国、HS、销售额、团队、发票、发货模式、补充说明），突出与合规相关的关键事实。
+禁止向客户提问、禁止索要补充信息、禁止写「请确认」「请问」等话术。
 
 ## 二、解决方案
 本节下必须包含三个小节（用 ### 标题）：
@@ -617,7 +631,7 @@ ${greeting}
 重点分析（结合客户平台、主体、目的国与发货模式）：
 - 国内增值税（进项、销项、出口退税/免税不退、无法退税风险等）
 - 国内企业所得税（利润归属、核定/查账、关联交易等注意点）
-- 目的国关税（HS 对应关税逻辑、完税价格、优惠税率/豁免可能性，信息不足时说明假设）
+- 目的国关税（HS 对应关税逻辑、完税价格、优惠税率/豁免可能性；信息不足时基于已给字段说明假设，仍不要追问用户）
 可补充目的国 VAT/销售税若与履约直接相关，但三大税负以上三项为必写。
 
 ### 3）行动建议
@@ -625,8 +639,10 @@ ${greeting}
 
 ## 写作要求
 1. 禁止只写提纲或一句话带过；禁止空泛表述如「建议合规经营」。
-2. 尽量引用具体政策/模式表述（如 9810/9610、报关单与销售清单、Marketplace Facilitator 等），信息不足时明确写出假设。
-3. 全文面向跨境卖家，表述专业、简洁、可落地。`;
+2. 禁止使用「好的，我是道一（Daoith），跨境财税合规专家…」或任何其他自我介绍；开场白以外不要再自我介绍。
+3. 禁止向用户反问或要求补充业务信息；全部结论必须基于上方已给客户信息直接给出。
+4. 尽量引用具体政策/模式表述（如 9810/9610、报关单与销售清单、Marketplace Facilitator 等），信息不足时明确写出假设即可。
+5. 全文面向跨境卖家，表述专业、简洁、可落地。`;
 }
 
 const platformNames = {
@@ -846,12 +862,71 @@ function ensureWeChatLogin(action) {
   return auth.requireLogin(action, '/#ai-solution');
 }
 
+const AI_REQUIRED_FIELDS = [
+  { id: 'platform', empty: (el) => !el.value },
+  { id: 'entity', empty: (el) => !el.value },
+  { id: 'country', empty: (el) => !el.value },
+  { id: 'hsCode', empty: (el) => !el.value.trim() },
+  { id: 'revenue', empty: (el) => !el.value },
+  { id: 'teamSize', empty: (el) => !el.value },
+  { id: 'invoice', empty: (el) => !el.value },
+  { id: 'shipping', empty: (el) => !el.value },
+];
+
+function clearAiFieldInvalid(el) {
+  const group = el?.closest?.('.form-group');
+  if (!group) return;
+  group.classList.remove('is-invalid');
+  group.querySelector('.field-error')?.remove();
+}
+
+function markAiFieldInvalid(el, message) {
+  const group = el?.closest?.('.form-group');
+  if (!group) return;
+  group.classList.add('is-invalid');
+  if (!group.querySelector('.field-error')) {
+    const tip = document.createElement('p');
+    tip.className = 'field-error';
+    tip.textContent = message || window.DAOITH_t('alert.fieldRequired');
+    group.appendChild(tip);
+  }
+}
+
+function validateAiFormRequired() {
+  let firstInvalid = null;
+  for (const field of AI_REQUIRED_FIELDS) {
+    const el = document.getElementById(field.id);
+    if (!el) continue;
+    clearAiFieldInvalid(el);
+    if (field.empty(el)) {
+      markAiFieldInvalid(el);
+      if (!firstInvalid) firstInvalid = el;
+    }
+  }
+  if (firstInvalid) {
+    firstInvalid.focus();
+    firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
+  return true;
+}
+
 function initAIForm() {
   const form = document.getElementById('aiForm');
   const queryBtn = document.getElementById('queryTax');
   const dutyBtn = document.getElementById('queryDuty');
   if (!form) return;
   const submitBtn = form.querySelector('button[type="submit"]');
+
+  for (const field of AI_REQUIRED_FIELDS) {
+    const el = document.getElementById(field.id);
+    if (!el) continue;
+    const clear = () => {
+      if (!field.empty(el)) clearAiFieldInvalid(el);
+    };
+    el.addEventListener('change', clear);
+    el.addEventListener('input', clear);
+  }
 
   queryBtn.addEventListener('click', async () => {
     const hsCode = document.getElementById('hsCode').value.trim();
@@ -914,13 +989,10 @@ function initAIForm() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    if (!validateAiFormRequired()) return;
     if (!ensureWeChatLogin('ai-generate')) return;
 
     const ctx = getFormContext();
-    if (!ctx.platform || !ctx.entity || !ctx.country) {
-      alert(window.DAOITH_t('alert.platformCountry'));
-      return;
-    }
 
     const placeholder = document.getElementById('resultPlaceholder');
     const content = document.getElementById('resultContent');
