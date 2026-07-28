@@ -522,36 +522,116 @@ function formatInline(text) {
 const SOLUTION_GREETING =
   '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
 
-/** Strip unwanted model self-intros and “please provide info / generic framework” dumps. */
-function sanitizeAiSolutionText(text) {
-  let raw = String(text || '');
-
-  raw = raw
-    .replace(/好的[，,]\s*我是道一（Daoith）[，,]?跨境财税合规专家[。.]?\s*很高兴为您提供专业的合规方案[。.]?\s*/g, '')
-    .replace(/我是道一（Daoith）[，,]?跨境财税合规专家[。.]?\s*很高兴为您提供专业的合规方案[。.]?\s*/g, '')
-    .replace(/^(好的[，,]\s*)?我是道一[（(]Daoith[）)][^\n]*\n+/gm, '');
-
-  // Drop “请您提供以下信息 … ---” intake questionnaires
-  raw = raw.replace(/请您提供以下信息[：:][\s\S]*?(?=#{1,3}\s|###\s|1）|二、|解决方案|$)/g, '');
-  raw = raw.replace(/请您提供具体信息[\s\S]*$/g, '');
-  raw = raw.replace(/在您提供信息前[\s\S]*?(?=#{1,3}\s|###\s|1）|二、|解决方案|$)/g, '');
-  // Drop generic framework dumps
-  raw = raw.replace(/跨境财税合规通用框架[\s\S]*?(?=#{1,3}\s|###\s|1）|二、|解决方案|$)/g, '');
-  raw = raw.replace(/我将为您定制方案[。.]?\s*/g, '');
-
-  // If model still echoed our greeting / background headings, drop duplicates later in render
-  return raw.trim();
+function isAskAgainOrGenericFramework(text) {
+  const t = String(text || '');
+  return (
+    /请您提供|请提供以下信息|请提供具体信息|在您提供信息前|我将为您定制方案/.test(t) ||
+    /跨境财税合规通用框架|通用且高发的场景|可套用的方案模板|由于您尚未提供/.test(t)
+  );
 }
 
-function buildBusinessBackgroundSummary(ctx) {
-  const notes = ctx.notes ? `；补充说明：${ctx.notes}` : '';
-  return (
-    `根据您在页面已选择的业务信息：客户通过「${ctx.platformLabel}」开展跨境电商，` +
-    `店铺主体为「${ctx.entityLabel}」，主要销售目的国/地区为「${ctx.countryLabel}」，` +
-    `产品HS编码为「${ctx.hsCode}」，年销售额区间为「${ctx.revenueLabel}」，` +
-    `团队规模为「${ctx.teamSizeLabel}」，供应商发票情况为「${ctx.invoiceLabel}」，` +
-    `发货模式为「${ctx.shippingLabel}」${notes}。以下方案基于上述信息直接生成，不再另行收集信息。`
-  );
+function aiSolutionUsesFormData(text, ctx) {
+  const t = String(text || '');
+  if (!t || isAskAgainOrGenericFramework(t)) return false;
+  const needles = [
+    ctx.platformLabel,
+    ctx.countryLabel,
+    ctx.entityLabel,
+    ctx.hsCode,
+    ctx.shippingLabel,
+  ].filter(Boolean);
+  const hits = needles.filter((n) => n && t.includes(n)).length;
+  return hits >= 2 && /增值税|所得税|关税|流程图|行动建议/.test(t);
+}
+
+function buildBusinessFactsListHtml(ctx) {
+  const rows = [
+    ['电商平台', ctx.platformLabel],
+    ['店铺主体', ctx.entityLabel],
+    ['目的国/地区', ctx.countryLabel],
+    ['产品HS编码', ctx.hsCode],
+    ['年销售额', ctx.revenueLabel],
+    ['团队人数', ctx.teamSizeLabel],
+    ['供应商发票', ctx.invoiceLabel],
+    ['发货模式', ctx.shippingLabel],
+  ];
+  if (ctx.notes) rows.push(['补充说明', ctx.notes]);
+
+  const items = rows
+    .map(
+      ([k, v]) =>
+        `<li><span class="fact-key">${escapeHtml(k)}</span><span class="fact-val">${escapeHtml(v || '—')}</span></li>`
+    )
+    .join('');
+  return `<ul class="result-facts">${items}</ul>`;
+}
+
+function buildLocalSolutionMarkdown(ctx) {
+  const isCnEntity = ctx.entity === 'cn' || ctx.entity === 'cn_individual';
+  const usesOverseasWarehouse =
+    ctx.shipping === 'platform_overseas' || ctx.shipping === 'self_overseas';
+  const invoiceRisk =
+    ctx.invoice === 'none' ||
+    ctx.invoice === 'special_none' ||
+    ctx.invoice === 'general_none' ||
+    ctx.invoice === 'general';
+
+  const flow = [
+    `采购备货（供应商 → ${ctx.entityLabel}）：核对合同、装箱单、发票（当前发票情况：${ctx.invoiceLabel}）`,
+    usesOverseasWarehouse
+      ? `出库报关/跨境调拨：按 HS「${ctx.hsCode}」归类申报，货值与物流单一致后发往「${ctx.countryLabel}」海外仓/平台仓`
+      : `国内直发履约：按订单拣货打包，跨境小包/专线发往「${ctx.countryLabel}」买家`,
+    `平台销售回款：在「${ctx.platformLabel}」完成销售、结算与平台费用核算（年销售额区间：${ctx.revenueLabel}）`,
+    `税务申报闭环：国内增值税/企业所得税（如适用）+ 目的国进口/流转税相关义务按期处理`,
+  ];
+
+  const vatLines = isCnEntity
+    ? [
+        `国内增值税：主体为「${ctx.entityLabel}」，需区分出口免税/退税适用条件；发货模式「${ctx.shippingLabel}」决定报关与进项匹配路径。`,
+        invoiceRisk
+          ? `发票风险偏高（${ctx.invoiceLabel}）：无票或普票占比会影响进项抵扣与出口退税资料链，建议优先梳理可取得专票的供应商。`
+          : `发票情况「${ctx.invoiceLabel}」相对有利于进项与退税资料齐套，仍需保证票货款一致、HS 与报关一致。`,
+      ]
+    : [
+        `国内增值税：店铺主体为「${ctx.entityLabel}」，中国侧增值税链条可能较弱或仅涉及关联采购；需单独梳理境内采购主体的开票与报关安排。`,
+        `关注关联采购定价与发票流是否能支撑目的国进口申报完税价格。`,
+      ];
+
+  const citLines = [
+    `企业所得税：利润主要归属「${ctx.entityLabel}」所在地税制；团队规模「${ctx.teamSizeLabel}」影响费用归集与核定/查账资料完备度。`,
+    usesOverseasWarehouse
+      ? `使用「${ctx.shippingLabel}」时，需评估「${ctx.countryLabel}」是否存在常设机构/仓储相关所得税争议，关联仓储服务费宜保留合同与定价依据。`
+      : `「${ctx.shippingLabel}」通常常设机构风险低于海外仓模式，但仍需关注目的国远程销售阈值与平台代扣规则。`,
+  ];
+
+  const dutyLines = [
+    `目的国关税：目的国「${ctx.countryLabel}」、HS「${ctx.hsCode}」决定归类与税率；申报完税价格应与采购/平台成交逻辑一致，避免低报。`,
+    `建议先用页面「查询目的国关税税率」核对 ${ctx.hsCode}，再固定商编与品名描述，减少查验与补税风险。`,
+  ];
+
+  const actions = [
+    `30天内：固化业务档案——平台「${ctx.platformLabel}」、主体「${ctx.entityLabel}」、目的国「${ctx.countryLabel}」、HS「${ctx.hsCode}」、发货模式「${ctx.shippingLabel}」一页纸台账`,
+    `30天内：按「${ctx.invoiceLabel}」盘点供应商开票缺口，能改专票的优先改；无票采购单独标注风险 SKU`,
+    `30天内：在「${ctx.platformLabel}」后台核对税务信息/税号上传与结算报表导出路径`,
+    `90天内：完成「${ctx.countryLabel}」进口/流转税义务评估（仓储、阈值、平台代扣代缴边界）并列出注册/申报日历`,
+    `90天内：建立月度「销售-物流-发票-申报」对账表，团队「${ctx.teamSizeLabel}」明确财务/运营责任人`,
+  ];
+
+  return [
+    '### 1）业务流程图',
+    ...flow.map((s, i) => `${i + 1}. ${s}`),
+    '',
+    '### 2）合规税负影响分析',
+    '**国内增值税**',
+    ...vatLines.map((s) => `- ${s}`),
+    '**国内企业所得税**',
+    ...citLines.map((s) => `- ${s}`),
+    '**目的国关税**',
+    ...dutyLines.map((s) => `- ${s}`),
+    '',
+    '### 3）行动建议',
+    ...actions.map((s) => `- ${s}`),
+  ].join('\n');
 }
 
 function renderAIPlanHtml(text) {
@@ -573,13 +653,10 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    // Drop leftover intros / ask-again lines
     if (/道一（Daoith）/.test(line) && /合规专家/.test(line)) continue;
     if (/道一合规小助手/.test(line)) continue;
-    if (/请您提供/.test(line) || /请提供以下信息/.test(line)) continue;
-    if (/通用框架/.test(line) || /定制方案/.test(line) && /提供信息/.test(line)) continue;
-    if (/^##?\s*一[、.．]?\s*业务背景/.test(line)) continue;
-    if (/^##?\s*二[、.．]?\s*解决方案\s*$/.test(line)) continue;
+    if (/请您提供|请提供以下信息|请提供具体信息/.test(line)) continue;
+    if (/通用框架|在您提供信息前|由于您尚未提供/.test(line)) continue;
 
     if (/^#{1,4}\s+/.test(line)) {
       closeList();
@@ -611,60 +688,38 @@ function renderAIPlanHtml(text) {
   return html;
 }
 
-/** Greeting + form-based background are fixed in UI; AI only fills solution body. */
+/** Greeting + form facts are fixed; solution body prefers AI only when it uses form data. */
 function assembleSolutionHtml(ctx, aiText) {
-  const cleaned = sanitizeAiSolutionText(aiText);
-  const body = renderAIPlanHtml(cleaned);
+  const useAi = aiSolutionUsesFormData(aiText, ctx);
+  const bodyMd = useAi ? String(aiText) : buildLocalSolutionMarkdown(ctx);
+  const body = renderAIPlanHtml(bodyMd);
+
   return (
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
     `<h5 class="result-section-title">一、业务背景信息总结</h5>` +
-    `<p class="result-paragraph">${escapeHtml(buildBusinessBackgroundSummary(ctx))}</p>` +
+    `<p class="result-paragraph">以下信息来自您在左侧表单的选择，方案据此生成：</p>` +
+    buildBusinessFactsListHtml(ctx) +
     `<h5 class="result-section-title">二、解决方案</h5>` +
-    (body ||
-      `<p class="result-paragraph">方案正文生成不完整，请重试。若持续出现，请联系道一财税合规专家。</p>`)
+    (body || `<p class="result-paragraph">方案生成失败，请重试。</p>`)
   );
 }
 
+/** Speak in the chat app’s expected “user already filled the fields” format. */
 function buildSolutionPrompt(ctx) {
-  return `你是跨境财税合规方案撰写助手。用户已在网页表单中完整填写业务信息（见下方）。你必须【立即】输出定制化解决方案，禁止再索要任何信息，禁止输出通用框架。
+  return `电商平台：${ctx.platformLabel}
+目的国/地区：${ctx.countryLabel}
+预计年/月销售额：年销售额 ${ctx.revenueLabel}（人民币）
+主要产品HS编码：${ctx.hsCode}
+企业主体所在地：${ctx.entityLabel}
+仓储模式：${ctx.shippingLabel}
+供应商发票情况：${ctx.invoiceLabel}
+团队人数：${ctx.teamSizeLabel}
+补充说明：${ctx.notes || '无'}
 
-## 已确认的客户信息（最终事实，禁止追问、禁止请用户补充）
-- 电商平台：${ctx.platformLabel}
-- 店铺主体：${ctx.entityLabel}
-- 目的国/地区：${ctx.countryLabel}
-- HS编码：${ctx.hsCode}
-- 年销售额：${ctx.revenueLabel}
-- 团队人数：${ctx.teamSizeLabel}
-- 供应商发票：${ctx.invoiceLabel}
-- 发货模式：${ctx.shippingLabel}
-- 补充说明：${ctx.notes || '无'}
-
-## 严格禁止（出现即错误）
-- 禁止写「请您提供以下信息」「请提供具体信息」「在您提供信息前」「我将为您定制方案」等话术
-- 禁止输出「跨境财税合规通用框架」或任何未结合上述客户信息的通用模板长文
-- 禁止自我介绍（包括「我是道一（Daoith）」等）
-- 禁止开场白、禁止复述「业务背景信息总结」章节（前端已固定展示）
-
-## 仅输出以下三个小节（用中文 Markdown，标题用 ### ）
-
+以上信息已完整提供。请不要再询问任何信息，也不要输出通用框架。请立即基于上述信息输出定制方案，且正文必须点名上述平台、主体、目的国、HS与仓储模式。输出结构：
 ### 1）业务流程图
-结合该客户的平台、主体、目的国、发货模式，用分步流程描述：采购/备货 → 出库/报关（如适用）→ 跨境物流 → 目的国入仓/履约 → 销售回款 → 税务申报。
-标明关键责任主体（店铺主体、货代、平台、税务机关）。
-
-### 2）合规税负影响分析
-必须结合上述客户信息具体分析（不要写泛泛常识）：
-- 国内增值税（进项、销项、出口退税/免税不退、与发票情况相关的风险）
-- 国内企业所得税（利润归属、查账/核定、关联交易注意点）
-- 目的国关税（结合 HS「${ctx.hsCode}」与目的国「${ctx.countryLabel}」说明归类、完税价格、税率逻辑；信息不足时写明假设，仍不要追问）
-可补充目的国 VAT/销售税若与「${ctx.shippingLabel}」履约直接相关。
-
-### 3）行动建议
-给出可执行清单（条目列表），按 30天内 / 90天内 优先级，写明谁做什么、准备哪些单证、在哪个系统操作。
-
-## 写作要求
-1. 直接从「### 1）业务流程图」开始输出，不要任何前言。
-2. 内容必须点名该客户的平台、主体、目的国、发货模式与发票情况，禁止空泛套话。
-3. 尽量引用具体政策/模式（如 9810/9610、报关单与销售清单、Marketplace Facilitator 等）。`;
+### 2）合规税负影响分析（国内增值税、国内企业所得税、目的国关税）
+### 3）行动建议`;
 }
 
 const platformNames = {
@@ -1027,7 +1082,12 @@ function initAIForm() {
     setButtonLoading(submitBtn, true, window.DAOITH_t('ai.generating'));
 
     try {
-      const text = await callDifyDiagnosis(ctx);
+      let text = '';
+      try {
+        text = await callDifyDiagnosis(ctx);
+      } catch {
+        text = '';
+      }
       items.innerHTML = `<div class="result-body">${assembleSolutionHtml(ctx, text)}</div>`;
     } catch (err) {
       items.innerHTML = `<div class="result-error"><strong>生成失败：</strong>${err.message}</div>`;
