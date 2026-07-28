@@ -519,8 +519,18 @@ function formatInline(text) {
   return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
+const SOLUTION_GREETING =
+  '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
+
+function ensureSolutionGreeting(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return SOLUTION_GREETING;
+  if (raw.includes('道一合规小助手')) return raw;
+  return `${SOLUTION_GREETING}\n\n${raw}`;
+}
+
 function renderAIPlanHtml(text) {
-  const lines = text.split('\n');
+  const lines = ensureSolutionGreeting(text).split('\n');
   let html = '';
   let inList = false;
 
@@ -538,25 +548,31 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    if (/^#{1,3}\s+/.test(line)) {
+    if (/^#{1,4}\s+/.test(line)) {
       closeList();
-      const title = line.replace(/^#{1,3}\s+/, '').replace(/\*\*/g, '');
-      html += `<h5 class="result-section-title">${escapeHtml(title)}</h5>`;
+      const level = (line.match(/^#+/) || ['##'])[0].length;
+      const title = line.replace(/^#{1,4}\s+/, '').replace(/\*\*/g, '');
+      const cls =
+        level >= 3 ? 'result-section-subtitle' : 'result-section-title';
+      html += `<h5 class="${cls}">${escapeHtml(title)}</h5>`;
       continue;
     }
 
-    if (/^[-*•]\s+/.test(line)) {
+    if (/^[-*•]\s+/.test(line) || /^\d+[.)、]\s+/.test(line)) {
       if (!inList) {
         html += '<ul class="result-list">';
         inList = true;
       }
-      const item = formatInline(line.replace(/^[-*•]\s+/, ''));
+      const item = formatInline(
+        line.replace(/^[-*•]\s+/, '').replace(/^\d+[.)、]\s+/, '')
+      );
       html += `<li>${item}</li>`;
       continue;
     }
 
     closeList();
-    html += `<p class="result-paragraph">${formatInline(line)}</p>`;
+    const isGreeting = line.includes('道一合规小助手');
+    html += `<p class="result-paragraph${isGreeting ? ' result-greeting' : ''}">${formatInline(line)}</p>`;
   }
 
   closeList();
@@ -564,6 +580,9 @@ function renderAIPlanHtml(text) {
 }
 
 function buildSolutionPrompt(ctx) {
+  const greeting =
+    '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
+
   return `请为以下跨境电商企业撰写一份【详细、可落地】的财税合规方案。
 
 ## 客户信息
@@ -577,23 +596,37 @@ function buildSolutionPrompt(ctx) {
 - 发货模式：${ctx.shippingLabel}
 - 补充说明：${ctx.notes || '无'}
 
-## 输出要求
-1. 用中文 Markdown 输出，必须包含以下章节（每节标题用 ## 开头）：
-   ## 业务概况与合规诊断
-   ## 出口模式与退税安排
-   ## 目的国税务合规（VAT/销售税/所得税）
-   ## 发票、单证与海关风险
-   ## 架构优化与ODI建议（如适用）
-   ## 分阶段行动计划
+## 输出结构（必须严格按此顺序，用中文 Markdown；章节标题用 ## ）
 
-2. 每个章节正文至少 3–5 句话（80–150字），必须包含：
-   - 具体政策/监管依据（如公告号、9810/9610、Marketplace Facilitator 等）
-   - 可操作步骤（谁先做什么、何时申报）
-   - 关键单证或系统名称（报关单、销售清单、Seller Central 税务设置等）
-   - 常见风险点及规避建议
+正文开头必须原样输出下面这段开场白（单独成段，不要改写、不要翻译、不要加引号）：
+${greeting}
 
-3. 禁止只写提纲或一句话带过；禁止空泛表述如"建议合规经营"。
-4. 「分阶段行动计划」用条目列表，按 30天/90天/180天 给出具体任务。`;
+然后按下列章节输出：
+
+## 一、业务背景信息总结
+用 1 段话复述并归纳客户填写的业务背景（平台、主体、目的国、销售额区间、发票与发货模式、补充说明等），突出与合规相关的关键事实。不要遗漏已填写字段。
+
+## 二、解决方案
+本节下必须包含三个小节（用 ### 标题）：
+
+### 1）业务流程图
+用清晰的分步流程描述从采购/备货 → 出库/报关（如适用）→ 跨境物流 → 目的国入仓/履约 → 销售回款 → 税务申报的链路。
+可用有序列表或「步骤A → 步骤B → 步骤C」形式；标明关键责任主体（店铺主体、货代、平台、税务机关）。
+
+### 2）合规税负影响分析
+重点分析（结合客户平台、主体、目的国与发货模式）：
+- 国内增值税（进项、销项、出口退税/免税不退、无法退税风险等）
+- 国内企业所得税（利润归属、核定/查账、关联交易等注意点）
+- 目的国关税（HS 对应关税逻辑、完税价格、优惠税率/豁免可能性，信息不足时说明假设）
+可补充目的国 VAT/销售税若与履约直接相关，但三大税负以上三项为必写。
+
+### 3）行动建议
+给出可执行清单（条目列表），按优先级或时间顺序（如 30天内 / 90天内），写明「谁做什么、准备哪些单证、在哪个系统操作」。
+
+## 写作要求
+1. 禁止只写提纲或一句话带过；禁止空泛表述如「建议合规经营」。
+2. 尽量引用具体政策/模式表述（如 9810/9610、报关单与销售清单、Marketplace Facilitator 等），信息不足时明确写出假设。
+3. 全文面向跨境卖家，表述专业、简洁、可落地。`;
 }
 
 const platformNames = {
