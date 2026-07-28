@@ -1223,6 +1223,8 @@ ul {
   padding: 16px 14px;
   overflow-y: auto;
   max-height: 467px;
+  display: flex;
+  flex-direction: column;
 }
 
 .ai-grid .faq-panel h3 {
@@ -1543,7 +1545,7 @@ ul {
 .tax-actions {
   margin-top: 12px;
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .tax-cart-btn {
@@ -1556,6 +1558,30 @@ ul {
 
 .tax-cart-btn-icon {
   flex-shrink: 0;
+}
+
+.ai-grid .faq-panel.faq-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-grid .faq-panel .faq-actions {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ai-grid .faq-panel .tax-cart-btn {
+  color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ai-grid .faq-panel .tax-cart-btn:hover {
+  border-color: rgba(155, 188, 255, 0.8);
+  background: rgba(34, 81, 255, 0.35);
+  color: #fff;
 }
 
 /* ===== EXPERT INSIGHTS ===== */
