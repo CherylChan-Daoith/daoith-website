@@ -135,7 +135,7 @@
         if (ok) {
           updateCartBadge();
           const locale = window.DAOITH_getLocale?.() || 'zh';
-          showToast(locale === 'en' ? 'Added to cart' : '已加入购物车');
+          showToast(locale === 'en' ? 'Added to inquiry list' : '已加入询价单');
         }
       });
     });

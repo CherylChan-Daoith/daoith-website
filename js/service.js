@@ -54,7 +54,7 @@
     const title = locale === 'en' && en?.title ? en.title : service.title;
     const desc = locale === 'en' && en?.desc ? en.desc : service.desc;
     const unit = locale === 'en' && en?.unit ? en.unit : service.unit;
-    const detailBtn = locale === 'en' ? 'Add to cart' : '加入购物车';
+    const detailBtn = locale === 'en' ? 'Add to inquiry list' : '加入询价单';
     const backLabel = locale === 'en' ? '← Back to marketplace' : '← 返回财税服务市场';
     const details = (locale === 'en' && en?.details?.length) ? en.details : service.details;
 

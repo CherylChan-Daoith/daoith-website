@@ -191,7 +191,7 @@
         }
         if (addBtn) {
           captureOriginal(addBtn, false);
-          setText(addBtn, locale === 'en' ? (s.cartBtn || 'Add to cart') : originalText.get(addBtn), false);
+          setText(addBtn, locale === 'en' ? (s.cartBtn || 'Add to inquiry list') : originalText.get(addBtn), false);
         }
         if (priceSpan && s.unit) {
           captureOriginal(priceSpan, false);
