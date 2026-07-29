@@ -250,10 +250,17 @@ def get_user_by_id(user_id: int):
     return _row_to_user(row)
 
 
-def _fetch_json(url: str):
-    req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
+# Bypass system HTTP proxy (common on Chinese cloud hosts; breaks WeChat API)
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def _fetch_json(url: str, timeout: int = 8):
+    req = urllib.request.Request(url, method="GET", headers={"User-Agent": "daoith-auth/1.0"})
+    try:
+        with _NO_PROXY_OPENER.open(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as err:
+        raise TimeoutError(f"微信接口不可达或超时: {err}") from err
     if data.get("errcode"):
         raise ValueError(data.get("errmsg") or f"WeChat API error {data['errcode']}")
     return data

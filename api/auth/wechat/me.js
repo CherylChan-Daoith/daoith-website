@@ -2,6 +2,10 @@ import { applyCors, handleOptions } from '../../lib/cors.js';
 import { getBearerToken, verifyJwt } from '../../lib/jwt.js';
 import { getUserById } from '../../lib/db.js';
 
+function hasDatabase() {
+  return Boolean(process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim());
+}
+
 export default async function handler(req, res) {
   applyCors(req, res, 'GET, OPTIONS');
 
@@ -18,9 +22,38 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: '未登录' });
   }
 
-  const payload = verifyJwt(token);
+  let payload;
+  try {
+    payload = verifyJwt(token);
+  } catch {
+    return res.status(503).json({ error: '未配置 JWT_SECRET' });
+  }
+
   if (!payload?.sub) {
     return res.status(401).json({ error: '登录已过期，请重新登录' });
+  }
+
+  // Prefer JWT profile claims (works without database)
+  if (payload.openid || payload.nickname || payload.avatarUrl) {
+    return res.status(200).json({
+      user: {
+        id: payload.sub,
+        openid: payload.openid || null,
+        nickname: payload.nickname || null,
+        avatarUrl: payload.avatarUrl || null,
+      },
+    });
+  }
+
+  if (!hasDatabase()) {
+    return res.status(200).json({
+      user: {
+        id: payload.sub,
+        openid: payload.openid || null,
+        nickname: null,
+        avatarUrl: null,
+      },
+    });
   }
 
   try {
