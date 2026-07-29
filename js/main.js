@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeroFeatures();
   initFAQ();
   initAIForm();
+  initAiChatbot();
   initTaxCalculator();
   initServiceFilters();
   initShowMoreServices();
@@ -296,16 +297,171 @@ function setupPagination({ itemsSelector, buttonId, labelKey, label, onUpdate, p
   return { applyPagination, items, getVisibleCount: () => visibleCount };
 }
 
-/* FAQ accordion */
+/* FAQ accordion (supports dynamically generated plan FAQs) */
 function initFAQ() {
-  document.querySelectorAll('.faq-question').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const item = btn.parentElement;
-      const isOpen = item.classList.contains('open');
+  const root = document.getElementById('planFaqList') || document;
+  root.addEventListener('click', (e) => {
+    const btn = e.target.closest('.faq-question');
+    if (!btn) return;
+    const item = btn.closest('.faq-item');
+    if (!item) return;
+    const isOpen = item.classList.contains('open');
+    root.querySelectorAll('.faq-item').forEach((i) => i.classList.remove('open'));
+    if (!isOpen) item.classList.add('open');
+  });
+}
 
-      document.querySelectorAll('.faq-item').forEach((i) => i.classList.remove('open'));
-      if (!isOpen) item.classList.add('open');
-    });
+function buildPlanRelatedFaqs(ctx) {
+  const faqs = [
+    {
+      q: '这份AI方案有法律效力吗？',
+      a: `方案基于您填写的「${ctx.platformLabel} / ${ctx.entityLabel} / ${ctx.countryLabel}」等信息生成，仅供一般性参考。正式落地前建议预约专家1v1，结合单证与账套出具可执行方案。`,
+    },
+    {
+      q: `出口方式「${ctx.exportModeLabel}」对退税有何影响？`,
+      a:
+        ctx.exportMode === 'cbec_9610' || ctx.exportMode === 'cbec_9810' || ctx.exportMode === 'cbec_9710'
+          ? `跨境电商监管方式「${ctx.exportModeLabel}」通常有特定申报与单证要求，退税/免税路径需与综试区、报关及销售清单匹配，请按本方案行动建议逐项核对。`
+          : ctx.exportMode === 'trade_0110'
+            ? `一般贸易（0110）更强调报关单、增值税专用发票与货物流一致；结合您的发票情况「${ctx.invoiceLabel}」评估退税资料齐套度。`
+            : `您选择的「${ctx.exportModeLabel}」决定通关与税务处理路径不同，请以方案中的流程图与税负分析为准，并保留完整物流与结算凭证。`,
+    },
+    {
+      q: `在「${ctx.countryLabel}」销售需要关注哪些税？`,
+      a: `结合发货模式「${ctx.shippingLabel}」，通常需关注目的国进口关税（HS「${ctx.hsCode}」）、当地VAT/销售税，以及仓储是否触发注册义务。可用下方「合规税负计算」做粗算。`,
+    },
+    {
+      q: `平台「${ctx.platformLabel}」代扣代缴后还要自行申报吗？`,
+      a: `部分国家/地区由平台代扣销售税或VAT，但卖家仍可能需完成税号注册、零申报或对未代扣交易自行处理。请对照方案中的行动建议核对「${ctx.platformLabel}」后台税务设置。`,
+    },
+    {
+      q: '供应商发票不齐怎么办？',
+      a: `当前发票情况为「${ctx.invoiceLabel}」。无票/普票占比高时，出口退税与进项抵扣风险上升，建议优先梳理可取得专票的供应商，并对无票 SKU 单独台账管理。`,
+    },
+    {
+      q: '接下来最优先做什么？',
+      a: `建议先按方案「行动建议」完成：固化平台/主体/目的国/HS/出口方式台账，核对「${ctx.exportModeLabel}」申报路径，并评估「${ctx.countryLabel}」税务注册与申报日历。需要人工落地可点击「专家1v1」加入询价单。`,
+    },
+  ];
+  return faqs;
+}
+
+function renderPlanFaqs(ctx) {
+  const panel = document.getElementById('planFaqPanel');
+  const list = document.getElementById('planFaqList');
+  if (!panel || !list) return;
+
+  const faqs = buildPlanRelatedFaqs(ctx);
+  list.innerHTML = faqs
+    .map(
+      (f) => `
+    <div class="faq-item" data-plan-faq="1">
+      <button type="button" class="faq-question">${escapeHtml(f.q)}<span class="faq-arrow">▼</span></button>
+      <div class="faq-answer"><div class="faq-answer-inner">${escapeHtml(f.a)}</div></div>
+    </div>`
+    )
+    .join('');
+
+  panel.hidden = false;
+  window.DAOITH_CART?.bindAddButtons?.(panel);
+}
+
+function buildLocalChatReply(message, ctx) {
+  const q = String(message || '').trim();
+  if (!ctx?.platform) {
+    return '请先在左侧填写业务信息并生成方案，我可以基于您的业务背景回答合规问题；也可直接预约专家1v1深入诊断。';
+  }
+  if (/退税|出口退税/.test(q)) {
+    return `结合您的出口方式「${ctx.exportModeLabel}」与发票情况「${ctx.invoiceLabel}」，退税关键是票货款一致与监管方式匹配。可先用「查询出口退税率」核对 HS「${ctx.hsCode}」，再按方案行动建议补齐单证。`;
+  }
+  if (/关税|VAT|销售税|税负/.test(q)) {
+    return `针对目的国「${ctx.countryLabel}」、发货模式「${ctx.shippingLabel}」，请重点看方案中的税负影响分析，并用下方税负计算器粗算。关税请参考该国海关官方税则对 HS「${ctx.hsCode}」终核。`;
+  }
+  if (/9610|9810|9710|0110|出口方式/.test(q)) {
+    return `您当前选择的出口方式是「${ctx.exportModeLabel}」。不同监管方式的报关、清单与退税路径不同，详情见方案业务流程图与行动建议。`;
+  }
+  return `已结合您的业务背景（${ctx.platformLabel} / ${ctx.entityLabel} / ${ctx.countryLabel} / ${ctx.exportModeLabel}）理解您的问题。更复杂的落地路径建议点击「专家1v1」加入询价单，由顾问结合账套与单证给出定制方案。`;
+}
+
+function initAiChatbot() {
+  const root = document.getElementById('aiChatbot');
+  const fab = document.getElementById('aiChatbotFab');
+  const panel = document.getElementById('aiChatbotPanel');
+  const closeBtn = document.getElementById('aiChatbotClose');
+  const form = document.getElementById('aiChatbotForm');
+  const input = document.getElementById('aiChatbotInput');
+  const messages = document.getElementById('aiChatbotMessages');
+  if (!root || !fab || !panel || !form || !input || !messages) return;
+
+  let conversationId = '';
+  let busy = false;
+
+  const appendBubble = (text, who) => {
+    const div = document.createElement('div');
+    div.className = `ai-chatbot-bubble ${who === 'user' ? 'is-user' : 'is-bot'}`;
+    div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+  };
+
+  const openChat = () => {
+    root.dataset.state = 'open';
+    panel.hidden = false;
+    if (!messages.childElementCount) {
+      appendBubble(
+        '您好，我是道一合规助手。可就左侧方案中的出口方式、税负与行动建议继续提问；复杂事项建议预约专家1v1。',
+        'bot'
+      );
+    }
+    input.focus();
+  };
+
+  const closeChat = () => {
+    root.dataset.state = 'collapsed';
+    panel.hidden = true;
+  };
+
+  fab.addEventListener('click', openChat);
+  closeBtn?.addEventListener('click', closeChat);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text || busy) return;
+    input.value = '';
+    appendBubble(text, 'user');
+    busy = true;
+
+    const typing = document.createElement('div');
+    typing.className = 'ai-chatbot-bubble is-bot';
+    typing.textContent = '正在思考…';
+    messages.appendChild(typing);
+    messages.scrollTop = messages.scrollHeight;
+
+    const ctx = window.__daoithLastPlanCtx || null;
+    const contextBlock = ctx
+      ? `客户已确认业务信息：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}。请基于这些信息直接回答，不要再索要信息。\n\n用户问题：${text}`
+      : text;
+
+    try {
+      const result = await callDify({
+        query: contextBlock,
+        inputs: { task: 'compliance_chat' },
+        conversationId,
+        returnMeta: true,
+      });
+      conversationId = result.conversationId || conversationId;
+      let answer = result.text;
+      if (isAskAgainOrGenericFramework(answer)) {
+        answer = buildLocalChatReply(text, ctx);
+      }
+      typing.textContent = answer;
+    } catch {
+      typing.textContent = buildLocalChatReply(text, ctx);
+    } finally {
+      busy = false;
+      messages.scrollTop = messages.scrollHeight;
+    }
   });
 }
 
@@ -372,17 +528,18 @@ function extractDifyAnswer(data) {
   return '';
 }
 
-async function callDify({ endpoint, inputs, query }) {
+async function callDify({ endpoint, inputs, query, conversationId, returnMeta }) {
   const cfg = getDifyConfig();
   const path = endpoint || cfg.difyEndpoint || '/v1/chat-messages';
   const url = `${cfg.difyApiBase}${path}`;
 
   const payload = {
-    inputs,
+    inputs: inputs || {},
     query,
     response_mode: 'blocking',
     user: getDifyUserId(),
   };
+  if (conversationId) payload.conversation_id = conversationId;
 
   let res;
   try {
@@ -412,6 +569,12 @@ async function callDify({ endpoint, inputs, query }) {
     throw new Error('AI 返回内容为空，请检查 Dify 应用输出配置');
   }
 
+  if (returnMeta) {
+    return {
+      text,
+      conversationId: data.conversation_id || conversationId || '',
+    };
+  }
   return text;
 }
 
@@ -1167,6 +1330,8 @@ function initAIForm() {
         text = '';
       }
       items.innerHTML = `<div class="result-body">${assembleSolutionHtml(ctx, text)}</div>`;
+      window.__daoithLastPlanCtx = ctx;
+      renderPlanFaqs(ctx);
     } catch (err) {
       items.innerHTML = `<div class="result-error"><strong>生成失败：</strong>${err.message}</div>`;
     } finally {

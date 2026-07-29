@@ -201,7 +201,7 @@
     }
 
     if (en.faqs) {
-      document.querySelectorAll('.faq-panel .faq-item').forEach((item, i) => {
+      document.querySelectorAll('.faq-panel .faq-item:not([data-plan-faq])').forEach((item, i) => {
         const f = en.faqs[i];
         if (!f) return;
         const q = item.querySelector('.faq-question');
