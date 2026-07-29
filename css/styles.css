@@ -630,10 +630,11 @@ ul {
 
 /* ===== AI SOLUTION ===== */
 .ai-grid {
+  --ai-panel-height: min(72vh, 640px);
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(0, 2.1fr);
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .ai-left {
@@ -641,11 +642,14 @@ ul {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  height: var(--ai-panel-height);
+  max-height: var(--ai-panel-height);
+  overflow: hidden;
 }
 
 .ai-grid > .ai-left .form-panel,
 .ai-grid > .result-panel {
-  min-height: 348px;
+  min-height: 0;
 }
 
 .form-panel {
@@ -660,7 +664,10 @@ ul {
 /* AI form — compact inputs & typography */
 .ai-grid .form-panel {
   padding: 16px 14px;
-  max-height: none;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .ai-grid .form-panel h3 {
@@ -1003,10 +1010,10 @@ ul {
   border: 1px solid var(--border-light);
   display: flex;
   flex-direction: column;
-  min-height: 320px;
   position: relative;
-  min-height: 520px;
-  max-height: 720px;
+  height: var(--ai-panel-height, min(72vh, 640px));
+  max-height: var(--ai-panel-height, min(72vh, 640px));
+  min-height: 0;
 }
 
 .result-placeholder {
@@ -1231,13 +1238,17 @@ ul {
   border-radius: var(--radius);
   padding: 16px 14px;
   overflow-y: auto;
-  max-height: none;
+  flex: 0 1 40%;
+  min-height: 0;
+  max-height: 40%;
   display: flex;
   flex-direction: column;
 }
 
 .ai-grid .faq-panel.faq-section[hidden] {
   display: none !important;
+  flex: 0;
+  max-height: 0;
 }
 
 .ai-grid .faq-panel h3 {
@@ -3584,20 +3595,33 @@ body.modal-open {
 
   .ai-grid {
     grid-template-columns: 1fr;
+    --ai-panel-height: auto;
+  }
+
+  .ai-left {
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .ai-grid > .ai-left .form-panel,
   .ai-grid > .result-panel {
     min-height: auto;
     max-height: none;
+    height: auto;
+  }
+
+  .ai-grid .form-panel {
+    max-height: min(70vh, 560px);
   }
 
   .form-panel {
-    max-height: none;
+    max-height: min(70vh, 560px);
   }
 
   .ai-grid .faq-panel.faq-section {
-    max-height: none;
+    max-height: min(50vh, 360px);
+    flex: none;
   }
 
   .hub-grid {
