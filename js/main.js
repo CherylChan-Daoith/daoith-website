@@ -55,37 +55,126 @@ function initHeader() {
   });
 }
 
-/* Active nav link on scroll */
+/* Active nav: section view switching (one page area at a time) */
 function initNavigation() {
-  const sections = document.querySelectorAll('section[id]');
+  const viewSections = document.querySelectorAll('[data-view]');
   const navLinks = document.querySelectorAll('.nav > a[href^="#"], .nav-dropdown-menu a[href^="#"]');
   const policyTrigger = document.querySelector('.nav-dropdown-trigger[data-nav-parent="policy"]');
   const policyIds = new Set(['policy', 'tax-systems', 'policy-expert', 'policy-tax', 'policy-platform']);
 
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const id = entry.target.id;
-          navLinks.forEach((link) => {
-            link.classList.toggle('active', link.getAttribute('href') === `#${id}`);
-          });
-          if (policyTrigger) {
-            policyTrigger.classList.toggle('active', policyIds.has(id));
-          }
-        }
+  const hashToView = {
+    '': 'home',
+    hero: 'home',
+    home: 'home',
+    'ai-solution': 'ai-solution',
+    services: 'services',
+    policy: 'policy',
+    'tax-systems': 'policy',
+    'policy-tax': 'policy',
+    'policy-platform': 'policy',
+    'policy-expert': 'policy',
+    about: 'about',
+    team: 'about',
+    hub: 'hub',
+  };
+
+  const viewToNavHref = {
+    home: '#hero',
+    'ai-solution': '#ai-solution',
+    services: '#services',
+    policy: '#policy',
+    about: '#about',
+    hub: '#hub',
+  };
+
+  function resolveView(hash) {
+    const id = String(hash || '').replace(/^#/, '');
+    return hashToView[id] || 'home';
+  }
+
+  function setActiveNav(hashId, view) {
+    const id = String(hashId || '').replace(/^#/, '') || 'hero';
+    navLinks.forEach((link) => {
+      const href = link.getAttribute('href') || '';
+      const linkId = href.replace(/^#/, '');
+      let active = false;
+      if (link.closest('.nav-dropdown-menu')) {
+        active =
+          view === 'policy' &&
+          (linkId === id || (id === 'policy' && linkId === 'tax-systems'));
+      } else {
+        active = href === viewToNavHref[view];
+      }
+      link.classList.toggle('active', active);
+    });
+    if (policyTrigger) {
+      policyTrigger.classList.toggle('active', view === 'policy');
+    }
+  }
+
+  function showView(hash, { updateHash = true, scrollTop = true } = {}) {
+    const raw = String(hash || 'hero').replace(/^#/, '') || 'hero';
+    const view = resolveView(raw);
+
+    document.body.dataset.activeView = view;
+    viewSections.forEach((el) => {
+      const match = el.getAttribute('data-view') === view;
+      el.classList.toggle('is-active-view', match);
+      el.hidden = !match;
+    });
+
+    setActiveNav(raw, view);
+
+    if (updateHash) {
+      const nextHash = `#${raw === 'home' ? 'hero' : raw}`;
+      if (location.hash !== nextHash) {
+        history.pushState({ view, hash: raw }, '', nextHash);
+      }
+    }
+
+    if (scrollTop) {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    }
+
+    // Within policy view, scroll to the specific block
+    if (view === 'policy' && policyIds.has(raw) && raw !== 'policy') {
+      requestAnimationFrame(() => {
+        const target = document.getElementById(raw);
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
-    },
-    { rootMargin: '-40% 0px -55% 0px' }
-  );
+    }
 
-  sections.forEach((section) => observer.observe(section));
+    document.getElementById('nav')?.classList.remove('open');
+    document.querySelectorAll('.nav-dropdown.open').forEach((d) => {
+      d.classList.remove('open');
+      d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
+    });
+  }
 
-  // Also observe in-page policy blocks for submenu highlighting
-  ['tax-systems', 'policy-expert', 'policy-tax', 'policy-platform'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) observer.observe(el);
+  function onNavigateClick(e) {
+    const link = e.target.closest('a[href^="#"]');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (!href || href === '#') {
+      e.preventDefault();
+      showView('hero');
+      return;
+    }
+    const id = href.slice(1);
+    if (!(id in hashToView) && id !== '') return;
+    e.preventDefault();
+    showView(id || 'hero');
+  }
+
+  document.addEventListener('click', onNavigateClick);
+  window.addEventListener('popstate', () => {
+    showView(location.hash.slice(1) || 'hero', { updateHash: false });
   });
+
+  // Initial view from URL hash
+  showView(location.hash.slice(1) || 'hero', { updateHash: false });
+
+  window.DAOITH_showView = showView;
 }
 
 /* Mobile menu */
