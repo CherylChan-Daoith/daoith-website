@@ -455,10 +455,36 @@ function renderPlanFaqs(ctx) {
   window.DAOITH_CART?.bindAddButtons?.(panel);
 }
 
+function sanitizeAiAnswer(text) {
+  let t = String(text || '');
+  // Strip model reasoning traces (DeepSeek-R1 / similar)
+  t = t.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '');
+  t = t.replace(/<\/?think\b[^>]*>/gi, '');
+  t = t.replace(/^\s*thinking[:：].*$/gim, '');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function isKnowledgeMissRefusal(text) {
+  const t = String(text || '');
+  return /知识库尚未收录|目前的知识库尚未|未在知识库|建议查阅官方税务局/.test(t);
+}
+
 function buildLocalChatReply(message, ctx) {
   const q = String(message || '').trim();
+
+  // Product → HS classification (common references; final check with Customs)
+  if (/海关编码|HS\s*编码|税号|归类/.test(q) || (/编码/.test(q) && /(手机|电脑|耳机|服装|玩具)/.test(q))) {
+    if (/手机|智能手机|iPhone|安卓/.test(q)) {
+      return '常见参考：智能手机多归入海关编码 8517.13（中国税则常见 85171300）。具体型号、是否带通信功能、是否成套等会影响归类，正式报关请以海关归类决定/预裁定为准。也可用左侧「HS 查询」核对退税率。';
+    }
+    if (/笔记本|电脑|平板/.test(q)) {
+      return '常见参考：便携式自动数据处理设备（笔记本等）多归入 8471.30。正式报关请以海关归类决定为准，可用左侧「HS 查询」核对退税率。';
+    }
+    return '海关编码（HS）需按商品材质、功能、用途做归类。可在左侧填写大致编码后用「查询出口退税率」核对；拿不准时建议预约专家1v1或申请海关预裁定。';
+  }
+
   if (!ctx?.platform) {
-    return '请先在左侧填写业务信息并生成方案，我可以基于您的业务背景回答合规问题；也可直接预约专家1v1深入诊断。';
+    return '我可以回答海关编码、出口方式、退税与税负等实务问题。若要结合您的店铺情况，请先在左侧填写业务信息并生成方案；复杂事项可预约专家1v1。';
   }
   if (/退税|出口退税/.test(q)) {
     return `结合您的出口方式「${ctx.exportModeLabel}」与发票情况「${ctx.invoiceLabel}」，退税关键是票货款一致与监管方式匹配。可先用「查询出口退税率」核对 HS「${ctx.hsCode}」，再按方案行动建议补齐单证。`;
