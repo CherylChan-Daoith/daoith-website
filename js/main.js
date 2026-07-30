@@ -533,7 +533,9 @@ function initAiChatbot() {
       : text;
 
     try {
+      const { difyChatEndpoint } = getDifyConfig();
       const result = await callDify({
+        endpoint: difyChatEndpoint || '/v1/chatbot/chat-messages',
         query: contextBlock,
         inputs: { task: 'compliance_chat' },
         conversationId,
@@ -575,6 +577,7 @@ function getDifyConfig() {
     difyDiagnosisEndpoint: '/v1/chat-messages',
     difyHsRateEndpoint: '/v1/chat-messages',
     difyTaxCalcEndpoint: '/v1/chat-messages',
+    difyChatEndpoint: '/v1/chatbot/chat-messages',
   };
 }
 
