@@ -457,9 +457,32 @@ function renderPlanFaqs(ctx) {
 
 function sanitizeAiAnswer(text) {
   let t = String(text || '');
-  // Strip model reasoning traces (DeepSeek-R1 / similar)
-  t = t.replace(/<think\b[^>]*>[\s\S]*?<\/think>/gi, '');
-  t = t.replace(/<\/?think\b[^>]*>/gi, '');
+
+  // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
+  const think = String.fromCharCode(116, 104, 105, 110, 107); // think
+  const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
+  for (const name of tagNames) {
+    t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '');
+    t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+  }
+
+  // Drop leading CoT if it ends with a short final refusal / conclusion
+  if (
+    /我们被要求回答|根据上下文|按照回答要求|必须严格按|所以回答[:：]/.test(t) &&
+    /关于该问题，我目前的知识库尚未收录|建议查阅官方/.test(t)
+  ) {
+    const m = t.match(/关于该问题，我目前的知识库尚未收录[\s\S]*$/);
+    if (m) t = m[0];
+  }
+
+  // Generic: remove a long Chinese reasoning preamble before the last short paragraph
+  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下/.test(t)) {
+    const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
+      t = parts[parts.length - 1];
+    }
+  }
+
   t = t.replace(/^\s*thinking[:：].*$/gim, '');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -485,6 +508,9 @@ function buildLocalChatReply(message, ctx) {
 
   if (!ctx?.platform) {
     return '我可以回答海关编码、出口方式、退税与税负等实务问题。若要结合您的店铺情况，请先在左侧填写业务信息并生成方案；复杂事项可预约专家1v1。';
+  }
+  if (/铝/.test(q) && /退税/.test(q) && /取消|停止|取消退税/.test(q)) {
+    return '根据财政部、税务总局调整出口退税政策的相关公告，铝材等产品取消出口退税，政策自2024年12月1日起实施（以公告原文及附件产品清单为准）。建议核对附件清单是否覆盖您的具体税号，并以税局/海关最新公告终核。';
   }
   if (/退税|出口退税/.test(q)) {
     return `结合您的出口方式「${ctx.exportModeLabel}」与发票情况「${ctx.invoiceLabel}」，退税关键是票货款一致与监管方式匹配。可先用「查询出口退税率」核对 HS「${ctx.hsCode}」，再按方案行动建议补齐单证。`;
@@ -554,9 +580,16 @@ function initAiChatbot() {
     messages.scrollTop = messages.scrollHeight;
 
     const ctx = window.__daoithLastPlanCtx || null;
-    const contextBlock = ctx
-      ? `客户已确认业务信息：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}。请基于这些信息直接回答，不要再索要信息。\n\n用户问题：${text}`
-      : text;
+    const contextBlock = [
+      '【回答规范】你是道一跨境电商财税合规助手。直接给出最终中文答案，禁止输出思考过程或推理草稿。',
+      '可回答海关编码归类参考、出口监管方式、退税与目的国税负等实务问题；不确定时说明需官方终核，不要仅以「知识库未收录」结束。',
+      ctx
+        ? `客户业务背景：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}。`
+        : '',
+      `用户问题：${text}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     try {
       const { difyChatEndpoint } = getDifyConfig();
@@ -568,8 +601,8 @@ function initAiChatbot() {
         returnMeta: true,
       });
       conversationId = result.conversationId || conversationId;
-      let answer = result.text;
-      if (isAskAgainOrGenericFramework(answer)) {
+      let answer = sanitizeAiAnswer(result.text);
+      if (!answer || isAskAgainOrGenericFramework(answer) || isKnowledgeMissRefusal(answer)) {
         answer = buildLocalChatReply(text, ctx);
       }
       typing.textContent = answer;
