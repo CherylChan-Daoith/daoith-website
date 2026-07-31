@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>获取公众号 OpenID — 道一</title>
+  <link rel="icon" href="/images/logo.png" type="image/png">
+  <link rel="stylesheet" href="/css/styles.css?v=20260731a">
+  <style>
+    .oa-openid-main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: #f3f6fb; }
+    .oa-openid-card { max-width: 420px; width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 22px; text-align: center; }
+    .oa-openid-card h1 { font-size: 1.15rem; margin: 12px 0 8px; color: #051c2c; }
+    .oa-openid-card p { font-size: 0.875rem; color: #64748b; line-height: 1.6; margin: 0 0 14px; }
+    .oa-openid-value { word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; color: #0f172a; margin: 12px 0; text-align: left; }
+    .oa-openid-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <main class="oa-openid-main">
+    <div class="oa-openid-card">
+      <img src="/images/logo.png" alt="DAOITH" width="48" height="48">
+      <h1>公众号 OpenID</h1>
+      <p id="oaStatus">正在准备微信授权…</p>
+      <div id="oaOpenIdBox" class="oa-openid-value" hidden></div>
+      <div class="oa-openid-actions">
+        <button type="button" class="btn btn-primary btn-sm" id="oaCopyBtn" hidden>复制 OpenID</button>
+        <a class="btn btn-outline btn-sm" href="/">返回首页</a>
+      </div>
+    </div>
+  </main>
+  <script src="/js/config.js?v=20260731a"></script>
+  <script>
+(function () {
+  const statusEl = document.getElementById('oaStatus');
+  const boxEl = document.getElementById('oaOpenIdBox');
+  const copyBtn = document.getElementById('oaCopyBtn');
+  const cfg = window.DAOITH_CONFIG || {};
+  const oaAppId = cfg.wechatOaAppId || '';
+  const apiBase = (cfg.authApiBase !== undefined && cfg.authApiBase !== '')
+    ? cfg.authApiBase
+    : 'https://api.daoith.com';
+  const redirectUri = 'https://www.daoith.com/auth/wechat-oa-openid.html';
+
+  function setStatus(msg) {
+    statusEl.textContent = msg;
+  }
+
+  function inWeChat() {
+    return /MicroMessenger/i.test(navigator.userAgent || '');
+  }
+
+  function buildOAuthUrl() {
+    const params = new URLSearchParams({
+      appid: oaAppId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'snsapi_base',
+      state: 'oa_openid',
+    });
+    return 'https://open.weixin.qq.com/connect/oauth2/authorize?' + params.toString() + '#wechat_redirect';
+  }
+
+  async function exchangeCode(code) {
+    const url = apiBase.replace(/\/$/, '') + '/api/auth/wechat-oa/openid?code=' + encodeURIComponent(code);
+    const res = await fetch(url, { method: 'GET' });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      throw new Error(data.error || data.errmsg || ('请求失败 HTTP ' + res.status));
+    }
+    return data;
+  }
+
+  function showOpenId(openid) {
+    boxEl.hidden = false;
+    boxEl.textContent = openid;
+    copyBtn.hidden = false;
+    setStatus('授权成功。请复制下面的 OpenID 发给开发人员用于模板消息测试。');
+    copyBtn.onclick = function () {
+      navigator.clipboard.writeText(openid).then(function () {
+        copyBtn.textContent = '已复制';
+      }).catch(function () {
+        setStatus('请手动长按复制 OpenID');
+      });
+    };
+  }
+
+  async function main() {
+    if (!oaAppId) {
+      setStatus('未配置服务号 AppID（wechatOaAppId）');
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+
+    if (!code) {
+      if (!inWeChat()) {
+        setStatus('请用手机微信打开本页面（可先关注服务号，再在微信里打开此链接）。电脑浏览器无法完成公众号授权。');
+        return;
+      }
+      window.location.replace(buildOAuthUrl());
+      return;
+    }
+
+    setStatus('正在换取 OpenID…');
+    try {
+      const data = await exchangeCode(code);
+      if (!data.openid) throw new Error('未返回 openid');
+      showOpenId(data.openid);
+      // Clean code from URL
+      history.replaceState({}, '', redirectUri);
+    } catch (err) {
+      setStatus(err.message || '换取失败，请重试');
+    }
+  }
+
+  main();
+})();
+  </script>
+</body>
+</html>

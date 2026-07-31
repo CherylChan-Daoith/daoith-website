@@ -12,6 +12,8 @@ window.DAOITH_CONFIG = {
   wechatAppId: 'wx1706a25af11cde09',
   wechatRedirectUri: 'https://www.daoith.com/auth/wechat-callback.html',
   wechatScope: 'snsapi_login',
+  // WeChat Official Account (服务号) — public AppID for OAuth / notify bind
+  wechatOaAppId: 'wx97e47510bad476a0',
   // Same-origin Vercel API — Aliyun api.daoith.com currently times out on WeChat exchange
   authApiBase: '',
 };

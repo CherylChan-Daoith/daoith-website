@@ -58,7 +58,11 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path == "/api/health":
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        query = urllib.parse.parse_qs(parsed.query)
+
+        if path == "/api/health":
             self.send_json(
                 200,
                 {
@@ -68,6 +72,9 @@ class Handler(SimpleHTTPRequestHandler):
                     "wechat_configured": bool(
                         load_env_value("WECHAT_APP_ID") and load_env_value("WECHAT_APP_SECRET")
                     ),
+                    "wechat_oa_configured": bool(
+                        load_env_value("WECHAT_OA_APP_ID") and load_env_value("WECHAT_OA_APP_SECRET")
+                    ),
                     "jwt_configured": bool(load_env_value("JWT_SECRET")),
                     "database_configured": bool(
                         load_env_value("DATABASE_URL") or load_env_value("POSTGRES_URL")
@@ -75,14 +82,70 @@ class Handler(SimpleHTTPRequestHandler):
                 },
             )
             return
-        if self.path == "/api/auth/wechat/me":
+        if path == "/api/auth/wechat/me":
             status, data = server_auth.handle_wechat_me(
                 self.headers.get("Authorization", ""),
                 load_env_value,
             )
             self.send_json(status, data)
             return
+        if path == "/api/auth/wechat-oa/openid":
+            self.handle_wechat_oa_openid(query)
+            return
         return super().do_GET()
+
+    def handle_wechat_oa_openid(self, query):
+        code = (query.get("code") or [""])[0].strip()
+        if not code:
+            self.send_json(400, {"error": "缺少 code"})
+            return
+
+        app_id = load_env_value("WECHAT_OA_APP_ID")
+        app_secret = load_env_value("WECHAT_OA_APP_SECRET")
+        if not app_id or not app_secret:
+            self.send_json(
+                503,
+                {
+                    "error": "未配置服务号凭证",
+                    "hint": "请在 .env 设置 WECHAT_OA_APP_ID 与 WECHAT_OA_APP_SECRET",
+                },
+            )
+            return
+
+        params = urllib.parse.urlencode(
+            {
+                "appid": app_id,
+                "secret": app_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+            }
+        )
+        url = f"https://api.weixin.qq.com/sns/oauth2/access_token?{params}"
+        try:
+            with _NO_PROXY_OPENER.open(url, timeout=15) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        except Exception as err:
+            self.send_json(502, {"error": f"微信接口请求失败: {err}"})
+            return
+
+        if data.get("errcode"):
+            self.send_json(
+                400,
+                {
+                    "error": data.get("errmsg") or f"WeChat error {data.get('errcode')}",
+                    "errcode": data.get("errcode"),
+                },
+            )
+            return
+
+        self.send_json(
+            200,
+            {
+                "openid": data.get("openid"),
+                "unionid": data.get("unionid"),
+                "scope": data.get("scope"),
+            },
+        )
 
     def do_POST(self):
         if self.path == "/api/deepseek":
