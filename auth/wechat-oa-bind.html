@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>绑定微信通知 — 道一</title>
+  <link rel="icon" href="/images/logo.png" type="image/png">
+  <link rel="stylesheet" href="/css/styles.css?v=20260731b">
+  <style>
+    .oa-bind-main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: #f3f6fb; }
+    .oa-bind-card { max-width: 420px; width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 22px; text-align: center; }
+    .oa-bind-card h1 { font-size: 1.15rem; margin: 12px 0 8px; color: #051c2c; }
+    .oa-bind-card p { font-size: 0.875rem; color: #64748b; line-height: 1.6; margin: 0 0 14px; }
+    .oa-bind-ok { color: #15803d; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main class="oa-bind-main">
+    <div class="oa-bind-card">
+      <img src="/images/logo.png" alt="DAOITH" width="48" height="48">
+      <h1>绑定微信通知</h1>
+      <p id="oaBindStatus">正在准备微信授权…</p>
+      <a class="btn btn-outline btn-sm" href="/#hub">返回服务管理</a>
+    </div>
+  </main>
+  <script src="/js/config.js?v=20260731b"></script>
+  <script>
+(function () {
+  const statusEl = document.getElementById('oaBindStatus');
+  const cfg = window.DAOITH_CONFIG || {};
+  const oaAppId = cfg.wechatOaAppId || '';
+  const apiBase = (cfg.notifyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
+  const redirectBase = 'https://www.daoith.com/auth/wechat-oa-bind.html';
+  const TICKET_KEY = 'daoith_notify_bind_ticket';
+
+  function setStatus(msg, ok) {
+    statusEl.textContent = msg;
+    statusEl.className = ok ? 'oa-bind-ok' : '';
+  }
+
+  function inWeChat() {
+    return /MicroMessenger/i.test(navigator.userAgent || '');
+  }
+
+  function getTicket() {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = (params.get('ticket') || '').trim();
+    if (fromUrl) {
+      try { sessionStorage.setItem(TICKET_KEY, fromUrl); } catch (e) { /* ignore */ }
+      return fromUrl;
+    }
+    try { return sessionStorage.getItem(TICKET_KEY) || ''; } catch (e) { return ''; }
+  }
+
+  function buildOAuthUrl() {
+    const params = new URLSearchParams({
+      appid: oaAppId,
+      redirect_uri: redirectBase,
+      response_type: 'code',
+      scope: 'snsapi_base',
+      state: 'oa_bind',
+    });
+    return 'https://open.weixin.qq.com/connect/oauth2/authorize?' + params.toString() + '#wechat_redirect';
+  }
+
+  async function bindWithCode(code, ticket) {
+    const res = await fetch(apiBase + '/api/auth/wechat/notify/bind', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code, ticket: ticket }),
+    });
+    const data = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      throw new Error(data.error || ('绑定失败 HTTP ' + res.status));
+    }
+    return data;
+  }
+
+  async function main() {
+    if (!oaAppId) {
+      setStatus('未配置服务号 AppID');
+      return;
+    }
+
+    const ticket = getTicket();
+    if (!ticket) {
+      setStatus('缺少绑定凭证。请先在官网登录后开启「微信通知」，再用微信扫码打开绑定链接。');
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+
+    if (!code) {
+      if (!inWeChat()) {
+        setStatus('请用手机微信打开本链接（可先关注道一服务号）。电脑浏览器无法完成公众号授权。');
+        return;
+      }
+      window.location.replace(buildOAuthUrl());
+      return;
+    }
+
+    setStatus('正在绑定微信通知…');
+    try {
+      await bindWithCode(code, ticket);
+      try { sessionStorage.removeItem(TICKET_KEY); } catch (e) { /* ignore */ }
+      history.replaceState({}, '', redirectBase);
+      setStatus('绑定成功！可返回官网，微信通知已开启。', true);
+    } catch (err) {
+      setStatus(err.message || '绑定失败，请返回官网重新开启订阅');
+    }
+  }
+
+  main();
+})();
+  </script>
+</body>
+</html>

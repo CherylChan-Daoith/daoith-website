@@ -16,4 +16,6 @@ window.DAOITH_CONFIG = {
   wechatOaAppId: 'wx97e47510bad476a0',
   // Same-origin Vercel API — Aliyun api.daoith.com currently times out on WeChat exchange
   authApiBase: '',
+  // Notify bind / status live on Aliyun (OA AppSecret + DB)
+  notifyApiBase: 'https://api.daoith.com',
 };

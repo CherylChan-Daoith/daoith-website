@@ -90,6 +90,13 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/auth/wechat/notify/status":
+            status, data = server_auth.handle_notify_status(
+                self.headers.get("Authorization", ""),
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/auth/wechat-oa/openid":
             self.handle_wechat_oa_openid(query)
             return
@@ -149,13 +156,16 @@ class Handler(SimpleHTTPRequestHandler):
         )
 
     def do_POST(self):
-        if self.path == "/api/deepseek":
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+
+        if path == "/api/deepseek":
             self.handle_deepseek()
             return
-        if self.path == "/api/dify":
+        if path == "/api/dify":
             self.handle_dify()
             return
-        if self.path == "/api/auth/wechat/login":
+        if path == "/api/auth/wechat/login":
             length = int(self.headers.get("Content-Length", 0))
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
@@ -163,6 +173,29 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_json(400, {"error": "请求体必须是 JSON"})
                 return
             status, data = server_auth.handle_wechat_login(body, load_env_value)
+            self.send_json(status, data)
+            return
+        if path in (
+            "/api/auth/wechat/notify/ticket",
+            "/api/auth/wechat/notify/bind",
+            "/api/auth/wechat/notify/enable",
+            "/api/auth/wechat/notify/disable",
+        ):
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            auth = self.headers.get("Authorization", "")
+            if path.endswith("/ticket"):
+                status, data = server_auth.handle_notify_ticket(auth, load_env_value)
+            elif path.endswith("/bind"):
+                status, data = server_auth.handle_notify_bind(auth, body, load_env_value)
+            elif path.endswith("/enable"):
+                status, data = server_auth.handle_notify_enable(auth, load_env_value)
+            else:
+                status, data = server_auth.handle_notify_disable(auth, load_env_value)
             self.send_json(status, data)
             return
         self.send_error(404)

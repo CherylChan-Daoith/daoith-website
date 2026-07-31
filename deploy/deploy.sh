@@ -22,8 +22,8 @@ rsync -avz --delete \
   --exclude '__pycache__' \
   "$ROOT/" "$REMOTE:$REMOTE_DIR/"
 
-echo "==> Installing systemd service (if not exists)"
-ssh "$REMOTE" "sudo cp $REMOTE_DIR/deploy/daoith-api.service /etc/systemd/system/daoith-api.service && sudo systemctl daemon-reload && sudo systemctl enable daoith-api && sudo systemctl restart daoith-api"
+echo "==> Restarting auth API"
+ssh "$REMOTE" "sudo systemctl daemon-reload && sudo systemctl restart daoith-auth && sudo systemctl disable --now daoith-api 2>/dev/null || true"
 
 echo "==> Checking API health"
 ssh "$REMOTE" "curl -sf http://127.0.0.1:8787/api/health || echo 'WARN: API not responding — check .env on server'"

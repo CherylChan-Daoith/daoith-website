@@ -6,12 +6,13 @@ import hashlib
 import hmac
 import json
 import os
+import secrets
 import sqlite3
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -362,4 +363,446 @@ def handle_wechat_me(auth_header: str, env_loader):
             "nickname": user["nickname"],
             "avatarUrl": user["avatarUrl"],
         }
+    }
+
+
+def ensure_notify_db():
+    """Separate prefs table so website JWT users can bind OA without schema risk."""
+    ensure_db()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS wechat_notify (
+                      website_openid TEXT PRIMARY KEY,
+                      oa_openid TEXT,
+                      unionid TEXT,
+                      enabled BOOLEAN NOT NULL DEFAULT FALSE,
+                      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_wechat_notify_oa ON wechat_notify(oa_openid)"
+                )
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS wechat_notify_ticket (
+                      ticket TEXT PRIMARY KEY,
+                      website_openid TEXT NOT NULL,
+                      expires_at TIMESTAMPTZ NOT NULL,
+                      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+            conn.commit()
+        return
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS wechat_notify (
+              website_openid TEXT PRIMARY KEY,
+              oa_openid TEXT,
+              unionid TEXT,
+              enabled INTEGER NOT NULL DEFAULT 0,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wechat_notify_oa ON wechat_notify(oa_openid)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS wechat_notify_ticket (
+              ticket TEXT PRIMARY KEY,
+              website_openid TEXT NOT NULL,
+              expires_at TEXT NOT NULL,
+              created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.commit()
+
+
+def _notify_row(row):
+    if not row:
+        return None
+    if isinstance(row, dict):
+        return {
+            "websiteOpenid": row.get("website_openid"),
+            "oaOpenid": row.get("oa_openid"),
+            "unionid": row.get("unionid"),
+            "enabled": bool(row.get("enabled")),
+            "updatedAt": row.get("updated_at"),
+        }
+    return {
+        "websiteOpenid": row[0],
+        "oaOpenid": row[1],
+        "unionid": row[2],
+        "enabled": bool(row[3]),
+        "updatedAt": row[4],
+    }
+
+
+def get_notify_prefs(website_openid: str):
+    ensure_notify_db()
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT website_openid, oa_openid, unionid, enabled, updated_at
+                    FROM wechat_notify WHERE website_openid = %s
+                    """,
+                    (website_openid,),
+                )
+                return _notify_row(cur.fetchone())
+
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            """
+            SELECT website_openid, oa_openid, unionid, enabled, updated_at
+            FROM wechat_notify WHERE website_openid = ?
+            """,
+            (website_openid,),
+        ).fetchone()
+    return _notify_row(row)
+
+
+def upsert_notify_bind(website_openid: str, oa_openid: str, unionid=None, enabled=True):
+    ensure_notify_db()
+    now = datetime.now(timezone.utc).isoformat()
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    INSERT INTO wechat_notify (website_openid, oa_openid, unionid, enabled, updated_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (website_openid) DO UPDATE SET
+                      oa_openid = EXCLUDED.oa_openid,
+                      unionid = COALESCE(EXCLUDED.unionid, wechat_notify.unionid),
+                      enabled = EXCLUDED.enabled,
+                      updated_at = EXCLUDED.updated_at
+                    RETURNING website_openid, oa_openid, unionid, enabled, updated_at
+                    """,
+                    (website_openid, oa_openid, unionid, enabled, now),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return _notify_row(row)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO wechat_notify (website_openid, oa_openid, unionid, enabled, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(website_openid) DO UPDATE SET
+              oa_openid = excluded.oa_openid,
+              unionid = COALESCE(excluded.unionid, wechat_notify.unionid),
+              enabled = excluded.enabled,
+              updated_at = excluded.updated_at
+            """,
+            (website_openid, oa_openid, unionid, 1 if enabled else 0, now),
+        )
+        row = conn.execute(
+            """
+            SELECT website_openid, oa_openid, unionid, enabled, updated_at
+            FROM wechat_notify WHERE website_openid = ?
+            """,
+            (website_openid,),
+        ).fetchone()
+        conn.commit()
+    return _notify_row(row)
+
+
+def set_notify_enabled(website_openid: str, enabled: bool):
+    ensure_notify_db()
+    prefs = get_notify_prefs(website_openid)
+    if not prefs:
+        return None
+    now = datetime.now(timezone.utc).isoformat()
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    UPDATE wechat_notify
+                    SET enabled = %s, updated_at = %s
+                    WHERE website_openid = %s
+                    RETURNING website_openid, oa_openid, unionid, enabled, updated_at
+                    """,
+                    (enabled, now, website_openid),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return _notify_row(row)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "UPDATE wechat_notify SET enabled = ?, updated_at = ? WHERE website_openid = ?",
+            (1 if enabled else 0, now, website_openid),
+        )
+        row = conn.execute(
+            """
+            SELECT website_openid, oa_openid, unionid, enabled, updated_at
+            FROM wechat_notify WHERE website_openid = ?
+            """,
+            (website_openid,),
+        ).fetchone()
+        conn.commit()
+    return _notify_row(row)
+
+
+def create_notify_ticket(website_openid: str, ttl_seconds: int = 900):
+    ensure_notify_db()
+    ticket = secrets.token_urlsafe(24)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+    created_at = datetime.now(timezone.utc)
+    if get_database_url():
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM wechat_notify_ticket WHERE expires_at < NOW()"
+                )
+                cur.execute(
+                    """
+                    INSERT INTO wechat_notify_ticket (ticket, website_openid, expires_at, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (ticket, website_openid, expires_at.isoformat(), created_at.isoformat()),
+                )
+            conn.commit()
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "DELETE FROM wechat_notify_ticket WHERE expires_at < ?",
+                (datetime.now(timezone.utc).isoformat(),),
+            )
+            conn.execute(
+                """
+                INSERT INTO wechat_notify_ticket (ticket, website_openid, expires_at, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    ticket,
+                    website_openid,
+                    expires_at.isoformat(),
+                    created_at.isoformat(),
+                ),
+            )
+            conn.commit()
+    return ticket, ttl_seconds
+
+
+def peek_notify_ticket(ticket: str):
+    ensure_notify_db()
+    if not ticket:
+        return None
+    now = datetime.now(timezone.utc)
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    """
+                    SELECT ticket, website_openid, expires_at
+                    FROM wechat_notify_ticket WHERE ticket = %s
+                    """,
+                    (ticket,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    return None
+                expires = row["expires_at"]
+                if hasattr(expires, "tzinfo") and expires.tzinfo is None:
+                    expires = expires.replace(tzinfo=timezone.utc)
+                if isinstance(expires, str):
+                    expires = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+                if expires < now:
+                    cur.execute("DELETE FROM wechat_notify_ticket WHERE ticket = %s", (ticket,))
+                    conn.commit()
+                    return None
+                return row["website_openid"]
+
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            "SELECT ticket, website_openid, expires_at FROM wechat_notify_ticket WHERE ticket = ?",
+            (ticket,),
+        ).fetchone()
+        if not row:
+            return None
+        expires = datetime.fromisoformat(row[2].replace("Z", "+00:00"))
+        if expires < now:
+            conn.execute("DELETE FROM wechat_notify_ticket WHERE ticket = ?", (ticket,))
+            conn.commit()
+            return None
+        return row[1]
+
+
+def delete_notify_ticket(ticket: str):
+    ensure_notify_db()
+    if get_database_url():
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM wechat_notify_ticket WHERE ticket = %s", (ticket,))
+            conn.commit()
+        return
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM wechat_notify_ticket WHERE ticket = ?", (ticket,))
+        conn.commit()
+
+
+def consume_notify_ticket(ticket: str):
+    website_openid = peek_notify_ticket(ticket)
+    if website_openid:
+        delete_notify_ticket(ticket)
+    return website_openid
+
+
+def _bearer_payload(auth_header: str, env_loader):
+    jwt_secret = load_env_value("JWT_SECRET", env_loader)
+    if not jwt_secret:
+        return None, (503, {"error": "未配置 JWT_SECRET"})
+    token = ""
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header[7:].strip()
+    if not token:
+        return None, (401, {"error": "未登录"})
+    payload = verify_jwt(token, jwt_secret)
+    if not payload:
+        return None, (401, {"error": "登录已过期，请重新登录"})
+    website_openid = (payload.get("openid") or "").strip()
+    if not website_openid and payload.get("sub"):
+        # Stateless Vercel tokens may use openid as sub
+        sub = str(payload.get("sub"))
+        if not sub.isdigit():
+            website_openid = sub
+    if not website_openid:
+        return None, (401, {"error": "登录信息不完整，请重新微信登录"})
+    return {"payload": payload, "websiteOpenid": website_openid}, None
+
+
+def handle_notify_status(auth_header: str, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    prefs = get_notify_prefs(resolved["websiteOpenid"])
+    return 200, {
+        "enabled": bool(prefs and prefs.get("enabled")),
+        "bound": bool(prefs and prefs.get("oaOpenid")),
+        "oaOpenid": (prefs or {}).get("oaOpenid"),
+    }
+
+
+def handle_notify_ticket(auth_header: str, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    ticket, ttl = create_notify_ticket(resolved["websiteOpenid"])
+    return 200, {
+        "ticket": ticket,
+        "expiresIn": ttl,
+        "bindUrl": f"https://www.daoith.com/auth/wechat-oa-bind.html?ticket={urllib.parse.quote(ticket)}",
+    }
+
+
+def handle_notify_bind(auth_header: str, body: dict, env_loader):
+    set_env_loader(env_loader)
+    body = body or {}
+    code = (body.get("code") or "").strip()
+    ticket = (body.get("ticket") or "").strip()
+    if not code:
+        return 400, {"error": "缺少微信授权 code"}
+
+    website_openid = None
+    unionid_hint = None
+    ticket_to_consume = None
+    if ticket:
+        website_openid = peek_notify_ticket(ticket)
+        if not website_openid:
+            return 401, {"error": "绑定链接已过期，请在电脑端重新开启订阅"}
+        ticket_to_consume = ticket
+    else:
+        resolved, err = _bearer_payload(auth_header, env_loader)
+        if err:
+            return err
+        website_openid = resolved["websiteOpenid"]
+        unionid_hint = resolved["payload"].get("unionid")
+
+    app_id = load_env_value("WECHAT_OA_APP_ID", env_loader)
+    app_secret = load_env_value("WECHAT_OA_APP_SECRET", env_loader)
+    if not app_id or not app_secret:
+        return 503, {"error": "未配置服务号凭证"}
+
+    try:
+        params = urllib.parse.urlencode(
+            {
+                "appid": app_id,
+                "secret": app_secret,
+                "code": code,
+                "grant_type": "authorization_code",
+            }
+        )
+        data = _fetch_json(f"https://api.weixin.qq.com/sns/oauth2/access_token?{params}", timeout=15)
+        oa_openid = data.get("openid")
+        if not oa_openid:
+            return 400, {"error": "未获取到公众号 openid"}
+        prefs = upsert_notify_bind(
+            website_openid=website_openid,
+            oa_openid=oa_openid,
+            unionid=data.get("unionid") or unionid_hint,
+            enabled=True,
+        )
+        if ticket_to_consume:
+            delete_notify_ticket(ticket_to_consume)
+        return 200, {
+            "enabled": True,
+            "bound": True,
+            "oaOpenid": prefs.get("oaOpenid"),
+        }
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def handle_notify_enable(auth_header: str, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    prefs = get_notify_prefs(resolved["websiteOpenid"])
+    if not prefs or not prefs.get("oaOpenid"):
+        return 400, {"error": "尚未绑定公众号", "needBind": True}
+    prefs = set_notify_enabled(resolved["websiteOpenid"], True)
+    return 200, {
+        "enabled": True,
+        "bound": True,
+        "oaOpenid": prefs.get("oaOpenid"),
+    }
+
+
+def handle_notify_disable(auth_header: str, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    prefs = set_notify_enabled(resolved["websiteOpenid"], False)
+    if not prefs:
+        return 200, {"enabled": False, "bound": False}
+    return 200, {
+        "enabled": False,
+        "bound": bool(prefs.get("oaOpenid")),
+        "oaOpenid": prefs.get("oaOpenid"),
     }

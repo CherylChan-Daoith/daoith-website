@@ -1777,13 +1777,190 @@ function renderHubProgress() {
 }
 
 /* WeChat Toggle */
+function notifyApiBase() {
+  const cfg = window.DAOITH_CONFIG || {};
+  return (cfg.notifyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
+}
+
+function setWechatToggleUi(on) {
+  const toggle = document.getElementById('wechatToggle');
+  if (!toggle) return;
+  toggle.classList.toggle('active', !!on);
+  toggle.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
+async function fetchNotifyStatus() {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) return { enabled: false, bound: false };
+  const res = await fetch(`${notifyApiBase()}/api/auth/wechat/notify/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function postNotify(path, body) {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) throw new Error(window.DAOITH_t('auth.loginRequired'));
+  const res = await fetch(`${notifyApiBase()}${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : '{}',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || `HTTP ${res.status}`);
+    err.needBind = !!data.needBind;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+function initWechatBindModal() {
+  const modal = document.getElementById('wechatBindModal');
+  if (!modal) return { open() {}, close() {} };
+
+  let pollTimer = null;
+  let currentBindUrl = '';
+
+  function close() {
+    modal.hidden = true;
+    document.body.classList.remove('modal-open');
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  async function refreshAfterBind() {
+    try {
+      const status = await fetchNotifyStatus();
+      if (status.enabled && status.bound) {
+        setWechatToggleUi(true);
+        const hint = document.getElementById('wechatBindHint');
+        if (hint) hint.textContent = window.DAOITH_t('alert.wechatBoundOk');
+        close();
+        alert(window.DAOITH_t('alert.wechatOn'));
+      }
+    } catch {
+      /* keep polling */
+    }
+  }
+
+  async function open(bindUrl) {
+    currentBindUrl = bindUrl;
+    const qr = document.getElementById('wechatBindQr');
+    const urlText = document.getElementById('wechatBindUrlText');
+    const hint = document.getElementById('wechatBindHint');
+    if (qr) {
+      qr.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(bindUrl)}`;
+    }
+    if (urlText) urlText.textContent = bindUrl;
+    if (hint) hint.textContent = window.DAOITH_t('alert.wechatBindWaiting');
+    modal.hidden = false;
+    document.body.classList.add('modal-open');
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(refreshAfterBind, 2500);
+  }
+
+  modal.querySelectorAll('[data-close-wechat-bind]').forEach((el) => {
+    el.addEventListener('click', async () => {
+      close();
+      try {
+        const status = await fetchNotifyStatus();
+        setWechatToggleUi(!!status.enabled);
+      } catch {
+        setWechatToggleUi(false);
+      }
+    });
+  });
+
+  document.getElementById('wechatBindCopy')?.addEventListener('click', async () => {
+    if (!currentBindUrl) return;
+    try {
+      await navigator.clipboard.writeText(currentBindUrl);
+      const btn = document.getElementById('wechatBindCopy');
+      if (btn) btn.textContent = window.DAOITH_t('alert.wechatLinkCopied');
+    } catch {
+      alert(currentBindUrl);
+    }
+  });
+
+  return { open, close };
+}
+
 function initWechatToggle() {
   const toggle = document.getElementById('wechatToggle');
   if (!toggle) return;
-  toggle.addEventListener('click', () => {
-    toggle.classList.toggle('active');
-    const on = toggle.classList.contains('active');
-    if (on) alert(window.DAOITH_t('alert.wechatOn'));
+  const bindModal = initWechatBindModal();
+  let busy = false;
+
+  async function syncFromServer() {
+    if (!window.DAOITH_AUTH?.isLoggedIn?.()) {
+      setWechatToggleUi(false);
+      return;
+    }
+    try {
+      const status = await fetchNotifyStatus();
+      setWechatToggleUi(!!status.enabled);
+    } catch {
+      setWechatToggleUi(false);
+    }
+  }
+
+  syncFromServer();
+  window.addEventListener('daoith-auth-change', syncFromServer);
+
+  toggle.addEventListener('click', async () => {
+    if (busy) return;
+    if (!window.DAOITH_AUTH?.requireLogin?.('wechat_notify', window.location.href.split('#')[0] + '#hub')) {
+      return;
+    }
+
+    const turningOn = !toggle.classList.contains('active');
+    busy = true;
+    toggle.disabled = true;
+    try {
+      if (!turningOn) {
+        await postNotify('/api/auth/wechat/notify/disable');
+        setWechatToggleUi(false);
+        alert(window.DAOITH_t('alert.wechatOff'));
+        return;
+      }
+
+      let status = await fetchNotifyStatus();
+      if (status.bound) {
+        await postNotify('/api/auth/wechat/notify/enable');
+        setWechatToggleUi(true);
+        alert(window.DAOITH_t('alert.wechatOn'));
+        return;
+      }
+
+      const ticketData = await postNotify('/api/auth/wechat/notify/ticket');
+      const bindUrl = ticketData.bindUrl || `https://www.daoith.com/auth/wechat-oa-bind.html?ticket=${encodeURIComponent(ticketData.ticket)}`;
+      await bindModal.open(bindUrl);
+    } catch (err) {
+      if (err.needBind) {
+        try {
+          const ticketData = await postNotify('/api/auth/wechat/notify/ticket');
+          const bindUrl = ticketData.bindUrl || `https://www.daoith.com/auth/wechat-oa-bind.html?ticket=${encodeURIComponent(ticketData.ticket)}`;
+          await bindModal.open(bindUrl);
+        } catch (e2) {
+          alert(e2.message || window.DAOITH_t('alert.wechatBindFail'));
+        }
+      } else {
+        alert(err.message || window.DAOITH_t('alert.wechatBindFail'));
+      }
+      setWechatToggleUi(false);
+    } finally {
+      busy = false;
+      toggle.disabled = false;
+    }
   });
 }
 

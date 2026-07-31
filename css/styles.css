@@ -2447,6 +2447,52 @@ body.modal-open {
   overflow: hidden;
 }
 
+.wechat-bind-dialog {
+  width: min(460px, 100%);
+}
+
+.wechat-bind-steps {
+  margin: 0 0 16px;
+  padding-left: 1.2rem;
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.wechat-bind-qr-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 12px;
+}
+
+.wechat-bind-qr-wrap img {
+  width: 180px;
+  height: 180px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.wechat-bind-link {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  word-break: break-all;
+  line-height: 1.4;
+  margin: 0 0 14px;
+  text-align: center;
+}
+
+.wechat-bind-actions {
+  justify-content: center;
+}
+
+.wechat-bind-hint {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
 .show-more button {
   background: none;
   border: 1px solid var(--border);
@@ -2527,6 +2573,11 @@ body.modal-open {
 
 .toggle-switch.active {
   background: var(--success);
+}
+
+.toggle-switch:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .toggle-switch::after {
