@@ -16,8 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAIForm();
   initAiChatbot();
   initTaxCalculator();
-  initServiceFilters();
-  initShowMoreServices();
+  initServicesMarketplace();
   initHubTabs();
   initWechatToggle();
   initFeedbackForm();
@@ -285,9 +284,12 @@ function refreshPaginationLabels() {
 
 function refreshShowMoreServicesLabel() {
   const btn = document.getElementById('showMoreServices');
-  if (!btn) return;
+  if (!btn || btn.hidden) return;
   const expanded = btn.dataset.expanded === 'true';
-  btn.textContent = expanded ? window.DAOITH_t('services.collapse') : window.DAOITH_t('services.showAll');
+  const total = Number(btn.dataset.total || 0);
+  btn.textContent = expanded
+    ? window.DAOITH_t('services.collapse')
+    : window.DAOITH_t('services.showAll').replace('{n}', String(total));
 }
 
 function updateExpertArticles() {
@@ -596,6 +598,7 @@ function initAiChatbot() {
     const contextBlock = [
       '【回答规范】你是道一跨境电商财税合规助手。直接给出最终中文答案，禁止输出思考过程或推理草稿。',
       '可回答海关编码归类参考、出口监管方式、退税与目的国税负等实务问题；不确定时说明需官方终核，不要仅以「知识库未收录」结束。',
+      '【出口退税硬规则】必须使用知识库字段「出口退税率」。严禁把「增值税税率」当成出口退税率。贵金属首饰（如镶钻银饰/金饰，税号71章）常见增值税13%、出口退税0%，二者不同。若知识库写出口退税率0%，必须答0%，不得改答13%。',
       ctx
         ? `客户业务背景：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}。`
         : '',
@@ -759,12 +762,14 @@ function callDifyHsRate(hsCode) {
       task: 'hs_refund_rate',
       hs_code: hsCode,
     },
-    query: `你是中国出口退税政策助手。请依据国家税务总局、海关总署公开发布的出口退税税则/商品编码退税率信息，查询海关编码 ${hsCode} 的现行出口退税率。
+    query: `你是中国出口退税政策助手。请优先依据已挂载的海关编码知识库查询海关编码 ${hsCode} 的现行出口退税率；知识库无精确匹配时再说明需核对官方文库。
+
+硬规则：只输出知识库中的「出口退税率」字段；严禁把「增值税税率」当作出口退税率。例如镶钻银饰71131110常见增值税13%、出口退税0%。
 
 输出要求（中文，简洁）：
 1. 第一行：出口退税率：X%
-2. 第二行：数据来源：国家税务总局 / 海关总署（注明依据类型，如出口退税率文库或税则公告）
-3. 第三行：简要说明（不超过40字；若编码不完整或无法精确匹配，说明需核对完整编码）
+2. 第二行：数据来源：知识库 / 国家税务总局出口退税率文库（注明依据）
+3. 第三行：简要说明（不超过40字；可同时注明增值税税率但不得与退税率混用）
 不要编造无法核实的税率；不确定时明确写「需人工核对官方税则」。`,
   });
 }
@@ -1661,56 +1666,149 @@ function initTaxCalculator() {
   });
 }
 
-/* Service Filters */
-function initServiceFilters() {
-  const buttons = document.querySelectorAll('.filter-btn');
-  const cards = document.querySelectorAll('.service-card');
+/* Services marketplace — render from DAOITH_SERVICES */
+const SERVICES_PREVIEW_COUNT = 6;
 
-  buttons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      buttons.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
+function escapeServiceHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
-      const filter = btn.dataset.filter;
-      cards.forEach((card) => {
-        const show = filter === 'all' || card.dataset.category === filter;
-        if (!card.classList.contains('hidden-service') || card.style.display !== 'none') {
-          card.style.display = show ? '' : 'none';
-        } else if (show && card.classList.contains('hidden-service')) {
-          card.style.display = '';
-        } else if (!show) {
-          card.style.display = 'none';
-        }
+function getLocalizedService(service) {
+  const locale = window.DAOITH_getLocale?.() || 'zh';
+  if (locale !== 'en') return service;
+  const en = (window.DAOITH_I18N_EN?.servicesCatalog || []).find((s) => s.id === service.id);
+  if (!en) return service;
+  return {
+    ...service,
+    title: en.title || service.title,
+    desc: en.desc || service.desc,
+    unit: en.unit || service.unit,
+  };
+}
+
+function initServicesMarketplace() {
+  const filtersEl = document.getElementById('serviceFilters');
+  const grid = document.getElementById('servicesGrid');
+  const moreBtn = document.getElementById('showMoreServices');
+  if (!filtersEl || !grid) return;
+
+  const categories = window.DAOITH_SERVICE_CATEGORIES || [
+    { id: 'all', label: '全部' },
+  ];
+  const services = window.DAOITH_SERVICES || [];
+  let activeFilter = 'all';
+  let expanded = false;
+
+  const enCategoryLabels = {
+    all: 'All',
+    consult: 'Advisory',
+    mainland: 'Mainland China',
+    hongkong: 'Hong Kong',
+    asia: 'Asia',
+    europe: 'Europe',
+    namerica: 'North America',
+    samerica: 'South America',
+    africa: 'Africa',
+    oceania: 'Oceania',
+  };
+
+  function categoryLabel(cat) {
+    const locale = window.DAOITH_getLocale?.() || 'zh';
+    if (locale === 'en') return enCategoryLabels[cat.id] || cat.label;
+    return cat.label;
+  }
+
+  function filteredServices() {
+    if (activeFilter === 'all') return services;
+    return services.filter((s) => s.category === activeFilter);
+  }
+
+  function renderFilters() {
+    filtersEl.innerHTML = categories
+      .map(
+        (cat) => `
+      <button type="button" class="filter-btn${cat.id === activeFilter ? ' active' : ''}" data-filter="${escapeServiceHtml(cat.id)}">
+        ${escapeServiceHtml(categoryLabel(cat))}
+      </button>`
+      )
+      .join('');
+
+    filtersEl.querySelectorAll('.filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        activeFilter = btn.dataset.filter || 'all';
+        expanded = activeFilter !== 'all';
+        renderFilters();
+        renderCards();
       });
     });
+  }
+
+  function renderCards() {
+    const locale = window.DAOITH_getLocale?.() || 'zh';
+    const detailLabel = locale === 'en' ? 'Service details' : '服务详情';
+    const cartLabel = locale === 'en' ? 'Add to inquiry list' : '加入询价单';
+    const list = filteredServices();
+    const limit = activeFilter === 'all' && !expanded ? SERVICES_PREVIEW_COUNT : list.length;
+    const visible = list.slice(0, limit);
+
+    grid.innerHTML = visible
+      .map((raw) => {
+        const s = getLocalizedService(raw);
+        return `
+      <div class="service-card" data-category="${escapeServiceHtml(s.category)}" data-service-id="${escapeServiceHtml(s.id)}">
+        <h4>${escapeServiceHtml(s.title)}</h4>
+        <p>${escapeServiceHtml(s.desc)}</p>
+        <div class="service-price">${escapeServiceHtml(s.priceLabel)} <span>${escapeServiceHtml(s.unit)}</span></div>
+        <div class="service-card-actions">
+          <a class="btn btn-outline btn-sm" href="/service.html?id=${encodeURIComponent(s.id)}" data-action="detail">${escapeServiceHtml(detailLabel)}</a>
+          <button type="button" class="btn btn-primary btn-sm" data-action="add" data-service-id="${escapeServiceHtml(s.id)}">${escapeServiceHtml(cartLabel)}</button>
+        </div>
+      </div>`;
+      })
+      .join('');
+
+    if (moreBtn) {
+      const needMore = activeFilter === 'all' && list.length > SERVICES_PREVIEW_COUNT;
+      moreBtn.hidden = !needMore;
+      moreBtn.dataset.expanded = expanded ? 'true' : 'false';
+      moreBtn.dataset.total = String(list.length);
+      if (needMore) {
+        moreBtn.textContent = expanded
+          ? window.DAOITH_t('services.collapse')
+          : window.DAOITH_t('services.showAll').replace('{n}', String(list.length));
+      }
+    }
+
+    window.DAOITH_CART?.bindAddButtons?.(grid);
+  }
+
+  if (moreBtn) {
+    moreBtn.addEventListener('click', () => {
+      if (activeFilter !== 'all') return;
+      expanded = !expanded;
+      renderCards();
+    });
+  }
+
+  renderFilters();
+  renderCards();
+
+  window.addEventListener('localechange', () => {
+    renderFilters();
+    renderCards();
   });
 }
 
-/* Show More Services */
+function initServiceFilters() {
+  /* replaced by initServicesMarketplace */
+}
+
 function initShowMoreServices() {
-  const btn = document.getElementById('showMoreServices');
-  if (!btn) return;
-  let expanded = false;
-
-  btn.addEventListener('click', () => {
-    expanded = !expanded;
-    document.querySelectorAll('.hidden-service').forEach((card) => {
-      const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
-      const match = activeFilter === 'all' || card.dataset.category === activeFilter;
-      card.style.display = expanded && match ? '' : expanded ? 'none' : 'none';
-    });
-
-    if (!expanded) {
-      document.querySelectorAll('.service-card:not(.hidden-service)').forEach((card) => {
-        const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
-        const match = activeFilter === 'all' || card.dataset.category === activeFilter;
-        card.style.display = match ? '' : 'none';
-      });
-    }
-
-    btn.textContent = expanded ? window.DAOITH_t('services.collapse') : window.DAOITH_t('services.showAll');
-    btn.dataset.expanded = expanded ? 'true' : 'false';
-  });
+  /* replaced by initServicesMarketplace */
 }
 
 /* Hub Tabs */

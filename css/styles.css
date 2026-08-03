@@ -1937,15 +1937,18 @@ ul {
   justify-content: center;
   flex-wrap: wrap;
   margin-bottom: 40px;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .filter-btn {
-  padding: 8px 18px;
+  padding: 8px 14px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--white);
   color: var(--text-secondary);
-  font-size: 0.8125rem;
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition);
@@ -2233,6 +2236,45 @@ ul {
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+}
+
+.service-detail-list {
+  margin: 0 0 18px;
+  padding-left: 1.25rem;
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 0.95rem;
+}
+
+.service-detail-list li + li {
+  margin-top: 6px;
+}
+
+.service-detail-faq {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.service-faq-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: #f8fafc;
+}
+
+.service-faq-item summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.service-faq-item p {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
 }
 
 .cart-container {

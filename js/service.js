@@ -24,6 +24,36 @@
     return list.find((s) => s.id === id) || null;
   }
 
+  function renderBlocks(details) {
+    return (details || []).map((block) => {
+      if (block.type === 'h2') {
+        return `<h2 class="article-view-h2">${escapeHtml(block.text)}</h2>`;
+      }
+      if (block.type === 'ul' && Array.isArray(block.items)) {
+        return `<ul class="service-detail-list">${block.items
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join('')}</ul>`;
+      }
+      if (block.type === 'ol' && Array.isArray(block.items)) {
+        return `<ol class="service-detail-list service-detail-list-ordered">${block.items
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join('')}</ol>`;
+      }
+      if (block.type === 'faq' && Array.isArray(block.items)) {
+        return `<div class="service-detail-faq">${block.items
+          .map(
+            (item) => `
+          <details class="service-faq-item">
+            <summary>${escapeHtml(item.q || '')}</summary>
+            <p>${escapeHtml(item.a || '')}</p>
+          </details>`
+          )
+          .join('')}</div>`;
+      }
+      return `<p class="article-view-p">${escapeHtml(block.text || '')}</p>`;
+    }).join('');
+  }
+
   function render() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
@@ -66,13 +96,6 @@
 
     if (loadingEl) loadingEl.remove();
 
-    const sections = (details || []).map((block) => {
-      if (block.type === 'h2') {
-        return `<h2 class="article-view-h2">${escapeHtml(block.text)}</h2>`;
-      }
-      return `<p class="article-view-p">${escapeHtml(block.text)}</p>`;
-    }).join('');
-
     viewEl.innerHTML = `
       <header class="article-view-header">
         <span class="article-view-tag">${locale === 'en' ? 'Service detail' : '服务详情'}</span>
@@ -82,7 +105,7 @@
           ${escapeHtml(service.priceLabel)} <span>${escapeHtml(unit)}</span>
         </div>
       </header>
-      <div class="article-view-body">${sections}</div>
+      <div class="article-view-body">${renderBlocks(details)}</div>
       <footer class="article-view-footer service-detail-actions">
         <a href="/#services" class="btn btn-outline btn-sm">${backLabel.replace(/^←\s*/, '')}</a>
         <button type="button" class="btn btn-primary btn-sm" data-action="add" data-service-id="${escapeHtml(service.id)}">${detailBtn}</button>
