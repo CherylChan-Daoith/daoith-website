@@ -386,7 +386,7 @@ def handle_oa_articles(env_loader, offset: int = 0, count: int = 20):
             "cached": False,
             "total": int(data.get("total_count") or len(articles)),
             "articles": articles,
-            "hint": "列表来自微信服务号已发布图文；点击后跳转公众号原文（建议微信内打开）。"
+            "hint": "列表来自微信服务号已发布图文。"
             if articles
             else "暂未拉到已发布图文。请确认文章是通过公众号「发表」发布，且服务号已认证并开通发布接口权限。",
         }

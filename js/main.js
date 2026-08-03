@@ -401,7 +401,7 @@ async function loadExpertArticlesFromWeChat() {
       setHint(
         locale === 'en'
           ? 'Synced from WeChat Official Account.'
-          : (data.hint || '列表已同步公众号文章。')
+          : '列表已同步公众号文章。'
       );
       initExpertArticlesPager();
       return;
