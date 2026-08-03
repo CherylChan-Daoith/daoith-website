@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260803e">
+  <link rel="stylesheet" href="/css/styles.css?v=20260803f">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -144,7 +144,7 @@
       <div class="section-header">
         <span class="section-badge">AI-Powered</span>
         <h2>AI自动化解决方案生成</h2>
-        <p>输入跨境电商业务信息，AI智能引擎为您匹配出口退税与跨境财税最优方案</p>
+        <p>至少填写电商平台与发货模式即可生成一般性方案；补充更多业务信息可获得更细化建议</p>
       </div>
 
       <div class="ai-grid">
@@ -152,8 +152,9 @@
         <div class="form-panel">
           <h3>业务信息 <span class="tag">AI</span></h3>
           <form id="aiForm" novalidate>
+            <p class="form-required-hint">仅「从事的电商平台」与「发货模式」为必填，其余可留空先看一般性方案。</p>
             <div class="form-group">
-              <label>从事的电商平台</label>
+              <label>从事的电商平台 <span class="req-mark" aria-hidden="true">*</span></label>
               <select id="platform" required>
                 <option value="">请选择</option>
                 <option value="amazon">亚马逊 Amazon</option>
@@ -169,8 +170,18 @@
               </select>
             </div>
             <div class="form-group">
-              <label>店铺主体</label>
-              <select id="entity" required>
+              <label>发货模式 <span class="req-mark" aria-hidden="true">*</span></label>
+              <select id="shipping" required>
+                <option value="">请选择</option>
+                <option value="self_overseas">自发货（海外仓）</option>
+                <option value="self_domestic">自发货（国内直发）</option>
+                <option value="platform_domestic">平台国内仓</option>
+                <option value="platform_overseas">平台海外仓（如FBA）</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>店铺主体 <span class="opt-mark">可选</span></label>
+              <select id="entity">
                 <option value="">请选择</option>
                 <option value="cn">中国公司</option>
                 <option value="cn_individual">中国个人</option>
@@ -191,8 +202,8 @@
               </select>
             </div>
             <div class="form-group">
-              <label>目的国/地区</label>
-              <select id="country" required>
+              <label>目的国/地区 <span class="opt-mark">可选</span></label>
+              <select id="country">
                 <option value="">请选择</option>
                 <option value="us">美国</option>
                 <option value="uk">英国</option>
@@ -212,9 +223,9 @@
               </select>
             </div>
             <div class="form-group">
-              <label>产品海关编码（HS Code）</label>
+              <label>产品海关编码（HS Code） <span class="opt-mark">可选</span></label>
               <div class="hs-input-group">
-                <input type="text" id="hsCode" placeholder="如 9504.50.00" autocomplete="off" required>
+                <input type="text" id="hsCode" placeholder="如 9504.50.00" autocomplete="off">
               </div>
               <div class="hs-actions">
                 <div class="hs-action-row">
@@ -230,8 +241,8 @@
               <p class="hs-rate-source" id="hsRateSource" hidden></p>
             </div>
             <div class="form-group">
-              <label>年销售额（万元人民币）</label>
-              <select id="revenue" required>
+              <label>年销售额（万元人民币） <span class="opt-mark">可选</span></label>
+              <select id="revenue">
                 <option value="">请选择</option>
                 <option value="under500">500以下</option>
                 <option value="500-2000">500-2000</option>
@@ -241,8 +252,8 @@
               </select>
             </div>
             <div class="form-group">
-              <label>团队人数</label>
-              <select id="teamSize" required>
+              <label>团队人数 <span class="opt-mark">可选</span></label>
+              <select id="teamSize">
                 <option value="">请选择</option>
                 <option value="under10">10人以下</option>
                 <option value="10-50">10-50人</option>
@@ -251,8 +262,8 @@
               </select>
             </div>
             <div class="form-group">
-              <label>供应商发票情况</label>
-              <select id="invoice" required>
+              <label>供应商发票情况 <span class="opt-mark">可选</span></label>
+              <select id="invoice">
                 <option value="">请选择</option>
                 <option value="special">增值税专票</option>
                 <option value="general">增值税普票</option>
@@ -263,18 +274,8 @@
               </select>
             </div>
             <div class="form-group">
-              <label>发货模式</label>
-              <select id="shipping" required>
-                <option value="">请选择</option>
-                <option value="self_overseas">自发货（海外仓）</option>
-                <option value="self_domestic">自发货（国内直发）</option>
-                <option value="platform_domestic">平台国内仓</option>
-                <option value="platform_overseas">平台海外仓（如FBA）</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>目前出口方式</label>
-              <select id="exportMode" required>
+              <label>目前出口方式 <span class="opt-mark">可选</span></label>
+              <select id="exportMode">
                 <option value="">请选择</option>
                 <option value="trade_0110">0110一般贸易</option>
                 <option value="market_1039">1039市场采购出口</option>
@@ -287,7 +288,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label>补充说明（可选）</label>
+              <label>补充说明 <span class="opt-mark">可选</span></label>
               <textarea id="notes" placeholder="如：涉及多国VAT注册、转让定价、海外公司架构等..."></textarea>
             </div>
             <button type="submit" class="btn btn-primary" style="width:100%">AI智能生成方案</button>
@@ -1070,7 +1071,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260731b"></script>
+  <script src="/js/locales/en.js?v=20260803f"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260803e"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -1080,6 +1081,6 @@
   <script src="/js/cart.js?v=20260729a"></script>
   <script src="/js/auth.js?v=20260728b"></script>
   <script src="/js/hs-rates.js?v=20260728i"></script>
-  <script src="/js/main.js?v=20260731b"></script>
+  <script src="/js/main.js?v=20260803f"></script>
 </body>
 </html>

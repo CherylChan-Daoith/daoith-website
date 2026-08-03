@@ -401,23 +401,32 @@ function initFAQ() {
 }
 
 function buildPlanRelatedFaqs(ctx) {
+  const countryText = ctx.countryLabel || '目标销售市场';
+  const hsText = ctx.hsCode || '待定 HS';
+  const exportText = ctx.exportModeLabel || '出口方式（未填写）';
+  const invoiceText = ctx.invoiceLabel || '发票情况（未填写）';
   const faqs = [
     {
       q: '这份AI方案有法律效力吗？',
-      a: `方案基于您填写的「${ctx.platformLabel} / ${ctx.entityLabel} / ${ctx.countryLabel}」等信息生成，仅供一般性参考。正式落地前建议预约专家1v1，结合单证与账套出具可执行方案。`,
+      a: `方案基于您填写的「${ctx.platformLabel} / ${ctx.shippingLabel}${ctx.entityLabel ? ` / ${ctx.entityLabel}` : ''}${ctx.countryLabel ? ` / ${ctx.countryLabel}` : ''}」等信息生成，仅供一般性参考。正式落地前建议预约专家1v1，结合单证与账套出具可执行方案。`,
     },
     {
-      q: `出口方式「${ctx.exportModeLabel}」对退税有何影响？`,
-      a:
-        ctx.exportMode === 'cbec_9610' || ctx.exportMode === 'cbec_9810' || ctx.exportMode === 'cbec_9710'
-          ? `跨境电商监管方式「${ctx.exportModeLabel}」通常有特定申报与单证要求，退税/免税路径需与综试区、报关及销售清单匹配，请按本方案行动建议逐项核对。`
+      q: ctx.exportMode
+        ? `出口方式「${exportText}」对退税有何影响？`
+        : '尚未填写出口方式时，退税一般看什么？',
+      a: !ctx.exportMode
+        ? `可先按「${ctx.platformLabel}」+「${ctx.shippingLabel}」梳理货权、报关与回款路径；在左侧补充出口方式后，方案可进一步区分 0110/9610/9810 等退税与单证要求。`
+        : ctx.exportMode === 'cbec_9610' || ctx.exportMode === 'cbec_9810' || ctx.exportMode === 'cbec_9710'
+          ? `跨境电商监管方式「${exportText}」通常有特定申报与单证要求，退税/免税路径需与综试区、报关及销售清单匹配，请按本方案行动建议逐项核对。`
           : ctx.exportMode === 'trade_0110'
-            ? `一般贸易（0110）更强调报关单、增值税专用发票与货物流一致；结合您的发票情况「${ctx.invoiceLabel}」评估退税资料齐套度。`
-            : `您选择的「${ctx.exportModeLabel}」决定通关与税务处理路径不同，请以方案中的流程图与税负分析为准，并保留完整物流与结算凭证。`,
+            ? `一般贸易（0110）更强调报关单、增值税专用发票与货物流一致；结合您的发票情况「${invoiceText}」评估退税资料齐套度。`
+            : `您选择的「${exportText}」决定通关与税务处理路径不同，请以方案中的流程图与税负分析为准，并保留完整物流与结算凭证。`,
     },
     {
-      q: `在「${ctx.countryLabel}」销售需要关注哪些税？`,
-      a: `结合发货模式「${ctx.shippingLabel}」，通常需关注目的国进口关税（HS「${ctx.hsCode}」）、当地VAT/销售税，以及仓储是否触发注册义务。可用下方「合规税负计算」做粗算。`,
+      q: ctx.country
+        ? `在「${countryText}」销售需要关注哪些税？`
+        : `「${ctx.shippingLabel}」模式下一般要关注哪些税？`,
+      a: `结合发货模式「${ctx.shippingLabel}」，通常需关注目的国进口关税（HS「${hsText}」）、当地VAT/销售税，以及仓储是否触发注册义务。可用下方「合规税负计算」做粗算；补充目的国与 HS 后会更准确。`,
     },
     {
       q: `平台「${ctx.platformLabel}」代扣代缴后还要自行申报吗？`,
@@ -425,11 +434,15 @@ function buildPlanRelatedFaqs(ctx) {
     },
     {
       q: '供应商发票不齐怎么办？',
-      a: `当前发票情况为「${ctx.invoiceLabel}」。无票/普票占比高时，出口退税与进项抵扣风险上升，建议优先梳理可取得专票的供应商，并对无票 SKU 单独台账管理。`,
+      a: ctx.invoice
+        ? `当前发票情况为「${invoiceText}」。无票/普票占比高时，出口退税与进项抵扣风险上升，建议优先梳理可取得专票的供应商，并对无票 SKU 单独台账管理。`
+        : `您尚未填写发票情况。一般建议尽快盘点专票/普票/无票占比；无票占比高时退税与成本核算风险上升，可在左侧补充后重新生成方案。`,
     },
     {
       q: '接下来最优先做什么？',
-      a: `建议先按方案「行动建议」完成：固化平台/主体/目的国/HS/出口方式台账，核对「${ctx.exportModeLabel}」申报路径，并评估「${ctx.countryLabel}」税务注册与申报日历。需要人工落地可点击「专家1v1」加入询价单。`,
+      a: hasSparseAiContext(ctx)
+        ? `建议先按方案「行动建议」落实「${ctx.platformLabel}」与「${ctx.shippingLabel}」相关合规动作，并在左侧补充主体、目的国、HS、发票与出口方式后重新生成细化方案。需要人工落地可点击「专家1v1」加入询价单。`
+        : `建议先按方案「行动建议」完成：固化平台/主体/目的国/HS/出口方式台账，核对「${exportText}」申报路径，并评估「${countryText}」税务注册与申报日历。需要人工落地可点击「专家1v1」加入询价单。`,
     },
   ];
   return faqs;
@@ -848,27 +861,42 @@ function isAskAgainOrGenericFramework(text) {
 function aiSolutionUsesFormData(text, ctx) {
   const t = String(text || '');
   if (!t || isAskAgainOrGenericFramework(t)) return false;
-  const needles = [
-    ctx.platformLabel,
-    ctx.countryLabel,
-    ctx.entityLabel,
-    ctx.hsCode,
-    ctx.shippingLabel,
-  ].filter(Boolean);
-  const hits = needles.filter((n) => n && t.includes(n)).length;
-  return hits >= 2 && /增值税|所得税|关税|流程图|行动建议/.test(t);
+  const hasPlatform = ctx.platformLabel && t.includes(ctx.platformLabel);
+  const hasShipping = ctx.shippingLabel && t.includes(ctx.shippingLabel);
+  return hasPlatform && hasShipping && /增值税|所得税|关税|流程图|行动建议|合规/.test(t);
+}
+
+function hasSparseAiContext(ctx) {
+  return !(
+    ctx.entity &&
+    ctx.country &&
+    ctx.hsCode &&
+    ctx.revenue &&
+    ctx.teamSize &&
+    ctx.invoice &&
+    ctx.exportMode
+  );
+}
+
+function buildRefineHintHtml(ctx) {
+  if (!hasSparseAiContext(ctx)) return '';
+  return (
+    `<p class="result-paragraph result-refine-hint">` +
+    `${escapeHtml(window.DAOITH_t('ai.refineHint'))}` +
+    `</p>`
+  );
 }
 
 function buildBusinessFactsListHtml(ctx) {
   const rows = [
     ['电商平台', ctx.platformLabel],
+    ['发货模式', ctx.shippingLabel],
     ['店铺主体', ctx.entityLabel],
     ['目的国/地区', ctx.countryLabel],
     ['产品HS编码', ctx.hsCode],
     ['年销售额', ctx.revenueLabel],
     ['团队人数', ctx.teamSizeLabel],
     ['供应商发票', ctx.invoiceLabel],
-    ['发货模式', ctx.shippingLabel],
     ['目前出口方式', ctx.exportModeLabel],
   ];
   if (ctx.notes) rows.push(['补充说明', ctx.notes]);
@@ -876,7 +904,7 @@ function buildBusinessFactsListHtml(ctx) {
   const items = rows
     .map(
       ([k, v]) =>
-        `<li><span class="fact-key">${escapeHtml(k)}</span><span class="fact-val">${escapeHtml(v || '—')}</span></li>`
+        `<li><span class="fact-key">${escapeHtml(k)}</span><span class="fact-val">${escapeHtml(v || '未填写')}</span></li>`
     )
     .join('');
   return `<ul class="result-facts">${items}</ul>`;
@@ -891,49 +919,80 @@ function buildLocalSolutionMarkdown(ctx) {
     ctx.invoice === 'special_none' ||
     ctx.invoice === 'general_none' ||
     ctx.invoice === 'general';
+  const entityText = ctx.entityLabel || '店铺主体（未填写）';
+  const countryText = ctx.countryLabel || '目标销售市场';
+  const hsText = ctx.hsCode || '待定 HS 编码';
+  const exportText = ctx.exportModeLabel || '出口方式（未填写）';
+  const invoiceText = ctx.invoiceLabel || '发票情况（未填写）';
+  const revenueText = ctx.revenueLabel || '销售额（未填写）';
+  const teamText = ctx.teamSizeLabel || '团队规模（未填写）';
+  const sparse = hasSparseAiContext(ctx);
 
   const flow = [
-    `采购备货（供应商 → ${ctx.entityLabel}）：核对合同、装箱单、发票（当前发票情况：${ctx.invoiceLabel}）`,
+    `采购备货：按「${ctx.platformLabel}」常见备货节奏准备货源与单证；主体为「${entityText}」时核对合同、装箱与发票（${invoiceText}）`,
     usesOverseasWarehouse
-      ? `出库报关/跨境调拨：按出口方式「${ctx.exportModeLabel}」、HS「${ctx.hsCode}」归类申报，货值与物流单一致后发往「${ctx.countryLabel}」海外仓/平台仓`
-      : `国内直发履约：按出口方式「${ctx.exportModeLabel}」办理通关/放行，跨境小包/专线发往「${ctx.countryLabel}」买家`,
-    `平台销售回款：在「${ctx.platformLabel}」完成销售、结算与平台费用核算（年销售额区间：${ctx.revenueLabel}）`,
-    `税务申报闭环：国内增值税/企业所得税（如适用）+ 目的国进口/流转税相关义务按期处理`,
+      ? `履约发货：采用「${ctx.shippingLabel}」，货物通常先入海外仓/平台仓再配送至「${countryText}」买家；出口申报与 HS「${hsText}」、货值、物流单宜保持一致`
+      : `履约发货：采用「${ctx.shippingLabel}」，多从国内仓直发「${countryText}」买家；关注通关时效、平台物流规则与包裹申报一致性`,
+    `平台销售回款：在「${ctx.platformLabel}」完成销售、结算与费用核算${ctx.revenue ? `（年销售额区间：${revenueText}）` : ''}`,
+    `税务申报闭环：梳理国内增值税/企业所得税（如适用）与目的国进口/流转税义务；细节随主体、市场与出口方式补全后可再细化`,
   ];
 
-  const vatLines = isCnEntity
+  const vatLines = !ctx.entity
     ? [
-        `国内增值税：主体为「${ctx.entityLabel}」，出口方式「${ctx.exportModeLabel}」决定免税/退税路径与单证要求；发货模式「${ctx.shippingLabel}」影响报关与进项匹配。`,
-        invoiceRisk
-          ? `发票风险偏高（${ctx.invoiceLabel}）：无票或普票占比会影响进项抵扣与出口退税资料链，建议优先梳理可取得专票的供应商。`
-          : `发票情况「${ctx.invoiceLabel}」相对有利于进项与退税资料齐套，仍需保证票货款一致、HS 与报关一致。`,
+        `当前未填写店铺主体，以下为「${ctx.platformLabel}」+「${ctx.shippingLabel}」场景下的一般性增值税关注点。`,
+        `若境内主体出口：出口方式与进项发票齐套程度决定免税/退税路径；发货模式「${ctx.shippingLabel}」会影响报关主体、货权转移时点与进项匹配。`,
+        `若境外主体销售：需同步看清境内采购/报关安排与关联交易定价，避免票货不一致。`,
       ]
-    : [
-        `国内增值税：店铺主体为「${ctx.entityLabel}」，中国侧增值税链条可能较弱或仅涉及关联采购；出口方式「${ctx.exportModeLabel}」需与境内采购/报关主体安排对齐。`,
-        `关注关联采购定价与发票流是否能支撑目的国进口申报完税价格。`,
-      ];
+    : isCnEntity
+      ? [
+          `国内增值税：主体为「${entityText}」，出口方式「${exportText}」影响免税/退税路径；发货模式「${ctx.shippingLabel}」影响报关与进项匹配。`,
+          ctx.invoice
+            ? (invoiceRisk
+              ? `发票风险偏高（${invoiceText}）：无票或普票占比会影响进项与退税资料链，建议优先梳理可取得专票的供应商。`
+              : `发票情况「${invoiceText}」相对有利于进项与退税资料齐套，仍需保证票货款一致。`)
+            : `尚未填写发票情况：建议尽快盘点专票/普票/无票占比，这是出口退税与成本核算的关键变量。`,
+        ]
+      : [
+          `国内增值税：店铺主体为「${entityText}」，中国侧增值税链条可能较弱或仅涉及关联采购；出口方式「${exportText}」需与境内采购/报关主体对齐。`,
+          `关注关联采购定价与发票流是否能支撑目的国进口申报完税价格。`,
+        ];
 
   const citLines = [
-    `企业所得税：利润主要归属「${ctx.entityLabel}」所在地税制；团队规模「${ctx.teamSizeLabel}」影响费用归集与核定/查账资料完备度。`,
+    ctx.entity
+      ? `企业所得税：利润主要归属「${entityText}」所在地税制${ctx.teamSize ? `；团队规模「${teamText}」影响费用归集与资料完备度` : ''}。`
+      : `企业所得税：尚未填写主体时，先按「${ctx.platformLabel}」经营利润归属地原则预留合规空间，后续按实际注册地税制细化。`,
     usesOverseasWarehouse
-      ? `使用「${ctx.shippingLabel}」时，需评估「${ctx.countryLabel}」是否存在常设机构/仓储相关所得税争议，关联仓储服务费宜保留合同与定价依据。`
-      : `「${ctx.shippingLabel}」通常常设机构风险低于海外仓模式，但仍需关注目的国远程销售阈值与平台代扣规则。`,
+      ? `使用「${ctx.shippingLabel}」时，需评估销售市场是否存在仓储/常设机构相关所得税争议，关联仓储服务费宜保留合同与定价依据。`
+      : `「${ctx.shippingLabel}」通常常设机构风险低于海外仓模式，但仍需关注目的国远程销售阈值与「${ctx.platformLabel}」平台代扣规则。`,
   ];
 
   const dutyLines = [
-    `目的国关税：目的国「${ctx.countryLabel}」、HS「${ctx.hsCode}」决定归类与税率；申报完税价格应与采购/平台成交逻辑一致，避免低报。`,
-    `建议先用页面「查询目的国关税税率」核对 ${ctx.hsCode}，再固定商编与品名描述，减少查验与补税风险。`,
+    ctx.country || ctx.hsCode
+      ? `目的国关税：目的国「${countryText}」、HS「${hsText}」共同决定归类与税率；申报完税价格应与采购/平台成交逻辑一致。`
+      : `目的国关税：尚未填写市场与 HS 时，先按「${ctx.platformLabel}」主要站点常见归类合规要求处理——固定品名描述、保留成交与物流凭证，避免低报。`,
+    ctx.hsCode
+      ? `建议用页面「查询目的国关税税率」核对 ${ctx.hsCode}，再固定商编与品名描述。`
+      : `补充 HS 编码与目的国后，可使用页面税率查询工具做更精确的关税粗算。`,
   ];
 
   const actions = [
-    `30天内：固化业务档案——平台「${ctx.platformLabel}」、主体「${ctx.entityLabel}」、目的国「${ctx.countryLabel}」、HS「${ctx.hsCode}」、发货模式「${ctx.shippingLabel}」、出口方式「${ctx.exportModeLabel}」一页纸台账`,
-    `30天内：按「${ctx.invoiceLabel}」盘点供应商开票缺口，能改专票的优先改；无票采购单独标注风险 SKU`,
+    `30天内：固化业务档案——至少写明平台「${ctx.platformLabel}」与发货模式「${ctx.shippingLabel}」，并逐步补齐主体、目的国、HS、出口方式等`,
     `30天内：在「${ctx.platformLabel}」后台核对税务信息/税号上传与结算报表导出路径`,
-    `90天内：完成「${ctx.countryLabel}」进口/流转税义务评估（仓储、阈值、平台代扣代缴边界）并列出注册/申报日历`,
-    `90天内：建立月度「销售-物流-发票-申报」对账表，团队「${ctx.teamSizeLabel}」明确财务/运营责任人`,
+    ctx.invoice
+      ? `30天内：按「${invoiceText}」盘点供应商开票缺口，能改专票的优先改`
+      : `30天内：盘点供应商开票能力（专票/普票/无票），识别影响退税与成本核算的缺口`,
+    usesOverseasWarehouse
+      ? `90天内：评估「${ctx.shippingLabel}」对应仓储地的进口/流转税与仓储合规边界，列出注册/申报日历`
+      : `90天内：梳理「${ctx.platformLabel}」直发场景下的远程销售阈值、平台代扣与自行申报边界`,
+    sparse
+      ? `如需更细化的合规建议：请在左侧业务信息栏补充店铺主体、目的国、HS、发票与出口方式等信息后重新生成`
+      : `90天内：建立月度「销售-物流-发票-申报」对账表，明确财务/运营责任人`,
   ];
 
   return [
+    sparse
+      ? '（说明：当前主要依据电商平台与发货模式生成一般性方案；补充左侧更多业务信息后可进一步细化。）'
+      : '',
     '### 1）业务流程图',
     ...flow.map((s, i) => `${i + 1}. ${s}`),
     '',
@@ -950,7 +1009,7 @@ function buildLocalSolutionMarkdown(ctx) {
     '',
     '### 3）行动建议',
     ...actions.map((s) => `- ${s}`),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 function renderAIPlanHtml(text) {
@@ -1022,31 +1081,42 @@ function assembleSolutionHtml(ctx, aiText) {
   const useAi = aiSolutionUsesFormData(aiText, ctx);
   const bodyMd = useAi ? String(aiText) : buildLocalSolutionMarkdown(ctx);
   const body = renderAIPlanHtml(bodyMd);
+  const summaryLead = hasSparseAiContext(ctx)
+    ? '以下为您已填写的业务信息。当前方案主要依据电商平台与发货模式给出一般性建议：'
+    : '以下信息来自您在左侧表单的选择，方案据此生成：';
 
   return (
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
     `<h5 class="result-section-title">一、业务背景信息总结</h5>` +
-    `<p class="result-paragraph">以下信息来自您在左侧表单的选择，方案据此生成：</p>` +
+    `<p class="result-paragraph">${escapeHtml(summaryLead)}</p>` +
     buildBusinessFactsListHtml(ctx) +
+    buildRefineHintHtml(ctx) +
     `<h5 class="result-section-title">二、解决方案</h5>` +
     (body || `<p class="result-paragraph">方案生成失败，请重试。</p>`)
   );
 }
 
-/** Speak in the chat app’s expected “user already filled the fields” format. */
+/** Speak in the chat app’s expected format; allow sparse optional fields. */
 function buildSolutionPrompt(ctx) {
-  return `电商平台：${ctx.platformLabel}
-目的国/地区：${ctx.countryLabel}
-预计年/月销售额：年销售额 ${ctx.revenueLabel}（人民币）
-主要产品HS编码：${ctx.hsCode}
-企业主体所在地：${ctx.entityLabel}
-仓储模式：${ctx.shippingLabel}
-目前出口方式：${ctx.exportModeLabel}
-供应商发票情况：${ctx.invoiceLabel}
-团队人数：${ctx.teamSizeLabel}
+  const sparse = hasSparseAiContext(ctx);
+  const val = (v) => v || '未填写';
+  return `必填信息（已提供）：
+电商平台：${ctx.platformLabel}
+发货/仓储模式：${ctx.shippingLabel}
+
+其他业务信息（未填写请按一般性处理，禁止追问）：
+目的国/地区：${val(ctx.countryLabel)}
+预计年销售额：${val(ctx.revenueLabel)}（人民币）
+主要产品HS编码：${val(ctx.hsCode)}
+企业主体所在地：${val(ctx.entityLabel)}
+目前出口方式：${val(ctx.exportModeLabel)}
+供应商发票情况：${val(ctx.invoiceLabel)}
+团队人数：${val(ctx.teamSizeLabel)}
 补充说明：${ctx.notes || '无'}
 
-以上信息已完整提供。请不要再询问任何信息，也不要输出通用框架。请立即基于上述信息输出定制方案，且正文必须点名上述平台、主体、目的国、HS与仓储模式。输出结构：
+请不要再询问任何信息。请立即输出${sparse ? '一般性' : '定制'}合规方案，正文必须点名电商平台「${ctx.platformLabel}」与发货模式「${ctx.shippingLabel}」。
+${sparse ? '若多项信息未填写：方案应明确这是基于平台与发货模式的一般性框架，并在行动建议中提示用户可在左侧业务信息栏补充店铺主体、目的国、HS、发票与出口方式等以获得更细化建议。' : '请尽量结合已填写的主体、目的国、HS 等信息做针对性分析。'}
+输出结构：
 ### 1）业务流程图
 ### 2）合规税负影响分析（国内增值税、国内企业所得税、目的国关税）
 ### 3）行动建议`;
@@ -1157,13 +1227,13 @@ function getFormContext() {
     invoice: document.getElementById('invoice').value,
     notes: document.getElementById('notes').value.trim(),
     platformLabel: platformNames[platform] || platform,
-    entityLabel: entityNames[entity] || entity,
-    countryLabel: countryNames[country] || country,
+    entityLabel: entity ? (entityNames[entity] || entity) : '',
+    countryLabel: country ? (countryNames[country] || country) : '',
     shippingLabel: shippingModes[shipping] || shipping,
-    exportModeLabel: exportModeNames[exportMode] || exportMode || '未填写',
-    revenueLabel: revenueNames[document.getElementById('revenue').value] || '未填写',
-    teamSizeLabel: teamSizeNames[document.getElementById('teamSize').value] || '未填写',
-    invoiceLabel: invoiceNames[document.getElementById('invoice').value] || '未填写',
+    exportModeLabel: exportMode ? (exportModeNames[exportMode] || exportMode) : '',
+    revenueLabel: revenueNames[document.getElementById('revenue').value] || '',
+    teamSizeLabel: teamSizeNames[document.getElementById('teamSize').value] || '',
+    invoiceLabel: invoiceNames[document.getElementById('invoice').value] || '',
   };
 }
 
@@ -1309,14 +1379,7 @@ function ensureWeChatLogin(action) {
 
 const AI_REQUIRED_FIELDS = [
   { id: 'platform', empty: (el) => !el.value },
-  { id: 'entity', empty: (el) => !el.value },
-  { id: 'country', empty: (el) => !el.value },
-  { id: 'hsCode', empty: (el) => !el.value.trim() },
-  { id: 'revenue', empty: (el) => !el.value },
-  { id: 'teamSize', empty: (el) => !el.value },
-  { id: 'invoice', empty: (el) => !el.value },
   { id: 'shipping', empty: (el) => !el.value },
-  { id: 'exportMode', empty: (el) => !el.value },
 ];
 
 function clearAiFieldInvalid(el) {
