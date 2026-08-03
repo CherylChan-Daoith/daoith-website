@@ -10,9 +10,7 @@
     });
     document.querySelectorAll('[data-company-email]').forEach((el) => {
       if (cfg.companyEmail) {
-        el.textContent = cfg.companyEmail.startsWith('邮箱')
-          ? cfg.companyEmail
-          : cfg.companyEmail;
+        el.textContent = cfg.companyEmail;
         if (el.tagName === 'A') el.setAttribute('href', `mailto:${cfg.companyEmail}`);
       }
     });
