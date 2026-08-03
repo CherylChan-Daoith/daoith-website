@@ -262,7 +262,7 @@ window.DAOITH_I18N_EN = {
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {
-      text: 'Advisory, Mainland China, Hong Kong, and major markets by continent — transparent pricing; add to inquiry list for preferential quotes.',
+      text: 'Transparent pricing on all services; add to inquiry list for preferential quotes.',
     },
     '.filter-btn[data-filter="all"]': { text: 'All' },
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
