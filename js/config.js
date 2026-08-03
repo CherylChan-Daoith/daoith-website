@@ -18,4 +18,10 @@ window.DAOITH_CONFIG = {
   authApiBase: '',
   // Notify bind / status live on Aliyun (OA AppSecret + DB)
   notifyApiBase: 'https://api.daoith.com',
+
+  // 公安备案 / 网站公示信息（须与营业执照及实际办公地一致；勿使用虚拟地址）
+  // TODO: 替换为营业执照上的公司全称与深圳实际办公地址（含门牌号）
+  companyLegalName: '【请填写营业执照上的公司全称】',
+  companyAddress: '【请填写深圳市具体实际办公地址（含门牌号）】',
+  companyEmail: 'service@daoith.com',
 };
