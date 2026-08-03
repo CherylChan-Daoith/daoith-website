@@ -310,7 +310,9 @@ window.DAOITH_I18N_EN = {
       text: 'Key tax points for major trading partners.',
     },
     '#policy-expert .policy-block-header h3': { text: 'Expert Insights' },
-    '#policy-expert .policy-block-header p': { text: 'Latest cross-border tax and compliance analysis.' },
+    '#policy-expert .policy-block-header p': {
+      text: 'Articles synced from our WeChat Official Account — tap to open the original post.',
+    },
     '#policy-tax .policy-block-header h3': { text: 'Tax Authority Updates' },
     '#policy-tax .policy-block-header p': {
       text: 'Cross-border tax regulations published in the last six months — click through to official sources.',

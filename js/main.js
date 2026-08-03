@@ -292,33 +292,166 @@ function refreshShowMoreServicesLabel() {
     : window.DAOITH_t('services.showAll').replace('{n}', String(total));
 }
 
-function updateExpertArticles() {
+function escapeArticleHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function oaArticlesApiBase() {
+  const cfg = window.DAOITH_CONFIG || {};
+  return (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
+}
+
+function localArticlesAsCards() {
   const locale = window.DAOITH_getLocale?.() || 'zh';
   const enMap = window.DAOITH_I18N_EN?.articleTexts || {};
-  document.querySelectorAll('.article-card[data-article-id]').forEach((card) => {
-    const id = card.dataset.articleId;
-    const article = typeof window.getArticleById === 'function' ? window.getArticleById(id) : null;
-    const en = enMap[id];
-    const titleLink = card.querySelector('.article-title-link');
-    const excerpt = card.querySelector('p');
-    const readLink = card.querySelector('.article-link');
-    if (titleLink) {
-      titleLink.textContent = locale === 'en' && en?.title ? en.title : (article?.title || titleLink.textContent);
-    }
-    if (excerpt) {
-      excerpt.textContent = locale === 'en' && en?.excerpt ? en.excerpt : (article?.excerpt || excerpt.textContent);
-    }
-    if (readLink) readLink.textContent = window.DAOITH_t('article.readMore');
+  return (window.DAOITH_ARTICLES || []).map((article) => {
+    const en = enMap[article.id];
+    return {
+      id: article.id,
+      title: locale === 'en' && en?.title ? en.title : article.title,
+      digest: locale === 'en' && en?.excerpt ? en.excerpt : article.excerpt,
+      author: article.author,
+      date: article.date,
+      url: `/article.html?id=${encodeURIComponent(article.id)}`,
+      external: false,
+    };
   });
 }
 
-function initLoadMore() {
-  setupPagination({
+function renderExpertArticleCards(articles) {
+  const grid = document.getElementById('expertArticlesGrid');
+  if (!grid) return;
+  const readLabel = window.DAOITH_t('article.readMore');
+  const wechatHint = window.DAOITH_getLocale?.() === 'en' ? 'Open in WeChat' : '微信内打开更佳';
+
+  grid.innerHTML = articles
+    .map((a) => {
+      const href = escapeArticleHtml(a.url);
+      const external = a.external !== false;
+      const rel = external ? 'noopener noreferrer' : '';
+      const target = external ? '_blank' : '_self';
+      const metaExtra = external
+        ? `<span class="article-oa-badge">${escapeArticleHtml(wechatHint)}</span>`
+        : '';
+      return `
+      <article class="article-card" data-article-id="${escapeArticleHtml(a.id)}">
+        <div class="article-date">${escapeArticleHtml(a.date || '')}</div>
+        <h4><a href="${href}" class="article-title-link" target="${target}" rel="${rel}">${escapeArticleHtml(a.title)}</a></h4>
+        <p>${escapeArticleHtml(a.digest || '')}</p>
+        <div class="article-meta">
+          <span>${escapeArticleHtml(a.author || '')}</span>
+          ${metaExtra}
+          <a href="${href}" class="article-link" target="${target}" rel="${rel}">${escapeArticleHtml(readLabel)}</a>
+        </div>
+      </article>`;
+    })
+    .join('');
+}
+
+let _expertArticlesPager = null;
+
+function initExpertArticlesPager() {
+  const button = document.getElementById('loadMoreArticles');
+  if (button) {
+    button.classList.add('is-hidden');
+    button.onclick = null;
+  }
+  _expertArticlesPager = setupPagination({
     itemsSelector: '#policy-expert .article-card',
     buttonId: 'loadMoreArticles',
     labelKey: 'loadMore.articles',
     pageSize: ARTICLES_PAGE_SIZE,
   });
+}
+
+async function loadExpertArticlesFromWeChat() {
+  const hint = document.getElementById('expertArticlesHint');
+  const locale = window.DAOITH_getLocale?.() || 'zh';
+
+  const setHint = (text, isError) => {
+    if (!hint) return;
+    hint.hidden = !text;
+    hint.textContent = text || '';
+    hint.classList.toggle('is-error', !!isError);
+  };
+
+  try {
+    const manual = (window.DAOITH_OA_MANUAL_ARTICLES || [])
+      .filter((a) => a && a.url && a.title)
+      .map((a) => ({ ...a, external: true }));
+
+    // Prefer curated OA links when present (WeChat API cannot list mass-notified posts).
+    if (manual.length) {
+      renderExpertArticleCards(manual);
+      setHint(
+        locale === 'en'
+          ? 'Articles from the DAOITH WeChat Official Account. Tap to open the original post in WeChat.'
+          : '来自「道一跨境咨询DAOITH」公众号原创文章，点击跳转微信原文（建议微信内打开）。'
+      );
+      initExpertArticlesPager();
+      return;
+    }
+
+    const res = await fetch(`${oaArticlesApiBase()}/api/wechat-oa/articles?offset=0&count=20`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    const articles = (data.articles || []).map((a) => ({ ...a, external: true }));
+    if (articles.length) {
+      renderExpertArticleCards(articles);
+      setHint(
+        locale === 'en'
+          ? 'Synced from WeChat Official Account. Links open the original WeChat article.'
+          : (data.hint || '列表已同步公众号文章，点击跳转微信原文（建议微信内打开）。')
+      );
+      initExpertArticlesPager();
+      return;
+    }
+
+    renderExpertArticleCards(localArticlesAsCards());
+    setHint(
+      locale === 'en'
+        ? (data.hint || 'No published WeChat articles yet. Showing on-site articles.')
+        : (data.hint || '暂未拉到公众号已发布图文，先展示站内文章。'),
+      false
+    );
+    initExpertArticlesPager();
+  } catch (err) {
+    const manual = (window.DAOITH_OA_MANUAL_ARTICLES || [])
+      .filter((a) => a && a.url && a.title)
+      .map((a) => ({ ...a, external: true }));
+    if (manual.length) {
+      renderExpertArticleCards(manual);
+      setHint(
+        locale === 'en'
+          ? 'Articles from the DAOITH WeChat Official Account.'
+          : '来自「道一跨境咨询DAOITH」公众号原创文章，点击跳转微信原文。'
+      );
+      initExpertArticlesPager();
+      return;
+    }
+    renderExpertArticleCards(localArticlesAsCards());
+    setHint(
+      locale === 'en'
+        ? `WeChat sync unavailable (${err.message}). Showing on-site articles.`
+        : `公众号同步暂不可用（${err.message}），已展示站内文章。`,
+      true
+    );
+    initExpertArticlesPager();
+  }
+}
+
+function updateExpertArticles() {
+  /* Titles/links are re-rendered by loadExpertArticlesFromWeChat on localechange. */
+  loadExpertArticlesFromWeChat();
+}
+
+function initLoadMore() {
+  // Expert articles pager is initialized after async OA fetch in loadExpertArticlesFromWeChat.
   setupPagination({
     itemsSelector: '#policyTaxList .policy-item',
     buttonId: 'loadMoreTaxPolicies',

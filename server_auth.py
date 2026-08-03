@@ -267,6 +267,137 @@ def _fetch_json(url: str, timeout: int = 8):
     return data
 
 
+def _post_json(url: str, payload: dict, timeout: int = 15):
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "User-Agent": "daoith-auth/1.0",
+            "Content-Type": "application/json; charset=utf-8",
+        },
+    )
+    try:
+        with _NO_PROXY_OPENER.open(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as err:
+        raise TimeoutError(f"微信接口不可达或超时: {err}") from err
+    if data.get("errcode"):
+        raise ValueError(data.get("errmsg") or f"WeChat API error {data['errcode']}")
+    return data
+
+
+_OA_TOKEN_CACHE = {"token": "", "expires_at": 0}
+
+
+def get_oa_access_token(env_loader):
+    now = time.time()
+    if _OA_TOKEN_CACHE["token"] and _OA_TOKEN_CACHE["expires_at"] > now + 60:
+        return _OA_TOKEN_CACHE["token"]
+
+    app_id = load_env_value("WECHAT_OA_APP_ID", env_loader)
+    app_secret = load_env_value("WECHAT_OA_APP_SECRET", env_loader)
+    if not app_id or not app_secret:
+        raise RuntimeError("未配置服务号凭证")
+
+    params = urllib.parse.urlencode(
+        {
+            "grant_type": "client_credential",
+            "appid": app_id,
+            "secret": app_secret,
+        }
+    )
+    data = _fetch_json(f"https://api.weixin.qq.com/cgi-bin/token?{params}", timeout=15)
+    token = data.get("access_token") or ""
+    if not token:
+        raise ValueError("未获取到服务号 access_token")
+    expires_in = int(data.get("expires_in") or 7200)
+    _OA_TOKEN_CACHE["token"] = token
+    _OA_TOKEN_CACHE["expires_at"] = now + expires_in
+    return token
+
+
+_OA_ARTICLES_CACHE = {"items": None, "fetched_at": 0, "total": 0}
+
+
+def handle_oa_articles(env_loader, offset: int = 0, count: int = 20):
+    """Return published OA articles for website list + open-in-WeChat links."""
+    set_env_loader(env_loader)
+    offset = max(0, int(offset or 0))
+    count = max(1, min(int(count or 20), 20))
+    cache_ttl = 600
+
+    now = time.time()
+    if (
+        _OA_ARTICLES_CACHE["items"] is not None
+        and now - _OA_ARTICLES_CACHE["fetched_at"] < cache_ttl
+        and offset == 0
+    ):
+        items = _OA_ARTICLES_CACHE["items"][:count]
+        return 200, {
+            "source": "wechat_oa",
+            "cached": True,
+            "total": _OA_ARTICLES_CACHE["total"],
+            "articles": items,
+        }
+
+    try:
+        token = get_oa_access_token(env_loader)
+        data = _post_json(
+            f"https://api.weixin.qq.com/cgi-bin/freepublish/batchget?access_token={token}",
+            {"offset": offset, "count": count, "no_content": 0},
+            timeout=20,
+        )
+        articles = []
+        for entry in data.get("item") or []:
+            update_time = entry.get("update_time") or 0
+            date_str = ""
+            if update_time:
+                date_str = datetime.fromtimestamp(int(update_time), tz=timezone.utc).astimezone().strftime("%Y-%m-%d")
+            news_items = ((entry.get("content") or {}).get("news_item")) or []
+            for idx, news in enumerate(news_items):
+                if news.get("is_deleted"):
+                    continue
+                url = (news.get("url") or "").strip()
+                if not url:
+                    continue
+                articles.append(
+                    {
+                        "id": f"{entry.get('article_id') or 'oa'}-{idx}",
+                        "articleId": entry.get("article_id"),
+                        "title": (news.get("title") or "").strip() or "未命名文章",
+                        "digest": (news.get("digest") or "").strip(),
+                        "author": (news.get("author") or "").strip() or "道一跨境咨询",
+                        "url": url,
+                        "thumbUrl": (news.get("thumb_url") or "").strip(),
+                        "date": date_str,
+                        "updateTime": update_time,
+                    }
+                )
+
+        if offset == 0:
+            _OA_ARTICLES_CACHE["items"] = articles
+            _OA_ARTICLES_CACHE["fetched_at"] = now
+            _OA_ARTICLES_CACHE["total"] = int(data.get("total_count") or len(articles))
+
+        return 200, {
+            "source": "wechat_oa",
+            "cached": False,
+            "total": int(data.get("total_count") or len(articles)),
+            "articles": articles,
+            "hint": "列表来自微信服务号已发布图文；点击后跳转公众号原文（建议微信内打开）。"
+            if articles
+            else "暂未拉到已发布图文。请确认文章是通过公众号「发表」发布，且服务号已认证并开通发布接口权限。",
+        }
+    except RuntimeError as e:
+        return 503, {"error": str(e), "articles": []}
+    except ValueError as e:
+        return 400, {"error": str(e), "articles": []}
+    except Exception as e:
+        return 502, {"error": str(e), "articles": []}
+
+
 def exchange_wechat_code(code: str, app_id: str, app_secret: str):
     params = urllib.parse.urlencode(
         {

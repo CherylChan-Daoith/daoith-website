@@ -100,6 +100,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/auth/wechat-oa/openid":
             self.handle_wechat_oa_openid(query)
             return
+        if path == "/api/wechat-oa/articles":
+            offset = int((query.get("offset") or ["0"])[0] or 0)
+            count = int((query.get("count") or ["20"])[0] or 20)
+            status, data = server_auth.handle_oa_articles(load_env_value, offset=offset, count=count)
+            self.send_json(status, data)
+            return
         return super().do_GET()
 
     def handle_wechat_oa_openid(self, query):
