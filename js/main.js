@@ -326,7 +326,6 @@ function renderExpertArticleCards(articles) {
   const grid = document.getElementById('expertArticlesGrid');
   if (!grid) return;
   const readLabel = window.DAOITH_t('article.readMore');
-  const wechatHint = window.DAOITH_getLocale?.() === 'en' ? 'Open in WeChat' : '微信内打开更佳';
 
   grid.innerHTML = articles
     .map((a) => {
@@ -334,9 +333,6 @@ function renderExpertArticleCards(articles) {
       const external = a.external !== false;
       const rel = external ? 'noopener noreferrer' : '';
       const target = external ? '_blank' : '_self';
-      const metaExtra = external
-        ? `<span class="article-oa-badge">${escapeArticleHtml(wechatHint)}</span>`
-        : '';
       return `
       <article class="article-card" data-article-id="${escapeArticleHtml(a.id)}">
         <div class="article-date">${escapeArticleHtml(a.date || '')}</div>
@@ -344,7 +340,6 @@ function renderExpertArticleCards(articles) {
         <p>${escapeArticleHtml(a.digest || '')}</p>
         <div class="article-meta">
           <span>${escapeArticleHtml(a.author || '')}</span>
-          ${metaExtra}
           <a href="${href}" class="article-link" target="${target}" rel="${rel}">${escapeArticleHtml(readLabel)}</a>
         </div>
       </article>`;
@@ -389,8 +384,8 @@ async function loadExpertArticlesFromWeChat() {
       renderExpertArticleCards(manual);
       setHint(
         locale === 'en'
-          ? 'Articles from the DAOITH WeChat Official Account. Tap to open the original post in WeChat.'
-          : '来自「道一跨境咨询DAOITH」公众号原创文章，点击跳转微信原文（建议微信内打开）。'
+          ? 'Articles from the DAOITH WeChat Official Account.'
+          : '来自「道一跨境咨询DAOITH」公众号原创文章。'
       );
       initExpertArticlesPager();
       return;
@@ -405,8 +400,8 @@ async function loadExpertArticlesFromWeChat() {
       renderExpertArticleCards(articles);
       setHint(
         locale === 'en'
-          ? 'Synced from WeChat Official Account. Links open the original WeChat article.'
-          : (data.hint || '列表已同步公众号文章，点击跳转微信原文（建议微信内打开）。')
+          ? 'Synced from WeChat Official Account.'
+          : (data.hint || '列表已同步公众号文章。')
       );
       initExpertArticlesPager();
       return;
