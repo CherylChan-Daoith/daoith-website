@@ -3,3 +3,8 @@ __pycache__/
 .DS_Store
 data/*.db
 node_modules/
+
+.venv-dbf/
+data/dify-hs-codes/
+data/dify-hs-codes.zip
+data/dify-hs-upload/
