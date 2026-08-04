@@ -1002,8 +1002,8 @@ def handle_notify_disable(auth_header: str, env_loader):
 
 
 ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "已报价", "已成交"}
-# WeChat template enum may still use 已受理; map for push only
-_TEMPLATE_STATUS_MAP = {"处理中": "已受理"}
+# WeChat template enum may not include 处理中; map for push only
+_TEMPLATE_STATUS_MAP = {"处理中": "已提交"}
 
 
 def ensure_inquiry_db():
