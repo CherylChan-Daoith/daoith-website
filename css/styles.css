@@ -2866,6 +2866,14 @@ body.modal-open {
   color: var(--accent);
 }
 
+.quote-progress-step.skipped {
+  opacity: 0.45;
+}
+
+.quote-progress-step.skipped .step-body strong {
+  text-decoration: line-through;
+}
+
 .quote-progress-meta {
   font-size: 0.78rem;
   color: var(--text-muted);

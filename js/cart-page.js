@@ -224,6 +224,8 @@
       ...payload,
       inquiryId,
       status: '已提交',
+      statusHistory: { '已提交': new Date().toISOString() },
+      createdAt: new Date().toISOString(),
     });
 
     cartApi.clearCart();
@@ -234,11 +236,8 @@
         ? t('已提交，顾问将尽快联系您', 'Submitted — an advisor will contact you soon.')
         : t('已保存本地记录', 'Saved locally.')
     );
-    renderCart();
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = t('提交询价', 'Submit');
-    }
+    // 提交成功后进入服务管理查看询价进度
+    window.location.href = '/#hub';
   });
 
   renderCart();

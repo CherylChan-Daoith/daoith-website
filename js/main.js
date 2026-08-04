@@ -2003,6 +2003,18 @@ function setQuotesCache(list) {
 }
 
 function normalizeRemoteQuote(q) {
+  const status = q.status || '已提交';
+  const createdAt = q.createdAt;
+  let statusHistory = q.statusHistory && typeof q.statusHistory === 'object' ? { ...q.statusHistory } : {};
+  // Client-side backfill if API/cache missing intermediate times
+  const order = ['已提交', '处理中', '已报价'];
+  const path = (status === '已成交' || status === '已关闭')
+    ? [...order, status]
+    : (order.includes(status) ? order.slice(0, order.indexOf(status) + 1) : ['已提交']);
+  const fallbackAt = statusHistory['已提交'] || createdAt;
+  path.forEach((key) => {
+    if (!statusHistory[key] && fallbackAt) statusHistory[key] = fallbackAt;
+  });
   return {
     inquiryId: q.inquiryId,
     company: q.company,
@@ -2010,8 +2022,9 @@ function normalizeRemoteQuote(q) {
     phone: q.phone,
     total: q.total,
     items: q.items || [],
-    status: q.status || '已提交',
-    createdAt: q.createdAt,
+    status,
+    statusHistory,
+    createdAt,
     openid: q.websiteOpenid || null,
   };
 }
@@ -2102,21 +2115,38 @@ function renderHubProgress(quotes) {
   }
   const latest = list[0];
   const status = latest.status || '已提交';
+  const history = latest.statusHistory && typeof latest.statusHistory === 'object' ? latest.statusHistory : {};
   const services = (latest.items || []).map((it) => it.title).join('、');
+  const pathDone = {
+    '已提交': ['已提交', '处理中', '已报价', '已成交', '已关闭'],
+    '处理中': ['处理中', '已报价', '已成交', '已关闭'],
+    '已报价': ['已报价', '已成交', '已关闭'],
+    '已成交': ['已成交'],
+    '已关闭': ['已关闭'],
+  };
+  // 已成交 / 已关闭 终态二选一：两个节点都展示，仅选中的算完成
   const steps = [
-    { key: '已提交', title: '询价已提交', doneWhen: ['已提交', '处理中', '已报价', '已成交'] },
-    { key: '处理中', title: '处理中', doneWhen: ['处理中', '已报价', '已成交'], pendingText: '顾问正在处理您的询价' },
-    { key: '已报价', title: '已报价', doneWhen: ['已报价', '已成交'], pendingText: '—' },
-    { key: '已成交', title: '已成交', doneWhen: ['已成交'], pendingText: '—' },
+    { key: '已提交', title: '询价已提交', pendingText: '—' },
+    { key: '处理中', title: '处理中', pendingText: '待处理' },
+    { key: '已报价', title: '已报价', pendingText: '待报价' },
+    { key: '已成交', title: '已成交', pendingText: status === '已关闭' ? '未选' : '—' },
+    { key: '已关闭', title: '已关闭', pendingText: status === '已成交' ? '未选' : '—' },
   ];
   wrap.innerHTML = `
     <div class="quote-progress">
       ${steps.map((step) => {
-        const done = step.doneWhen.includes(status);
-        const current = step.key === status;
-        const cls = done ? 'done' : (current ? 'current' : '');
+        const done = (pathDone[step.key] || []).includes(status);
+        const skipped = (step.key === '已成交' && status === '已关闭')
+          || (step.key === '已关闭' && status === '已成交');
+        const cls = [
+          done ? 'done' : '',
+          skipped ? 'skipped' : '',
+        ].filter(Boolean).join(' ');
+        const at = history[step.key]
+          || (done && step.key === '已提交' ? latest.createdAt : '')
+          || (done ? history['已提交'] || latest.createdAt : '');
         const sub = done
-          ? (step.key === '已提交' ? formatDate(latest.createdAt) : status)
+          ? (at ? formatDate(at) : '—')
           : (step.pendingText || '—');
         return `
           <div class="quote-progress-step ${cls}">

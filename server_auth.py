@@ -1001,12 +1001,134 @@ def handle_notify_disable(auth_header: str, env_loader):
     }
 
 
-ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "已报价", "已成交"}
+ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "已报价", "已成交", "已关闭"}
+_INQUIRY_STATUS_ORDER = ["已提交", "处理中", "已报价"]
+_INQUIRY_TERMINALS = {"已成交", "已关闭"}
 # WeChat template enum may not include 处理中; map for push only
 _TEMPLATE_STATUS_MAP = {"处理中": "已提交"}
 
 
+def _inquiry_status_path(status: str) -> list:
+    """Statuses from 已提交 up to and including `status` (终态二选一)."""
+    if status in _INQUIRY_TERMINALS:
+        return list(_INQUIRY_STATUS_ORDER) + [status]
+    if status in _INQUIRY_STATUS_ORDER:
+        idx = _INQUIRY_STATUS_ORDER.index(status)
+        return list(_INQUIRY_STATUS_ORDER[: idx + 1])
+    return ["已提交"]
+
+
+def _parse_status_history(raw) -> dict:
+    if isinstance(raw, dict):
+        return {str(k): str(v) for k, v in raw.items() if k and v}
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else {}
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(k): str(v) for k, v in data.items() if k and v}
+
+
+def _merge_status_history(existing, status: str, at: str) -> dict:
+    """Record times for newly reached nodes; keep earlier timestamps; drop other terminal."""
+    history = dict(_parse_status_history(existing))
+    for s in _inquiry_status_path(status):
+        if s not in history:
+            history[s] = at
+    if status in _INQUIRY_TERMINALS:
+        history[status] = history.get(status) or at
+        other = "已关闭" if status == "已成交" else "已成交"
+        history.pop(other, None)
+    return history
+
+
+def _synthesize_status_history(status: str, created_iso: str, raw_history=None) -> dict:
+    """Build a complete timeline for API/UI; used for legacy rows with empty history."""
+    history = _parse_status_history(raw_history)
+    status = status or "已提交"
+    at = created_iso or datetime.now(timezone.utc).isoformat()
+    if "已提交" not in history:
+        history = _merge_status_history(history, "已提交", at)
+    if status not in history:
+        history = _merge_status_history(history, status, at)
+    # Ensure every reached node has a timestamp (including intermediates)
+    for s in _inquiry_status_path(status):
+        if s not in history:
+            history[s] = at
+    return history
+
+
+def _backfill_empty_status_histories():
+    """Persist synthesized timelines for rows still stored as {}."""
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, status, status_history_json, created_at
+                    FROM website_inquiries
+                    WHERE status_history_json IS NULL
+                       OR status_history_json = ''
+                       OR status_history_json = '{}'
+                    """
+                )
+                rows = cur.fetchall()
+                for inquiry_id, status, raw, created in rows:
+                    created_iso = (
+                        created.isoformat() if hasattr(created, "isoformat") else str(created or "")
+                    )
+                    history = _synthesize_status_history(status or "已提交", created_iso, raw)
+                    cur.execute(
+                        "UPDATE website_inquiries SET status_history_json = %s WHERE id = %s",
+                        (json.dumps(history, ensure_ascii=False), inquiry_id),
+                    )
+            conn.commit()
+        return
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT id, status, status_history_json, created_at
+            FROM website_inquiries
+            WHERE status_history_json IS NULL
+               OR status_history_json = ''
+               OR status_history_json = '{}'
+            """
+        ).fetchall()
+        for r in rows:
+            history = _synthesize_status_history(
+                r["status"] or "已提交", r["created_at"] or "", r["status_history_json"]
+            )
+            conn.execute(
+                "UPDATE website_inquiries SET status_history_json = ? WHERE id = ?",
+                (json.dumps(history, ensure_ascii=False), r["id"]),
+            )
+        conn.commit()
+
+
+_STATUS_HISTORY_BACKFILL_DONE = False
+
+
+def _ensure_status_history_column(cur, *, postgres: bool):
+    if postgres:
+        cur.execute(
+            "ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS status_history_json TEXT NOT NULL DEFAULT '{}'"
+        )
+    else:
+        cols = {r[1] for r in cur.execute("PRAGMA table_info(website_inquiries)").fetchall()}
+        if "status_history_json" not in cols:
+            cur.execute(
+                "ALTER TABLE website_inquiries ADD COLUMN status_history_json TEXT NOT NULL DEFAULT '{}'"
+            )
+
+
 def ensure_inquiry_db():
+    global _STATUS_HISTORY_BACKFILL_DONE
     ensure_db()
     database_url = get_database_url()
     if database_url:
@@ -1023,12 +1145,14 @@ def ensure_inquiry_db():
                       total DOUBLE PRECISION NOT NULL DEFAULT 0,
                       items_json TEXT NOT NULL DEFAULT '[]',
                       status TEXT NOT NULL DEFAULT '已提交',
+                      status_history_json TEXT NOT NULL DEFAULT '{}',
                       notify_sent BOOLEAN NOT NULL DEFAULT FALSE,
                       pm_synced BOOLEAN NOT NULL DEFAULT FALSE,
                       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                     """
                 )
+                _ensure_status_history_column(cur, postgres=True)
                 cur.execute(
                     "CREATE INDEX IF NOT EXISTS idx_website_inquiries_openid ON website_inquiries(website_openid)"
                 )
@@ -1036,6 +1160,12 @@ def ensure_inquiry_db():
                     "CREATE INDEX IF NOT EXISTS idx_website_inquiries_created ON website_inquiries(created_at DESC)"
                 )
             conn.commit()
+        if not _STATUS_HISTORY_BACKFILL_DONE:
+            try:
+                _backfill_empty_status_histories()
+                _STATUS_HISTORY_BACKFILL_DONE = True
+            except Exception:
+                pass
         return
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -1051,16 +1181,24 @@ def ensure_inquiry_db():
               total REAL NOT NULL DEFAULT 0,
               items_json TEXT NOT NULL DEFAULT '[]',
               status TEXT NOT NULL DEFAULT '已提交',
+              status_history_json TEXT NOT NULL DEFAULT '{}',
               notify_sent INTEGER NOT NULL DEFAULT 0,
               pm_synced INTEGER NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL
             )
             """
         )
+        _ensure_status_history_column(conn, postgres=False)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_website_inquiries_openid ON website_inquiries(website_openid)"
         )
         conn.commit()
+    if not _STATUS_HISTORY_BACKFILL_DONE:
+        try:
+            _backfill_empty_status_histories()
+            _STATUS_HISTORY_BACKFILL_DONE = True
+        except Exception:
+            pass
 
 
 def _new_inquiry_id() -> str:
@@ -1071,14 +1209,18 @@ def save_inquiry(record: dict):
     ensure_inquiry_db()
     database_url = get_database_url()
     items_json = json.dumps(record.get("items") or [], ensure_ascii=False)
+    created_at = record.get("createdAt") or datetime.now(timezone.utc).isoformat()
+    status = record.get("status") or "已提交"
+    history = record.get("statusHistory") or _merge_status_history({}, status, created_at)
+    history_json = json.dumps(history, ensure_ascii=False)
     if database_url:
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     INSERT INTO website_inquiries
-                      (id, website_openid, company, contact, phone, total, items_json, status, notify_sent, pm_synced, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                      (id, website_openid, company, contact, phone, total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                     """,
                     (
                         record["id"],
@@ -1088,7 +1230,8 @@ def save_inquiry(record: dict):
                         record["phone"],
                         float(record.get("total") or 0),
                         items_json,
-                        record.get("status") or "已提交",
+                        status,
+                        history_json,
                         bool(record.get("notifySent")),
                         bool(record.get("pmSynced")),
                     ),
@@ -1100,8 +1243,8 @@ def save_inquiry(record: dict):
         conn.execute(
             """
             INSERT INTO website_inquiries
-              (id, website_openid, company, contact, phone, total, items_json, status, notify_sent, pm_synced, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (id, website_openid, company, contact, phone, total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["id"],
@@ -1111,10 +1254,11 @@ def save_inquiry(record: dict):
                 record["phone"],
                 float(record.get("total") or 0),
                 items_json,
-                record.get("status") or "已提交",
+                status,
+                history_json,
                 1 if record.get("notifySent") else 0,
                 1 if record.get("pmSynced") else 0,
-                datetime.now(timezone.utc).isoformat(),
+                created_at,
             ),
         )
         conn.commit()
@@ -1256,38 +1400,98 @@ def update_inquiry_status(inquiry_id: str, status: str):
     ensure_inquiry_db()
     if status not in ALLOWED_INQUIRY_STATUS:
         raise ValueError(f"无效状态：{status}")
+    now = datetime.now(timezone.utc).isoformat()
     database_url = get_database_url()
     if database_url:
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE website_inquiries SET status = %s WHERE id = %s RETURNING id, website_openid, status",
-                    (status, inquiry_id),
+                    "SELECT website_openid, status_history_json FROM website_inquiries WHERE id = %s",
+                    (inquiry_id,),
                 )
                 row = cur.fetchone()
+                if not row:
+                    return None
+                history = _merge_status_history(row[1], status, now)
+                history_json = json.dumps(history, ensure_ascii=False)
+                cur.execute(
+                    """
+                    UPDATE website_inquiries
+                    SET status = %s, status_history_json = %s
+                    WHERE id = %s
+                    RETURNING id, website_openid, status, status_history_json
+                    """,
+                    (status, history_json, inquiry_id),
+                )
+                updated = cur.fetchone()
             conn.commit()
-        if not row:
-            return None
-        return {"id": row[0], "websiteOpenid": row[1], "status": row[2]}
+        return {
+            "id": updated[0],
+            "websiteOpenid": updated[1],
+            "status": updated[2],
+            "statusHistory": _parse_status_history(updated[3]),
+        }
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        cur = conn.execute(
-            "UPDATE website_inquiries SET status = ? WHERE id = ?",
-            (status, inquiry_id),
-        )
-        if cur.rowcount == 0:
-            conn.commit()
-            return None
         row = conn.execute(
-            "SELECT id, website_openid, status FROM website_inquiries WHERE id = ?",
+            "SELECT website_openid, status_history_json FROM website_inquiries WHERE id = ?",
             (inquiry_id,),
         ).fetchone()
+        if not row:
+            return None
+        history = _merge_status_history(row["status_history_json"], status, now)
+        history_json = json.dumps(history, ensure_ascii=False)
+        conn.execute(
+            "UPDATE website_inquiries SET status = ?, status_history_json = ? WHERE id = ?",
+            (status, history_json, inquiry_id),
+        )
         conn.commit()
     return {
-        "id": row["id"],
+        "id": inquiry_id,
         "websiteOpenid": row["website_openid"],
-        "status": row["status"],
+        "status": status,
+        "statusHistory": history,
+    }
+
+
+def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
+    if postgres:
+        items_raw, status, history_raw, created = r[6], r[7], r[8], r[9]
+        base = {
+            "inquiryId": r[0],
+            "websiteOpenid": r[1],
+            "company": r[2],
+            "contact": r[3],
+            "phone": r[4],
+            "total": float(r[5] or 0),
+        }
+    else:
+        items_raw = r["items_json"]
+        status = r["status"]
+        history_raw = r["status_history_json"] if "status_history_json" in r.keys() else "{}"
+        created = r["created_at"]
+        base = {
+            "inquiryId": r["id"],
+            "websiteOpenid": r["website_openid"],
+            "company": r["company"],
+            "contact": r["contact"],
+            "phone": r["phone"],
+            "total": float(r["total"] or 0),
+        }
+    try:
+        items = json.loads(items_raw or "[]")
+    except Exception:
+        items = []
+    created_iso = created.isoformat() if hasattr(created, "isoformat") else str(created or "")
+    status = status or "已提交"
+    history = _synthesize_status_history(status, created_iso, history_raw)
+    return {
+        **base,
+        "items": items,
+        "status": status,
+        "statusHistory": history,
+        "createdAt": created_iso,
     }
 
 
@@ -1300,7 +1504,8 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, website_openid, company, contact, phone, total, items_json, status, created_at
+                    SELECT id, website_openid, company, contact, phone, total, items_json,
+                           status, status_history_json, created_at
                     FROM website_inquiries
                     WHERE website_openid = %s
                     ORDER BY created_at DESC
@@ -1309,33 +1514,14 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
                     (website_openid, limit),
                 )
                 rows = cur.fetchall()
-        out = []
-        for r in rows:
-            try:
-                items = json.loads(r[6] or "[]")
-            except Exception:
-                items = []
-            created = r[8]
-            out.append(
-                {
-                    "inquiryId": r[0],
-                    "websiteOpenid": r[1],
-                    "company": r[2],
-                    "contact": r[3],
-                    "phone": r[4],
-                    "total": float(r[5] or 0),
-                    "items": items,
-                    "status": r[7] or "已提交",
-                    "createdAt": created.isoformat() if hasattr(created, "isoformat") else str(created),
-                }
-            )
-        return out
+        return [_inquiry_row_to_dict(r, postgres=True) for r in rows]
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """
-            SELECT id, website_openid, company, contact, phone, total, items_json, status, created_at
+            SELECT id, website_openid, company, contact, phone, total, items_json,
+                   status, status_history_json, created_at
             FROM website_inquiries
             WHERE website_openid = ?
             ORDER BY created_at DESC
@@ -1343,26 +1529,7 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
             """,
             (website_openid, limit),
         ).fetchall()
-    out = []
-    for r in rows:
-        try:
-            items = json.loads(r["items_json"] or "[]")
-        except Exception:
-            items = []
-        out.append(
-            {
-                "inquiryId": r["id"],
-                "websiteOpenid": r["website_openid"],
-                "company": r["company"],
-                "contact": r["contact"],
-                "phone": r["phone"],
-                "total": float(r["total"] or 0),
-                "items": items,
-                "status": r["status"] or "已提交",
-                "createdAt": r["created_at"],
-            }
-        )
-    return out
+    return [_inquiry_row_to_dict(r, postgres=False) for r in rows]
 
 
 def _authorize_website_sync(headers, env_loader):
@@ -1414,7 +1581,13 @@ def handle_inquiry_status_update(headers, body: dict, env_loader):
             except Exception as e:
                 notify = {"sent": False, "error": str(e)}
 
-    return 200, {"ok": True, "inquiryId": inquiry_id, "status": status, "notify": notify}
+    return 200, {
+        "ok": True,
+        "inquiryId": inquiry_id,
+        "status": status,
+        "statusHistory": updated.get("statusHistory") or {},
+        "notify": notify,
+    }
 
 
 def handle_inquiry_list(auth_header: str, env_loader, limit: int = 50):
@@ -1468,6 +1641,8 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
 
     inquiry_id = _new_inquiry_id()
     status = "已提交"
+    created_at = datetime.now(timezone.utc).isoformat()
+    status_history = {"已提交": created_at}
     record = {
         "id": inquiry_id,
         "websiteOpenid": website_openid,
@@ -1477,9 +1652,10 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
         "total": total,
         "items": items,
         "status": status,
+        "statusHistory": status_history,
         "notifySent": False,
         "pmSynced": False,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": created_at,
         "nickname": nickname,
     }
     save_inquiry(record)
