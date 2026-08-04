@@ -170,8 +170,16 @@ function initNavigation() {
     showView(location.hash.slice(1) || 'hero', { updateHash: false });
   });
 
-  // Initial view from URL hash
-  showView(location.hash.slice(1) || 'hero', { updateHash: false });
+  // Open quote modal / cart deep-links may land on home; honor pending view (e.g. after inquiry submit)
+  let initialHash = location.hash.slice(1) || 'hero';
+  try {
+    const pending = sessionStorage.getItem('daoith_open_view');
+    if (pending) {
+      sessionStorage.removeItem('daoith_open_view');
+      initialHash = pending;
+    }
+  } catch { /* ignore */ }
+  showView(initialHash, { updateHash: initialHash !== (location.hash.slice(1) || 'hero') });
 
   window.DAOITH_showView = showView;
 }

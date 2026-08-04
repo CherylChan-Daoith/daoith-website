@@ -236,8 +236,9 @@
         ? t('已提交，顾问将尽快联系您', 'Submitted — an advisor will contact you soon.')
         : t('已保存本地记录', 'Saved locally.')
     );
-    // 提交成功后进入服务管理查看询价进度
-    window.location.href = '/#hub';
+    // 提交成功后进入服务管理（用 sessionStorage + 绝对地址，避免微信内从 cart.html 跳 /#hub 失败）
+    try { sessionStorage.setItem('daoith_open_view', 'hub'); } catch { /* ignore */ }
+    window.location.replace(`${window.location.origin}/#hub`);
   });
 
   renderCart();
