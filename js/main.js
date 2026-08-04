@@ -1948,12 +1948,18 @@ function initHubTabs() {
     feedback: document.getElementById('feedbackTab'),
   };
 
+  async function refreshHubQuotes() {
+    const quotes = await loadQuotesForHub();
+    renderQuotesList(quotes);
+    renderHubProgress(quotes);
+    return quotes;
+  }
+
   function showTab(name) {
     Object.entries(tabPanes).forEach(([k, el]) => {
       if (el) el.style.display = k === name ? '' : 'none';
     });
-    if (name === 'quotes') renderQuotesList();
-  if (name === 'orders') renderHubProgress();
+    if (name === 'quotes' || name === 'orders') refreshHubQuotes();
   }
 
   tabs.forEach((tab) => {
@@ -1964,7 +1970,10 @@ function initHubTabs() {
     });
   });
 
-  renderHubProgress();
+  refreshHubQuotes();
+  window.addEventListener('daoith-auth-change', () => {
+    refreshHubQuotes();
+  });
 }
 
 function getQuotes() {
@@ -1973,6 +1982,73 @@ function getQuotes() {
     const list = raw ? JSON.parse(raw) : [];
     return Array.isArray(list) ? list : [];
   } catch { return []; }
+}
+
+function setQuotesCache(list) {
+  try {
+    localStorage.setItem('daoith_quotes', JSON.stringify((list || []).slice(0, 50)));
+  } catch { /* ignore */ }
+}
+
+function mergeQuoteStatus(localList, remoteList) {
+  const byId = new Map();
+  (remoteList || []).forEach((q) => {
+    if (q?.inquiryId) byId.set(q.inquiryId, q);
+  });
+  const merged = (localList || []).map((q) => {
+    const remote = q.inquiryId ? byId.get(q.inquiryId) : null;
+    if (!remote) return q;
+    byId.delete(q.inquiryId);
+    return {
+      ...q,
+      status: remote.status || q.status || '已提交',
+      company: q.company || remote.company,
+      contact: q.contact || remote.contact,
+      phone: q.phone || remote.phone,
+      total: q.total ?? remote.total,
+      items: (q.items && q.items.length) ? q.items : (remote.items || []),
+      createdAt: q.createdAt || remote.createdAt,
+    };
+  });
+  // Remote-only records (e.g. submitted on another device while logged in)
+  byId.forEach((q) => {
+    merged.push({
+      inquiryId: q.inquiryId,
+      company: q.company,
+      contact: q.contact,
+      phone: q.phone,
+      total: q.total,
+      items: q.items || [],
+      status: q.status || '已提交',
+      createdAt: q.createdAt,
+    });
+  });
+  merged.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  return merged;
+}
+
+async function fetchRemoteQuotes() {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) return null;
+  try {
+    const res = await fetch(`${notifyApiBase()}/api/inquiry?limit=50`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return null;
+    return Array.isArray(data.inquiries) ? data.inquiries : [];
+  } catch {
+    return null;
+  }
+}
+
+async function loadQuotesForHub() {
+  const local = getQuotes();
+  const remote = await fetchRemoteQuotes();
+  if (!remote) return local;
+  const merged = mergeQuoteStatus(local, remote);
+  setQuotesCache(merged);
+  return merged;
 }
 
 function formatDate(iso) {
@@ -1985,22 +2061,28 @@ function formatWanHub(v) {
   return `¥${(Number(v) || 0).toFixed(2)} 万元`;
 }
 
-function renderQuotesList() {
+function quoteStatusLabel(status) {
+  const s = status || '已提交';
+  return s;
+}
+
+function renderQuotesList(quotes) {
   const wrap = document.getElementById('quotesListWrap');
   if (!wrap) return;
-  const quotes = getQuotes();
-  if (!quotes.length) {
+  const list = Array.isArray(quotes) ? quotes : getQuotes();
+  if (!list.length) {
     wrap.innerHTML = `<div class="empty-state"><div class="icon">📬</div><h4>暂无询价记录</h4><p>在购物车提交询价后，记录将显示在这里</p></div>`;
     return;
   }
-  wrap.innerHTML = quotes.map((q, i) => {
+  wrap.innerHTML = list.map((q, i) => {
     const services = (q.items || []).map((it) => `${it.title} × ${it.qty}`).join('、');
+    const status = quoteStatusLabel(q.status);
     return `
       <div class="quote-record">
         <div class="quote-record-head">
-          <span class="quote-record-no">询价 #${quotes.length - i}</span>
+          <span class="quote-record-no">${q.inquiryId || `询价 #${list.length - i}`}</span>
           <span class="quote-record-date">${formatDate(q.createdAt)}</span>
-          <span class="quote-record-status">待跟进</span>
+          <span class="quote-record-status">${status}</span>
         </div>
         <div class="quote-record-body">
           <div><strong>公司：</strong>${q.company || '—'} &nbsp; <strong>联系人：</strong>${q.contact || '—'} &nbsp; <strong>电话：</strong>${q.phone || '—'}</div>
@@ -2011,49 +2093,44 @@ function renderQuotesList() {
   }).join('');
 }
 
-function renderHubProgress() {
+function renderHubProgress(quotes) {
   const wrap = document.getElementById('hubProgressWrap') || document.getElementById('quoteProgressWrap');
   if (!wrap) return;
-  const quotes = getQuotes();
-  if (!quotes.length) {
+  const list = Array.isArray(quotes) ? quotes : getQuotes();
+  if (!list.length) {
     wrap.innerHTML = `<div class="empty-state"><div class="icon icon-muted">—</div><h4>暂未提交询价</h4><p>在购物车提交询价后，顾问会跟进并在此更新进度</p><a href="/cart.html" class="btn btn-primary btn-sm" style="margin-top:12px">前往购物车</a></div>`;
     return;
   }
-  const latest = quotes[0];
+  const latest = list[0];
+  const status = latest.status || '已提交';
   const services = (latest.items || []).map((it) => it.title).join('、');
+  const steps = [
+    { key: '已提交', title: '询价已提交', doneWhen: ['已提交', '处理中', '已报价', '已成交'] },
+    { key: '处理中', title: '处理中', doneWhen: ['处理中', '已报价', '已成交'], pendingText: '顾问正在处理您的询价' },
+    { key: '已报价', title: '已报价', doneWhen: ['已报价', '已成交'], pendingText: '—' },
+    { key: '已成交', title: '已成交', doneWhen: ['已成交'], pendingText: '—' },
+  ];
   wrap.innerHTML = `
     <div class="quote-progress">
-      <div class="quote-progress-step done">
-        <div class="step-dot"></div>
-        <div class="step-body">
-          <strong>询价已提交</strong>
-          <span>${formatDate(latest.createdAt)}</span>
-        </div>
-      </div>
-      <div class="quote-progress-step">
-        <div class="step-dot"></div>
-        <div class="step-body">
-          <strong>顾问跟进中</strong>
-          <span>顾问将在1-2个工作日内联系您</span>
-        </div>
-      </div>
-      <div class="quote-progress-step">
-        <div class="step-dot"></div>
-        <div class="step-body">
-          <strong>方案确认</strong>
-          <span>—</span>
-        </div>
-      </div>
-      <div class="quote-progress-step">
-        <div class="step-dot"></div>
-        <div class="step-body">
-          <strong>服务进行中</strong>
-          <span>—</span>
-        </div>
-      </div>
+      ${steps.map((step) => {
+        const done = step.doneWhen.includes(status);
+        const current = step.key === status;
+        const cls = done ? 'done' : (current ? 'current' : '');
+        const sub = done
+          ? (step.key === '已提交' ? formatDate(latest.createdAt) : status)
+          : (step.pendingText || '—');
+        return `
+          <div class="quote-progress-step ${cls}">
+            <div class="step-dot"></div>
+            <div class="step-body">
+              <strong>${step.title}</strong>
+              <span>${sub}</span>
+            </div>
+          </div>`;
+      }).join('')}
     </div>
     <div class="quote-progress-meta">
-      <span>最新询价：${services}</span>
+      <span>最新询价：${services || '—'}（${status}）</span>
       &nbsp;·&nbsp;
       <a href="#" class="hub-tab-link" data-tab="quotes">查看全部询价记录 →</a>
     </div>

@@ -90,6 +90,15 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/inquiry":
+            limit = int((query.get("limit") or ["50"])[0] or 50)
+            status, data = server_auth.handle_inquiry_list(
+                self.headers.get("Authorization", ""),
+                load_env_value,
+                limit=limit,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/auth/wechat/notify/status":
             status, data = server_auth.handle_notify_status(
                 self.headers.get("Authorization", ""),
@@ -213,6 +222,20 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             status, data = server_auth.handle_inquiry_create(
                 self.headers.get("Authorization", ""),
+                body,
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
+        if path == "/api/inquiry/status":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_inquiry_status_update(
+                self.headers,
                 body,
                 load_env_value,
             )

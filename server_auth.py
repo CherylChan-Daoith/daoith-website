@@ -1001,7 +1001,9 @@ def handle_notify_disable(auth_header: str, env_loader):
     }
 
 
-ALLOWED_INQUIRY_STATUS = {"已提交", "已受理", "已报价", "已成交", "已关闭"}
+ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "已报价", "已成交"}
+# WeChat template enum may still use 已受理; map for push only
+_TEMPLATE_STATUS_MAP = {"处理中": "已受理"}
 
 
 def ensure_inquiry_db():
@@ -1155,8 +1157,9 @@ def send_inquiry_template(oa_openid: str, *, inquiry_id: str, status: str, env_l
     template_id = load_env_value("WECHAT_TMPL_INQUIRY", env_loader)
     if not template_id:
         raise RuntimeError("未配置 WECHAT_TMPL_INQUIRY")
-    if status not in ALLOWED_INQUIRY_STATUS:
-        status = "已提交"
+    tmpl_status = _TEMPLATE_STATUS_MAP.get(status, status)
+    if tmpl_status not in {"已提交", "已受理", "已报价", "已成交", "已关闭"}:
+        tmpl_status = "已提交"
     token = get_oa_access_token(env_loader)
     now = datetime.now().strftime("%Y年%m月%d日 %H:%M")
     due = datetime.now().strftime("%Y年%m月%d日")
@@ -1168,7 +1171,7 @@ def send_inquiry_template(oa_openid: str, *, inquiry_id: str, status: str, env_l
             "thing3": {"value": "官网询价"},
             "time4": {"value": now},
             "character_string5": {"value": str(inquiry_id)[:32]},
-            "const12": {"value": status},
+            "const12": {"value": tmpl_status},
             "time29": {"value": due},
         },
     }
@@ -1247,6 +1250,180 @@ def sync_inquiry_to_pm(inquiry: dict, env_loader=None):
     )
     with _NO_PROXY_OPENER.open(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8"))
+
+
+def update_inquiry_status(inquiry_id: str, status: str):
+    ensure_inquiry_db()
+    if status not in ALLOWED_INQUIRY_STATUS:
+        raise ValueError(f"无效状态：{status}")
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE website_inquiries SET status = %s WHERE id = %s RETURNING id, website_openid, status",
+                    (status, inquiry_id),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        if not row:
+            return None
+        return {"id": row[0], "websiteOpenid": row[1], "status": row[2]}
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.execute(
+            "UPDATE website_inquiries SET status = ? WHERE id = ?",
+            (status, inquiry_id),
+        )
+        if cur.rowcount == 0:
+            conn.commit()
+            return None
+        row = conn.execute(
+            "SELECT id, website_openid, status FROM website_inquiries WHERE id = ?",
+            (inquiry_id,),
+        ).fetchone()
+        conn.commit()
+    return {
+        "id": row["id"],
+        "websiteOpenid": row["website_openid"],
+        "status": row["status"],
+    }
+
+
+def list_inquiries_for_openid(website_openid: str, limit: int = 50):
+    ensure_inquiry_db()
+    limit = max(1, min(100, int(limit or 50)))
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, website_openid, company, contact, phone, total, items_json, status, created_at
+                    FROM website_inquiries
+                    WHERE website_openid = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (website_openid, limit),
+                )
+                rows = cur.fetchall()
+        out = []
+        for r in rows:
+            try:
+                items = json.loads(r[6] or "[]")
+            except Exception:
+                items = []
+            created = r[8]
+            out.append(
+                {
+                    "inquiryId": r[0],
+                    "websiteOpenid": r[1],
+                    "company": r[2],
+                    "contact": r[3],
+                    "phone": r[4],
+                    "total": float(r[5] or 0),
+                    "items": items,
+                    "status": r[7] or "已提交",
+                    "createdAt": created.isoformat() if hasattr(created, "isoformat") else str(created),
+                }
+            )
+        return out
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT id, website_openid, company, contact, phone, total, items_json, status, created_at
+            FROM website_inquiries
+            WHERE website_openid = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (website_openid, limit),
+        ).fetchall()
+    out = []
+    for r in rows:
+        try:
+            items = json.loads(r["items_json"] or "[]")
+        except Exception:
+            items = []
+        out.append(
+            {
+                "inquiryId": r["id"],
+                "websiteOpenid": r["website_openid"],
+                "company": r["company"],
+                "contact": r["contact"],
+                "phone": r["phone"],
+                "total": float(r["total"] or 0),
+                "items": items,
+                "status": r["status"] or "已提交",
+                "createdAt": r["created_at"],
+            }
+        )
+    return out
+
+
+def _authorize_website_sync(headers, env_loader):
+    secret = (
+        (headers.get("X-Website-Sync-Secret") if headers else None)
+        or (headers.get("x-website-sync-secret") if headers else None)
+        or (headers.get("X-Order-Sync-Secret") if headers else None)
+        or (headers.get("x-order-sync-secret") if headers else None)
+        or ""
+    ).strip()
+    expected = load_env_value("PM_SYNC_SECRET", env_loader) or load_env_value(
+        "WEBSITE_SYNC_SECRET", env_loader
+    )
+    if not expected or secret != expected:
+        return False
+    return True
+
+
+def handle_inquiry_status_update(headers, body: dict, env_loader):
+    """PM → website status sync (shared secret)."""
+    set_env_loader(env_loader)
+    if not _authorize_website_sync(headers, env_loader):
+        return 401, {"error": "无效的同步密钥"}
+    body = body or {}
+    inquiry_id = (body.get("inquiryId") or body.get("id") or "").strip()
+    status = (body.get("status") or "").strip()
+    if not inquiry_id:
+        return 400, {"error": "缺少 inquiryId"}
+    if status not in ALLOWED_INQUIRY_STATUS:
+        return 400, {"error": f"状态须为：{' / '.join(sorted(ALLOWED_INQUIRY_STATUS))}"}
+
+    updated = update_inquiry_status(inquiry_id, status)
+    if not updated:
+        return 404, {"error": "询价不存在"}
+
+    notify = {"sent": False}
+    openid = updated.get("websiteOpenid")
+    if openid:
+        prefs = get_notify_prefs(openid)
+        if prefs and prefs.get("enabled") and prefs.get("oaOpenid"):
+            try:
+                wx = send_inquiry_template(
+                    prefs["oaOpenid"],
+                    inquiry_id=inquiry_id,
+                    status=status,
+                    env_loader=env_loader,
+                )
+                notify = {"sent": True, "msgid": wx.get("msgid")}
+            except Exception as e:
+                notify = {"sent": False, "error": str(e)}
+
+    return 200, {"ok": True, "inquiryId": inquiry_id, "status": status, "notify": notify}
+
+
+def handle_inquiry_list(auth_header: str, env_loader, limit: int = 50):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    items = list_inquiries_for_openid(resolved["websiteOpenid"], limit=limit)
+    return 200, {"ok": True, "inquiries": items}
 
 
 def handle_inquiry_create(auth_header: str, body: dict, env_loader):
