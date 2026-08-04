@@ -152,12 +152,13 @@
     if (e.key === 'Escape') closeModal();
   });
 
-  document.getElementById('quoteForm')?.addEventListener('submit', (e) => {
+  document.getElementById('quoteForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const company = document.getElementById('quoteCompany')?.value.trim() || '';
     const contact = document.getElementById('quoteContact')?.value.trim() || '';
     const phone = document.getElementById('quotePhone')?.value.trim() || '';
     const err = document.getElementById('quoteFormError');
+    const submitBtn = document.getElementById('quoteSubmitBtn');
 
     if (!company || !contact || !phone) {
       if (err) {
@@ -168,19 +169,70 @@
     }
 
     const items = cartApi.getCart();
-    cartApi.saveQuote({
+    const payload = {
       company,
       contact,
       phone,
       total: cartApi.getTotal(),
       items: items.map((i) => ({ id: i.id, title: i.title, qty: i.qty, priceValue: i.priceValue })),
+    };
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = t('提交中…', 'Submitting…');
+    }
+
+    let serverOk = false;
+    let inquiryId = '';
+    try {
+      const cfg = window.DAOITH_CONFIG || {};
+      const apiBase = (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
+      const headers = { 'Content-Type': 'application/json' };
+      const token = window.DAOITH_AUTH?.getToken?.();
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`${apiBase}/api/inquiry`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      serverOk = true;
+      inquiryId = data.inquiryId || '';
+    } catch (submitErr) {
+      if (err) {
+        err.hidden = false;
+        err.textContent = t(
+          `提交失败：${submitErr.message || '网络错误'}，请稍后重试`,
+          `Submit failed: ${submitErr.message || 'network error'}. Please try again.`
+        );
+      }
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = t('提交询价', 'Submit');
+      }
+      return;
+    }
+
+    cartApi.saveQuote({
+      ...payload,
+      inquiryId,
+      status: '已提交',
     });
 
     cartApi.clearCart();
     closeModal();
     document.getElementById('quoteForm')?.reset();
-    cartApi.showToast(t('已提交，顾问将尽快联系您', 'Submitted — an advisor will contact you soon.'));
+    cartApi.showToast(
+      serverOk
+        ? t('已提交，顾问将尽快联系您', 'Submitted — an advisor will contact you soon.')
+        : t('已保存本地记录', 'Saved locally.')
+    );
     renderCart();
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = t('提交询价', 'Submit');
+    }
   });
 
   renderCart();

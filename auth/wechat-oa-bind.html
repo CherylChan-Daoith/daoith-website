@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex">
   <title>绑定微信通知 — 道一</title>
   <link rel="icon" href="/images/logo.png" type="image/png">
-  <link rel="stylesheet" href="/css/styles.css?v=20260731b">
+  <link rel="stylesheet" href="/css/styles.css?v=20260804a">
   <style>
     .oa-bind-main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; background: #f3f6fb; }
     .oa-bind-card { max-width: 420px; width: 100%; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px 22px; text-align: center; }
@@ -24,7 +24,7 @@
       <a class="btn btn-outline btn-sm" href="/#hub">返回服务管理</a>
     </div>
   </main>
-  <script src="/js/config.js?v=20260731b"></script>
+  <script src="/js/config.js?v=20260804a"></script>
   <script>
 (function () {
   const statusEl = document.getElementById('oaBindStatus');
@@ -50,16 +50,23 @@
       try { sessionStorage.setItem(TICKET_KEY, fromUrl); } catch (e) { /* ignore */ }
       return fromUrl;
     }
+    // OAuth callback: ticket travels in `state` (sessionStorage may be cleared)
+    const state = (params.get('state') || '').trim();
+    if (state && state !== 'oa_bind' && /^[A-Za-z0-9_-]{8,128}$/.test(state)) {
+      try { sessionStorage.setItem(TICKET_KEY, state); } catch (e) { /* ignore */ }
+      return state;
+    }
     try { return sessionStorage.getItem(TICKET_KEY) || ''; } catch (e) { return ''; }
   }
 
-  function buildOAuthUrl() {
+  function buildOAuthUrl(ticket) {
     const params = new URLSearchParams({
       appid: oaAppId,
       redirect_uri: redirectBase,
       response_type: 'code',
       scope: 'snsapi_base',
-      state: 'oa_bind',
+      // Carry ticket in state so bind survives OAuth redirect
+      state: ticket,
     });
     return 'https://open.weixin.qq.com/connect/oauth2/authorize?' + params.toString() + '#wechat_redirect';
   }
@@ -97,7 +104,7 @@
         setStatus('请用手机微信打开本链接（可先关注道一服务号）。电脑浏览器无法完成公众号授权。');
         return;
       }
-      window.location.replace(buildOAuthUrl());
+      window.location.replace(buildOAuthUrl(ticket));
       return;
     }
 

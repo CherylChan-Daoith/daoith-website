@@ -2197,8 +2197,12 @@ function initWechatToggle() {
     try {
       const status = await fetchNotifyStatus();
       setWechatToggleUi(!!status.enabled);
-    } catch {
+    } catch (err) {
       setWechatToggleUi(false);
+      // Surface auth mismatch once (Vercel JWT vs Aliyun) instead of silent fail
+      if (err && /登录|过期|401/.test(String(err.message || ''))) {
+        console.warn('[wechat-notify]', err.message);
+      }
     }
   }
 

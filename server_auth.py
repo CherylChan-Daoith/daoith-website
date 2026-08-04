@@ -799,6 +799,47 @@ def consume_notify_ticket(ticket: str):
     return website_openid
 
 
+def _verify_via_www_me(token: str, env_loader=None):
+    """Accept Vercel-issued JWTs by validating against www /api/auth/wechat/me.
+
+    Login JWT is signed on Vercel; notify APIs run on Aliyun. Secrets may differ,
+    so we trust tokens that www.daoith.com still recognizes.
+    """
+    me_url = (
+        load_env_value("WEBSITE_AUTH_ME_URL", env_loader)
+        or "https://www.daoith.com/api/auth/wechat/me"
+    )
+    req = urllib.request.Request(
+        me_url,
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "User-Agent": "daoith-auth/1.0",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with _NO_PROXY_OPENER.open(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    user = data.get("user") or {}
+    openid = (user.get("openid") or "").strip()
+    if not openid:
+        return None
+    return {
+        "payload": {
+            "sub": str(user.get("id") or openid),
+            "openid": openid,
+            "nickname": user.get("nickname"),
+            "avatarUrl": user.get("avatarUrl"),
+            "via": "www",
+        },
+        "websiteOpenid": openid,
+        "user": user,
+    }
+
+
 def _bearer_payload(auth_header: str, env_loader):
     jwt_secret = load_env_value("JWT_SECRET", env_loader)
     if not jwt_secret:
@@ -809,17 +850,23 @@ def _bearer_payload(auth_header: str, env_loader):
     if not token:
         return None, (401, {"error": "未登录"})
     payload = verify_jwt(token, jwt_secret)
-    if not payload:
-        return None, (401, {"error": "登录已过期，请重新登录"})
-    website_openid = (payload.get("openid") or "").strip()
-    if not website_openid and payload.get("sub"):
-        # Stateless Vercel tokens may use openid as sub
-        sub = str(payload.get("sub"))
-        if not sub.isdigit():
-            website_openid = sub
-    if not website_openid:
-        return None, (401, {"error": "登录信息不完整，请重新微信登录"})
-    return {"payload": payload, "websiteOpenid": website_openid}, None
+    if payload:
+        website_openid = (payload.get("openid") or "").strip()
+        if not website_openid and payload.get("sub"):
+            # Stateless Vercel tokens may use openid as sub
+            sub = str(payload.get("sub"))
+            if not sub.isdigit():
+                website_openid = sub
+        if not website_openid:
+            return None, (401, {"error": "登录信息不完整，请重新微信登录"})
+        return {"payload": payload, "websiteOpenid": website_openid, "token": token}, None
+
+    # Cross-host fallback: Vercel JWT_SECRET may differ from Aliyun
+    adopted = _verify_via_www_me(token, env_loader)
+    if adopted:
+        adopted["token"] = token
+        return adopted, None
+    return None, (401, {"error": "登录已过期，请重新登录"})
 
 
 def handle_notify_status(auth_header: str, env_loader):
@@ -827,6 +874,21 @@ def handle_notify_status(auth_header: str, env_loader):
     resolved, err = _bearer_payload(auth_header, env_loader)
     if err:
         return err
+    # Best-effort: keep PM website user list in sync when notify status is checked
+    try:
+        payload = resolved.get("payload") or {}
+        sync_user_to_pm(
+            {
+                "id": payload.get("sub") or resolved["websiteOpenid"],
+                "openid": resolved["websiteOpenid"],
+                "nickname": payload.get("nickname"),
+                "avatarUrl": payload.get("avatarUrl"),
+            },
+            env_loader,
+            record_login=False,
+        )
+    except Exception:
+        pass
     prefs = get_notify_prefs(resolved["websiteOpenid"])
     return 200, {
         "enabled": bool(prefs and prefs.get("enabled")),
@@ -936,4 +998,357 @@ def handle_notify_disable(auth_header: str, env_loader):
         "enabled": False,
         "bound": bool(prefs.get("oaOpenid")),
         "oaOpenid": prefs.get("oaOpenid"),
+    }
+
+
+ALLOWED_INQUIRY_STATUS = {"已提交", "已受理", "已报价", "已成交", "已关闭"}
+
+
+def ensure_inquiry_db():
+    ensure_db()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS website_inquiries (
+                      id TEXT PRIMARY KEY,
+                      website_openid TEXT,
+                      company TEXT NOT NULL,
+                      contact TEXT NOT NULL,
+                      phone TEXT NOT NULL,
+                      total DOUBLE PRECISION NOT NULL DEFAULT 0,
+                      items_json TEXT NOT NULL DEFAULT '[]',
+                      status TEXT NOT NULL DEFAULT '已提交',
+                      notify_sent BOOLEAN NOT NULL DEFAULT FALSE,
+                      pm_synced BOOLEAN NOT NULL DEFAULT FALSE,
+                      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                    """
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_website_inquiries_openid ON website_inquiries(website_openid)"
+                )
+                cur.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_website_inquiries_created ON website_inquiries(created_at DESC)"
+                )
+            conn.commit()
+        return
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS website_inquiries (
+              id TEXT PRIMARY KEY,
+              website_openid TEXT,
+              company TEXT NOT NULL,
+              contact TEXT NOT NULL,
+              phone TEXT NOT NULL,
+              total REAL NOT NULL DEFAULT 0,
+              items_json TEXT NOT NULL DEFAULT '[]',
+              status TEXT NOT NULL DEFAULT '已提交',
+              notify_sent INTEGER NOT NULL DEFAULT 0,
+              pm_synced INTEGER NOT NULL DEFAULT 0,
+              created_at TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_website_inquiries_openid ON website_inquiries(website_openid)"
+        )
+        conn.commit()
+
+
+def _new_inquiry_id() -> str:
+    return "INQ" + datetime.now().strftime("%y%m%d%H%M%S") + secrets.token_hex(2).upper()
+
+
+def save_inquiry(record: dict):
+    ensure_inquiry_db()
+    database_url = get_database_url()
+    items_json = json.dumps(record.get("items") or [], ensure_ascii=False)
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO website_inquiries
+                      (id, website_openid, company, contact, phone, total, items_json, status, notify_sent, pm_synced, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    """,
+                    (
+                        record["id"],
+                        record.get("websiteOpenid"),
+                        record["company"],
+                        record["contact"],
+                        record["phone"],
+                        float(record.get("total") or 0),
+                        items_json,
+                        record.get("status") or "已提交",
+                        bool(record.get("notifySent")),
+                        bool(record.get("pmSynced")),
+                    ),
+                )
+            conn.commit()
+        return
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO website_inquiries
+              (id, website_openid, company, contact, phone, total, items_json, status, notify_sent, pm_synced, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record["id"],
+                record.get("websiteOpenid"),
+                record["company"],
+                record["contact"],
+                record["phone"],
+                float(record.get("total") or 0),
+                items_json,
+                record.get("status") or "已提交",
+                1 if record.get("notifySent") else 0,
+                1 if record.get("pmSynced") else 0,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+
+
+def update_inquiry_flags(inquiry_id: str, *, notify_sent=None, pm_synced=None):
+    ensure_inquiry_db()
+    database_url = get_database_url()
+    fields = []
+    vals = []
+    if notify_sent is not None:
+        fields.append("notify_sent")
+        vals.append(bool(notify_sent) if database_url else (1 if notify_sent else 0))
+    if pm_synced is not None:
+        fields.append("pm_synced")
+        vals.append(bool(pm_synced) if database_url else (1 if pm_synced else 0))
+    if not fields:
+        return
+    if database_url:
+        assignments = ", ".join(f"{f} = %s" for f in fields)
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE website_inquiries SET {assignments} WHERE id = %s",
+                    (*vals, inquiry_id),
+                )
+            conn.commit()
+        return
+    assignments = ", ".join(f"{f} = ?" for f in fields)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            f"UPDATE website_inquiries SET {assignments} WHERE id = ?",
+            (*vals, inquiry_id),
+        )
+        conn.commit()
+
+
+def send_inquiry_template(oa_openid: str, *, inquiry_id: str, status: str, env_loader=None):
+    set_env_loader(env_loader)
+    template_id = load_env_value("WECHAT_TMPL_INQUIRY", env_loader)
+    if not template_id:
+        raise RuntimeError("未配置 WECHAT_TMPL_INQUIRY")
+    if status not in ALLOWED_INQUIRY_STATUS:
+        status = "已提交"
+    token = get_oa_access_token(env_loader)
+    now = datetime.now().strftime("%Y年%m月%d日 %H:%M")
+    due = datetime.now().strftime("%Y年%m月%d日")
+    body = {
+        "touser": oa_openid,
+        "template_id": template_id,
+        "url": "https://www.daoith.com/#hub",
+        "data": {
+            "thing3": {"value": "官网询价"},
+            "time4": {"value": now},
+            "character_string5": {"value": str(inquiry_id)[:32]},
+            "const12": {"value": status},
+            "time29": {"value": due},
+        },
+    }
+    return _post_json(
+        f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={token}",
+        body,
+        timeout=15,
+    )
+
+
+def _pm_headers(env_loader=None):
+    secret = load_env_value("PM_SYNC_SECRET", env_loader) or load_env_value(
+        "WEBSITE_SYNC_SECRET", env_loader
+    )
+    if not secret:
+        return None
+    return {
+        "Content-Type": "application/json; charset=utf-8",
+        "User-Agent": "daoith-website/1.0",
+        "x-website-sync-secret": secret,
+        "x-order-sync-secret": secret,
+    }
+
+
+def sync_user_to_pm(user: dict, env_loader=None, *, record_login=False):
+    """Best-effort push of website WeChat user to pm.daoith.com."""
+    set_env_loader(env_loader)
+    base = (load_env_value("PM_SYNC_URL", env_loader) or "https://pm.daoith.com").rstrip("/")
+    headers = _pm_headers(env_loader)
+    if not headers:
+        return {"ok": False, "skipped": True, "reason": "missing PM_SYNC_SECRET"}
+    openid = (user.get("openid") or "").strip()
+    if not openid:
+        return {"ok": False, "skipped": True, "reason": "missing openid"}
+    now = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "recordLogin": bool(record_login),
+        "users": [
+            {
+                "externalId": str(user.get("id") or openid),
+                "openid": openid,
+                "unionid": user.get("unionid"),
+                "nickname": user.get("nickname"),
+                "avatarUrl": user.get("avatarUrl") or user.get("avatar_url"),
+                "country": user.get("country"),
+                "province": user.get("province"),
+                "city": user.get("city"),
+                "registeredAt": user.get("registeredAt") or now,
+                "lastSeenAt": now,
+            }
+        ],
+    }
+    url = f"{base}/api/website/users/sync"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    with _NO_PROXY_OPENER.open(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def sync_inquiry_to_pm(inquiry: dict, env_loader=None):
+    set_env_loader(env_loader)
+    base = (load_env_value("PM_SYNC_URL", env_loader) or "https://pm.daoith.com").rstrip("/")
+    headers = _pm_headers(env_loader)
+    if not headers:
+        return {"ok": False, "skipped": True, "reason": "missing PM_SYNC_SECRET"}
+    url = f"{base}/api/website/inquiries/sync"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(inquiry, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    with _NO_PROXY_OPENER.open(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def handle_inquiry_create(auth_header: str, body: dict, env_loader):
+    """Persist quote request, sync to PM, optionally send OA template."""
+    set_env_loader(env_loader)
+    body = body or {}
+    company = (body.get("company") or "").strip()
+    contact = (body.get("contact") or "").strip()
+    phone = (body.get("phone") or "").strip()
+    items = body.get("items") if isinstance(body.get("items"), list) else []
+    try:
+        total = float(body.get("total") or 0)
+    except (TypeError, ValueError):
+        total = 0.0
+
+    if not company or not contact or not phone:
+        return 400, {"error": "请填写公司名字、联系人和联系电话"}
+    if not items:
+        return 400, {"error": "询价单为空，请先选择服务"}
+
+    website_openid = None
+    nickname = None
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if not err and resolved:
+        website_openid = resolved["websiteOpenid"]
+        nickname = (resolved.get("payload") or {}).get("nickname")
+        # Keep PM website-user analytics fresh when logged-in users inquire
+        try:
+            sync_user_to_pm(
+                {
+                    "id": (resolved.get("payload") or {}).get("sub") or website_openid,
+                    "openid": website_openid,
+                    "nickname": nickname,
+                    "avatarUrl": (resolved.get("payload") or {}).get("avatarUrl"),
+                },
+                env_loader,
+                record_login=False,
+            )
+        except Exception:
+            pass
+
+    inquiry_id = _new_inquiry_id()
+    status = "已提交"
+    record = {
+        "id": inquiry_id,
+        "websiteOpenid": website_openid,
+        "company": company,
+        "contact": contact,
+        "phone": phone,
+        "total": total,
+        "items": items,
+        "status": status,
+        "notifySent": False,
+        "pmSynced": False,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "nickname": nickname,
+    }
+    save_inquiry(record)
+
+    notify = {"sent": False}
+    if website_openid:
+        prefs = get_notify_prefs(website_openid)
+        if prefs and prefs.get("enabled") and prefs.get("oaOpenid"):
+            try:
+                wx = send_inquiry_template(
+                    prefs["oaOpenid"],
+                    inquiry_id=inquiry_id,
+                    status=status,
+                    env_loader=env_loader,
+                )
+                notify = {"sent": True, "msgid": wx.get("msgid")}
+                update_inquiry_flags(inquiry_id, notify_sent=True)
+            except Exception as e:
+                notify = {"sent": False, "error": str(e)}
+
+    pm = {"ok": False}
+    try:
+        pm = sync_inquiry_to_pm(
+            {
+                "inquiryId": inquiry_id,
+                "company": company,
+                "contact": contact,
+                "phone": phone,
+                "total": total,
+                "items": items,
+                "status": status,
+                "websiteOpenid": website_openid,
+                "nickname": nickname,
+                "createdAt": record["createdAt"],
+            },
+            env_loader,
+        )
+        if pm.get("ok") or pm.get("inquiry"):
+            update_inquiry_flags(inquiry_id, pm_synced=True)
+            pm["ok"] = True
+    except Exception as e:
+        pm = {"ok": False, "error": str(e)}
+
+    return 200, {
+        "ok": True,
+        "inquiryId": inquiry_id,
+        "status": status,
+        "notify": notify,
+        "pm": pm,
     }
