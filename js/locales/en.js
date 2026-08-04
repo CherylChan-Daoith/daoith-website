@@ -282,10 +282,20 @@ window.DAOITH_I18N_EN = {
     '.wechat-notify h4': { text: 'WeChat notifications' },
     '.wechat-notify p': { text: 'Service updates pushed to your WeChat when enabled.' },
     '#wechatBindTitle': { text: 'Bind WeChat notifications' },
-    '#wechatBindLead': { text: 'Scan with WeChat to authorize the Official Account and receive inquiry & service updates.' },
-    '.wechat-bind-steps li:nth-child(1)': { text: 'Follow the DAOITH Official Account' },
-    '.wechat-bind-steps li:nth-child(2)': { text: 'Scan the QR code (or open the link in WeChat)' },
-    '.wechat-bind-steps li:nth-child(3)': { text: 'Return here after authorizing — the switch will turn on' },
+    '#wechatBindLead': {
+      text: 'Follow the Official Account first, then scan the bind QR to receive inquiry & service updates.',
+    },
+    '.wechat-bind-steps li:nth-child(1)': {
+      text: 'Scan the left QR to follow 「道一跨境咨询DAOITH」',
+    },
+    '.wechat-bind-steps li:nth-child(2)': {
+      text: 'Scan the right QR to authorize (or open the link in WeChat)',
+    },
+    '.wechat-bind-steps li:nth-child(3)': {
+      text: 'Return here after authorizing — the switch will turn on',
+    },
+    '#wechatFollowQrLabel': { text: '① Follow OA' },
+    '#wechatBindQrLabel': { text: '② Authorize' },
     '#wechatBindCopy': { text: 'Copy link' },
     '#wechatBindDone': { text: 'Done' },
     '#wechatBindHint': { text: 'Waiting for WeChat bind…' },

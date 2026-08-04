@@ -2529,7 +2529,7 @@ body.modal-open {
 }
 
 .wechat-bind-dialog {
-  width: min(460px, 100%);
+  width: min(520px, 100%);
 }
 
 .wechat-bind-steps {
@@ -2538,6 +2538,44 @@ body.modal-open {
   font-size: 0.88rem;
   color: var(--text);
   line-height: 1.65;
+}
+
+.wechat-bind-qr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+
+.wechat-bind-qr-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.wechat-bind-qr-card img {
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.wechat-bind-qr-card span {
+  font-size: 0.8rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (max-width: 520px) {
+  .wechat-bind-qr-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .wechat-bind-qr-wrap {

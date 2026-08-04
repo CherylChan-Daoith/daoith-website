@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260803k">
+  <link rel="stylesheet" href="/css/styles.css?v=20260804b">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -858,14 +858,21 @@
     <div class="quote-modal-dialog wechat-bind-dialog" role="dialog" aria-modal="true" aria-labelledby="wechatBindTitle">
       <button type="button" class="quote-modal-close" data-close-wechat-bind aria-label="关闭">&times;</button>
       <h2 id="wechatBindTitle">绑定微信通知</h2>
-      <p class="quote-modal-lead" id="wechatBindLead">请用手机微信扫码，完成服务号授权后即可接收询价与服务进展推送。</p>
+      <p class="quote-modal-lead" id="wechatBindLead">先关注服务号，再用微信扫「授权绑定」码，即可接收询价与服务进展推送。</p>
       <ol class="wechat-bind-steps">
-        <li>关注道一跨境咨询服务号</li>
-        <li>用微信扫描下方二维码（或复制链接在微信中打开）</li>
+        <li>扫左侧二维码关注「道一跨境咨询DAOITH」服务号</li>
+        <li>扫右侧二维码完成授权绑定（或复制链接在微信中打开）</li>
         <li>授权完成后返回本页，开关将自动开启</li>
       </ol>
-      <div class="wechat-bind-qr-wrap">
-        <img id="wechatBindQr" alt="微信绑定二维码" width="180" height="180">
+      <div class="wechat-bind-qr-grid">
+        <div class="wechat-bind-qr-card">
+          <img src="/images/wechat-oa-qr.png" alt="关注道一服务号" width="160" height="160">
+          <span id="wechatFollowQrLabel">① 关注服务号</span>
+        </div>
+        <div class="wechat-bind-qr-card">
+          <img id="wechatBindQr" alt="授权绑定二维码" width="160" height="160">
+          <span id="wechatBindQrLabel">② 授权绑定</span>
+        </div>
       </div>
       <p class="wechat-bind-link" id="wechatBindUrlText"></p>
       <div class="quote-form-actions wechat-bind-actions">
@@ -876,7 +883,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260803i"></script>
+  <script src="/js/locales/en.js?v=20260804b"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260803e"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -887,6 +894,6 @@
   <script src="/js/cart.js?v=20260729a"></script>
   <script src="/js/auth.js?v=20260728b"></script>
   <script src="/js/hs-rates.js?v=20260728i"></script>
-  <script src="/js/main.js?v=20260804a"></script>
+  <script src="/js/main.js?v=20260804b"></script>
 </body>
 </html>
