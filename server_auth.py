@@ -1447,23 +1447,24 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
     website_openid = None
     nickname = None
     resolved, err = _bearer_payload(auth_header, env_loader)
-    if not err and resolved:
-        website_openid = resolved["websiteOpenid"]
-        nickname = (resolved.get("payload") or {}).get("nickname")
-        # Keep PM website-user analytics fresh when logged-in users inquire
-        try:
-            sync_user_to_pm(
-                {
-                    "id": (resolved.get("payload") or {}).get("sub") or website_openid,
-                    "openid": website_openid,
-                    "nickname": nickname,
-                    "avatarUrl": (resolved.get("payload") or {}).get("avatarUrl"),
-                },
-                env_loader,
-                record_login=False,
-            )
-        except Exception:
-            pass
+    if err:
+        return err
+    website_openid = resolved["websiteOpenid"]
+    nickname = (resolved.get("payload") or {}).get("nickname")
+    # Keep PM website-user analytics fresh when logged-in users inquire
+    try:
+        sync_user_to_pm(
+            {
+                "id": (resolved.get("payload") or {}).get("sub") or website_openid,
+                "openid": website_openid,
+                "nickname": nickname,
+                "avatarUrl": (resolved.get("payload") or {}).get("avatarUrl"),
+            },
+            env_loader,
+            record_login=False,
+        )
+    except Exception:
+        pass
 
     inquiry_id = _new_inquiry_id()
     status = "已提交"

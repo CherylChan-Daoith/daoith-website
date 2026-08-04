@@ -1,7 +1,20 @@
 /* DAOITH shopping cart (localStorage) */
 (function () {
   const CART_KEY = 'daoith_cart';
-  const QUOTE_KEY = 'daoith_quotes';
+  const QUOTE_KEY_LEGACY = 'daoith_quotes';
+
+  function currentOpenid() {
+    try {
+      return String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  function quoteStorageKey(openid) {
+    const oid = openid != null ? String(openid).trim() : currentOpenid();
+    return oid ? `daoith_quotes:${oid}` : 'daoith_quotes:anon';
+  }
 
   function readCart() {
     try {
@@ -49,8 +62,8 @@
       items.push({
         id: service.id,
         title: service.title,
-        priceLabel: service.priceLabel,
         priceValue: service.priceValue,
+        priceLabel: service.price,
         unit: service.unit,
         qty: addQty,
       });
@@ -80,20 +93,32 @@
     writeCart([]);
   }
 
-  function saveQuote(payload) {
-    let list = [];
+  function getQuotes(openid) {
     try {
-      const raw = localStorage.getItem(QUOTE_KEY);
-      list = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(list)) list = [];
+      const raw = localStorage.getItem(quoteStorageKey(openid));
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
     } catch {
-      list = [];
+      return [];
     }
+  }
+
+  function setQuotes(list, openid) {
+    const key = quoteStorageKey(openid);
+    localStorage.setItem(key, JSON.stringify((list || []).slice(0, 50)));
+    // Drop legacy shared key so accounts never leak across logins on this browser
+    try { localStorage.removeItem(QUOTE_KEY_LEGACY); } catch { /* ignore */ }
+  }
+
+  function saveQuote(payload) {
+    const openid = currentOpenid();
+    const list = getQuotes(openid);
     list.unshift({
       ...payload,
-      createdAt: new Date().toISOString(),
+      openid: openid || null,
+      createdAt: payload?.createdAt || new Date().toISOString(),
     });
-    localStorage.setItem(QUOTE_KEY, JSON.stringify(list.slice(0, 50)));
+    setQuotes(list, openid);
   }
 
   function updateCartBadge() {
@@ -149,6 +174,9 @@
     removeItem,
     updateQty,
     clearCart,
+    getQuotes,
+    setQuotes,
+    quoteStorageKey,
     saveQuote,
     updateCartBadge,
     showToast,
@@ -159,6 +187,4 @@
     updateCartBadge();
     bindAddButtons();
   });
-
-  window.addEventListener('daoith:cartchange', updateCartBadge);
 })();

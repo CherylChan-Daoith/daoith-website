@@ -141,6 +141,9 @@
 
   document.getElementById('openQuoteBtn')?.addEventListener('click', () => {
     if (!cartApi.getCart().length) return;
+    if (window.DAOITH_AUTH?.requireLogin && !window.DAOITH_AUTH.requireLogin('quote_submit', '/cart.html')) {
+      return;
+    }
     openModal();
   });
 
@@ -189,7 +192,10 @@
       const apiBase = (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
       const headers = { 'Content-Type': 'application/json' };
       const token = window.DAOITH_AUTH?.getToken?.();
-      if (token) headers.Authorization = `Bearer ${token}`;
+      if (!token) {
+        throw new Error(t('请先微信登录后再提交询价', 'Please sign in with WeChat before submitting.'));
+      }
+      headers.Authorization = `Bearer ${token}`;
       const res = await fetch(`${apiBase}/api/inquiry`, {
         method: 'POST',
         headers,

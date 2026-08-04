@@ -1976,55 +1976,44 @@ function initHubTabs() {
   });
 }
 
-function getQuotes() {
+function getQuotes(openid) {
+  if (window.DAOITH_CART?.getQuotes) return window.DAOITH_CART.getQuotes(openid);
   try {
-    const raw = localStorage.getItem('daoith_quotes');
+    const oid = openid != null
+      ? String(openid).trim()
+      : String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
+    const key = oid ? `daoith_quotes:${oid}` : 'daoith_quotes:anon';
+    const raw = localStorage.getItem(key);
     const list = raw ? JSON.parse(raw) : [];
     return Array.isArray(list) ? list : [];
   } catch { return []; }
 }
 
 function setQuotesCache(list) {
+  if (window.DAOITH_CART?.setQuotes) {
+    window.DAOITH_CART.setQuotes(list);
+    return;
+  }
   try {
-    localStorage.setItem('daoith_quotes', JSON.stringify((list || []).slice(0, 50)));
+    const openid = String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
+    const key = openid ? `daoith_quotes:${openid}` : 'daoith_quotes:anon';
+    localStorage.setItem(key, JSON.stringify((list || []).slice(0, 50)));
+    localStorage.removeItem('daoith_quotes');
   } catch { /* ignore */ }
 }
 
-function mergeQuoteStatus(localList, remoteList) {
-  const byId = new Map();
-  (remoteList || []).forEach((q) => {
-    if (q?.inquiryId) byId.set(q.inquiryId, q);
-  });
-  const merged = (localList || []).map((q) => {
-    const remote = q.inquiryId ? byId.get(q.inquiryId) : null;
-    if (!remote) return q;
-    byId.delete(q.inquiryId);
-    return {
-      ...q,
-      status: remote.status || q.status || '已提交',
-      company: q.company || remote.company,
-      contact: q.contact || remote.contact,
-      phone: q.phone || remote.phone,
-      total: q.total ?? remote.total,
-      items: (q.items && q.items.length) ? q.items : (remote.items || []),
-      createdAt: q.createdAt || remote.createdAt,
-    };
-  });
-  // Remote-only records (e.g. submitted on another device while logged in)
-  byId.forEach((q) => {
-    merged.push({
-      inquiryId: q.inquiryId,
-      company: q.company,
-      contact: q.contact,
-      phone: q.phone,
-      total: q.total,
-      items: q.items || [],
-      status: q.status || '已提交',
-      createdAt: q.createdAt,
-    });
-  });
-  merged.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
-  return merged;
+function normalizeRemoteQuote(q) {
+  return {
+    inquiryId: q.inquiryId,
+    company: q.company,
+    contact: q.contact,
+    phone: q.phone,
+    total: q.total,
+    items: q.items || [],
+    status: q.status || '已提交',
+    createdAt: q.createdAt,
+    openid: q.websiteOpenid || null,
+  };
 }
 
 async function fetchRemoteQuotes() {
@@ -2036,19 +2025,29 @@ async function fetchRemoteQuotes() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return null;
-    return Array.isArray(data.inquiries) ? data.inquiries : [];
+    return Array.isArray(data.inquiries) ? data.inquiries.map(normalizeRemoteQuote) : [];
   } catch {
     return null;
   }
 }
 
 async function loadQuotesForHub() {
-  const local = getQuotes();
+  const openid = String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
+  // Always drop the legacy shared key that mixed accounts on one browser
+  try { localStorage.removeItem('daoith_quotes'); } catch { /* ignore */ }
+
+  if (!openid) {
+    // Hub quote history is account-scoped; guests see empty
+    return [];
+  }
+
   const remote = await fetchRemoteQuotes();
-  if (!remote) return local;
-  const merged = mergeQuoteStatus(local, remote);
-  setQuotesCache(merged);
-  return merged;
+  if (remote) {
+    // Server list for this openid is the source of truth — never merge other accounts' local cache
+    setQuotesCache(remote);
+    return remote;
+  }
+  return getQuotes(openid);
 }
 
 function formatDate(iso) {
