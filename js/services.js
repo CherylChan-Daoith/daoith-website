@@ -224,7 +224,7 @@
           type: 'table',
           variant: 'compare',
           firstColHeader: true,
-          headers: ['服务项目', '合规代账全托管', '传统代账', '合规代账全托管 — 服务核心价值'],
+          headers: ['服务项目', '合规代账全托管', '传统代账', '服务亮点'],
           rows: [
             [
               '服务团队配置',

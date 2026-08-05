@@ -635,7 +635,7 @@ window.DAOITH_I18N_EN = {
           type: 'table',
           variant: 'compare',
           firstColHeader: true,
-          headers: ['Item', 'Fully managed compliance bookkeeping', 'Traditional bookkeeping', 'Core value'],
+          headers: ['Item', 'Fully managed compliance bookkeeping', 'Traditional bookkeeping', 'Highlights'],
           rows: [
             [
               'Service team',
