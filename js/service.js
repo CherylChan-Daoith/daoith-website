@@ -50,6 +50,11 @@
     const rows = Array.isArray(block.rows) ? block.rows : [];
     const variant = block.variant ? ` service-detail-table--${escapeHtml(block.variant)}` : '';
     const caption = block.caption ? `<caption>${escapeHtml(block.caption)}</caption>` : '';
+    let colgroup = '';
+    if (block.variant === 'compare' && headers.length >= 4) {
+      colgroup =
+        '<colgroup><col class="compare-col-item"><col class="compare-col-managed"><col class="compare-col-traditional"><col class="compare-col-value"></colgroup>';
+    }
     const thead = headers.length
       ? `<thead><tr>${headers.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join('')}</tr></thead>`
       : '';
@@ -68,7 +73,7 @@
       .join('')}</tbody>`;
     return `<div class="service-table-wrap${
       block.variant ? ` service-table-wrap--${escapeHtml(block.variant)}` : ''
-    }"><table class="service-detail-table${variant}">${caption}${thead}${tbody}</table></div>`;
+    }"><table class="service-detail-table${variant}">${caption}${colgroup}${thead}${tbody}</table></div>`;
   }
 
   function renderTimeline(block) {
