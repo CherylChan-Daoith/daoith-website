@@ -20,8 +20,8 @@
   window.DAOITH_SERVICE_CATEGORIES = [
     { id: 'all', label: '全部' },
     { id: 'consult', label: '财税咨询' },
-    { id: 'mainland', label: '中国内地财税合规' },
-    { id: 'hongkong', label: '中国香港财税合规' },
+    { id: 'mainland', label: '中国内地' },
+    { id: 'hongkong', label: '中国香港' },
     { id: 'asia', label: '亚洲' },
     { id: 'europe', label: '欧洲' },
     { id: 'namerica', label: '北美洲' },
