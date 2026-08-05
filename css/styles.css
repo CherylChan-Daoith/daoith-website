@@ -2522,13 +2522,19 @@ ul {
 .service-detail-table--compare tbody td.col-3 {
   width: 22%;
   max-width: 12rem;
-  color: #666;
+  color: #333;
   padding: 6px 8px;
 }
 
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li {
   font-size: 0.66rem;
   line-height: 1.35;
+}
+
+.service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-ok span:last-child,
+.service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-no span:last-child,
+.service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-plain {
+  color: #333;
 }
 
 .service-detail-table--compare tbody td.col-4 {
