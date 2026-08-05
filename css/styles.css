@@ -2544,7 +2544,7 @@ ul {
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-no span:last-child,
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-plain {
   color: #051c2c !important;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .service-detail-table--compare tbody td.col-4 {
