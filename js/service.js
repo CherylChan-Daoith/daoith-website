@@ -24,6 +24,27 @@
     return list.find((s) => s.id === id) || null;
   }
 
+  function formatCell(cell) {
+    if (cell == null) return '';
+    if (Array.isArray(cell)) {
+      return `<ul class="svc-cell-list">${cell
+        .map((item) => {
+          if (typeof item === 'string') {
+            return `<li class="is-plain"><span>${escapeHtml(item)}</span></li>`;
+          }
+          const mark = item?.mark;
+          const cls = mark === 'ok' ? 'is-ok' : mark === 'no' ? 'is-no' : 'is-plain';
+          const icon = mark === 'ok' ? '✓' : mark === 'no' ? '✗' : '';
+          const text = escapeHtml(item?.text ?? '');
+          return `<li class="${cls}">${
+            icon ? `<span class="svc-mark" aria-hidden="true">${icon}</span>` : ''
+          }<span>${text}</span></li>`;
+        })
+        .join('')}</ul>`;
+    }
+    return escapeHtml(String(cell)).replace(/\n/g, '<br>');
+  }
+
   function renderTable(block) {
     const headers = Array.isArray(block.headers) ? block.headers : [];
     const rows = Array.isArray(block.rows) ? block.rows : [];
@@ -40,12 +61,14 @@
               const tag = i === 0 && block.firstColHeader ? 'th' : 'td';
               const scope = tag === 'th' ? ' scope="row"' : '';
               const colClass = i > 0 ? ` class="col-${i + 1}"` : '';
-              return `<${tag}${scope}${colClass}>${escapeHtml(cell ?? '')}</${tag}>`;
+              return `<${tag}${scope}${colClass}>${formatCell(cell)}</${tag}>`;
             })
             .join('')}</tr>`
       )
       .join('')}</tbody>`;
-    return `<div class="service-table-wrap${variant ? ` service-table-wrap--${escapeHtml(block.variant)}` : ''}"><table class="service-detail-table${variant}">${caption}${thead}${tbody}</table></div>`;
+    return `<div class="service-table-wrap${
+      block.variant ? ` service-table-wrap--${escapeHtml(block.variant)}` : ''
+    }"><table class="service-detail-table${variant}">${caption}${thead}${tbody}</table></div>`;
   }
 
   function renderTimeline(block) {

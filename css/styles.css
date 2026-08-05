@@ -2445,7 +2445,7 @@ ul {
 }
 
 .service-detail-table--compare {
-  min-width: 760px;
+  min-width: 860px;
 }
 
 .service-detail-table--compare thead th:nth-child(2) {
@@ -2454,16 +2454,67 @@ ul {
 
 .service-detail-table--compare tbody td.col-2 {
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 400;
   background: rgba(5, 28, 44, 0.03);
 }
 
 .service-detail-table--compare tbody td.col-3 {
-  color: #777;
+  color: #666;
 }
 
 .service-detail-table--compare tbody td.col-4 {
+  color: #444;
+}
+
+.svc-cell-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.svc-cell-list li {
+  display: grid;
+  grid-template-columns: 0.85rem 1fr;
+  gap: 4px;
+  align-items: start;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.svc-cell-list li.is-plain {
+  grid-template-columns: 1fr;
   color: #555;
+  margin-bottom: 2px;
+}
+
+.svc-cell-list .svc-mark {
+  font-size: 0.68rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.svc-cell-list li.is-ok .svc-mark {
+  color: #1a7f4b;
+}
+
+.svc-cell-list li.is-no .svc-mark {
+  color: #b42318;
+}
+
+.svc-cell-list li.is-ok span:last-child {
+  color: #333;
+}
+
+.svc-cell-list li.is-no span:last-child {
+  color: #666;
+}
+
+.service-detail-table--compare tbody td.col-4 .svc-cell-list li.is-plain {
+  color: #444;
+  font-size: 0.7rem;
 }
 
 .service-detail-table--pricing {
