@@ -92,9 +92,8 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
   const steps = (Array.isArray(process) ? process : []).map((title, i, arr) => {
     let time = 'As scheduled';
     if (i === 0) time = 'Within 1–5 business days after kickoff';
-    else if (i === arr.length - 1) {
-      time = typeof timeline === 'string' ? timeline.replace(/\.\s*$/, '') : 'Final delivery';
-    } else time = 'In progress';
+    else if (i === arr.length - 1) time = 'Final delivery';
+    else time = 'In progress';
     return { title, time };
   });
 
@@ -105,7 +104,7 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
   if (scope.length) {
     out.push({
       type: 'table',
-      variant: 'deliver',
+      variant: 'scope',
       headers: ['Scope'],
       rows: scope.map((b) => [[{ mark: 'ok', text: b }]]),
     });
@@ -114,7 +113,11 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
   if (pricing) out.push({ type: 'p', text: pricing });
   out.push({ type: 'h2', text: 'Process' });
   if (steps.length) out.push({ type: 'timeline', steps });
+  if (typeof timeline === 'string' && timeline) {
+    out.push({ type: 'p', text: `Overall timing: ${timeline}` });
+  }
   if (steps.length) {
+    const note = typeof timeline === 'string' ? timeline.replace(/\.\s*$/, '') : '';
     out.push({
       type: 'table',
       variant: 'deliver',
@@ -126,7 +129,9 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
         i === 0
           ? 'Scope confirmation / document checklist'
           : i === steps.length - 1
-            ? 'Closing pack / final deliverables'
+            ? note
+              ? `Closing pack / final deliverables (${note})`
+              : 'Closing pack / final deliverables'
             : 'Milestone confirmation and working papers',
       ]),
     });

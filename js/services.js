@@ -27,25 +27,27 @@
       }));
     }
     const list = Array.isArray(process) ? process : [];
-    const note = typeof timeline === 'string' ? timeline.replace(/。\s*$/, '') : '';
     return list.map((title, i) => {
       let time = '按约定推进';
       if (i === 0) time = '启动后 1–5 个工作日';
-      else if (i === list.length - 1) time = note || '收尾交付';
+      else if (i === list.length - 1) time = '收尾交付';
       else time = '推进中';
       return { title, time };
     });
   }
 
-  function resolveDeliver(deliver, steps) {
+  function resolveDeliver(deliver, steps, timeline) {
     if (Array.isArray(deliver) && deliver.length) return deliver;
+    const note = typeof timeline === 'string' ? timeline.replace(/。\s*$/, '') : '';
     return (steps || []).map((s, i) => [
       `${i + 1}. ${s.title}`,
       s.time,
       i === 0
         ? '需求确认／资料清单'
         : i === steps.length - 1
-          ? '办结材料／成果交付'
+          ? note
+            ? `办结材料／成果交付（${note}）`
+            : '办结材料／成果交付'
           : '阶段确认与过程文档',
     ]);
   }
@@ -67,7 +69,7 @@
   }) {
     const out = [];
     const resolvedSteps = resolveSteps(steps, process, timeline);
-    const resolvedDeliver = resolveDeliver(deliver, resolvedSteps);
+    const resolvedDeliver = resolveDeliver(deliver, resolvedSteps, timeline);
 
     out.push({ type: 'h2', text: '服务内容' });
     if (content) out.push({ type: 'p', text: content });
@@ -77,7 +79,7 @@
     if (scopeItems.length) {
       out.push({
         type: 'table',
-        variant: 'deliver',
+        variant: 'scope',
         headers: ['服务范围'],
         rows: scopeItems.map((b) => [[{ mark: 'ok', text: b }]]),
       });
@@ -98,6 +100,9 @@
     out.push({ type: 'h2', text: '服务流程' });
     if (resolvedSteps.length) {
       out.push({ type: 'timeline', steps: resolvedSteps });
+    }
+    if (typeof timeline === 'string' && timeline && !steps?.length) {
+      out.push({ type: 'p', text: `整体时效：${timeline}` });
     }
     if (resolvedDeliver.length) {
       out.push({

@@ -2609,9 +2609,9 @@ ul {
 }
 
 .service-detail-table--pricing {
-  min-width: 420px;
-  max-width: none;
-  width: 100%;
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
 }
 
 .service-detail-table--pricing tbody td.col-2,
@@ -2622,33 +2622,63 @@ ul {
   white-space: nowrap;
 }
 
-.service-detail-table--deliver {
-  min-width: 680px;
+.service-table-wrap--scope,
+.service-table-wrap--deliver,
+.service-table-wrap--pricing {
+  width: max-content;
+  max-width: 100%;
 }
 
+.service-detail-table--scope {
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+.service-detail-table--scope .svc-cell-list li {
+  font-size: 0.72rem;
+}
+
+.service-detail-table--deliver {
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+.service-detail-table--deliver thead th:nth-child(1),
 .service-detail-table--deliver tbody th {
   white-space: normal;
-  min-width: 9rem;
+  min-width: 0;
+  max-width: 16rem;
 }
 
+.service-detail-table--deliver thead th:nth-child(2),
 .service-detail-table--deliver tbody td.col-2 {
-  color: #666;
+  color: #555;
   white-space: nowrap;
   font-size: 0.7rem;
+  width: 1%;
 }
 
+.service-detail-table--deliver thead th:nth-child(3),
 .service-detail-table--deliver tbody td.col-3 {
-  color: #555;
+  color: #444;
+  white-space: normal;
+  max-width: 22rem;
 }
 
 .service-timeline {
   list-style: none;
-  margin: 0 0 16px;
+  margin: 0 0 14px;
   padding: 4px 0 2px;
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  gap: 0 8px;
+  grid-template-columns: repeat(var(--timeline-count, 4), minmax(0, 1fr));
+  gap: 12px 14px;
   position: relative;
+  width: 100%;
+  max-width: min(100%, calc(var(--timeline-count, 4) * 12rem));
 }
 
 .service-timeline::before {
@@ -2704,7 +2734,7 @@ ul {
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--ink);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .service-timeline-time {
@@ -2712,7 +2742,7 @@ ul {
   font-size: 0.66rem;
   color: #888;
   font-weight: 400;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .service-timeline-desc {
@@ -2721,21 +2751,21 @@ ul {
 
 @media (max-width: 1100px) {
   .service-timeline {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 12px;
   }
 
   .service-timeline::before {
     display: none;
   }
 
-  .service-timeline-step:not(:nth-child(4n)):after {
+  .service-timeline-step:not(:nth-child(2n)):after {
     content: '';
     display: block;
     position: absolute;
     top: 10px;
     left: 26px;
-    right: -10px;
+    right: -12px;
     height: 1px;
     background: #d0d0d0;
     z-index: 0;
@@ -2770,6 +2800,7 @@ ul {
     background: #d0d0d0;
   }
 
+  .service-timeline-step:not(:nth-child(2n)):after,
   .service-timeline-step:not(:nth-child(4n)):after {
     display: none;
   }
@@ -2778,6 +2809,18 @@ ul {
     flex: 1;
     min-width: 0;
     padding-top: 1px;
+  }
+
+  .service-table-wrap--scope,
+  .service-table-wrap--deliver,
+  .service-table-wrap--pricing {
+    width: 100%;
+  }
+
+  .service-detail-table--scope,
+  .service-detail-table--deliver,
+  .service-detail-table--pricing {
+    width: 100%;
   }
 
   .service-detail-table th,
