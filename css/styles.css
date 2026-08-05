@@ -2292,38 +2292,30 @@ ul {
   margin-bottom: 28px;
 }
 
-.service-page .article-view-h2,
-.service-page .service-detail-heading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.service-page .article-view-h2.service-detail-heading {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-sans);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: var(--ink);
+  color: #051c2c;
   margin: 26px 0 12px;
   padding: 8px 12px;
   border: 0;
-  border-bottom: 0;
-  background: #eef1f5;
-  box-shadow: inset 3px 0 0 var(--ink);
+  border-left: 3px solid #051c2c;
+  border-radius: 0;
+  background: #eef1f5 !important;
+  box-shadow: none !important;
 }
 
-.service-page .service-detail-heading:first-child {
+.service-page .article-view-h2.service-detail-heading:first-child {
   margin-top: 0;
 }
 
-.service-page .service-detail-heading span {
-  position: relative;
-}
-
-.service-page .service-detail-heading--content,
-.service-page .service-detail-heading--pricing,
-.service-page .service-detail-heading--process,
-.service-page .service-detail-heading--faq,
-.service-page .service-detail-heading--generic {
-  background: #eef1f5;
-  box-shadow: inset 3px 0 0 var(--ink);
+.service-page .article-view-h2.service-detail-heading span {
+  color: inherit;
 }
 
 .service-page .article-view-p {
@@ -2602,7 +2594,8 @@ ul {
 
 .service-detail-table--pricing {
   min-width: 420px;
-  max-width: 560px;
+  max-width: none;
+  width: 100%;
 }
 
 .service-detail-table--pricing tbody td.col-2,

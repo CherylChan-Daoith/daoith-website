@@ -98,8 +98,7 @@
   function renderBlocks(details) {
     return (details || []).map((block) => {
       if (block.type === 'h2') {
-        const slug = sectionSlug(block.text || '');
-        return `<h2 class="article-view-h2 service-detail-heading service-detail-heading--${escapeHtml(slug)}"><span>${escapeHtml(block.text)}</span></h2>`;
+        return `<h2 class="article-view-h2 service-detail-heading"><span>${escapeHtml(block.text)}</span></h2>`;
       }
       if (block.type === 'ul' && Array.isArray(block.items)) {
         return `<ul class="service-detail-list">${block.items
@@ -130,20 +129,6 @@
       }
       return `<p class="article-view-p">${escapeHtml(block.text || '')}</p>`;
     }).join('');
-  }
-
-  function sectionSlug(text) {
-    const map = {
-      服务内容: 'content',
-      服务收费: 'pricing',
-      服务流程: 'process',
-      常见问题: 'faq',
-      'Service content': 'content',
-      Pricing: 'pricing',
-      Process: 'process',
-      FAQ: 'faq',
-    };
-    return map[text] || 'generic';
   }
 
   function render() {
