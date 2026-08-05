@@ -2317,24 +2317,13 @@ ul {
   position: relative;
 }
 
-.service-page .service-detail-heading--content {
+.service-page .service-detail-heading--content,
+.service-page .service-detail-heading--pricing,
+.service-page .service-detail-heading--process,
+.service-page .service-detail-heading--faq,
+.service-page .service-detail-heading--generic {
   background: #eef1f5;
   box-shadow: inset 3px 0 0 var(--ink);
-}
-
-.service-page .service-detail-heading--pricing {
-  background: #eef2ff;
-  box-shadow: inset 3px 0 0 #2251ff;
-}
-
-.service-page .service-detail-heading--process {
-  background: #eef4f8;
-  box-shadow: inset 3px 0 0 #0a2e4a;
-}
-
-.service-page .service-detail-heading--faq {
-  background: #f3f3f3;
-  box-shadow: inset 3px 0 0 #757575;
 }
 
 .service-page .article-view-p {
