@@ -24,6 +24,47 @@
     return list.find((s) => s.id === id) || null;
   }
 
+  function renderTable(block) {
+    const headers = Array.isArray(block.headers) ? block.headers : [];
+    const rows = Array.isArray(block.rows) ? block.rows : [];
+    const caption = block.caption ? `<caption>${escapeHtml(block.caption)}</caption>` : '';
+    const thead = headers.length
+      ? `<thead><tr>${headers.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join('')}</tr></thead>`
+      : '';
+    const tbody = `<tbody>${rows
+      .map(
+        (row) =>
+          `<tr>${(row || [])
+            .map((cell, i) => {
+              const tag = i === 0 && block.firstColHeader ? 'th' : 'td';
+              const scope = tag === 'th' ? ' scope="row"' : '';
+              return `<${tag}${scope}>${escapeHtml(cell ?? '')}</${tag}>`;
+            })
+            .join('')}</tr>`
+      )
+      .join('')}</tbody>`;
+    return `<div class="service-table-wrap"><table class="service-detail-table">${caption}${thead}${tbody}</table></div>`;
+  }
+
+  function renderTimeline(block) {
+    const steps = Array.isArray(block.steps) ? block.steps : [];
+    return `<ol class="service-timeline">${steps
+      .map(
+        (step, i) => `
+      <li class="service-timeline-step">
+        <div class="service-timeline-marker" aria-hidden="true">
+          <span class="service-timeline-num">${i + 1}</span>
+        </div>
+        <div class="service-timeline-body">
+          <h3 class="service-timeline-title">${escapeHtml(step.title || '')}</h3>
+          ${step.time ? `<p class="service-timeline-time">${escapeHtml(step.time)}</p>` : ''}
+          ${step.desc ? `<p class="service-timeline-desc">${escapeHtml(step.desc)}</p>` : ''}
+        </div>
+      </li>`
+      )
+      .join('')}</ol>`;
+  }
+
   function renderBlocks(details) {
     return (details || []).map((block) => {
       if (block.type === 'h2') {
@@ -38,6 +79,12 @@
         return `<ol class="service-detail-list service-detail-list-ordered">${block.items
           .map((item) => `<li>${escapeHtml(item)}</li>`)
           .join('')}</ol>`;
+      }
+      if (block.type === 'table') {
+        return renderTable(block);
+      }
+      if (block.type === 'timeline' && Array.isArray(block.steps)) {
+        return renderTimeline(block);
       }
       if (block.type === 'faq' && Array.isArray(block.items)) {
         return `<div class="service-detail-faq">${block.items

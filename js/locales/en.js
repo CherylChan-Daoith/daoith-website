@@ -625,6 +625,148 @@ window.DAOITH_I18N_EN = {
       ],
     },
     {
+      id: 'domestic-compliance-bookkeeping',
+      title: 'Fully managed compliance bookkeeping',
+      desc: 'Digital full-service bookkeeping with risk screening, filings, management reporting, and optional export-rebate coordination.',
+      unit: '/ year from',
+      details: [
+        { type: 'h2', text: 'What you get' },
+        {
+          type: 'p',
+          text: 'End-to-end compliance bookkeeping for cross-border sellers: onboarding diagnostics, monthly books and tax filings, quarterly management insights, and annual health checks—with optional export-rebate coordination.',
+        },
+        {
+          type: 'table',
+          firstColHeader: true,
+          headers: ['Item', 'Compliance managed', 'Traditional bookkeeping', 'Value'],
+          rows: [
+            [
+              'Data processing',
+              'Digitized workflow with automated capture and less manual entry',
+              'Mostly manual voucher entry',
+              'More timely and accurate books, fewer omissions',
+            ],
+            [
+              'Accounting granularity',
+              'Order / project / SKU-level profitability views',
+              'Basic ledgers mainly for tax filing',
+              'Supports operating decisions with clearer unit economics',
+            ],
+            [
+              'Tax risk control',
+              'Preset risk models with ongoing monitoring and early alerts',
+              'Reactive fixes after issues surface',
+              'Lower penalty risk and stronger compliance posture',
+            ],
+            [
+              'Financial analysis',
+              'Quarterly / annual review meetings with actionable insights',
+              'Statements only, little interpretation',
+              'Helps owners spot issues and improve margins',
+            ],
+            [
+              'Export rebate management',
+              'Books tightly linked to rebate tracking end-to-end',
+              'Finance and rebate work often disconnected',
+              'Faster cash recovery and fewer missed claims',
+            ],
+            [
+              'Collaboration depth',
+              'Dedicated advisors who understand your operating model',
+              'Document collection with limited business context',
+              'A trusted external finance team, not just a filing vendor',
+            ],
+            [
+              'Digital archives',
+              'Electronic accounting archives available anytime',
+              'Paper files that are hard to search and easy to lose',
+              'Faster retrieval and lower archive risk',
+            ],
+            [
+              'Value-added support',
+              'Access to equity incentive, financing advisory, internal control support',
+              'Narrow scope with limited complex support',
+              'Scales with your company across the finance lifecycle',
+            ],
+          ],
+        },
+        { type: 'h2', text: 'Pricing' },
+        {
+          type: 'p',
+          text: 'Annual fee by annual sales tiers (every RMB 5 million). Without export rebate: 0.1% of sales, capped at ¥30,000. With export rebate: 0.2% of sales, capped at ¥60,000.',
+        },
+        {
+          type: 'table',
+          firstColHeader: true,
+          headers: ['Annual sales', 'Without export rebate (0.1%)', 'With export rebate (0.2%)'],
+          rows: [
+            ['Up to RMB 5m', '¥5,000', '¥10,000'],
+            ['RMB 5–10m', '¥10,000', '¥20,000'],
+            ['RMB 10–15m', '¥15,000', '¥30,000'],
+            ['RMB 15–20m', '¥20,000', '¥40,000'],
+            ['RMB 20–25m', '¥25,000', '¥50,000'],
+            ['RMB 25–30m', '¥30,000', '¥60,000'],
+            ['Above RMB 30m', '¥30,000 (cap)', '¥60,000 (cap)'],
+          ],
+        },
+        {
+          type: 'p',
+          text: 'Excludes government fees, tax-control devices, third-party audits, and rush window charges. Multi-entity or historical rebuild may be scoped separately.',
+        },
+        { type: 'h2', text: 'Process & timeline' },
+        {
+          type: 'timeline',
+          steps: [
+            { title: 'Understand the business', time: 'Within 1 week after payment', desc: 'Interviews and process mapping' },
+            { title: 'Tax & finance risk screen', time: 'Prior half-year review', desc: 'Identify legacy risks and remediation path' },
+            { title: 'Data handover & setup', time: 'Within 1 month after payment', desc: 'Handover checklist and books initialization' },
+            { title: 'Bookkeeping', time: 'Monthly', desc: 'Digital posting and voucher archiving' },
+            { title: 'Tax filing', time: 'Monthly / quarterly', desc: 'Returns filing and payment evidence' },
+            { title: 'Finance analysis', time: 'Quarterly', desc: 'Management review and anomaly alerts' },
+            { title: 'Annual health-check report', time: 'Once a year', desc: 'CIT finalization and compliance assessment' },
+            { title: 'Audit-ready archive check', time: 'Annually', desc: 'Full archive pack and audit support files' },
+          ],
+        },
+        {
+          type: 'table',
+          firstColHeader: true,
+          headers: ['Stage', 'Workstream', 'Cycle', 'Deliverables'],
+          rows: [
+            ['1', 'Business discovery', '1 week after payment', 'Interview outline & research report; process map'],
+            ['2', 'Risk screening', 'Prior half-year', 'Legacy risk assessment; remediation plan'],
+            ['3', 'Handover & setup', 'Within 1 month', 'Handover checklist; initialization confirmation'],
+            ['4', 'Compliance bookkeeping', 'Monthly', 'Vouchers, ledgers, monthly financial statements'],
+            ['5', 'Tax filings', 'Monthly / quarterly', 'Tax returns; payment / clearance evidence'],
+            ['6', 'Analysis & review', 'Quarterly', 'Management accounting report; anomaly alerts'],
+            ['7', 'Annual health check', 'Once a year', 'CIT finalization report; annual compliance assessment'],
+            ['8', 'Archive readiness', 'Annually', 'Full electronic/paper archive pack; audit support file'],
+          ],
+        },
+        { type: 'h2', text: 'FAQ' },
+        {
+          type: 'faq',
+          items: [
+            {
+              q: 'How is this different from traditional bookkeeping?',
+              a: 'Traditional bookkeeping focuses on filing. This managed service adds digital capture, finer profitability views, proactive risk alerts, management reviews, and optional export-rebate coordination.',
+            },
+            {
+              q: 'We already have a bookkeeping firm—can we switch?',
+              a: 'Yes. After contracting we run handover, opening-balance checks, and a risk screen, then transition monthly books and filings. Historical rebuilds can be scoped separately.',
+            },
+            {
+              q: 'Should we choose the package with export rebate?',
+              a: 'Choose “with export rebate” if you need rebate filing coordination and document tracking. Choose “without” if you mainly need compliance bookkeeping, filings, and analysis.',
+            },
+            {
+              q: 'Does the fee include government charges or tax-control devices?',
+              a: 'No. The fee covers agreed bookkeeping, filing, and analysis deliverables. Government fees, devices, audits, and rush services are billed separately.',
+            },
+          ],
+        },
+      ],
+    },
+    {
       id: 'domestic-rebate',
       title: 'Export rebate agency',
       desc: 'Full 9810/9610 rebate filing including documentation and authority liaison.',
