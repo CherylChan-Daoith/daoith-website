@@ -64,6 +64,78 @@ window.DAOITH_I18N_ZH = {
   },
 };
 
+window.DAOITH_enServiceBlocks = function enServiceBlocks({
+  content,
+  bullets,
+  pricing,
+  process,
+  timeline,
+  faqs,
+}) {
+  function padFaqs(list) {
+    const items = Array.isArray(list) ? list.slice() : [];
+    if (items.length < 2) {
+      items.push({
+        q: 'Are government fees included?',
+        a: 'The service fee covers agreed advisory/agency work. Government fees, translations, notarization, and third-party audits are usually billed separately.',
+      });
+    }
+    if (items.length < 3) {
+      items.push({
+        q: 'How do kickoff and delivery work?',
+        a: 'After confirming scope and documents, we start under contract and deliver by process milestones, with optional online reviews at key steps.',
+      });
+    }
+    return items;
+  }
+
+  const steps = (Array.isArray(process) ? process : []).map((title, i, arr) => {
+    let time = 'As scheduled';
+    if (i === 0) time = 'Within 1–5 business days after kickoff';
+    else if (i === arr.length - 1) {
+      time = typeof timeline === 'string' ? timeline.replace(/\.\s*$/, '') : 'Final delivery';
+    } else time = 'In progress';
+    return { title, time };
+  });
+
+  const scope = bullets?.length ? bullets : steps.map((s) => s.title);
+  const out = [];
+  out.push({ type: 'h2', text: 'Service content' });
+  if (content) out.push({ type: 'p', text: content });
+  if (scope.length) {
+    out.push({
+      type: 'table',
+      variant: 'deliver',
+      headers: ['Scope'],
+      rows: scope.map((b) => [[{ mark: 'ok', text: b }]]),
+    });
+  }
+  out.push({ type: 'h2', text: 'Pricing' });
+  if (pricing) out.push({ type: 'p', text: pricing });
+  out.push({ type: 'h2', text: 'Process' });
+  if (steps.length) out.push({ type: 'timeline', steps });
+  if (steps.length) {
+    out.push({
+      type: 'table',
+      variant: 'deliver',
+      firstColHeader: true,
+      headers: ['Workstream', 'Timing', 'Deliverables'],
+      rows: steps.map((s, i) => [
+        `${i + 1}. ${s.title}`,
+        s.time,
+        i === 0
+          ? 'Scope confirmation / document checklist'
+          : i === steps.length - 1
+            ? 'Closing pack / final deliverables'
+            : 'Milestone confirmation and working papers',
+      ]),
+    });
+  }
+  out.push({ type: 'h2', text: 'FAQ' });
+  out.push({ type: 'faq', items: padFaqs(faqs) });
+  return out;
+};
+
 window.DAOITH_I18N_EN = {
   meta: {
     title: 'DAOITH Consulting - Cross-Border E-Commerce Tax Solutions',
@@ -270,10 +342,8 @@ window.DAOITH_I18N_EN = {
     '.filter-btn[data-filter="hongkong"]': { text: 'Hong Kong' },
     '.filter-btn[data-filter="asia"]': { text: 'Asia' },
     '.filter-btn[data-filter="europe"]': { text: 'Europe' },
-    '.filter-btn[data-filter="namerica"]': { text: 'North America' },
-    '.filter-btn[data-filter="samerica"]': { text: 'South America' },
-    '.filter-btn[data-filter="africa"]': { text: 'Africa' },
-    '.filter-btn[data-filter="oceania"]': { text: 'Oceania' },
+    '.filter-btn[data-filter="americas"]': { text: 'Americas' },
+    '.filter-btn[data-filter="africa-oceania"]': { text: 'Africa & Oceania' },
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .section-header h2': { text: 'Service Hub' },
     '#hub .section-header p': {
@@ -573,56 +643,158 @@ window.DAOITH_I18N_EN = {
       title: 'Expert 1-on-1 advisory',
       desc: 'In-depth consulting on structure, compliance diagnosis, and rebate optimization.',
       unit: '/ hour',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'One-on-one advisory covering platform choice, store entity, fulfillment model, invoicing chain, and export rebate pathways with actionable recommendations.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Sellers at launch or restructuring stages, and finance leads managing multi-country sales.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Billed hourly; session notes available on request. Prepare platform, destination, HS code, and revenue context in advance.' },
-      ],
+      details: window.DAOITH_enServiceBlocks({
+        content: 'One-on-one advisory covering platform choice, store entity, fulfillment model, invoicing chain, and export rebate pathways with actionable recommendations.',
+        bullets: [
+          'Business model and entity structure review',
+          'Export rebate / overseas tax boundary assessment',
+          'Priority risk list and action plan',
+          'Session notes on request',
+        ],
+        pricing: 'From ¥2,999 / hour. Complex topics can be packaged by session. Government and third-party fees extra.',
+        process: [
+          'Share business background',
+          'Book expert slot and confirm agenda',
+          '1-on-1 consultation',
+          'Notes and follow-up recommendations',
+        ],
+        timeline: 'First session usually within 1–3 business days after booking; notes within 2 business days.',
+        faqs: [
+          { q: 'What should I prepare?', a: 'Platform type, entity, fulfillment model, destination markets, HS codes, revenue range, and invoice status.' },
+          { q: 'Is this a formal legal opinion?', a: 'Default is oral diagnosis plus notes. Formal written opinions can be scoped separately.' },
+        ],
+      }),
     },
     {
       id: 'consult-annual',
       title: 'Compliance coaching (annual)',
       desc: 'Year-round expert support across structure, accounting, rebates, and overseas tax.',
       unit: '/ year',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Annual coaching with quarterly reviews, policy updates, and support through key filings.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Growing cross-border businesses that need ongoing compliance support.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Annual engagement with agreed expert sessions and written notes.' },
-      ],
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Annual coaching with quarterly reviews, policy updates, and support through key filings.',
+        bullets: [
+          'Annual compliance calendar',
+          'Quarterly tax / operations reviews',
+          'Policy change briefings',
+          'Agreed expert sessions with notes',
+        ],
+        pricing: 'From ¥98,000 / year. Session counts and response levels follow the signed plan.',
+        process: [
+          'Discovery and scope confirmation',
+          'Sign annual agreement and set up channel',
+          'Publish compliance calendar',
+          'Quarterly reviews and key-node support',
+        ],
+        timeline: 'Baseline diagnosis and calendar draft within 5–10 business days after signing.',
+        faqs: [
+          { q: 'Does coaching include bookkeeping?', a: 'Coaching is advisory. Bookkeeping or rebate agency can be added as separate services.' },
+          { q: 'Can we expand mid-year?', a: 'Yes. Expanded scope is covered by a supplemental quote and agreement.' },
+        ],
+      }),
+    },
+    {
+      id: 'consult-tp',
+      title: 'Transfer pricing documentation',
+      desc: 'Local file, master file, and contemporaneous documentation for related-party transactions.',
+      unit: ' from',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Map related-party flows and prepare contemporaneous / local / master file documentation.',
+        bullets: [
+          'Related-party mapping and FAR analysis',
+          'Pricing method recommendation',
+          'Local / master / contemporaneous files',
+          'Optional annual updates',
+        ],
+        pricing: 'From ¥50,000, varying by complexity and document tier.',
+        process: [
+          'Collect org chart and transaction data',
+          'FAR analysis and method selection',
+          'Draft and internal review',
+          'Final delivery and walkthrough',
+        ],
+        timeline: 'Draft usually 15–30 business days after complete data.',
+        faqs: [
+          { q: 'Do small sellers need TP docs?', a: 'It depends on related-party volume and local thresholds. Start with an obligation check.' },
+        ],
+      }),
     },
     {
       id: 'domestic-diagnosis',
       title: 'Cross-border tax diagnosis',
       desc: 'Full compliance assessment with remediation report and export rebate review.',
       unit: '/ session',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Diagnose business model, documents, customs/rebate readiness, and entity structure; prioritize remediation actions.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Firms preparing for rebates, financing, IPO, or responding to tax authority attention.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'One written diagnosis report plus a walkthrough meeting.' },
-      ],
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Diagnose business model, documents, customs/rebate readiness, and entity structure; prioritize remediation actions.',
+        bullets: [
+          'Cash and operating flow mapping',
+          'Export rebate compliance review',
+          'Risk ranking and remediation roadmap',
+          'One report walkthrough meeting',
+        ],
+        pricing: 'From ¥15,000 per engagement. Multi-entity or long history may add effort.',
+        process: [
+          'Questionnaire and document list',
+          'Interviews and sample testing',
+          'Issue diagnosis report',
+          'Walkthrough and priority confirmation',
+        ],
+        timeline: 'Report usually within 10–20 business days after complete documents.',
+        faqs: [
+          { q: 'Is the diagnosis an official ruling?', a: 'No. It is professional advisory for internal remediation, not an authority decision.' },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-setup',
+      title: 'Company setup & licenses',
+      desc: 'Company registration, import/export rights, customs filing, and e-port setup.',
+      unit: ' from',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Company formation and core cross-border licenses (import/export, customs, e-port).',
+        bullets: [
+          'Name check and company incorporation',
+          'Bank account onboarding guidance',
+          'Import/export, customs, and e-port filings',
+          'Tax registration handoff notes',
+        ],
+        pricing: 'From ¥5,000. Government fees, chops, rush, and cross-city work are extra.',
+        process: [
+          'Confirm company type and business scope',
+          'Prepare and submit formation packs',
+          'Complete AIC / tax registrations',
+          'Complete import/export and customs licenses',
+        ],
+        timeline: 'Formation often 5–15 business days; with trade licenses commonly 10–25 business days.',
+        faqs: [
+          { q: 'Can an individual hold import/export rights?', a: 'Usually rights sit with a company entity. Personal and company models differ—plan the entity first.' },
+        ],
+      }),
     },
     {
       id: 'domestic-bookkeeping',
       title: 'Bookkeeping & filing',
       desc: 'Bookkeeping, tax filing, and annual reconciliation for e-commerce businesses.',
       unit: '/ month',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Monthly bookkeeping and tax filings tailored to marketplace settlements and multi-currency flows.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'China-entity sellers needing reliable accounting and compliance filings.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Monthly retainer; pricing varies with document volume and complexity.' },
-      ],
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Monthly bookkeeping and tax filings tailored to marketplace settlements and multi-currency flows.',
+        bullets: [
+          'Voucher processing and books',
+          'VAT and surtax filings',
+          'CIT prepaid and annual finalization support',
+          'Marketplace settlement and FX guidance',
+        ],
+        pricing: 'From ¥800 / month, varying with volume and complexity. Annual CIT finalization may be billed yearly.',
+        process: [
+          'Contract and opening-balance handover',
+          'Monthly document collection and posting',
+          'Pre-filing review and confirmation',
+          'File returns and share tax forms',
+        ],
+        timeline: 'Monthly close before filing deadlines; first setup often 5–15 business days.',
+        faqs: [
+          { q: 'Can we book purchases without invoices?', a: 'Yes, but it affects input VAT and rebate trails. We flag risks and recommend fixes.' },
+        ],
+      }),
     },
     {
       id: 'domestic-compliance-bookkeeping',
@@ -865,112 +1037,118 @@ window.DAOITH_I18N_EN = {
       title: 'Export rebate agency',
       desc: 'Full 9810/9610 rebate filing including documentation and authority liaison.',
       unit: '/ case',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Prepare rebate packs, file claims, and support responses to tax authority queries.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Exporters using 9810/9610 models with eligible rebate conditions.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Per case or batch; complex matters may require separate scoping.' },
-      ],
-    },
-    {
-      id: 'domestic-setup',
-      title: 'Company setup & licenses',
-      desc: 'Company registration, import/export rights, customs filing, and e-port setup.',
-      unit: ' from',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Company formation and core cross-border licenses (import/export, customs, e-port).' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'New teams setting up operating entities and licenses.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Starting fee by region and urgency; government fees billed separately.' },
-      ],
-    },
-    {
-      id: 'overseas-vat',
-      title: 'EU VAT registration',
-      desc: 'VAT registration and filing in UK, Germany, France, and other EU markets.',
-      unit: '/ country',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'VAT registration support and filing cycle setup, clarifying platform withholding vs seller duties.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Sellers on European marketplaces needing VAT registration or ongoing filings.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Priced per country from; ongoing filing can be annualized.' },
-      ],
-    },
-    {
-      id: 'overseas-us-sales-tax',
-      title: 'US sales tax compliance',
-      desc: 'State sales tax registration, filing, and economic nexus advisory.',
-      unit: '/ state',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Nexus assessment, state registration, and filing arrangements.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'US marketplace and DTC sellers with multi-state exposure.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Priced per state from; multi-state packages available.' },
-      ],
-    },
-    {
-      id: 'overseas-odi',
-      title: 'ODI filing agency',
-      desc: 'End-to-end outbound investment filing (NDRC, commerce, SAFE).',
-      unit: ' from',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Prepare ODI materials and coordinate NDRC, commerce, and SAFE process steps.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'China companies setting up or acquiring overseas entities / warehouses.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Project-based; outcomes depend on authorities; we drive documentation and process.' },
-      ],
-    },
-    {
-      id: 'overseas-company',
-      title: 'Offshore company setup',
-      desc: 'Incorporation and secretarial services in HK, Singapore, US, BVI, etc.',
-      unit: ' from',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Incorporation and basic secretarial compliance in popular jurisdictions.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Teams needing overseas settlement, brand holding, or warehouse entities.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Fees vary by jurisdiction; government and banking fees extra.' },
-      ],
-    },
-    {
-      id: 'consult-tp',
-      title: 'Transfer pricing documentation',
-      desc: 'Local file, master file, and contemporaneous documentation for related-party transactions.',
-      unit: ' from',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Map related-party flows and prepare contemporaneous / local / master file documentation.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'Groups with cross-border related purchases, service fees, or royalties.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Scoped by complexity; annual updates available.' },
-      ],
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Prepare rebate packs, file claims, and support responses to tax authority queries.',
+        bullets: [
+          'Eligibility and model assessment',
+          'Document completeness check',
+          'Rebate filing agency',
+          'Supplement and authority liaison',
+        ],
+        pricing: 'From ¥3,000 per case, or by batch / rebate amount. Complex cases scoped separately.',
+        process: [
+          'Assess rebate conditions and customs model',
+          'Collect and verify documents',
+          'Submit filing and track progress',
+          'Support supplements through completion',
+        ],
+        timeline: 'Filing submission often 5–15 business days after documents are complete; authority review is separate.',
+        faqs: [
+          { q: 'Can we claim without import/export rights?', a: 'Usually you need the right export qualifications and documents. Start with an eligibility check.' },
+        ],
+      }),
     },
     {
       id: 'domestic-hte',
       title: 'High-tech enterprise qualification',
       desc: 'Application support including R&D expense aggregation and IP planning.',
       unit: ' from',
-      details: [
-        { type: 'h2', text: 'Scope' },
-        { type: 'p', text: 'Application coaching for high-tech enterprise qualification, including R&D expense and IP readiness.' },
-        { type: 'h2', text: 'Best for' },
-        { type: 'p', text: 'R&D-active companies seeking or renewing high-tech status.' },
-        { type: 'h2', text: 'Delivery' },
-        { type: 'p', text: 'Advisory engagement; approval is determined by authorities.' },
-      ],
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Application coaching for high-tech enterprise qualification, including R&D expense and IP readiness.',
+        process: [
+          'Eligibility gap analysis',
+          'R&D expense and materials prep',
+          'Filing coaching and form review',
+          'Result follow-up and maintenance advice',
+        ],
+        timeline: 'Coaching usually 1–3 months; official review is separate.',
+        pricing: 'From ¥20,000. IP agency and audit fees are extra; approval is by authorities.',
+        faqs: [
+          { q: 'Can cross-border e-commerce firms apply?', a: 'If R&D activity and IP meet criteria, we can assess feasibility without industry labels.' },
+        ],
+      }),
+    },
+    {
+      id: 'overseas-odi',
+      title: 'ODI filing agency',
+      desc: 'End-to-end outbound investment filing (NDRC, commerce, SAFE).',
+      unit: ' from',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Prepare ODI materials and coordinate NDRC, commerce, and SAFE process steps.',
+        bullets: [
+          'Investment structure and path advice',
+          'Document preparation and form review',
+          'Authority process management',
+          'Handoff notes for overseas setup / banking',
+        ],
+        pricing: 'From ¥30,000, varying by structure and approval complexity.',
+        process: [
+          'Confirm destination and shareholding',
+          'Prepare filing / approval packs',
+          'Submit and track each authority',
+          'Hand over closing document pack',
+        ],
+        timeline: 'Commonly 4–12 weeks after materials are ready.',
+        faqs: [
+          { q: 'Is ODI always required?', a: 'Direct outbound investment by China entities usually needs the relevant filings. Path design should come first.' },
+        ],
+      }),
+    },
+    {
+      id: 'overseas-vat',
+      title: 'EU VAT registration',
+      desc: 'VAT registration and filing in UK, Germany, France, and other EU markets.',
+      unit: '/ country',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'VAT registration support and filing cycle setup, clarifying platform withholding vs seller duties.',
+        bullets: [
+          'Registration obligation assessment',
+          'VAT number application coaching',
+          'Monthly / quarterly filing support',
+          'IOSS / platform withholding boundary notes',
+        ],
+        pricing: 'From ¥3,500 per country. Ongoing filing can be annualized. Translation and authority fees extra.',
+        process: [
+          'Confirm sales countries and warehousing',
+          'Prepare registration packs',
+          'Submit and obtain VAT number',
+          'Set filing cadence and archives',
+        ],
+        timeline: 'Numbers often take 2–8 weeks after complete materials, depending on country.',
+        faqs: [
+          { q: 'If we only use FBA, do we still need VAT?', a: 'Often yes, or you must track transactions not covered by platform withholding. Build a per-country checklist.' },
+        ],
+      }),
+    },
+    {
+      id: 'overseas-us-sales-tax',
+      title: 'US sales tax compliance',
+      desc: 'State sales tax registration, filing, and economic nexus advisory.',
+      unit: '/ state',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Nexus assessment, state registration, and filing arrangements.',
+        process: [
+          'Nexus and marketplace collection review',
+          'Prepare state registration packs',
+          'Complete registration and filing frequency',
+          'First filing coaching and archives',
+        ],
+        timeline: 'Assessment 3–7 business days; single-state registration often 1–4 weeks.',
+        pricing: 'From ¥5,000 per state; multi-state packages available.',
+        faqs: [
+          { q: 'Amazon already collects—do we still register?', a: 'Many states cover marketplace orders, but DTC, B2B, or uncovered sales may still require action.' },
+        ],
+      }),
     },
   ],
   taxPolicies: [

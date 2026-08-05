@@ -1,19 +1,116 @@
 /* DAOITH service marketplace catalog
- * Categories: consult | mainland | hongkong | asia | europe | namerica | samerica | africa | oceania
+ * Categories: consult | mainland | hongkong | asia | europe | americas | africa-oceania
  */
 (function () {
-  function blocks({ content, bullets, pricing, process, timeline, faqs }) {
+  function padFaqs(faqs) {
+    const items = Array.isArray(faqs) ? faqs.slice() : [];
+    if (items.length < 2) {
+      items.push({
+        q: '服务是否含政府规费与第三方费用？',
+        a: '服务费覆盖约定范围内的顾问／代办工作；政府规费、翻译公证、审计等第三方费用通常另计，以签约方案为准。',
+      });
+    }
+    if (items.length < 3) {
+      items.push({
+        q: '如何启动与交付？',
+        a: '确认需求与资料清单后签约启动；按服务流程节点交付过程文件与最终成果，关键节点可安排线上沟通。',
+      });
+    }
+    return items;
+  }
+
+  function resolveSteps(steps, process, timeline) {
+    if (Array.isArray(steps) && steps.length) {
+      return steps.map((s) => ({
+        title: s.title || String(s),
+        time: s.time || '按约定推进',
+      }));
+    }
+    const list = Array.isArray(process) ? process : [];
+    const note = typeof timeline === 'string' ? timeline.replace(/。\s*$/, '') : '';
+    return list.map((title, i) => {
+      let time = '按约定推进';
+      if (i === 0) time = '启动后 1–5 个工作日';
+      else if (i === list.length - 1) time = note || '收尾交付';
+      else time = '推进中';
+      return { title, time };
+    });
+  }
+
+  function resolveDeliver(deliver, steps) {
+    if (Array.isArray(deliver) && deliver.length) return deliver;
+    return (steps || []).map((s, i) => [
+      `${i + 1}. ${s.title}`,
+      s.time,
+      i === 0
+        ? '需求确认／资料清单'
+        : i === steps.length - 1
+          ? '办结材料／成果交付'
+          : '阶段确认与过程文档',
+    ]);
+  }
+
+  /**
+   * Unified detail layout aligned with 合规代账全托管:
+   * 服务内容 → 服务收费 → 服务流程(timeline + deliver) → 常见问题
+   */
+  function blocks({
+    content,
+    bullets,
+    pricing,
+    pricingTable,
+    process,
+    timeline,
+    steps,
+    deliver,
+    faqs,
+  }) {
     const out = [];
+    const resolvedSteps = resolveSteps(steps, process, timeline);
+    const resolvedDeliver = resolveDeliver(deliver, resolvedSteps);
+
     out.push({ type: 'h2', text: '服务内容' });
     if (content) out.push({ type: 'p', text: content });
-    if (bullets?.length) out.push({ type: 'ul', items: bullets });
+    const scopeItems = bullets?.length
+      ? bullets
+      : resolvedSteps.map((s) => s.title).filter(Boolean);
+    if (scopeItems.length) {
+      out.push({
+        type: 'table',
+        variant: 'deliver',
+        headers: ['服务范围'],
+        rows: scopeItems.map((b) => [[{ mark: 'ok', text: b }]]),
+      });
+    }
+
     out.push({ type: 'h2', text: '服务收费' });
-    out.push({ type: 'p', text: pricing });
-    out.push({ type: 'h2', text: '服务流程和时效' });
-    if (process?.length) out.push({ type: 'ol', items: process });
-    if (timeline) out.push({ type: 'p', text: timeline });
+    if (pricing) out.push({ type: 'p', text: pricing });
+    if (pricingTable?.headers && pricingTable?.rows) {
+      out.push({
+        type: 'table',
+        variant: 'pricing',
+        firstColHeader: true,
+        headers: pricingTable.headers,
+        rows: pricingTable.rows,
+      });
+    }
+
+    out.push({ type: 'h2', text: '服务流程' });
+    if (resolvedSteps.length) {
+      out.push({ type: 'timeline', steps: resolvedSteps });
+    }
+    if (resolvedDeliver.length) {
+      out.push({
+        type: 'table',
+        variant: 'deliver',
+        firstColHeader: true,
+        headers: ['服务内容', '服务时效', '交付物'],
+        rows: resolvedDeliver,
+      });
+    }
+
     out.push({ type: 'h2', text: '常见问题' });
-    if (faqs?.length) out.push({ type: 'faq', items: faqs });
+    out.push({ type: 'faq', items: padFaqs(faqs) });
     return out;
   }
 
@@ -24,10 +121,8 @@
     { id: 'hongkong', label: '中国香港' },
     { id: 'asia', label: '亚洲' },
     { id: 'europe', label: '欧洲' },
-    { id: 'namerica', label: '北美洲' },
-    { id: 'samerica', label: '南美洲' },
-    { id: 'africa', label: '非洲' },
-    { id: 'oceania', label: '大洋洲' },
+    { id: 'americas', label: '美洲' },
+    { id: 'africa-oceania', label: '非洲／大洋洲' },
   ];
 
   window.DAOITH_SERVICES = [
@@ -756,10 +851,10 @@
       }),
     },
 
-    /* ——— 北美洲 ——— */
+    /* ——— 美洲 ——— */
     {
       id: 'overseas-us-sales-tax',
-      category: 'namerica',
+      category: 'americas',
       title: '美国销售税合规',
       desc: '美国各州销售税注册、申报与合规咨询，覆盖经济关联度规则',
       priceLabel: '¥5,000',
@@ -782,7 +877,7 @@
     },
     {
       id: 'namerica-ca-tax',
-      category: 'namerica',
+      category: 'americas',
       title: '加拿大GST／HST合规',
       desc: '加拿大 GST／HST 注册与申报辅导，适配亚马逊加拿大站等场景',
       priceLabel: '¥4,500',
@@ -805,7 +900,7 @@
     },
     {
       id: 'namerica-mx-tax',
-      category: 'namerica',
+      category: 'americas',
       title: '墨西哥税务合规',
       desc: '墨西哥电商税务注册与合规辅导，适配美客多等平台',
       priceLabel: '¥5,500',
@@ -827,10 +922,10 @@
       }),
     },
 
-    /* ——— 南美洲 ——— */
+    /* ——— 美洲（续） ——— */
     {
       id: 'samerica-br-tax',
-      category: 'samerica',
+      category: 'americas',
       title: '巴西电商税务合规',
       desc: '巴西站／美客多巴西等场景下的税务与合规路径辅导',
       priceLabel: '¥6,800',
@@ -853,7 +948,7 @@
     },
     {
       id: 'samerica-cl-co-tax',
-      category: 'samerica',
+      category: 'americas',
       title: '智利／哥伦比亚等市场税务辅导',
       desc: '南美新兴电商市场税务注册与平台合规要点辅导',
       priceLabel: '¥5,200',
@@ -875,10 +970,10 @@
       }),
     },
 
-    /* ——— 非洲 ——— */
+    /* ——— 非洲／大洋洲 ——— */
     {
       id: 'africa-za-tax',
-      category: 'africa',
+      category: 'africa-oceania',
       title: '南非VAT与公司合规',
       desc: '南非公司／VAT 相关注册与申报辅导，服务进入非洲电商的卖家',
       priceLabel: '¥7,500',
@@ -901,7 +996,7 @@
     },
     {
       id: 'africa-ng-ke-tax',
-      category: 'africa',
+      category: 'africa-oceania',
       title: '尼日利亚／肯尼亚等市场税务辅导',
       desc: '非洲新兴电商市场税务与本地合规入门辅导',
       priceLabel: '¥6,200',
@@ -923,10 +1018,10 @@
       }),
     },
 
-    /* ——— 大洋洲 ——— */
+    /* ——— 非洲／大洋洲（续） ——— */
     {
       id: 'oceania-au-gst',
-      category: 'oceania',
+      category: 'africa-oceania',
       title: '澳大利亚GST合规',
       desc: '澳大利亚 GST 注册与申报辅导，适配亚马逊澳洲站等',
       priceLabel: '¥4,800',
@@ -949,7 +1044,7 @@
     },
     {
       id: 'oceania-nz-gst',
-      category: 'oceania',
+      category: 'africa-oceania',
       title: '新西兰GST合规',
       desc: '新西兰 GST 远程卖家注册与申报辅导',
       priceLabel: '¥4,200',

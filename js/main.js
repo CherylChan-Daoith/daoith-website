@@ -1846,10 +1846,8 @@ function initServicesMarketplace() {
     hongkong: 'Hong Kong',
     asia: 'Asia',
     europe: 'Europe',
-    namerica: 'North America',
-    samerica: 'South America',
-    africa: 'Africa',
-    oceania: 'Oceania',
+    americas: 'Americas',
+    'africa-oceania': 'Africa & Oceania',
   };
 
   function categoryLabel(cat) {
