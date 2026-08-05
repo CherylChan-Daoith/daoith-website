@@ -2290,82 +2290,51 @@ ul {
 
 .service-page .article-view-body {
   margin-bottom: 28px;
+}
+
+.service-page .article-view-h2,
+.service-page .service-detail-heading {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.service-detail-section {
-  margin: 0;
-  padding: 16px 18px 14px;
-  background: #f7f8fa;
-  border: 1px solid #e6e8ec;
-  border-left: 3px solid var(--ink);
-  box-shadow: 0 1px 0 rgba(5, 28, 44, 0.04);
-}
-
-.service-detail-section.is-alt {
-  background: #fbfbfc;
-  border-left-color: #6b7c93;
-}
-
-.service-detail-section--content {
-  border-left-color: var(--ink);
-}
-
-.service-detail-section--pricing {
-  border-left-color: #2251ff;
-  background: #f6f8ff;
-}
-
-.service-detail-section--process {
-  border-left-color: #0a2e4a;
-  background: #f5f7f9;
-}
-
-.service-detail-section--faq {
-  border-left-color: #757575;
-  background: #fafafa;
-}
-
-.service-page .service-detail-section .article-view-h2 {
+  align-items: center;
+  gap: 10px;
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--ink);
-  margin: 0 0 12px;
-  padding: 0 0 8px;
-  border-bottom: 1px solid rgba(5, 28, 44, 0.18);
+  margin: 26px 0 12px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 0;
+  background: #eef1f5;
+  box-shadow: inset 3px 0 0 var(--ink);
 }
 
-.service-page .article-view-h2 {
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--ink);
-  margin: 28px 0 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--ink);
-}
-
-.service-page .article-view-h2:first-child {
+.service-page .service-detail-heading:first-child {
   margin-top: 0;
 }
 
-.service-page .service-detail-section .article-view-p {
-  margin-bottom: 10px;
+.service-page .service-detail-heading span {
+  position: relative;
 }
 
-.service-page .service-detail-section .service-table-wrap,
-.service-page .service-detail-section .service-timeline,
-.service-page .service-detail-section .service-detail-faq {
-  margin-bottom: 0;
+.service-page .service-detail-heading--content {
+  background: #eef1f5;
+  box-shadow: inset 3px 0 0 var(--ink);
 }
 
-.service-page .service-detail-section .service-table-wrap + .article-view-p,
-.service-page .service-detail-section .article-view-p + .service-table-wrap,
-.service-page .service-detail-section .service-timeline + .service-table-wrap {
-  margin-top: 12px;
+.service-page .service-detail-heading--pricing {
+  background: #eef2ff;
+  box-shadow: inset 3px 0 0 #2251ff;
+}
+
+.service-page .service-detail-heading--process {
+  background: #eef4f8;
+  box-shadow: inset 3px 0 0 #0a2e4a;
+}
+
+.service-page .service-detail-heading--faq {
+  background: #f3f3f3;
+  box-shadow: inset 3px 0 0 #757575;
 }
 
 .service-page .article-view-p {

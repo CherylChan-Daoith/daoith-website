@@ -95,38 +95,41 @@
       .join('')}</ol>`;
   }
 
-  function renderBlock(block) {
-    if (block.type === 'h2') {
-      return `<h2 class="article-view-h2">${escapeHtml(block.text)}</h2>`;
-    }
-    if (block.type === 'ul' && Array.isArray(block.items)) {
-      return `<ul class="service-detail-list">${block.items
-        .map((item) => `<li>${escapeHtml(item)}</li>`)
-        .join('')}</ul>`;
-    }
-    if (block.type === 'ol' && Array.isArray(block.items)) {
-      return `<ol class="service-detail-list service-detail-list-ordered">${block.items
-        .map((item) => `<li>${escapeHtml(item)}</li>`)
-        .join('')}</ol>`;
-    }
-    if (block.type === 'table') {
-      return renderTable(block);
-    }
-    if (block.type === 'timeline' && Array.isArray(block.steps)) {
-      return renderTimeline(block);
-    }
-    if (block.type === 'faq' && Array.isArray(block.items)) {
-      return `<div class="service-detail-faq">${block.items
-        .map(
-          (item) => `
+  function renderBlocks(details) {
+    return (details || []).map((block) => {
+      if (block.type === 'h2') {
+        const slug = sectionSlug(block.text || '');
+        return `<h2 class="article-view-h2 service-detail-heading service-detail-heading--${escapeHtml(slug)}"><span>${escapeHtml(block.text)}</span></h2>`;
+      }
+      if (block.type === 'ul' && Array.isArray(block.items)) {
+        return `<ul class="service-detail-list">${block.items
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join('')}</ul>`;
+      }
+      if (block.type === 'ol' && Array.isArray(block.items)) {
+        return `<ol class="service-detail-list service-detail-list-ordered">${block.items
+          .map((item) => `<li>${escapeHtml(item)}</li>`)
+          .join('')}</ol>`;
+      }
+      if (block.type === 'table') {
+        return renderTable(block);
+      }
+      if (block.type === 'timeline' && Array.isArray(block.steps)) {
+        return renderTimeline(block);
+      }
+      if (block.type === 'faq' && Array.isArray(block.items)) {
+        return `<div class="service-detail-faq">${block.items
+          .map(
+            (item) => `
           <details class="service-faq-item">
             <summary>${escapeHtml(item.q || '')}</summary>
             <p>${escapeHtml(item.a || '')}</p>
           </details>`
-        )
-        .join('')}</div>`;
-    }
-    return `<p class="article-view-p">${escapeHtml(block.text || '')}</p>`;
+          )
+          .join('')}</div>`;
+      }
+      return `<p class="article-view-p">${escapeHtml(block.text || '')}</p>`;
+    }).join('');
   }
 
   function sectionSlug(text) {
@@ -141,44 +144,6 @@
       FAQ: 'faq',
     };
     return map[text] || 'generic';
-  }
-
-  function renderBlocks(details) {
-    const blocks = details || [];
-    const sections = [];
-    let current = null;
-
-    blocks.forEach((block) => {
-      if (block.type === 'h2') {
-        current = {
-          title: block.text || '',
-          slug: sectionSlug(block.text || ''),
-          parts: [block],
-        };
-        sections.push(current);
-        return;
-      }
-      if (!current) {
-        current = { title: '', slug: 'generic', parts: [] };
-        sections.push(current);
-      }
-      current.parts.push(block);
-    });
-
-    if (!sections.length) {
-      return blocks.map(renderBlock).join('');
-    }
-
-    return sections
-      .map(
-        (section, i) => `
-      <section class="service-detail-section service-detail-section--${escapeHtml(
-        section.slug
-      )}${i % 2 === 1 ? ' is-alt' : ''}" aria-label="${escapeHtml(section.title || 'Section')}">
-        ${section.parts.map(renderBlock).join('')}
-      </section>`
-      )
-      .join('');
   }
 
   function render() {
