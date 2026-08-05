@@ -27,6 +27,7 @@
   function renderTable(block) {
     const headers = Array.isArray(block.headers) ? block.headers : [];
     const rows = Array.isArray(block.rows) ? block.rows : [];
+    const variant = block.variant ? ` service-detail-table--${escapeHtml(block.variant)}` : '';
     const caption = block.caption ? `<caption>${escapeHtml(block.caption)}</caption>` : '';
     const thead = headers.length
       ? `<thead><tr>${headers.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join('')}</tr></thead>`
@@ -38,22 +39,23 @@
             .map((cell, i) => {
               const tag = i === 0 && block.firstColHeader ? 'th' : 'td';
               const scope = tag === 'th' ? ' scope="row"' : '';
-              return `<${tag}${scope}>${escapeHtml(cell ?? '')}</${tag}>`;
+              const colClass = i > 0 ? ` class="col-${i + 1}"` : '';
+              return `<${tag}${scope}${colClass}>${escapeHtml(cell ?? '')}</${tag}>`;
             })
             .join('')}</tr>`
       )
       .join('')}</tbody>`;
-    return `<div class="service-table-wrap"><table class="service-detail-table">${caption}${thead}${tbody}</table></div>`;
+    return `<div class="service-table-wrap${variant ? ` service-table-wrap--${escapeHtml(block.variant)}` : ''}"><table class="service-detail-table${variant}">${caption}${thead}${tbody}</table></div>`;
   }
 
   function renderTimeline(block) {
     const steps = Array.isArray(block.steps) ? block.steps : [];
-    return `<ol class="service-timeline">${steps
+    return `<ol class="service-timeline" style="--timeline-count:${steps.length}">${steps
       .map(
         (step, i) => `
       <li class="service-timeline-step">
         <div class="service-timeline-marker" aria-hidden="true">
-          <span class="service-timeline-num">${i + 1}</span>
+          <span class="service-timeline-num">${String(i + 1).padStart(2, '0')}</span>
         </div>
         <div class="service-timeline-body">
           <h3 class="service-timeline-title">${escapeHtml(step.title || '')}</h3>
