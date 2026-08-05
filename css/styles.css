@@ -2518,23 +2518,33 @@ ul {
   border-bottom: 1.5px solid var(--ink);
 }
 
+.service-detail-table--compare thead th:nth-child(3) {
+  color: #ffffff;
+  font-weight: 600;
+}
+
 .service-detail-table--compare thead th:nth-child(3),
 .service-detail-table--compare tbody td.col-3 {
   width: 22%;
   max-width: 12rem;
-  color: #333;
   padding: 6px 8px;
 }
 
-.service-detail-table--compare tbody td.col-3 .svc-cell-list li {
-  font-size: 0.66rem;
-  line-height: 1.35;
+.service-detail-table--compare tbody td.col-3 {
+  color: #051c2c;
 }
 
+.service-detail-table--compare tbody td.col-3 .svc-cell-list li {
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.service-detail-table--compare tbody td.col-3 .svc-cell-list li span:last-child,
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-ok span:last-child,
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-no span:last-child,
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-plain {
-  color: #333;
+  color: #051c2c !important;
+  font-weight: 500;
 }
 
 .service-detail-table--compare tbody td.col-4 {
@@ -2590,7 +2600,7 @@ ul {
 }
 
 .svc-cell-list li.is-no span:last-child {
-  color: #666;
+  color: #333;
 }
 
 .service-detail-table--compare tbody td.col-4 .svc-cell-list li.is-plain {
