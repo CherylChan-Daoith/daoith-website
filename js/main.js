@@ -830,26 +830,44 @@ function initAiChatbot() {
     try {
       const { difyChatEndpoint } = getDifyConfig();
       const endpoint = difyChatEndpoint || '/v1/chatbot/chat-messages';
+
+      const callChat = (conversationId) => callDify({
+        endpoint,
+        query,
+        inputs: {},
+        conversationId,
+        returnMeta: true,
+      });
+
+      const isClassifierFail = (err) =>
+        /json block|invalid_param|Run failed|could not find json/i.test(String(err?.message || ''));
+
       let result;
+      let conversationId = isConversationBound() ? sessionId : '';
       try {
-        result = await callDify({
-          endpoint,
-          query,
-          inputs: {},
-          conversationId: isConversationBound() ? sessionId : '',
-          returnMeta: true,
-        });
+        result = await callChat(conversationId);
       } catch (firstErr) {
         const msg = String(firstErr?.message || '');
-        if (isConversationBound() && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
-          // 本地 id 失效（例如服务端清过会话）→ 重建
-          result = await callDify({
-            endpoint,
-            query,
-            inputs: {},
-            conversationId: '',
-            returnMeta: true,
-          });
+        // 本地 conversation 失效 → 重建会话再试
+        if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
+          conversationId = '';
+          persistConversationId(sessionId, false);
+          result = await callChat('');
+        } else if (isClassifierFail(firstErr)) {
+          // Question Classifier 偶发失败：短暂重试 1～2 次（Dify 已发布版问题，控制台草稿可能正常）
+          let lastErr = firstErr;
+          for (let i = 0; i < 2; i += 1) {
+            await new Promise((r) => setTimeout(r, 400 + i * 400));
+            try {
+              result = await callChat(conversationId);
+              lastErr = null;
+              break;
+            } catch (retryErr) {
+              lastErr = retryErr;
+              if (!isClassifierFail(retryErr)) break;
+            }
+          }
+          if (lastErr) throw lastErr;
         } else {
           throw firstErr;
         }
@@ -865,12 +883,12 @@ function initAiChatbot() {
       }
       typing.textContent = answer;
     } catch (err) {
-      // Surface API/classifier failures instead of silently substituting a local script
-      // that looks like a different "AI" answer from Dify preview.
       const msg = String(err?.message || '');
-      if (/json block|invalid_param|Run failed|HTTP|无法连接/i.test(msg)) {
+      if (/json block|invalid_param|Run failed|could not find json/i.test(msg)) {
         typing.textContent =
-          '道一助手暂时未能完成检索回答（服务端工作流异常）。请稍后重试；若 Dify 控制台预览正常，请确认预览的是「道一聊天机器人」Chatflow 的已发布版本，而不是其它工作流。';
+          '道一助手当前发布版工作流异常（问题分类节点未返回合法 JSON）。请在 Dify 打开「道一聊天机器人」Chatflow → 修复 Question Classifier → 点击发布后再试。控制台草稿预览正常不代表已发布版可用。';
+      } else if (/HTTP|无法连接/i.test(msg)) {
+        typing.textContent = `道一助手暂时无法连接（${msg}）。请稍后重试。`;
       } else {
         typing.textContent = buildLocalChatReply(text, ctx);
       }
