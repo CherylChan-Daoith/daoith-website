@@ -1722,6 +1722,28 @@ ul {
   object-fit: contain;
 }
 
+.ai-chatbot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-chatbot-new {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: transparent;
+  color: #fff;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.ai-chatbot-new:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .ai-chatbot-close {
   border: none;
   background: transparent;

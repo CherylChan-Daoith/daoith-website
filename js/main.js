@@ -640,7 +640,7 @@ function sanitizeAiAnswer(text) {
 
 function isKnowledgeMissRefusal(text) {
   const t = String(text || '');
-  return /知识库尚未收录|目前的知识库尚未|未在知识库|建议查阅官方税务局/.test(t);
+  return /知识库尚未收录|目前的知识库尚未|未在知识库|建议查阅官方税务局|信息还需补充，或者预约专家/.test(t);
 }
 
 function buildLocalChatReply(message, ctx) {
@@ -680,13 +680,63 @@ function initAiChatbot() {
   const fab = document.getElementById('aiChatbotFab');
   const panel = document.getElementById('aiChatbotPanel');
   const closeBtn = document.getElementById('aiChatbotClose');
+  const newBtn = document.getElementById('aiChatbotNew');
   const form = document.getElementById('aiChatbotForm');
   const input = document.getElementById('aiChatbotInput');
   const messages = document.getElementById('aiChatbotMessages');
   if (!root || !fab || !panel || !form || !input || !messages) return;
 
-  let conversationId = '';
+  const CONV_KEY = 'daoith_ai_conversation_id';
+  const COUNT_KEY = 'daoith_ai_ask_count';
+  const BOUND_KEY = 'daoith_ai_conversation_bound'; // '1' = id 已由 Dify 确认，可安全作为 conversation_id
+  const FREE_ASK_LIMIT = 10;
   let busy = false;
+
+  const newUuid = () =>
+    (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `c-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const getAskCount = () => {
+    const n = parseInt(localStorage.getItem(COUNT_KEY) || '0', 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+
+  const setAskCount = (n) => {
+    localStorage.setItem(COUNT_KEY, String(Math.max(0, n | 0)));
+  };
+
+  /** 打开页面时确保有会话 UUID；已有则复用（会话记忆） */
+  const ensureConversationId = () => {
+    let id = localStorage.getItem(CONV_KEY);
+    if (!id) {
+      id = newUuid();
+      localStorage.setItem(CONV_KEY, id);
+      localStorage.setItem(BOUND_KEY, '0');
+      setAskCount(0);
+    }
+    return id;
+  };
+
+  /** 新建对话 / 清空：清掉旧 UUID，生成新的 */
+  const resetConversation = () => {
+    const id = newUuid();
+    localStorage.setItem(CONV_KEY, id);
+    localStorage.setItem(BOUND_KEY, '0');
+    setAskCount(0);
+    return id;
+  };
+
+  const isConversationBound = () => localStorage.getItem(BOUND_KEY) === '1';
+
+  const persistConversationId = (id, bound) => {
+    if (!id) return;
+    localStorage.setItem(CONV_KEY, id);
+    localStorage.setItem(BOUND_KEY, bound ? '1' : '0');
+  };
+
+  // 新用户打开页面即生成会话 ID
+  ensureConversationId();
 
   const appendBubble = (text, who) => {
     const div = document.createElement('div');
@@ -696,15 +746,22 @@ function initAiChatbot() {
     messages.scrollTop = messages.scrollHeight;
   };
 
+  const clearMessages = () => {
+    messages.innerHTML = '';
+  };
+
+  const showWelcome = () => {
+    appendBubble(
+      '您好，我是道一合规助手。可就左侧方案中的出口方式、税负与行动建议继续提问；复杂事项建议预约专家1v1。',
+      'bot'
+    );
+  };
+
   const openChat = () => {
     root.dataset.state = 'open';
     panel.hidden = false;
-    if (!messages.childElementCount) {
-      appendBubble(
-        '您好，我是道一合规助手。可就左侧方案中的出口方式、税负与行动建议继续提问；复杂事项建议预约专家1v1。',
-        'bot'
-      );
-    }
+    ensureConversationId();
+    if (!messages.childElementCount) showWelcome();
     input.focus();
   };
 
@@ -713,13 +770,41 @@ function initAiChatbot() {
     panel.hidden = true;
   };
 
+  const startNewConversation = () => {
+    resetConversation();
+    clearMessages();
+    showWelcome();
+    input.value = '';
+    input.focus();
+  };
+
   fab.addEventListener('click', openChat);
   closeBtn?.addEventListener('click', closeChat);
+  newBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    startNewConversation();
+  });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = input.value.trim();
     if (!text || busy) return;
+
+    const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+    const askCount = getAskCount();
+    // 未登录用户提问超过 10 次后需微信登录
+    if (!loggedIn && askCount >= FREE_ASK_LIMIT) {
+      appendBubble(
+        '免费体验已达 10 次。请微信登录后继续咨询，登录后可保留当前会话记忆。',
+        'bot'
+      );
+      window.DAOITH_AUTH?.requireLogin?.(
+        'ai_chat',
+        `${window.location.pathname}${window.location.search}#ai-solution`
+      );
+      return;
+    }
+
     input.value = '';
     appendBubble(text, 'user');
     busy = true;
@@ -731,35 +816,64 @@ function initAiChatbot() {
     messages.scrollTop = messages.scrollHeight;
 
     const ctx = window.__daoithLastPlanCtx || null;
-    const contextBlock = [
-      '【回答规范】你是道一跨境电商财税合规助手。直接给出最终中文答案，禁止输出思考过程或推理草稿。',
-      '可回答海关编码归类参考、出口监管方式、退税与目的国税负等实务问题；不确定时说明需官方终核，不要仅以「知识库未收录」结束。',
-      '【出口退税硬规则】必须使用知识库字段「出口退税率」。严禁把「增值税税率」当成出口退税率。贵金属首饰（如镶钻银饰/金饰，税号71章）常见增值税13%、出口退税0%，二者不同。若知识库写出口退税率0%，必须答0%，不得改答13%。',
-      ctx
-        ? `客户业务背景：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}。`
-        : '',
-      `用户问题：${text}`,
-    ]
-      .filter(Boolean)
-      .join('\n');
+    // IMPORTANT: 道一聊天机器人 is a Chatflow with Question Classifier.
+    // Do NOT wrap the query with long system rules — that breaks classifier JSON
+    // parsing ("could not find json block") and the UI falls back to local replies,
+    // which diverge from Dify console preview. Keep query close to the user text.
+    const query = ctx
+      ? `${text}\n\n（业务背景：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}）`
+      : text;
 
+    const sessionId = ensureConversationId();
+    // 已绑定的会话：把 localStorage 中的 ID 作为 conversation_id 发给 Dify（会话记忆）。
+    // 全新 UUID：Dify 尚无此会话，首轮不传 id，成功后用返回的 conversation_id 覆盖本地。
     try {
       const { difyChatEndpoint } = getDifyConfig();
-      const result = await callDify({
-        endpoint: difyChatEndpoint || '/v1/chatbot/chat-messages',
-        query: contextBlock,
-        inputs: { task: 'compliance_chat' },
-        conversationId,
-        returnMeta: true,
-      });
-      conversationId = result.conversationId || conversationId;
+      const endpoint = difyChatEndpoint || '/v1/chatbot/chat-messages';
+      let result;
+      try {
+        result = await callDify({
+          endpoint,
+          query,
+          inputs: {},
+          conversationId: isConversationBound() ? sessionId : '',
+          returnMeta: true,
+        });
+      } catch (firstErr) {
+        const msg = String(firstErr?.message || '');
+        if (isConversationBound() && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
+          // 本地 id 失效（例如服务端清过会话）→ 重建
+          result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: '',
+            returnMeta: true,
+          });
+        } else {
+          throw firstErr;
+        }
+      }
+
+      const nextId = result.conversationId || sessionId;
+      persistConversationId(nextId, true);
+      setAskCount(askCount + 1);
+
       let answer = sanitizeAiAnswer(result.text);
       if (!answer || isAskAgainOrGenericFramework(answer) || isKnowledgeMissRefusal(answer)) {
         answer = buildLocalChatReply(text, ctx);
       }
       typing.textContent = answer;
-    } catch {
-      typing.textContent = buildLocalChatReply(text, ctx);
+    } catch (err) {
+      // Surface API/classifier failures instead of silently substituting a local script
+      // that looks like a different "AI" answer from Dify preview.
+      const msg = String(err?.message || '');
+      if (/json block|invalid_param|Run failed|HTTP|无法连接/i.test(msg)) {
+        typing.textContent =
+          '道一助手暂时未能完成检索回答（服务端工作流异常）。请稍后重试；若 Dify 控制台预览正常，请确认预览的是「道一聊天机器人」Chatflow 的已发布版本，而不是其它工作流。';
+      } else {
+        typing.textContent = buildLocalChatReply(text, ctx);
+      }
     } finally {
       busy = false;
       messages.scrollTop = messages.scrollHeight;
