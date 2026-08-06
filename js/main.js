@@ -638,6 +638,46 @@ function sanitizeAiAnswer(text) {
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** 把偏散文的答复整理成「结论加粗 + 要点列表」，便于扫读 */
+function enhanceChatMarkdown(text) {
+  let t = String(text || '').trim();
+  if (!t) return t;
+
+  // 已有标题 / 列表 / 加粗则只做轻度规范化
+  const structured = /^#{1,4}\s|^\s*[-*•]\s|^\s*\d+[.)、]\s|\*\*[^*\n]{2,}\*\*/m.test(t);
+  if (structured) {
+    // 把「标题：」单独成行并加粗，便于扫读
+    t = t.replace(/^(【?[^】\n]{2,20}】?)[:：]\s*$/gm, '**$1**');
+    t = t.replace(/^([一二三四五六七八九十]+[、.．]?\s*[^:\n]{2,24})[:：]\s*$/gm, '**$1**');
+    return t;
+  }
+
+  // 按句号/分号/换行拆成要点
+  const parts = t
+    .split(/(?<=[。！？；])\s*|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 1);
+
+  if (parts.length >= 2 && parts.length <= 10) {
+    const lead = parts[0].replace(/\*\*/g, '');
+    const rest = parts.slice(1).map((p) => `- ${p.replace(/\*\*/g, '')}`);
+    return `**${lead}**\n\n${rest.join('\n')}`;
+  }
+
+  // 单段：把首个短分句加粗作结论
+  const clause = t.match(/^(.{6,36}?)([，,：:].+)$/);
+  if (clause && !/\*\*/.test(t)) {
+    return `**${clause[1].replace(/\*\*/g, '')}**${clause[2]}`;
+  }
+  return t;
+}
+
+function renderChatBubbleHtml(text) {
+  const md = enhanceChatMarkdown(sanitizeAiAnswer(text));
+  const html = renderAIPlanHtml(md);
+  return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
+}
+
 function isKnowledgeMissRefusal(text) {
   const t = String(text || '');
   return /知识库尚未收录|目前的知识库尚未|未在知识库|建议查阅官方税务局|信息还需补充，或者预约专家/.test(t);
@@ -649,30 +689,92 @@ function buildLocalChatReply(message, ctx) {
   // Product → HS classification (common references; final check with Customs)
   if (/海关编码|HS\s*编码|税号|归类/.test(q) || (/编码/.test(q) && /(手机|电脑|耳机|服装|玩具)/.test(q))) {
     if (/手机|智能手机|iPhone|安卓/.test(q)) {
-      return '常见参考：智能手机多归入海关编码 8517.13（中国税则常见 85171300）。具体型号、是否带通信功能、是否成套等会影响归类，正式报关请以海关归类决定/预裁定为准。也可用左侧「HS 查询」核对退税率。';
+      return [
+        '**智能手机常见归类参考**',
+        '',
+        '- 税号参考：多归入 **8517.13**（中国税则常见 85171300）',
+        '- 注意：型号、通信功能、是否成套等会影响归类',
+        '- 正式报关请以海关归类决定 / 预裁定为准',
+        '- 可用左侧「HS 查询」核对退税率',
+      ].join('\n');
     }
     if (/笔记本|电脑|平板/.test(q)) {
-      return '常见参考：便携式自动数据处理设备（笔记本等）多归入 8471.30。正式报关请以海关归类决定为准，可用左侧「HS 查询」核对退税率。';
+      return [
+        '**便携式电脑常见归类参考**',
+        '',
+        '- 税号参考：多归入 **8471.30**',
+        '- 正式报关请以海关归类决定为准',
+        '- 可用左侧「HS 查询」核对退税率',
+      ].join('\n');
     }
-    return '海关编码（HS）需按商品材质、功能、用途做归类。可在左侧填写大致编码后用「查询出口退税率」核对；拿不准时建议预约专家1v1或申请海关预裁定。';
+    return [
+      '**海关编码（HS）归类提示**',
+      '',
+      '- 需按商品材质、功能、用途归类',
+      '- 可在左侧填写大致编码后查询出口退税率',
+      '- 拿不准时可预约专家1v1，或申请海关预裁定',
+    ].join('\n');
   }
 
   if (!ctx?.platform) {
-    return '我可以回答海关编码、出口方式、退税与税负等实务问题。若要结合您的店铺情况，请先在左侧填写业务信息并生成方案；复杂事项可预约专家1v1。';
+    return [
+      '**我可以协助的实务方向**',
+      '',
+      '- 海关编码与出口退税',
+      '- 出口方式与税负路径',
+      '- 结合店铺情况：请先在左侧填写业务信息并生成方案',
+      '- 复杂事项建议预约**专家1v1**',
+    ].join('\n');
   }
   if (/铝/.test(q) && /退税/.test(q) && /取消|停止|取消退税/.test(q)) {
-    return '根据财政部、税务总局调整出口退税政策的相关公告，铝材等产品取消出口退税，政策自2024年12月1日起实施（以公告原文及附件产品清单为准）。建议核对附件清单是否覆盖您的具体税号，并以税局/海关最新公告终核。';
+    return [
+      '**铝材出口退税政策要点**',
+      '',
+      '- 依据：财政部、税务总局调整出口退税政策相关公告',
+      '- 内容：铝材等产品**取消出口退税**',
+      '- 实施：自 **2024年12月1日** 起（以公告原文及附件清单为准）',
+      '- 建议：核对附件清单是否覆盖您的具体税号，并以税局 / 海关最新公告终核',
+    ].join('\n');
   }
   if (/退税|出口退税/.test(q)) {
-    return `结合您的出口方式「${ctx.exportModeLabel}」与发票情况「${ctx.invoiceLabel}」，退税关键是票货款一致与监管方式匹配。可先用「查询出口退税率」核对 HS「${ctx.hsCode}」，再按方案行动建议补齐单证。`;
+    return [
+      '**出口退税关注点**',
+      '',
+      `- 出口方式：${ctx.exportModeLabel || '未填写'}`,
+      `- 发票情况：${ctx.invoiceLabel || '未填写'}`,
+      '- 关键：票货款一致、监管方式匹配',
+      `- 建议：用「查询出口退税率」核对 HS「${ctx.hsCode || '未填写'}」，并按方案行动建议补齐单证`,
+    ].join('\n');
   }
   if (/关税|VAT|销售税|税负/.test(q)) {
-    return `针对目的国「${ctx.countryLabel}」、发货模式「${ctx.shippingLabel}」，请重点看方案中的税负影响分析，并用下方税负计算器粗算。关税请参考该国海关官方税则对 HS「${ctx.hsCode}」终核。`;
+    return [
+      '**税负与关税提示**',
+      '',
+      `- 目的国：${ctx.countryLabel || '未填写'}`,
+      `- 发货模式：${ctx.shippingLabel || '未填写'}`,
+      '- 建议先看方案中的税负影响分析，并用下方税负计算器粗算',
+      `- 关税终核：参考该国海关官方税则对 HS「${ctx.hsCode || '未填写'}」`,
+    ].join('\n');
   }
   if (/9610|9810|9710|0110|出口方式/.test(q)) {
-    return `您当前选择的出口方式是「${ctx.exportModeLabel}」。不同监管方式的报关、清单与退税路径不同，详情见方案业务流程图与行动建议。`;
+    return [
+      '**出口方式说明**',
+      '',
+      `- 当前选择：${ctx.exportModeLabel || '未填写'}`,
+      '- 不同监管方式的报关、清单与退税路径不同',
+      '- 详情见方案业务流程图与行动建议',
+    ].join('\n');
   }
-  return `已结合您的业务背景（${ctx.platformLabel} / ${ctx.entityLabel} / ${ctx.countryLabel} / ${ctx.exportModeLabel}）理解您的问题。更复杂的落地路径建议点击「专家1v1」加入询价单，由顾问结合账套与单证给出定制方案。`;
+  return [
+    '**已结合您的业务背景**',
+    '',
+    `- 平台：${ctx.platformLabel || '未填写'}`,
+    `- 主体：${ctx.entityLabel || '未填写'}`,
+    `- 目的国：${ctx.countryLabel || '未填写'}`,
+    `- 出口方式：${ctx.exportModeLabel || '未填写'}`,
+    '',
+    '更复杂的落地路径建议点击**专家1v1**加入询价单，由顾问结合账套与单证给出定制方案。',
+  ].join('\n');
 }
 
 function initAiChatbot() {
@@ -741,9 +843,21 @@ function initAiChatbot() {
   const appendBubble = (text, who) => {
     const div = document.createElement('div');
     div.className = `ai-chatbot-bubble ${who === 'user' ? 'is-user' : 'is-bot'}`;
-    div.textContent = text;
+    if (who === 'bot') {
+      div.classList.add('is-rich');
+      div.innerHTML = renderChatBubbleHtml(text);
+    } else {
+      div.textContent = text;
+    }
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
+    return div;
+  };
+
+  const setBotBubble = (el, text) => {
+    if (!el) return;
+    el.classList.add('is-bot', 'is-rich');
+    el.innerHTML = renderChatBubbleHtml(text);
   };
 
   const clearMessages = () => {
@@ -752,7 +866,16 @@ function initAiChatbot() {
 
   const showWelcome = () => {
     appendBubble(
-      '您好，我是道一合规助手。可就左侧方案中的出口方式、税负与行动建议继续提问；复杂事项建议预约专家1v1。',
+      [
+        '**您好，我是道一合规助手**',
+        '',
+        '可围绕以下主题继续提问：',
+        '- 出口方式与报关路径',
+        '- 税负与 VAT / 销售税',
+        '- 方案中的行动建议',
+        '',
+        '复杂落地事项建议预约**专家1v1**。',
+      ].join('\n'),
       'bot'
     );
   };
@@ -881,16 +1004,26 @@ function initAiChatbot() {
       if (!answer || isAskAgainOrGenericFramework(answer) || isKnowledgeMissRefusal(answer)) {
         answer = buildLocalChatReply(text, ctx);
       }
-      typing.textContent = answer;
+      setBotBubble(typing, answer);
     } catch (err) {
       const msg = String(err?.message || '');
       if (/json block|invalid_param|Run failed|could not find json/i.test(msg)) {
-        typing.textContent =
-          '道一助手当前发布版工作流异常（问题分类节点未返回合法 JSON）。请在 Dify 打开「道一聊天机器人」Chatflow → 修复 Question Classifier → 点击发布后再试。控制台草稿预览正常不代表已发布版可用。';
+        setBotBubble(
+          typing,
+          [
+            '**道一助手当前发布版工作流异常**',
+            '',
+            '- 原因：问题分类节点未返回合法 JSON',
+            '- 请在 Dify 打开「道一聊天机器人」Chatflow',
+            '- 修复 Question Classifier 后点击**发布**再试',
+            '',
+            '控制台草稿预览正常，不代表已发布版可用。',
+          ].join('\n')
+        );
       } else if (/HTTP|无法连接/i.test(msg)) {
-        typing.textContent = `道一助手暂时无法连接（${msg}）。请稍后重试。`;
+        setBotBubble(typing, `**暂时无法连接**\n\n- ${msg}\n- 请稍后重试`);
       } else {
-        typing.textContent = buildLocalChatReply(text, ctx);
+        setBotBubble(typing, buildLocalChatReply(text, ctx));
       }
     } finally {
       busy = false;

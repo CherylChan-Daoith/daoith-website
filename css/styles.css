@@ -1774,6 +1774,50 @@ ul {
   word-break: break-word;
 }
 
+.ai-chatbot-bubble.is-rich {
+  white-space: normal;
+}
+
+.ai-chatbot-bubble.is-rich .result-paragraph {
+  margin: 0 0 0.45em;
+  font-size: inherit;
+  line-height: 1.55;
+}
+
+.ai-chatbot-bubble.is-rich .result-paragraph:last-child {
+  margin-bottom: 0;
+}
+
+.ai-chatbot-bubble.is-rich .result-section-title,
+.ai-chatbot-bubble.is-rich .result-section-subtitle {
+  margin: 0.55em 0 0.3em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #0f1c3f;
+  line-height: 1.4;
+}
+
+.ai-chatbot-bubble.is-rich .result-section-title:first-child,
+.ai-chatbot-bubble.is-rich .result-section-subtitle:first-child,
+.ai-chatbot-bubble.is-rich .result-paragraph:first-child {
+  margin-top: 0;
+}
+
+.ai-chatbot-bubble.is-rich .result-list {
+  margin: 0.25em 0 0.45em;
+  padding-left: 1.15em;
+}
+
+.ai-chatbot-bubble.is-rich .result-list li {
+  margin: 0.2em 0;
+  padding-left: 0.15em;
+}
+
+.ai-chatbot-bubble.is-rich strong {
+  font-weight: 700;
+  color: #0f1c3f;
+}
+
 .ai-chatbot-bubble.is-bot {
   align-self: flex-start;
   background: #fff;
