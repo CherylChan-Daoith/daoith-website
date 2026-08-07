@@ -1254,16 +1254,8 @@ function extractHsFromRefundQuestion(message) {
 
 function formatStructuredRefundReply(kb, hsCode) {
   const matched = kb.hs_code || hsCode;
-  const lines = [
-    `**出口退税率：${kb.display || `${kb.rate}%`}**`,
-    '',
-    `- 商品编码：${matched}`,
-    `- 数据来源：${kb.source || 'Dify 出口退税率知识库'}`,
-    `- 说明：仅采用知识库「出口退税率」字段；**不要**把增值税税率当作退税率`,
-  ];
-  if (kb.message) lines.push(`- ${kb.message}`);
-  lines.push('- 实务申报请以国家税务总局出口退税率文库终核为准');
-  return lines.join('\n');
+  const rate = kb.display || `${kb.rate}%`;
+  return `${matched} 的出口退税率为 ${rate}。`;
 }
 
 function callDifyDutyRate(hsCode, countryLabel) {
@@ -1746,20 +1738,20 @@ function extractRatePercent(text) {
 function setHsRateSource(kind, result) {
   const el = document.getElementById('hsRateSource');
   if (!el) return;
-  if (!result) {
+  // 出口退税：只展示税率框，不展示来源/说明文案
+  if (kind === 'refund' || !result) {
     el.hidden = true;
     el.innerHTML = '';
     return;
   }
-  const title = kind === 'refund' ? '出口退税率' : '目的国关税';
+  const title = '目的国关税';
   const link = result.sourceUrl
     ? ` <a href="${escapeHtml(result.sourceUrl)}" target="_blank" rel="noopener noreferrer">官方查询</a>`
     : '';
   el.hidden = false;
   el.innerHTML =
     `<strong>${escapeHtml(title)}</strong>：${escapeHtml(result.display)}` +
-    `｜${escapeHtml(result.message || '')}` +
-    `｜来源：${escapeHtml(result.source || '')}` +
+    (result.message ? `｜${escapeHtml(result.message)}` : '') +
     link;
 }
 
@@ -1958,12 +1950,10 @@ function initAIForm() {
       }
 
       let result = null;
-      let fromKb = false;
       try {
         const kb = await lookupRefundRateFromKnowledgeBase(hsCode);
         if (kb && kb.ok && kb.rate != null) {
           result = kb;
-          fromKb = true;
         }
       } catch {
         // Fall back to local table when API/KB unavailable.
@@ -1971,17 +1961,10 @@ function initAIForm() {
 
       if (!result) {
         result = api.lookupRefundRate(hsCode);
-        if (result?.ok) {
-          result = {
-            ...result,
-            message: `${result.message || ''}（知识库未命中，已用本地参考）`.trim(),
-            source: `${result.source || '本地参考表'}｜本地回退`,
-          };
-        }
       }
 
       if (rateBox) rateBox.value = result.display || '—';
-      setHsRateSource('refund', result);
+      setHsRateSource('refund', null);
 
       if (result.ok && result.rate != null) {
         const refundInput = document.getElementById('taxRefund');
@@ -1989,9 +1972,7 @@ function initAIForm() {
       }
 
       if (!result.ok) {
-        alert(result.message || '未查到参考退税率，请核对 HS 编码后重试');
-      } else if (!fromKb && /本地回退/.test(result.source || '')) {
-        // Soft notice only in source line; avoid extra alert noise.
+        alert('未查到参考退税率，请核对海关编码后重试');
       }
     } catch (err) {
       if (rateBox) rateBox.value = '';
