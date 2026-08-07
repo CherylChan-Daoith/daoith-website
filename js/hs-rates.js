@@ -21,7 +21,7 @@
     };
   }
 
-  /** 常见商品编码出口退税率（%），优先于章目默认 */
+  /** 常见商品编码出口退税率（%），优先于章目默认；键可为 HS4/HS6/HS8 */
   const CN_REFUND_HS = {
     '392690': 13,
     '420222': 13,
@@ -39,11 +39,31 @@
     '950300': 13,
     '950450': 13,
     '950490': 13,
+    // 财政部 税务总局公告2024年第15号：自2024-12-01起取消铝材等出口退税（文库口径 0%）
+    '7601': 0,
+    '7602': 0,
+    '7603': 0,
+    '7604': 0,
+    '7605': 0,
+    '7606': 0,
+    '7607': 0,
+    '7608': 0,
+    '7609': 0,
+    '7610': 0,
+    '76101000': 0,
+    '76109000': 0,
+    '7611': 0,
+    '7612': 0,
+    '7613': 0,
+    '7614': 0,
+    '7615': 0,
+    '7616': 0,
   };
 
   /**
    * 章（前2位）出口退税率默认参考（%）
    * 口径：多数出口货物增值税退税率与征税率一致（13%/9% 等），以税局文库为准
+   * 注意：第76章铝及其制品受2024年第15号公告影响，多数铝材已取消退税，勿用章默认13%
    */
   const CN_REFUND_CHAPTER = {
     '01': 9, '02': 9, '03': 9, '04': 9, '05': 0,
@@ -61,7 +81,8 @@
     '61': 13, '62': 13, '63': 13, '64': 13, '65': 13,
     '66': 13, '67': 13, '68': 13, '69': 13, '70': 13,
     '71': 0, '72': 0, '73': 13, '74': 0, '75': 0,
-    '76': 13, '78': 0, '79': 0, '80': 0, '81': 0,
+    // 铝及其制品：2024-12-01 起铝材等取消退税，章默认改为 0（具体税号仍以文库为准）
+    '76': 0, '78': 0, '79': 0, '80': 0, '81': 0,
     '82': 13, '83': 13, '84': 13, '85': 13, '86': 13,
     '87': 13, '88': 13, '89': 13, '90': 13, '91': 13,
     '92': 13, '93': 0, '94': 13, '95': 13, '96': 13,
@@ -207,14 +228,27 @@
 
     let rate = null;
     let matchLevel = '';
-    if (hs.hs6 && CN_REFUND_HS[hs.hs6] != null) {
-      rate = CN_REFUND_HS[hs.hs6];
-      matchLevel = 'HS6';
-    } else if (hs.hs4 && CN_REFUND_HS[hs.hs4] != null) {
-      rate = CN_REFUND_HS[hs.hs4];
-      matchLevel = 'HS4';
-    } else if (hs.hs2 && CN_REFUND_CHAPTER[hs.hs2] != null) {
+    let matchKey = '';
+    // 精确优先：HS8 → HS6 → HS4 → 章目
+    const candidates = [
+      hs.digits.length >= 10 ? hs.digits.slice(0, 10) : '',
+      hs.hs8,
+      hs.hs6,
+      hs.hs4,
+    ].filter(Boolean);
+
+    for (const key of candidates) {
+      if (CN_REFUND_HS[key] != null) {
+        rate = CN_REFUND_HS[key];
+        matchKey = key;
+        matchLevel = key.length >= 8 ? 'HS8' : key.length >= 6 ? 'HS6' : 'HS4';
+        break;
+      }
+    }
+
+    if (rate == null && hs.hs2 && CN_REFUND_CHAPTER[hs.hs2] != null) {
       rate = CN_REFUND_CHAPTER[hs.hs2];
+      matchKey = hs.hs2;
       matchLevel = '章目';
     }
 
@@ -229,15 +263,20 @@
       };
     }
 
+    let message =
+      matchLevel === '章目'
+        ? `章目 ${hs.hs2} 参考退税率；请用完整税号在官方文库终核`
+        : `按 ${matchLevel}「${matchKey}」匹配的参考退税率`;
+    if (hs.hs2 === '76' || matchKey.startsWith('76')) {
+      message += '（铝及其制品受财政部税务总局公告2024年第15号影响，自2024-12-01起多数铝材取消出口退税）';
+    }
+
     return {
       ok: true,
       rate,
       display: `${rate}%`,
       matchLevel,
-      message:
-        matchLevel === '章目'
-          ? `章目 ${hs.hs2} 参考退税率；请用完整税号在官方文库终核`
-          : `按 ${matchLevel}「${hs.hs6 || hs.hs4}」匹配的参考退税率`,
+      message,
       source: '国家税务总局 / 海关总署公布税则（出口退税率文库）',
       sourceUrl: 'https://www.chinatax.gov.cn/',
     };
