@@ -1083,11 +1083,13 @@ function getDifyUserId() {
 function getDifyConfig() {
   return window.DAOITH_CONFIG || {
     difyApiBase: 'https://api.daoith.com',
+    notifyApiBase: 'https://api.daoith.com',
     difyEndpoint: '/v1/chat-messages',
     difyDiagnosisEndpoint: '/v1/chat-messages',
     difyHsRateEndpoint: '/v1/chat-messages',
     difyTaxCalcEndpoint: '/v1/chat-messages',
     difyChatEndpoint: '/v1/chatbot/chat-messages',
+    hsRefundApiPath: '/api/hs-refund-rate',
   };
 }
 
@@ -1207,6 +1209,28 @@ function callDifyHsRate(hsCode) {
 3. 第三行：简要说明（不超过40字；可同时注明增值税税率但不得与退税率混用）
 不要编造无法核实的税率；不确定时明确写「需人工核对官方税则」。`,
   });
+}
+
+/** Left-side HS refund lookup: Dataset Retrieve API (structured), not Chat LLM. */
+async function lookupRefundRateFromKnowledgeBase(hsCode) {
+  const cfg = getDifyConfig();
+  const base = (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
+  const path = cfg.hsRefundApiPath || '/api/hs-refund-rate';
+  const res = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hs_code: hsCode }),
+  });
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`退税率知识库返回异常（HTTP ${res.status}）`);
+  }
+  if (!res.ok) {
+    throw new Error(data.message || data.error || `知识库查询失败（HTTP ${res.status}）`);
+  }
+  return data;
 }
 
 function callDifyDutyRate(hsCode, countryLabel) {
@@ -1894,7 +1918,30 @@ function initAIForm() {
       if (!api?.lookupRefundRate) {
         throw new Error('税率查询组件未加载，请刷新页面后重试');
       }
-      const result = api.lookupRefundRate(hsCode);
+
+      let result = null;
+      let fromKb = false;
+      try {
+        const kb = await lookupRefundRateFromKnowledgeBase(hsCode);
+        if (kb && kb.ok && kb.rate != null) {
+          result = kb;
+          fromKb = true;
+        }
+      } catch {
+        // Fall back to local table when API/KB unavailable.
+      }
+
+      if (!result) {
+        result = api.lookupRefundRate(hsCode);
+        if (result?.ok) {
+          result = {
+            ...result,
+            message: `${result.message || ''}（知识库未命中，已用本地参考）`.trim(),
+            source: `${result.source || '本地参考表'}｜本地回退`,
+          };
+        }
+      }
+
       if (rateBox) rateBox.value = result.display || '—';
       setHsRateSource('refund', result);
 
@@ -1905,6 +1952,8 @@ function initAIForm() {
 
       if (!result.ok) {
         alert(result.message || '未查到参考退税率，请核对 HS 编码后重试');
+      } else if (!fromKb && /本地回退/.test(result.source || '')) {
+        // Soft notice only in source line; avoid extra alert noise.
       }
     } catch (err) {
       if (rateBox) rateBox.value = '';

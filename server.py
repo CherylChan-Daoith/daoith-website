@@ -10,11 +10,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import server_auth
+import hs_refund
 
 ROOT = Path(__file__).resolve().parent
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
 DEFAULT_MODEL = "deepseek-chat"
 DEFAULT_DIFY_BASE = "http://localhost/v1"
+DEFAULT_HS_REFUND_DATASET_ID = "ed8d40b7-9133-4691-a4ba-51f99825e62d"
 
 # Bypass system HTTP proxy (common cause of "Tunnel connection failed: 403")
 _NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
@@ -45,6 +47,18 @@ def load_dify_base():
     return load_env_value("DIFY_API_BASE") or DEFAULT_DIFY_BASE
 
 
+def load_dify_dataset_key():
+    return load_env_value("DIFY_DATASET_API_KEY")
+
+
+def load_hs_refund_dataset_id():
+    return (
+        load_env_value("DIFY_HS_REFUND_DATASET_ID")
+        or load_env_value("DIFY_DATASET_ID")
+        or DEFAULT_HS_REFUND_DATASET_ID
+    )
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
@@ -70,6 +84,9 @@ class Handler(SimpleHTTPRequestHandler):
                     "ok": True,
                     "deepseek_configured": bool(load_api_key()),
                     "dify_configured": bool(load_dify_key()),
+                    "hs_refund_kb_configured": bool(
+                        load_dify_dataset_key() and load_hs_refund_dataset_id()
+                    ),
                     "wechat_configured": bool(
                         load_env_value("WECHAT_APP_ID") and load_env_value("WECHAT_APP_SECRET")
                     ),
@@ -180,6 +197,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/dify":
             self.handle_dify()
             return
+        if path == "/api/hs-refund-rate":
+            self.handle_hs_refund_rate()
+            return
         if path == "/api/auth/wechat/login":
             length = int(self.headers.get("Content-Length", 0))
             try:
@@ -289,6 +309,51 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_json(502, {"error": str(e)})
 
+    def handle_hs_refund_rate(self):
+        api_key = load_dify_dataset_key()
+        dataset_id = load_hs_refund_dataset_id()
+        api_base = load_dify_base()
+        if not api_key or not dataset_id:
+            self.send_json(
+                503,
+                {
+                    "ok": False,
+                    "message": "未配置出口退税率知识库",
+                    "hint": "在 .env 设置 DIFY_DATASET_API_KEY 与 DIFY_HS_REFUND_DATASET_ID",
+                },
+            )
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            self.send_json(400, {"ok": False, "message": "请求体必须是 JSON"})
+            return
+
+        hs_code = str(body.get("hs_code") or body.get("hsCode") or "").strip()
+        if not hs_code:
+            self.send_json(400, {"ok": False, "message": "缺少 hs_code"})
+            return
+
+        try:
+            result = hs_refund.lookup_refund_rate(
+                hs_code,
+                api_base=api_base,
+                api_key=api_key,
+                dataset_id=dataset_id,
+            )
+            self.send_json(200, result)
+        except Exception as e:
+            self.send_json(
+                502,
+                {
+                    "ok": False,
+                    "message": f"知识库查询失败：{e}",
+                    "source": "Dify 出口退税率知识库",
+                },
+            )
+
     def handle_dify(self):
         api_key = self.headers.get("X-Dify-API-Key", "").strip() or load_dify_key()
         if not api_key:
@@ -369,10 +434,13 @@ def main():
     print("Exam prep:     http://localhost:{0}/exam-prep.html".format(port))
     print("DeepSeek proxy: POST /api/deepseek")
     print("Dify proxy:     POST /api/dify")
+    print("HS refund KB:   POST /api/hs-refund-rate")
     if not load_api_key():
         print("Warning: DEEPSEEK_API_KEY not set")
     if not load_dify_key():
         print("Info: DIFY_API_KEY not in .env — configure in exam-prep settings")
+    if not load_dify_dataset_key():
+        print("Info: DIFY_DATASET_API_KEY not in .env — HS refund KB lookup disabled")
     server.serve_forever()
 
 

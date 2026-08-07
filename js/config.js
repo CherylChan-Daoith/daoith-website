@@ -1,13 +1,16 @@
 /* Public API endpoints — no secrets in this file */
 window.DAOITH_CONFIG = {
   difyApiBase: 'https://api.daoith.com',
-  // Plan generation / HS / tax → original Dify app via /v1/chat-messages
-  // Floating chatbot → separate Chatflow via /v1/chatbot/chat-messages
+  // Plan generation / HS / tax → 「道一合规方案助手」via /v1/chat-messages
+  // Floating chatbot → 「道一聊天机器人」Chatflow via /v1/chatbot/chat-messages
+  // (Do not compare官网咨询 against an unrelated Workflow preview.)
   difyEndpoint: '/v1/chat-messages',
   difyDiagnosisEndpoint: '/v1/chat-messages',
   difyHsRateEndpoint: '/v1/chat-messages',
   difyTaxCalcEndpoint: '/v1/chat-messages',
   difyChatEndpoint: '/v1/chatbot/chat-messages',
+  // Left-side HS export rebate → Dataset Retrieve via Aliyun API (not Chat app)
+  hsRefundApiPath: '/api/hs-refund-rate',
   // WeChat Open Platform — AppID is public; AppSecret stays server-side only
   wechatAppId: 'wx1706a25af11cde09',
   wechatRedirectUri: 'https://www.daoith.com/auth/wechat-callback.html',
