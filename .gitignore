@@ -8,3 +8,9 @@ node_modules/
 data/dify-hs-codes/
 data/dify-hs-codes.zip
 data/dify-hs-upload/
+data/dify-hs-rebate/
+data/dify-hs-import-vat/
+
+.venv-pdf/
+data/deloitte-tax-highlights-pdf/
+data/deloitte-tax-highlights-md/
