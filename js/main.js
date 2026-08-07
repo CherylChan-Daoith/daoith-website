@@ -827,8 +827,61 @@ function initAiChatbot() {
   const CONV_KEY = 'daoith_ai_conversation_id';
   const COUNT_KEY = 'daoith_ai_ask_count';
   const BOUND_KEY = 'daoith_ai_conversation_bound'; // '1' = id 已由 Dify 确认，可安全作为 conversation_id
+  const ANSWER_CACHE_KEY = 'daoith_ai_answer_cache_v1';
   const FREE_ASK_LIMIT = 10;
+  const ANSWER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  const ANSWER_CACHE_MAX = 80;
   let busy = false;
+
+  const normalizeChatQuestion = (q) =>
+    String(q || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[？?。.！!，,、；;：:\s]/g, '')
+      .replace(/出口退税率是多少|出口退税是多少|退税率是多少|退税是多少/g, '出口退税率');
+
+  const readAnswerCache = () => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(ANSWER_CACHE_KEY) || '{}');
+      return raw && typeof raw === 'object' ? raw : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const writeAnswerCache = (map) => {
+    try {
+      localStorage.setItem(ANSWER_CACHE_KEY, JSON.stringify(map));
+    } catch {
+      /* ignore quota */
+    }
+  };
+
+  const getCachedAnswer = (question) => {
+    const key = normalizeChatQuestion(question);
+    if (!key) return '';
+    const map = readAnswerCache();
+    const hit = map[key];
+    if (!hit || !hit.answer) return '';
+    if (Date.now() - (hit.ts || 0) > ANSWER_CACHE_TTL_MS) {
+      delete map[key];
+      writeAnswerCache(map);
+      return '';
+    }
+    hit.ts = Date.now(); // LRU touch
+    writeAnswerCache(map);
+    return String(hit.answer);
+  };
+
+  const setCachedAnswer = (question, answer) => {
+    const key = normalizeChatQuestion(question);
+    const text = String(answer || '').trim();
+    if (!key || text.length < 4) return;
+    const map = readAnswerCache();
+    map[key] = { answer: text, ts: Date.now() };
+    const entries = Object.entries(map).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
+    writeAnswerCache(Object.fromEntries(entries.slice(0, ANSWER_CACHE_MAX)));
+  };
 
   const newUuid = () =>
     (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -959,9 +1012,18 @@ function initAiChatbot() {
     appendBubble(text, 'user');
     busy = true;
 
+    // 相同问题本地缓存：秒回，避免每次都走模型思考
+    const cached = getCachedAnswer(text);
+    if (cached) {
+      appendBubble(cached, 'bot');
+      busy = false;
+      messages.scrollTop = messages.scrollHeight;
+      return;
+    }
+
     const typing = document.createElement('div');
     typing.className = 'ai-chatbot-bubble is-bot';
-    typing.textContent = '正在思考…';
+    typing.textContent = '正在查询…';
     messages.appendChild(typing);
     messages.scrollTop = messages.scrollHeight;
 
@@ -979,8 +1041,10 @@ function initAiChatbot() {
         try {
           const kb = await lookupRefundRateFromKnowledgeBase(hsForRefund);
           if (kb?.ok && kb.rate != null) {
+            const reply = formatStructuredRefundReply(kb, hsForRefund);
             setAskCount(askCount + 1);
-            setBotBubble(typing, formatStructuredRefundReply(kb, hsForRefund));
+            setCachedAnswer(text, reply);
+            setBotBubble(typing, reply);
             return;
           }
         } catch {
@@ -1042,6 +1106,7 @@ function initAiChatbot() {
       if (!answer || answer.length < 8) {
         answer = result.text || buildLocalChatReply(text, ctx);
       }
+      setCachedAnswer(text, answer);
       setBotBubble(typing, answer);
     } catch (err) {
       const msg = String(err?.message || '');

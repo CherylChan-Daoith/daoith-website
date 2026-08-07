@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import json
 import re
+import time
 import urllib.error
 import urllib.request
 
 _NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+# In-process cache: identical HS lookups should not re-hit Dify every time
+_LOOKUP_CACHE: dict[str, tuple[float, dict]] = {}
+_LOOKUP_CACHE_TTL_SEC = 6 * 60 * 60
+_LOOKUP_CACHE_MAX = 500
 
 CODE_PATTERNS = [
     re.compile(r"【商品编码】\s*(\d{8,10})"),
@@ -140,6 +146,28 @@ def retrieve_dataset(
     return data.get("records") or []
 
 
+def _cache_get(cache_key: str) -> dict | None:
+    item = _LOOKUP_CACHE.get(cache_key)
+    if not item:
+        return None
+    ts, payload = item
+    if time.time() - ts > _LOOKUP_CACHE_TTL_SEC:
+        _LOOKUP_CACHE.pop(cache_key, None)
+        return None
+    return dict(payload)
+
+
+def _cache_set(cache_key: str, payload: dict) -> None:
+    if len(_LOOKUP_CACHE) >= _LOOKUP_CACHE_MAX:
+        # Drop oldest ~20%
+        oldest = sorted(_LOOKUP_CACHE.items(), key=lambda kv: kv[1][0])[
+            : max(1, _LOOKUP_CACHE_MAX // 5)
+        ]
+        for k, _ in oldest:
+            _LOOKUP_CACHE.pop(k, None)
+    _LOOKUP_CACHE[cache_key] = (time.time(), dict(payload))
+
+
 def lookup_refund_rate(
     hs_code: str,
     *,
@@ -156,6 +184,12 @@ def lookup_refund_rate(
             "message": "请填写10位海关编码以获得准确退税率（至少需8位才能检索）",
             "source": "Dify 出口退税率知识库",
         }
+
+    cache_key = f"{dataset_id}:{digits[:10] if len(digits) >= 10 else digits[:8]}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        cached["cached"] = True
+        return cached
 
     # 文库条目多为 8 位；用户常输 10 位申报编码 → 依次试 10 / 8 位
     targets = []
@@ -201,6 +235,7 @@ def lookup_refund_rate(
                             f"按商品编码「{hs}」匹配知识库出口退税率"
                             "（建议补足10位海关编码以便与申报编码一致）"
                         )
+                    _cache_set(cache_key, hit)
                     return hit
 
     return {
