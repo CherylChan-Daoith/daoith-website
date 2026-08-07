@@ -973,6 +973,21 @@ function initAiChatbot() {
     // 已绑定的会话：把 localStorage 中的 ID 作为 conversation_id 发给 Dify（会话记忆）。
     // 全新 UUID：Dify 尚无此会话，首轮不传 id，成功后用返回的 conversation_id 覆盖本地。
     try {
+      // 退税率 + 明确税号：走结构化知识库检索，避免聊天模型把增值税率当成退税率
+      const hsForRefund = extractHsFromRefundQuestion(text);
+      if (hsForRefund) {
+        try {
+          const kb = await lookupRefundRateFromKnowledgeBase(hsForRefund);
+          if (kb?.ok && kb.rate != null) {
+            setAskCount(askCount + 1);
+            setBotBubble(typing, formatStructuredRefundReply(kb, hsForRefund));
+            return;
+          }
+        } catch {
+          // Fall through to Chatflow if structured lookup fails.
+        }
+      }
+
       const { difyChatEndpoint } = getDifyConfig();
       const endpoint = difyChatEndpoint || '/v1/chatbot/chat-messages';
 
@@ -1223,6 +1238,32 @@ async function lookupRefundRateFromKnowledgeBase(hsCode) {
     throw new Error(data.message || data.error || `知识库查询失败（HTTP ${res.status}）`);
   }
   return data;
+}
+
+/** Extract HS digits from a refund-rate style chat question. */
+function extractHsFromRefundQuestion(message) {
+  const q = String(message || '').trim();
+  if (!/(出口退税|退税率|退税多少|退税是多少|退税率为|退税率是)/.test(q)) return '';
+  const labeled = q.match(
+    /(?:海关编码|商品编码|HS\s*Code|HS|税号|编码)\s*[:：]?\s*([0-9][0-9.\s]{6,16})/i
+  );
+  const raw = labeled?.[1] || (q.match(/\b(\d{8,12})\b/) || [])[1] || '';
+  const digits = String(raw).replace(/\D/g, '');
+  return digits.length >= 8 ? digits.slice(0, 10) : '';
+}
+
+function formatStructuredRefundReply(kb, hsCode) {
+  const matched = kb.hs_code || hsCode;
+  const lines = [
+    `**出口退税率：${kb.display || `${kb.rate}%`}**`,
+    '',
+    `- 商品编码：${matched}`,
+    `- 数据来源：${kb.source || 'Dify 出口退税率知识库'}`,
+    `- 说明：仅采用知识库「出口退税率」字段；**不要**把增值税税率当作退税率`,
+  ];
+  if (kb.message) lines.push(`- ${kb.message}`);
+  lines.push('- 实务申报请以国家税务总局出口退税率文库终核为准');
+  return lines.join('\n');
 }
 
 function callDifyDutyRate(hsCode, countryLabel) {
@@ -1897,6 +1938,11 @@ function initAIForm() {
     const hsCode = document.getElementById('hsCode').value.trim();
     if (!hsCode) {
       alert(window.DAOITH_t('alert.hsCode'));
+      return;
+    }
+    const hsDigits = hsCode.replace(/\D/g, '');
+    if (hsDigits.length < 8) {
+      alert('请填写10位海关编码以获得准确退税率（至少需8位数字）');
       return;
     }
 

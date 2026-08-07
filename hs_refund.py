@@ -153,14 +153,16 @@ def lookup_refund_rate(
             "ok": False,
             "rate": None,
             "display": "—",
-            "message": "请至少输入 8 位海关编码（建议 8–10 位）以便知识库精确匹配",
+            "message": "请填写10位海关编码以获得准确退税率（至少需8位才能检索）",
             "source": "Dify 出口退税率知识库",
         }
 
+    # 文库条目多为 8 位；用户常输 10 位申报编码 → 依次试 10 / 8 位
     targets = []
     for key in (digits[:10] if len(digits) >= 10 else "", digits[:8]):
         if key and key not in targets:
             targets.append(key)
+    input_digits = digits[:10] if len(digits) >= 10 else digits
 
     methods = ("full_text_search", "hybrid_search", "semantic_search")
     queries_for = lambda hs: (hs, f"【商品编码】{hs}", f"商品编码：{hs} 出口退税率")
@@ -188,6 +190,17 @@ def lookup_refund_rate(
                 if hit:
                     hit["search_method"] = method
                     hit["query"] = query
+                    if input_digits != hs:
+                        hit["message"] = (
+                            f"按商品编码「{hs}」匹配知识库出口退税率"
+                            f"（您输入 {input_digits}，文库精确匹配到前{len(hs)}位）"
+                        )
+                        hit["input_hs_code"] = input_digits
+                    elif len(input_digits) < 10:
+                        hit["message"] = (
+                            f"按商品编码「{hs}」匹配知识库出口退税率"
+                            "（建议补足10位海关编码以便与申报编码一致）"
+                        )
                     return hit
 
     return {

@@ -225,7 +225,7 @@
             <div class="form-group">
               <label>产品海关编码（HS Code） <span class="opt-mark">可选</span></label>
               <div class="hs-input-group">
-                <input type="text" id="hsCode" placeholder="如 9504.50.00" autocomplete="off">
+                <input type="text" id="hsCode" placeholder="请填写10位海关编码以获得准确退税率" inputmode="numeric" autocomplete="off" maxlength="14">
               </div>
               <div class="hs-actions">
                 <div class="hs-action-row">
@@ -237,7 +237,7 @@
                   <input type="text" class="hs-rate-box" id="dutyRateBox" readonly placeholder="—" aria-label="目的国关税税率">
                 </div>
               </div>
-              <p class="hs-hint" id="hsHint">出口退税率参考国家税务总局 / 海关总署公布税则；目的国关税参考该国海关官方税则（请先选择目的国）</p>
+              <p class="hs-hint" id="hsHint">请填写10位海关编码以获得准确退税率（知识库按完整税号精确匹配；不足10位时将尝试按前8位匹配）。目的国关税请先选择目的国后再查。</p>
               <p class="hs-rate-source" id="hsRateSource" hidden></p>
             </div>
             <div class="form-group">
@@ -894,7 +894,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260805o"></script>
+  <script src="/js/locales/en.js?v=20260807f"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260807d"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -905,6 +905,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260728b"></script>
   <script src="/js/hs-rates.js?v=20260807c"></script>
-  <script src="/js/main.js?v=20260807e"></script>
+  <script src="/js/main.js?v=20260807f"></script>
 </body>
 </html>
