@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Split customs HS DBF into two Dify knowledge bases.
+"""Split customs HS DBF into two Dify knowledge bases (Markdown).
 
 1) 出口退税率知识库 — only export rebate rate (no VAT / TSL)
 2) 进口增值税与暂定税率知识库 — only import VAT + provisional rate (no rebate)
+
+Outputs `.md` files for Dify upload.
 
 Usage:
   .venv-dbf/bin/python scripts/dbf_to_dify_split_kbs.py [/path/to/dbf-folder]
@@ -146,19 +148,21 @@ def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str
     alias_part = f"、{'、'.join(aliases)}" if aliases else ""
 
     lines = [
-        f"【商品编码】{code}",
-        f"【出口退税率问答】问：{code}、{name}{alias_part} 的出口退税率是多少？答：{rebate}。",
-        f"出口退税率：{rebate}",
-        f"出口退税率（仅此字段作答）：{rebate}",
-        f"商品名称：{name}",
+        f"## 商品编码 {code}",
+        "",
+        f"**出口退税率问答**：问：{code}、{name}{alias_part} 的出口退税率是多少？答：{rebate}。",
+        "",
+        f"- **出口退税率**：{rebate}",
+        f"- **出口退税率（仅此字段作答）**：{rebate}",
+        f"- **商品名称**：{name}",
     ]
     if aliases:
-        lines.append(f"常用别名：{'、'.join(aliases)}")
-    lines.append(f"商品编码：{code}")
+        lines.append(f"- **常用别名**：{'、'.join(aliases)}")
+    lines.append(f"- **商品编码**：{code}")
     if unit:
-        lines.append(f"计量单位：{unit}")
+        lines.append(f"- **计量单位**：{unit}")
     if dwcode:
-        lines.append(f"单位代码：{dwcode}")
+        lines.append(f"- **单位代码**：{dwcode}")
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
@@ -168,14 +172,15 @@ def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str
     ]:
         val = clean(cm.get(key))
         if val and val not in ("False", "True"):
-            lines.append(f"{label}：{val}")
+            lines.append(f"- **{label}**：{val}")
 
-    vline = validity_line(cm)
-    if vline:
-        lines.append(vline)
+    st, en = clean(cm.get("ST_DATE")), clean(cm.get("END_DATE"))
+    if st or en:
+        lines.append(f"- **有效期**：{st} ~ {en}")
 
+    lines.append("")
     lines.append(
-        f"关键词：出口退税率{rebate} 海关编码{code} HS{code} {name} {' '.join(aliases)}".rstrip()
+        f"**关键词**：出口退税率{rebate} 海关编码{code} HS{code} {name} {' '.join(aliases)}".rstrip()
     )
     lines.append("")
     lines.append("---")
@@ -190,20 +195,22 @@ def vat_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     alias_part = f"、{'、'.join(aliases)}" if aliases else ""
 
     lines = [
-        f"【商品编码】{code}",
-        f"【进口增值税税率问答】问：{code}、{name}{alias_part} 的进口增值税税率是多少？答：{vat}。",
-        f"进口增值税税率：{vat}",
-        f"增值税税率：{vat}",
-        f"暂定税率：{tsl}",
-        f"商品名称：{name}",
+        f"## 商品编码 {code}",
+        "",
+        f"**进口增值税税率问答**：问：{code}、{name}{alias_part} 的进口增值税税率是多少？答：{vat}。",
+        "",
+        f"- **进口增值税税率**：{vat}",
+        f"- **增值税税率**：{vat}",
+        f"- **暂定税率**：{tsl}",
+        f"- **商品名称**：{name}",
     ]
     if aliases:
-        lines.append(f"常用别名：{'、'.join(aliases)}")
-    lines.append(f"商品编码：{code}")
+        lines.append(f"- **常用别名**：{'、'.join(aliases)}")
+    lines.append(f"- **商品编码**：{code}")
     if unit:
-        lines.append(f"计量单位：{unit}")
+        lines.append(f"- **计量单位**：{unit}")
     if dwcode:
-        lines.append(f"单位代码：{dwcode}")
+        lines.append(f"- **单位代码**：{dwcode}")
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
@@ -213,14 +220,15 @@ def vat_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     ]:
         val = clean(cm.get(key))
         if val and val not in ("False", "True"):
-            lines.append(f"{label}：{val}")
+            lines.append(f"- **{label}**：{val}")
 
-    vline = validity_line(cm)
-    if vline:
-        lines.append(vline)
+    st, en = clean(cm.get("ST_DATE")), clean(cm.get("END_DATE"))
+    if st or en:
+        lines.append(f"- **有效期**：{st} ~ {en}")
 
+    lines.append("")
     lines.append(
-        f"关键词：进口增值税税率{vat} 暂定税率{tsl} 海关编码{code} HS{code} "
+        f"**关键词**：进口增值税税率{vat} 暂定税率{tsl} 海关编码{code} HS{code} "
         f"{name} {' '.join(aliases)}".rstrip()
     )
     lines.append("")
@@ -245,12 +253,15 @@ def write_kb(
         start_code = clean(chunk[0]["CODE"])
         end_code = clean(chunk[-1]["CODE"])
         idx = i // RECORDS_PER_FILE + 1
-        name = f"hs_{idx:03d}_{start_code}_{end_code}.txt"
+        name = f"hs_{idx:03d}_{start_code}_{end_code}.md"
         parts = [
-            f"{title}第 {idx} 批",
-            f"编码范围：{start_code} ~ {end_code}",
-            f"本文件共 {len(chunk)} 条。",
-            field_note,
+            f"# {title}第 {idx} 批",
+            "",
+            f"- **编码范围**：{start_code} ~ {end_code}",
+            f"- **本文件条数**：{len(chunk)}",
+            f"- **说明**：{field_note}",
+            "",
+            "---",
             "",
         ]
         for r in chunk:
@@ -283,7 +294,7 @@ def write_kb(
                 (batch_dir / fname).write_text(text, encoding="utf-8")
 
     for root in out_dirs:
-        (root / "README上传说明.txt").write_text(guide, encoding="utf-8")
+        (root / "README上传说明.md").write_text(guide, encoding="utf-8")
 
     return len(files), batch_count
 
@@ -333,26 +344,26 @@ def main() -> None:
             f"vat={parse_vat(sample)} tsl={parse_tsl(sample)}"
         )
 
-    rebate_guide = """如何上传到 Dify（出口退税率知识库）
+    rebate_guide = """# 如何上传到 Dify（出口退税率知识库）
 
-1. 新建知识库，名称建议：海关编码-出口退税率
-2. 不要上传 zip；每次最多 5 个文件（一个 batch 文件夹）
-3. 打开 batch-01，全选 .txt 上传 → 等索引完成 → 再传 batch-02
-4. 分段标识符：---
+1. 新建知识库，名称建议：`海关编码-出口退税率`
+2. 不要上传 zip；每次最多 5 个 **Markdown（.md）** 文件（一个 batch 文件夹）
+3. 打开 `batch-01`，全选 `.md` 上传 → 等索引完成 → 再传 `batch-02`
+4. 分段标识符：`---`
 5. 分段最大长度建议 1200，重叠 1
 6. 本库【仅含出口退税率】，不含增值税/暂定税率
 7. NOTE 无「退x」时，出口退税率记为 0%
 
-Chatflow 提示：查询出口退税时只检索本库，只回答「出口退税率」字段。
+Chatflow 提示：查询出口退税时只检索本库，只回答「出口退税率」字段。  
 官网左侧退税率查询也应绑定本库 Dataset ID。
 """
 
-    vat_guide = """如何上传到 Dify（进口增值税与暂定税率知识库）
+    vat_guide = """# 如何上传到 Dify（进口增值税与暂定税率知识库）
 
-1. 新建知识库，名称建议：海关编码-进口增值税与暂定税率
-2. 不要上传 zip；每次最多 5 个文件（一个 batch 文件夹）
-3. 打开 batch-01，全选 .txt 上传 → 等索引完成 → 再传 batch-02
-4. 分段标识符：---
+1. 新建知识库，名称建议：`海关编码-进口增值税与暂定税率`
+2. 不要上传 zip；每次最多 5 个 **Markdown（.md）** 文件（一个 batch 文件夹）
+3. 打开 `batch-01`，全选 `.md` 上传 → 等索引完成 → 再传 `batch-02`
+4. 分段标识符：`---`
 5. 分段最大长度建议 1200，重叠 1
 6. 本库【仅含进口增值税税率 + 暂定税率】，不含出口退税率
 

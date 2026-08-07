@@ -17,13 +17,17 @@ _LOOKUP_CACHE_MAX = 500
 
 CODE_PATTERNS = [
     re.compile(r"【商品编码】\s*(\d{8,10})"),
+    re.compile(r"##\s*商品编码\s+(\d{8,10})"),
+    re.compile(r"\*\*商品编码\*\*\s*[:：]\s*(\d{8,10})"),
     re.compile(r"商品编码\s*[:：]\s*(\d{8,10})"),
     re.compile(r"\bHS\s*(\d{8,10})\b", re.IGNORECASE),
 ]
 
 RATE_PATTERNS = [
-    re.compile(r"出口退税率（仅此字段作答）\s*[:：]\s*([\d.]+)\s*%"),
-    re.compile(r"出口退税率\s*[:：]\s*([\d.]+)\s*%"),
+    re.compile(r"出口退税率（仅此字段作答）\*?\*?\s*[:：]\s*([\d.]+)\s*%"),
+    re.compile(r"\*\*出口退税率（仅此字段作答）\*\*\s*[:：]\s*([\d.]+)\s*%"),
+    re.compile(r"\*\*出口退税率\*\*\s*[:：]\s*([\d.]+)\s*%"),
+    re.compile(r"出口退税率\*?\*?\s*[:：]\s*([\d.]+)\s*%"),
     re.compile(r"出口退税率\s*=\s*([\d.]+)\s*%"),
     re.compile(r"答：\s*([\d.]+)\s*%"),
 ]
@@ -75,6 +79,8 @@ def segment_matches_hs(content: str, hs: str) -> bool:
     # Exact field forms commonly used in the HS markdown KB
     markers = (
         f"【商品编码】{hs}",
+        f"## 商品编码 {hs}",
+        f"**商品编码**：{hs}",
         f"商品编码：{hs}",
         f"商品编码:{hs}",
         f"HS{hs}",
@@ -199,7 +205,12 @@ def lookup_refund_rate(
     input_digits = digits[:10] if len(digits) >= 10 else digits
 
     methods = ("full_text_search", "hybrid_search", "semantic_search")
-    queries_for = lambda hs: (hs, f"【商品编码】{hs}", f"商品编码：{hs} 出口退税率")
+    queries_for = lambda hs: (
+        hs,
+        f"## 商品编码 {hs}",
+        f"【商品编码】{hs}",
+        f"商品编码：{hs} 出口退税率",
+    )
 
     last_error = ""
     for hs in targets:
