@@ -844,7 +844,7 @@ function initAiChatbot() {
   const CONV_KEY = 'daoith_ai_conversation_id';
   const COUNT_KEY = 'daoith_ai_ask_count';
   const BOUND_KEY = 'daoith_ai_conversation_bound'; // '1' = id 已由 Dify 确认，可安全作为 conversation_id
-  const ANSWER_CACHE_KEY = 'daoith_ai_answer_cache_v1';
+  const ANSWER_CACHE_KEY = 'daoith_ai_answer_cache_v2';
   const FREE_ASK_LIMIT = 10;
   const ANSWER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
   const ANSWER_CACHE_MAX = 80;
@@ -1052,21 +1052,23 @@ function initAiChatbot() {
     // 已绑定的会话：把 localStorage 中的 ID 作为 conversation_id 发给 Dify（会话记忆）。
     // 全新 UUID：Dify 尚无此会话，首轮不传 id，成功后用返回的 conversation_id 覆盖本地。
     try {
-      // 退税率 + 明确税号：走结构化知识库检索，避免聊天模型把增值税率当成退税率
+      // 退税率 + 明确税号：与左侧查询同一路径（知识库 → 本地表），禁止交给聊天模型编造
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
-        try {
-          const kb = await lookupRefundRateFromKnowledgeBase(hsForRefund);
-          if (kb?.ok && kb.rate != null) {
-            const reply = formatStructuredRefundReply(kb, hsForRefund);
-            setAskCount(askCount + 1);
-            setCachedAnswer(text, reply);
-            setBotBubble(typing, reply);
-            return;
-          }
-        } catch {
-          // Fall through to Chatflow if structured lookup fails.
+        const resolved = await resolveExportRefundRate(hsForRefund);
+        if (resolved?.ok && resolved.rate != null) {
+          const reply = formatStructuredRefundReply(resolved, hsForRefund);
+          setAskCount(askCount + 1);
+          setCachedAnswer(text, reply);
+          setBotBubble(typing, reply);
+          return;
         }
+        setAskCount(askCount + 1);
+        setBotBubble(
+          typing,
+          `未查到海关编码 ${hsForRefund} 的出口退税率，请核对编码后重试，或以国家税务总局出口退税率文库为准。`
+        );
+        return;
       }
 
       const { difyChatEndpoint } = getDifyConfig();
@@ -1411,19 +1413,37 @@ async function lookupRefundRateFromKnowledgeBase(hsCode) {
 /** Extract HS digits from a refund-rate style chat question. */
 function extractHsFromRefundQuestion(message) {
   const q = String(message || '').trim();
-  if (!/(出口退税|退税率|退税多少|退税是多少|退税率为|退税率是)/.test(q)) return '';
+  if (!/(出口退税|退税率|退税多少|退税是多少|退税率为|退税率是|退税)/.test(q)) return '';
   const labeled = q.match(
     /(?:海关编码|商品编码|HS\s*Code|HS|税号|编码)\s*[:：]?\s*([0-9][0-9.\s]{6,16})/i
   );
-  const raw = labeled?.[1] || (q.match(/\b(\d{8,12})\b/) || [])[1] || '';
+  const loose = q.match(/(\d{8,12})/);
+  const raw = labeled?.[1] || loose?.[1] || '';
   const digits = String(raw).replace(/\D/g, '');
   return digits.length >= 8 ? digits.slice(0, 10) : '';
+}
+
+/** Same resolution path as left-side HS query: KB first, then local table. */
+async function resolveExportRefundRate(hsCode) {
+  try {
+    const kb = await lookupRefundRateFromKnowledgeBase(hsCode);
+    if (kb?.ok && kb.rate != null) return kb;
+  } catch {
+    // continue to local table
+  }
+  const api = window.DAOITH_HS_RATES;
+  if (api?.lookupRefundRate) {
+    return api.lookupRefundRate(hsCode);
+  }
+  return { ok: false, rate: null, display: '—' };
 }
 
 function formatStructuredRefundReply(kb, hsCode) {
   const matched = kb.hs_code || hsCode;
   const rate = kb.display || `${kb.rate}%`;
-  return `${matched} 的出口退税率为 ${rate}。`;
+  // Prefer 8-digit matched code in reply when input was 10-digit
+  const show = String(matched).replace(/\D/g, '').slice(0, 10) || hsCode;
+  return `${show} 的出口退税率为 ${rate}。`;
 }
 
 function callDifyDutyRate(hsCode, countryLabel) {
