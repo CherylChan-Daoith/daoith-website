@@ -607,14 +607,24 @@ function renderPlanFaqs(ctx) {
 }
 
 function sanitizeAiAnswer(text) {
-  let t = String(text || '');
+  const raw = String(text || '');
+  let t = raw;
 
   // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
   const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
 
+  // Prefer text after the last closed think block (formal answer usually follows)
+  for (const name of tagNames) {
+    const afterClose = new RegExp(`<\\s*\\/\\s*${name}\\s*>\\s*([\\s\\S]*)$`, 'i');
+    const m = t.match(afterClose);
+    if (m && m[1] && m[1].trim().length >= 8) {
+      t = m[1];
+      break;
+    }
+  }
+
   // 默认：丢弃思考标签内容，只用标签外正式答复。
-  // 仅当标签外为空/短标题，且标签内不像推理草稿时，才回退用标签内。
   let outside = t;
   const insides = [];
   for (const name of tagNames) {
@@ -641,7 +651,7 @@ function sanitizeAiAnswer(text) {
     );
 
   outside = clean(outside);
-  let inside = clean(insides.join('\n\n'));
+  const inside = clean(insides.join('\n\n'));
 
   const outsideLooksStub =
     !outside ||
@@ -653,7 +663,6 @@ function sanitizeAiAnswer(text) {
   } else if (inside && !looksLikeCot(inside)) {
     t = inside;
   } else if (inside) {
-    // 标签内全是推理时，尽量截出末尾结论句
     const parts = inside.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
     const last = parts[parts.length - 1] || '';
     t = (!looksLikeCot(last) && last.length < 220 ? last : '') || outside || '';
@@ -670,7 +679,6 @@ function sanitizeAiAnswer(text) {
     if (m) t = m[0];
   }
 
-  // Generic: remove a long Chinese reasoning preamble before the last short paragraph
   if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想/.test(t)) {
     const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
@@ -678,7 +686,16 @@ function sanitizeAiAnswer(text) {
     }
   }
 
-  return clean(t);
+  t = clean(t);
+  // Last resort: never show a blank bubble if the model did return something
+  if (!t && raw.trim()) {
+    t = clean(
+      raw
+        .replace(new RegExp(`<\\s*${think}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${think}\\s*>`, 'gi'), '\n')
+        .replace(new RegExp(`<\\s*\\/?\\s*${think}\\b[^>]*>`, 'gi'), '')
+    );
+  }
+  return t;
 }
 
 /** 轻度排版：已有列表/加粗则原样渲染，避免改写 Dify 完整答复 */
@@ -1104,7 +1121,13 @@ function initAiChatbot() {
       // 优先完整展示 Dify 原文，不再用本地短回复覆盖有效答案
       let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
-        answer = result.text || buildLocalChatReply(text, ctx);
+        answer = sanitizeAiAnswer(result.text) || result.text || buildLocalChatReply(text, ctx);
+      }
+      answer = sanitizeAiAnswer(answer) || answer;
+      if (!answer || answer.length < 4) {
+        // Force a fresh conversation next time; stale conversation_id often yields blank payloads
+        persistConversationId(newUuid(), false);
+        throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
       setCachedAnswer(text, answer);
       setBotBubble(typing, answer);
@@ -1152,6 +1175,31 @@ function getDifyUserId() {
   return id;
 }
 
+/** Reset chatbot conversation when WeChat login identity changes (Dify ties chats to user). */
+function syncDifyUserConversation() {
+  const USER_MARK = 'daoith_dify_user_mark';
+  const current = getDifyUserId();
+  const prev = localStorage.getItem(USER_MARK) || '';
+  if (prev && prev !== current) {
+    localStorage.removeItem('daoith_ai_conversation_id');
+    localStorage.setItem('daoith_ai_conversation_bound', '0');
+  }
+  localStorage.setItem(USER_MARK, current);
+}
+
+window.addEventListener('daoith-auth-change', () => {
+  try {
+    syncDifyUserConversation();
+  } catch {
+    /* ignore */
+  }
+});
+try {
+  syncDifyUserConversation();
+} catch {
+  /* ignore */
+}
+
 function getDifyConfig() {
   return window.DAOITH_CONFIG || {
     difyApiBase: 'https://api.daoith.com',
@@ -1182,25 +1230,52 @@ function buildDifyInputs(ctx) {
 }
 
 function extractDifyAnswer(data) {
-  if (typeof data.answer === 'string' && data.answer.trim()) {
-    return data.answer.trim();
+  if (!data || typeof data !== 'object') return '';
+
+  const candidates = [];
+  if (typeof data.answer === 'string') candidates.push(data.answer);
+  if (Array.isArray(data.answer)) {
+    candidates.push(
+      data.answer
+        .map((x) => (typeof x === 'string' ? x : x?.text || x?.content || ''))
+        .join('\n')
+    );
+  }
+  if (typeof data.answer === 'object' && data.answer) {
+    for (const key of ['text', 'content', 'answer', 'output']) {
+      if (typeof data.answer[key] === 'string') candidates.push(data.answer[key]);
+    }
   }
 
   const outputs = data.data?.outputs;
   if (outputs) {
-    if (typeof outputs === 'string' && outputs.trim()) return outputs.trim();
-    const keys = ['text', 'result', 'answer', 'output', 'report'];
-    for (const key of keys) {
-      if (typeof outputs[key] === 'string' && outputs[key].trim()) {
-        return outputs[key].trim();
+    if (typeof outputs === 'string') candidates.push(outputs);
+    else if (typeof outputs === 'object') {
+      for (const key of ['text', 'result', 'answer', 'output', 'report']) {
+        if (typeof outputs[key] === 'string') candidates.push(outputs[key]);
       }
     }
   }
 
-  if (typeof data.message === 'string' && data.message.trim()) {
-    return data.message.trim();
+  if (typeof data.message === 'string') candidates.push(data.message);
+  if (typeof data.text === 'string') candidates.push(data.text);
+
+  // Some builds put usable text only under metadata / reasoning payloads
+  const meta = data.metadata;
+  if (meta && typeof meta === 'object') {
+    if (typeof meta.annotation_reply === 'string') candidates.push(meta.annotation_reply);
+    const reasoning = meta.reasoning;
+    if (typeof reasoning === 'string') candidates.push(reasoning);
+    else if (reasoning && typeof reasoning === 'object') {
+      for (const key of ['text', 'content', 'answer', 'summary']) {
+        if (typeof reasoning[key] === 'string') candidates.push(reasoning[key]);
+      }
+    }
   }
 
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
   return '';
 }
 
@@ -1209,46 +1284,74 @@ async function callDify({ endpoint, inputs, query, conversationId, returnMeta })
   const path = endpoint || cfg.difyEndpoint || '/v1/chat-messages';
   const url = `${cfg.difyApiBase}${path}`;
 
-  const payload = {
-    inputs: inputs || {},
-    query,
-    response_mode: 'blocking',
-    user: getDifyUserId(),
+  const postOnce = async (cid) => {
+    const payload = {
+      inputs: inputs || {},
+      query,
+      response_mode: 'blocking',
+      user: getDifyUserId(),
+    };
+    if (cid) payload.conversation_id = cid;
+
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      throw new Error('无法连接道一 AI 服务（api.daoith.com），请检查网络或稍后重试');
+    }
+
+    let data;
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`AI 服务返回异常（HTTP ${res.status}）`);
+    }
+
+    return { res, data, cid };
   };
-  if (conversationId) payload.conversation_id = conversationId;
 
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    throw new Error('无法连接道一 AI 服务（api.daoith.com），请检查网络或稍后重试');
-  }
-
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`AI 服务返回异常（HTTP ${res.status}）`);
-  }
+  let { res, data, cid } = await postOnce(conversationId || '');
 
   if (!res.ok) {
     const msg = data.message || data.error || data.code || `请求失败（HTTP ${res.status}）`;
-    throw new Error(msg);
+    // Stale conversation / user mismatch → retry as a fresh chat once
+    if (
+      conversationId &&
+      /conversation|not exist|not_found|无效|Conversation|user/i.test(String(msg))
+    ) {
+      ({ res, data, cid } = await postOnce(''));
+      if (!res.ok) {
+        const msg2 = data.message || data.error || data.code || `请求失败（HTTP ${res.status}）`;
+        throw new Error(msg2);
+      }
+    } else {
+      throw new Error(msg);
+    }
   }
 
-  const text = extractDifyAnswer(data);
+  let text = extractDifyAnswer(data);
+  // Empty answer with an old conversation_id is a common Chatflow glitch — retry fresh once
+  if (!text && conversationId) {
+    ({ res, data, cid } = await postOnce(''));
+    if (!res.ok) {
+      const msg = data.message || data.error || data.code || `请求失败（HTTP ${res.status}）`;
+      throw new Error(msg);
+    }
+    text = extractDifyAnswer(data);
+  }
+
   if (!text) {
-    throw new Error('AI 返回内容为空，请检查 Dify 应用输出配置');
+    throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
   }
 
   if (returnMeta) {
     return {
       text,
-      conversationId: data.conversation_id || conversationId || '',
+      conversationId: data.conversation_id || cid || conversationId || '',
     };
   }
   return text;
