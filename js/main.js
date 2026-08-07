@@ -612,9 +612,51 @@ function sanitizeAiAnswer(text) {
   // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
   const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
+
+  // 部分模型会把正式答复写在 <think> 内、外面只留短标题。
+  // 策略：分别取「标签外」与「标签内」文本，保留更完整的那段。
+  let outside = t;
+  const insides = [];
   for (const name of tagNames) {
-    t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '');
-    t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+    const blockRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*?)<\\s*\\/\\s*${name}\\s*>`, 'gi');
+    outside = outside.replace(blockRe, (_, inner) => {
+      if (inner && String(inner).trim()) insides.push(String(inner).trim());
+      return '\n';
+    });
+    // 未闭合的思考块：从开标签截到文末
+    const unclosedRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*)$`, 'i');
+    const m = outside.match(unclosedRe);
+    if (m && m[1] && m[1].trim().length > 40) {
+      insides.push(m[1].trim());
+      outside = outside.replace(unclosedRe, '\n');
+    }
+    outside = outside.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+  }
+
+  const clean = (s) =>
+    String(s || '')
+      .replace(/^\s*thinking[:：].*$/gim, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+
+  outside = clean(outside);
+  const inside = clean(insides.join('\n\n'));
+
+  // 若标签外只是短标题/空，而标签内有完整答复，采用标签内
+  const outsideLooksStub =
+    !outside ||
+    outside.length < 40 ||
+    (/的海关编码归类|常见归类参考|归类提示/.test(outside) && outside.length < 80);
+
+  if (inside && (outsideLooksStub || inside.length > outside.length * 1.2)) {
+    // 思考块里常混有推理；若含列表/编码等答案特征则采用
+    if (/HS|海关编码|退税率|^\s*[-*•]/m.test(inside) || inside.length > 120) {
+      t = inside;
+    } else {
+      t = outside || inside;
+    }
+  } else {
+    t = outside || inside;
   }
 
   // Drop leading CoT if it ends with a short final refusal / conclusion
@@ -634,40 +676,42 @@ function sanitizeAiAnswer(text) {
     }
   }
 
-  t = t.replace(/^\s*thinking[:：].*$/gim, '');
-  return t.replace(/\n{3,}/g, '\n\n').trim();
+  // 若采用了思考块内容，尽量去掉纯推理开头，从「正式答复」特征处截取
+  if (inside && t === inside) {
+    const cut = t.split(
+      /(?=(?:根据知识库|常见分类如下|以下是常见|对应的海关编码|建议参考\s*\*\*|[-*•]\s*\*\*))/
+    );
+    if (cut.length > 1 && cut.slice(1).join('').trim().length > 80) {
+      t = cut.slice(1).join('').trim();
+    }
+  }
+
+  return clean(t);
 }
 
-/** 把偏散文的答复整理成「结论加粗 + 要点列表」，便于扫读 */
+/** 轻度排版：已有列表/加粗则原样渲染，避免改写 Dify 完整答复 */
 function enhanceChatMarkdown(text) {
   let t = String(text || '').trim();
   if (!t) return t;
 
-  // 已有标题 / 列表 / 加粗则只做轻度规范化
-  const structured = /^#{1,4}\s|^\s*[-*•]\s|^\s*\d+[.)、]\s|\*\*[^*\n]{2,}\*\*/m.test(t);
-  if (structured) {
-    // 把「标题：」单独成行并加粗，便于扫读
+  // 已有结构：只做标题行加粗，不拆句重写
+  if (/^#{1,4}\s|^\s*[-*•]\s|^\s*\d+[.)、]\s|\*\*[^*\n]{2,}\*\*/m.test(t)) {
     t = t.replace(/^(【?[^】\n]{2,20}】?)[:：]\s*$/gm, '**$1**');
-    t = t.replace(/^([一二三四五六七八九十]+[、.．]?\s*[^:\n]{2,24})[:：]\s*$/gm, '**$1**');
     return t;
   }
 
-  // 按句号/分号/换行拆成要点
+  // 短散文才整理；长文保持原样，防止丢内容
+  if (t.length > 220 || t.split('\n').length > 4) return t;
+
   const parts = t
-    .split(/(?<=[。！？；])\s*|\n+/)
+    .split(/(?<=[。！？；])\s*/)
     .map((s) => s.trim())
     .filter((s) => s.length > 1);
 
-  if (parts.length >= 2 && parts.length <= 10) {
+  if (parts.length >= 2 && parts.length <= 6) {
     const lead = parts[0].replace(/\*\*/g, '');
     const rest = parts.slice(1).map((p) => `- ${p.replace(/\*\*/g, '')}`);
     return `**${lead}**\n\n${rest.join('\n')}`;
-  }
-
-  // 单段：把首个短分句加粗作结论
-  const clause = t.match(/^(.{6,36}?)([，,：:].+)$/);
-  if (clause && !/\*\*/.test(t)) {
-    return `**${clause[1].replace(/\*\*/g, '')}**${clause[2]}`;
   }
   return t;
 }
@@ -930,13 +974,8 @@ function initAiChatbot() {
     messages.scrollTop = messages.scrollHeight;
 
     const ctx = window.__daoithLastPlanCtx || null;
-    // IMPORTANT: 道一聊天机器人 is a Chatflow with Question Classifier.
-    // Do NOT wrap the query with long system rules — that breaks classifier JSON
-    // parsing ("could not find json block") and the UI falls back to local replies,
-    // which diverge from Dify console preview. Keep query close to the user text.
-    const query = ctx
-      ? `${text}\n\n（业务背景：平台${ctx.platformLabel}，主体${ctx.entityLabel}，目的国${ctx.countryLabel}，HS${ctx.hsCode}，出口方式${ctx.exportModeLabel}，发货模式${ctx.shippingLabel}）`
-      : text;
+    // Keep query close to the user text — wrapping long context breaks classifier / answers.
+    const query = text;
 
     const sessionId = ensureConversationId();
     // 已绑定的会话：把 localStorage 中的 ID 作为 conversation_id 发给 Dify（会话记忆）。
@@ -991,9 +1030,10 @@ function initAiChatbot() {
       persistConversationId(nextId, true);
       setAskCount(askCount + 1);
 
+      // 优先完整展示 Dify 原文，不再用本地短回复覆盖有效答案
       let answer = sanitizeAiAnswer(result.text);
-      if (!answer || isAskAgainOrGenericFramework(answer) || isKnowledgeMissRefusal(answer)) {
-        answer = buildLocalChatReply(text, ctx);
+      if (!answer || answer.length < 8) {
+        answer = result.text || buildLocalChatReply(text, ctx);
       }
       setBotBubble(typing, answer);
     } catch (err) {
@@ -1014,7 +1054,10 @@ function initAiChatbot() {
       } else if (/HTTP|无法连接/i.test(msg)) {
         setBotBubble(typing, `**暂时无法连接**\n\n- ${msg}\n- 请稍后重试`);
       } else {
-        setBotBubble(typing, buildLocalChatReply(text, ctx));
+        setBotBubble(
+          typing,
+          `**暂时未能完成回答**\n\n- ${msg || '未知错误'}\n- 请点击「新建对话」后重试`
+        );
       }
     } finally {
       busy = false;
