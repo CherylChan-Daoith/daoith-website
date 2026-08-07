@@ -613,8 +613,8 @@ function sanitizeAiAnswer(text) {
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
   const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
 
-  // 部分模型会把正式答复写在 <think> 内、外面只留短标题。
-  // 策略：分别取「标签外」与「标签内」文本，保留更完整的那段。
+  // 默认：丢弃思考标签内容，只用标签外正式答复。
+  // 仅当标签外为空/短标题，且标签内不像推理草稿时，才回退用标签内。
   let outside = t;
   const insides = [];
   for (const name of tagNames) {
@@ -623,13 +623,9 @@ function sanitizeAiAnswer(text) {
       if (inner && String(inner).trim()) insides.push(String(inner).trim());
       return '\n';
     });
-    // 未闭合的思考块：从开标签截到文末
+    // 未闭合的思考块：整段丢弃（不当作答复）
     const unclosedRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*)$`, 'i');
-    const m = outside.match(unclosedRe);
-    if (m && m[1] && m[1].trim().length > 40) {
-      insides.push(m[1].trim());
-      outside = outside.replace(unclosedRe, '\n');
-    }
+    outside = outside.replace(unclosedRe, '\n');
     outside = outside.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
   }
 
@@ -639,24 +635,30 @@ function sanitizeAiAnswer(text) {
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
-  outside = clean(outside);
-  const inside = clean(insides.join('\n\n'));
+  const looksLikeCot = (s) =>
+    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库/.test(
+      s || ''
+    );
 
-  // 若标签外只是短标题/空，而标签内有完整答复，采用标签内
+  outside = clean(outside);
+  let inside = clean(insides.join('\n\n'));
+
   const outsideLooksStub =
     !outside ||
-    outside.length < 40 ||
+    outside.length < 24 ||
     (/的海关编码归类|常见归类参考|归类提示/.test(outside) && outside.length < 80);
 
-  if (inside && (outsideLooksStub || inside.length > outside.length * 1.2)) {
-    // 思考块里常混有推理；若含列表/编码等答案特征则采用
-    if (/HS|海关编码|退税率|^\s*[-*•]/m.test(inside) || inside.length > 120) {
-      t = inside;
-    } else {
-      t = outside || inside;
-    }
+  if (!outsideLooksStub) {
+    t = outside;
+  } else if (inside && !looksLikeCot(inside)) {
+    t = inside;
+  } else if (inside) {
+    // 标签内全是推理时，尽量截出末尾结论句
+    const parts = inside.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    t = (!looksLikeCot(last) && last.length < 220 ? last : '') || outside || '';
   } else {
-    t = outside || inside;
+    t = outside;
   }
 
   // Drop leading CoT if it ends with a short final refusal / conclusion
@@ -669,20 +671,10 @@ function sanitizeAiAnswer(text) {
   }
 
   // Generic: remove a long Chinese reasoning preamble before the last short paragraph
-  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下/.test(t)) {
+  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想/.test(t)) {
     const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
       t = parts[parts.length - 1];
-    }
-  }
-
-  // 若采用了思考块内容，尽量去掉纯推理开头，从「正式答复」特征处截取
-  if (inside && t === inside) {
-    const cut = t.split(
-      /(?=(?:根据知识库|常见分类如下|以下是常见|对应的海关编码|建议参考\s*\*\*|[-*•]\s*\*\*))/
-    );
-    if (cut.length > 1 && cut.slice(1).join('').trim().length > 80) {
-      t = cut.slice(1).join('').trim();
     }
   }
 
