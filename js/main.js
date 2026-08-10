@@ -1030,12 +1030,19 @@ function initAiChatbot() {
       const { difyChatEndpoint } = getDifyConfig();
       const endpoint = difyChatEndpoint || '/v1/chatbot/chat-messages';
 
-      const callChat = (conversationId) => callDify({
+      const paintStream = (partial) => {
+        const clean = sanitizeAiAnswer(partial) || partial;
+        if (!clean) return;
+        setBotBubble(typing, clean);
+        messages.scrollTop = messages.scrollHeight;
+      };
+
+      const callChat = (conversationId) => callDifyStream({
         endpoint,
         query,
         inputs: {},
         conversationId,
-        returnMeta: true,
+        onChunk: paintStream,
       });
 
       const isClassifierFail = (err) =>
@@ -1051,6 +1058,7 @@ function initAiChatbot() {
         if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
           conversationId = '';
           persistConversationId(sessionId, false);
+          typing.textContent = '正在查询…';
           result = await callChat('');
         } else if (isClassifierFail(firstErr)) {
           // Question Classifier 偶发失败：短暂重试 1～2 次（Dify 已发布版问题，控制台草稿可能正常）
@@ -1058,6 +1066,7 @@ function initAiChatbot() {
           for (let i = 0; i < 2; i += 1) {
             await new Promise((r) => setTimeout(r, 400 + i * 400));
             try {
+              typing.textContent = '正在查询…';
               result = await callChat(conversationId);
               lastErr = null;
               break;
@@ -1235,6 +1244,173 @@ function extractDifyAnswer(data) {
     if (typeof c === 'string' && c.trim()) return c.trim();
   }
   return '';
+}
+
+/**
+ * Dify SSE streaming chat. Calls onChunk(accumulatedAnswer) as tokens arrive.
+ * Returns { text, conversationId }.
+ */
+async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk }) {
+  const cfg = getDifyConfig();
+  const path = endpoint || cfg.difyEndpoint || '/v1/chat-messages';
+  const url = `${cfg.difyApiBase}${path}`;
+
+  const payload = {
+    inputs: inputs || {},
+    query,
+    response_mode: 'streaming',
+    user: getDifyUserId(),
+  };
+  if (conversationId) payload.conversation_id = conversationId;
+
+  let res;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error('无法连接道一 AI 服务（api.daoith.com），请检查网络或稍后重试');
+  }
+
+  const contentType = String(res.headers.get('content-type') || '');
+
+  // Non-SSE error body (e.g. classifier 400 JSON)
+  if (!res.ok) {
+    let msg = `请求失败（HTTP ${res.status}）`;
+    try {
+      const errData = await res.json();
+      msg = errData.message || errData.error || errData.code || msg;
+    } catch {
+      try {
+        const raw = await res.text();
+        if (raw) msg = raw.slice(0, 240);
+      } catch {
+        /* ignore */
+      }
+    }
+    throw new Error(msg);
+  }
+
+  // Some proxies may fall back to a single JSON body even when streaming was requested
+  if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
+    const data = await res.json();
+    const text = extractDifyAnswer(data);
+    if (!text) throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+    if (typeof onChunk === 'function') onChunk(text);
+    return {
+      text,
+      conversationId: data.conversation_id || conversationId || '',
+    };
+  }
+
+  if (!res.body || typeof res.body.getReader !== 'function') {
+    throw new Error('当前浏览器不支持流式响应，请升级浏览器后重试');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let answer = '';
+  let nextConversationId = conversationId || '';
+  let streamError = '';
+  let lastPaint = 0;
+
+  const emit = (force) => {
+    if (typeof onChunk !== 'function' || !answer) return;
+    const now = Date.now();
+    if (!force && now - lastPaint < 40) return;
+    lastPaint = now;
+    onChunk(answer);
+  };
+
+  const handleEvent = (raw) => {
+    const line = String(raw || '').trim();
+    if (!line || line === '[DONE]') return;
+    let data;
+    try {
+      data = JSON.parse(line);
+    } catch {
+      return;
+    }
+
+    if (data.conversation_id) nextConversationId = data.conversation_id;
+
+    const event = String(data.event || '');
+    if (event === 'error') {
+      streamError = data.message || data.code || data.error || '流式响应出错';
+      return;
+    }
+
+    // Token deltas (chat / agent / Chatflow LLM nodes)
+    if (
+      event === 'message' ||
+      event === 'agent_message' ||
+      event === 'text_chunk'
+    ) {
+      const delta =
+        (typeof data.answer === 'string' && data.answer) ||
+        (typeof data.text === 'string' && data.text) ||
+        (typeof data.data?.text === 'string' && data.data.text) ||
+        '';
+      if (delta) {
+        answer += delta;
+        emit(false);
+      }
+      return;
+    }
+
+    if (event === 'message_end' || event === 'workflow_finished') {
+      const finalText = extractDifyAnswer(data) || extractDifyAnswer(data.data) || '';
+      if (finalText && finalText.length > answer.length) {
+        answer = finalText;
+      }
+      emit(true);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    // SSE frames separated by blank line; each data line may be "data: {...}"
+    let splitAt;
+    while ((splitAt = buffer.indexOf('\n')) >= 0) {
+      let line = buffer.slice(0, splitAt);
+      buffer = buffer.slice(splitAt + 1);
+      if (line.endsWith('\r')) line = line.slice(0, -1);
+      if (!line) continue;
+      if (line.startsWith(':')) continue; // comment / keepalive
+      if (line.startsWith('data:')) {
+        handleEvent(line.slice(5).trim());
+        if (streamError) throw new Error(streamError);
+      }
+    }
+  }
+
+  // Flush trailing buffer
+  if (buffer.trim()) {
+    const trailing = buffer.trim();
+    if (trailing.startsWith('data:')) handleEvent(trailing.slice(5).trim());
+    else handleEvent(trailing);
+  }
+  if (streamError) throw new Error(streamError);
+
+  emit(true);
+
+  if (!answer) {
+    throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+  }
+
+  return {
+    text: answer,
+    conversationId: nextConversationId || conversationId || '',
+  };
 }
 
 async function callDify({ endpoint, inputs, query, conversationId, returnMeta }) {
