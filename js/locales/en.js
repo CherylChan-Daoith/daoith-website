@@ -247,7 +247,7 @@ window.DAOITH_I18N_EN = {
     },
     '#heroFeatures .feature-card[data-step="2"] h4': { text: 'Tax Burden Calculator' },
     '#heroFeatures .feature-card[data-step="2"] p': {
-      text: 'Automated multi-tax estimation covering export rebates, VAT, and corporate income tax.',
+      text: 'Automated domestic tax estimation covering VAT, corporate income tax, and staff individual income tax.',
     },
     '#heroFeatures .feature-card[data-step="3"] h4': { text: 'Online Ordering' },
     '#heroFeatures .feature-card[data-step="3"] p': {
@@ -318,7 +318,7 @@ window.DAOITH_I18N_EN = {
     '.faq-panel h3': { text: 'FAQ' },
     '.tax-calc h3': { text: 'Compliance Tax Calculator' },
     '.tax-calc > p': {
-      text: 'Estimate circulation taxes and income tax burden from your annual sales, cost ratios, and destination tax rates.',
+      text: 'Estimate domestic corporate income tax, VAT, and staff individual income tax from your annual sales and cost ratios.',
     },
     '.tax-form-grid .form-group:nth-child(1) label': { text: 'Annual export sales (CNY 10k)' },
     '.tax-form-grid .form-group:nth-child(2) label': { text: 'Export rebate rate (%)' },
@@ -330,10 +330,8 @@ window.DAOITH_I18N_EN = {
     '.tax-form-grid .form-group:nth-child(8) label': { text: 'Logistics ratio (%)' },
     '.tax-form-grid .form-group:nth-child(9) label': { text: 'Staff cost ratio (%)' },
     '.tax-form-grid .form-group:nth-child(10) label': { text: 'Other expense ratio (%)' },
-    '.tax-form-grid .form-group:nth-child(11) label': { text: 'Destination import CIF value (CNY 10k)' },
-    '.tax-form-grid .form-group:nth-child(12) label': { text: 'Destination duty rate (%)' },
-    '.tax-form-grid .form-group:nth-child(13) label': { text: 'Destination VAT rate (%)' },
-    '.tax-form-note': { text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue.' },
+    '.tax-form-grid .form-group:nth-child(11) label': { text: 'IIT effective rate (%) for staff tax estimate' },
+    '.tax-form-note': { text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue. VAT uses the levy–rebate gap (levy rate assumed 13%).' },
     '#calcTax': { text: 'Calculate tax burden' },
     '.tax-result-label': { text: 'Estimated annual compliance tax' },
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },

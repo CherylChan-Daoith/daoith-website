@@ -1585,12 +1585,24 @@ ul {
   padding: 8px 10px;
 }
 
-.tax-breakdown-section strong,
+.tax-breakdown-section strong {
+  display: inline;
+  margin-bottom: 0;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
 .tax-breakdown-summary strong {
   display: block;
   margin-bottom: 4px;
   color: var(--ink);
   font-size: 0.8rem;
+}
+
+.tax-breakdown-formula {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  margin-top: 2px;
 }
 
 .tax-breakdown-ref {

@@ -2246,11 +2246,6 @@ function initAIForm() {
       if (rateBox) rateBox.value = result.display || '—';
       setHsRateSource('duty', result);
 
-      if (result.ok && result.rate != null) {
-        const dutyInput = document.getElementById('taxDutyRate');
-        if (dutyInput) dutyInput.value = String(result.rate);
-      }
-
       if (!result.ok) {
         alert(result.message || '未查到参考关税税率，请核对 HS 与目的国后重试');
       }
@@ -2329,10 +2324,9 @@ function initTaxCalculator() {
     const shippingRate = parseFloat(document.getElementById('taxShippingRate').value) || 0;
     const staffRate = parseFloat(document.getElementById('taxStaffRate').value) || 0;
     const otherRate = parseFloat(document.getElementById('taxOtherRate').value) || 0;
-    const cifPrice = parseFloat(document.getElementById('taxCifPrice').value) || 0;
-    const dutyRate = parseFloat(document.getElementById('taxDutyRate').value) || 0;
-    const vatRate = parseFloat(document.getElementById('taxVat').value) || 0;
+    const iitRate = parseFloat(document.getElementById('taxIitRate')?.value) || 0;
     const incomeRate = parseFloat(document.getElementById('taxIncome').value) || 0;
+    const vatLevyRate = 13; // 国内货物增值税征税率（简化）
 
     resultEl.textContent = window.DAOITH_t('tax.calcLoading');
     setButtonLoading(calcBtn, true, window.DAOITH_t('tax.calcLoading'));
@@ -2345,35 +2339,39 @@ function initTaxCalculator() {
         note.className = 'tax-result-note';
         resultEl.parentElement.appendChild(note);
       }
-      const exportRebate = revenue * (productCostRate / 100) * (refundRate / 100);
-      const dutyCost = cifPrice * (dutyRate / 100);
-      const destinationVat = revenue * (vatRate / 100);
+      // 增值税税负：按外贸企业征退差 ≈ 销售额 × 产品成本率 × (征税率 − 退税率)
+      const vatGap = Math.max(0, (vatLevyRate - refundRate) / 100);
+      const vatTax = revenue * (productCostRate / 100) * vatGap;
       const profitRate = 1
         - (productCostRate / 100)
         - (marketingRate / 100)
         - (shippingRate / 100)
         - (staffRate / 100)
         - (otherRate / 100);
-      const incomeTax = revenue * profitRate * (incomeRate / 100);
-      const total = dutyCost + destinationVat + incomeTax;
+      const incomeTax = Math.max(0, revenue * profitRate * (incomeRate / 100));
+      // 分工个税：员工成本 × 个税综合税率
+      const staffIit = revenue * (staffRate / 100) * (iitRate / 100);
+      const total = vatTax + incomeTax + staffIit;
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const copy = locale === 'en'
         ? {
-            circulation: 'I. Turnover-tax related costs',
-            duty: '1) Destination duty cost',
-            vat: '2) Destination VAT',
-            income: 'II. Corporate income tax burden',
-            rebateNote: 'Export rebate (reference only, not counted as tax cost)',
-            total: 'Total',
+            income: '1) Corporate income tax',
+            incomeFormula: 'Sales × (1 − product − marketing − shipping − staff − other) × CIT rate',
+            vat: '2) VAT (levy–rebate gap)',
+            vatFormula: 'Sales × product cost ratio × max(0, 13% − rebate rate)',
+            iit: '3) Staff individual income tax',
+            iitFormula: 'Sales × staff cost ratio × IIT effective rate',
+            total: 'Total domestic tax burden',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
         : {
-            circulation: '（一）流转税成本',
-            duty: '1）目的国关税成本',
-            vat: '2）目的国VAT',
-            income: '（二）企业所得税税负',
-            rebateNote: '出口退税（参考，不计入税负成本）',
-            total: '合计',
+            income: '1）企业所得税',
+            incomeFormula: '销售额 × (1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率) × 适用所得税税率',
+            vat: '2）增值税',
+            vatFormula: '销售额 × 产品成本率 × max(0, 13% − 出口退税率)',
+            iit: '3）分工个税',
+            iitFormula: '销售额 × 员工成本率 × 个税综合税率',
+            total: '国内税负合计',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
 
@@ -2381,16 +2379,16 @@ function initTaxCalculator() {
       note.innerHTML = `
         <div class="tax-breakdown">
           <div class="tax-breakdown-section">
-            <strong>${copy.circulation}</strong>
-            <div>${copy.duty}：${formatWan(dutyCost)}（目的国进口CIF价 × 关税税率）</div>
-            <div>${copy.vat}：${formatWan(destinationVat)}（销售额 × 目的国VAT税率）</div>
+            <div><strong>${copy.income}</strong>：${formatWan(incomeTax)}</div>
+            <div class="tax-breakdown-formula">${copy.incomeFormula}</div>
           </div>
           <div class="tax-breakdown-section">
-            <strong>${copy.income}</strong>
-            <div>${formatWan(incomeTax)}（销售额 × (1 - 产品成本率 - 营销费率 - 运输费率 - 员工成本率 - 其他费用率) × 适用税率）</div>
+            <div><strong>${copy.vat}</strong>：${formatWan(vatTax)}</div>
+            <div class="tax-breakdown-formula">${copy.vatFormula}</div>
           </div>
-          <div class="tax-breakdown-section tax-breakdown-ref">
-            <div>${copy.rebateNote}：${formatWan(exportRebate)}（销售额 × 产品成本率 × 出口退税率）</div>
+          <div class="tax-breakdown-section">
+            <div><strong>${copy.iit}</strong>：${formatWan(staffIit)}</div>
+            <div class="tax-breakdown-formula">${copy.iitFormula}</div>
           </div>
           <div class="tax-breakdown-summary">
             <strong>${copy.total}：${formatWan(total)}</strong>

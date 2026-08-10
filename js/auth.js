@@ -65,7 +65,7 @@
       'platform', 'entity', 'country', 'hsCode', 'revenue', 'teamSize', 'invoice', 'shipping', 'notes',
       'taxRevenue', 'taxRefund', 'taxEntity', 'taxEntityCountry', 'taxIncome',
       'taxProductCostRate', 'taxMarketingRate', 'taxShippingRate', 'taxStaffRate', 'taxOtherRate',
-      'taxCifPrice', 'taxDutyRate', 'taxVat',
+      'taxIitRate',
     ];
     const state = {};
     ids.forEach((id) => {
