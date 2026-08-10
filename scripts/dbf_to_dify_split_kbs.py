@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Split customs HS DBF into two Dify knowledge bases (Markdown).
 
-1) 出口退税率知识库 — only export rebate rate (no VAT / TSL)
+1) 出口退税率知识库 — only codes with explicit NOTE「退x」(incl. 退0);
+   codes without 退x are skipped (never default to 0%).
 2) 进口增值税与暂定税率知识库 — only import VAT + provisional rate (no rebate)
 
 Outputs `.md` files for Dify upload.
@@ -30,6 +31,7 @@ DESKTOP_REBATE = Path.home() / "Desktop" / "DIFY知识库" / "海关编码-出�
 DESKTOP_VAT = Path.home() / "Desktop" / "DIFY知识库" / "海关编码-进口增值税与暂定税率"
 
 DEFAULT_CANDIDATES = [
+    Path.home() / "Desktop" / "出口退税率文库CMCODE2026B",
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b"),
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b-1"),
     Path("/Users/cheryl/Downloads/34ad0f0b7c4c460bb2a3bd137b4440ea"),
@@ -80,12 +82,17 @@ def fmt_pct(v) -> str:
         return f"{s}%" if not s.endswith("%") else s
 
 
-def parse_export_rebate(note: str) -> str:
-    """Parse NOTE like '退13;' / '退9;' / '退9;13;' → display string."""
+def parse_export_rebate(note: str) -> str | None:
+    """Parse NOTE like '退13;' / '退9;' / '退0;' → display string.
+
+    Returns None when NOTE has no explicit 「退x」 marker.
+    Empty NOTE must NOT be treated as 0% — that was a data bug (e.g. phones).
+    Only NOTE with explicit 退0 counts as real 0% rebate.
+    """
     text = clean(note)
     rates = re.findall(r"退\s*([0-9]+(?:\.[0-9]+)?)", text)
     if not rates:
-        return "0%"
+        return None
     parts = []
     for r in rates:
         try:
@@ -100,6 +107,11 @@ def parse_export_rebate(note: str) -> str:
             seen.add(p)
             uniq.append(p)
     return " / ".join(uniq)
+
+
+def has_export_rebate(note: str) -> bool:
+    """True only when NOTE explicitly contains 退x (including 退0)."""
+    return parse_export_rebate(note) is not None
 
 
 def parse_vat(cm: dict) -> str:
@@ -142,8 +154,11 @@ def validity_line(cm: dict) -> str:
     return ""
 
 
-def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
+def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str | None:
     rebate = parse_export_rebate(cm.get("NOTE") or "")
+    if rebate is None:
+        # 无「退x」：不入库，避免把「未知」误写成 0%
+        return None
     aliases = build_aliases(name)
     alias_part = f"、{'、'.join(aliases)}" if aliases else ""
 
@@ -264,19 +279,23 @@ def write_kb(
             "---",
             "",
         ]
+        body_parts: list[str] = []
         for r in chunk:
             code = clean(r.get("CODE"))
             std = std_map.get(code, {})
-            parts.append(
-                record_fn(
-                    code,
-                    std.get("NAME") or clean(r.get("NAME")),
-                    std.get("UNIT") or clean(r.get("UNIT")),
-                    std.get("DWCODE") or clean(r.get("DWCODE")),
-                    r,
-                )
+            block = record_fn(
+                code,
+                std.get("NAME") or clean(r.get("NAME")),
+                std.get("UNIT") or clean(r.get("UNIT")),
+                std.get("DWCODE") or clean(r.get("DWCODE")),
+                r,
             )
-        files.append((name, "\n".join(parts)))
+            if block:
+                body_parts.append(block)
+        if not body_parts:
+            continue
+        parts[3] = f"- **本文件条数**：{len(body_parts)}"
+        files.append((name, "\n".join(parts + body_parts)))
 
     for root in out_dirs:
         if root.exists():
@@ -329,19 +348,28 @@ def main() -> None:
         current.append(dict(r))
 
     current.sort(key=lambda x: clean(x.get("CODE")))
-    rebate_nz = sum(
-        1 for r in current if parse_export_rebate(r.get("NOTE") or "") != "0%"
+    rebate_known = [r for r in current if has_export_rebate(r.get("NOTE") or "")]
+    rebate_zero = sum(
+        1 for r in rebate_known if parse_export_rebate(r.get("NOTE") or "") == "0%"
     )
-    print(f"valid current codes: {len(current)} (export rebate >0: {rebate_nz})")
+    rebate_pos = len(rebate_known) - rebate_zero
+    skipped = len(current) - len(rebate_known)
+    print(
+        f"valid current codes: {len(current)} | "
+        f"rebate known: {len(rebate_known)} "
+        f"(>0%: {rebate_pos}, explicit 0%: {rebate_zero}) | "
+        f"skipped (no 退x in NOTE): {skipped}"
+    )
 
-    # sanity samples
-    for code in ("76101000", "71131911"):
+    # sanity samples（含无退税字段的手机，应显示 None / 不入库）
+    for code in ("76101000", "71131911", "85171300"):
         sample = next((r for r in current if clean(r.get("CODE")) == code), None)
         if not sample:
             continue
         print(
-            f"sample {code}: rebate={parse_export_rebate(sample.get('NOTE') or '')} "
-            f"vat={parse_vat(sample)} tsl={parse_tsl(sample)}"
+            f"sample {code}: rebate={parse_export_rebate(sample.get('NOTE') or '')!r} "
+            f"vat={parse_vat(sample)} tsl={parse_tsl(sample)} "
+            f"in_rebate_kb={has_export_rebate(sample.get('NOTE') or '')}"
         )
 
     rebate_guide = """# 如何上传到 Dify（出口退税率知识库）
@@ -352,10 +380,12 @@ def main() -> None:
 4. 分段标识符：`---`
 5. 分段最大长度建议 1200，重叠 1
 6. 本库【仅含出口退税率】，不含增值税/暂定税率
-7. NOTE 无「退x」时，出口退税率记为 0%
+7. **重要**：仅收录 NOTE 中带明确「退x」的税号（含「退0」=真实 0%）
+8. NOTE 为空或无「退x」时 **不入库**（禁止默认写成 0%，避免如手机等误标）
+9. 完整覆盖请改用国家税务总局正式出口退税率文库，不要仅依赖海关商品编码 DBF 的 NOTE
 
-Chatflow 提示：查询出口退税时只检索本库，只回答「出口退税率」字段。  
-官网左侧退税率查询也应绑定本库 Dataset ID。
+Chatflow 提示：查询出口退税时只检索本库，只回答「出口退税率」字段；未命中则说明文库未收录。  
+官网左侧退税率查询也应绑定本库 Dataset ID，未命中时回退本地表或提示未收录。
 """
 
     vat_guide = """# 如何上传到 Dify（进口增值税与暂定税率知识库）
@@ -372,8 +402,11 @@ Chatflow 提示：问进口增值税/暂定税率时只检索本库；问出口�
 
     n1, b1 = write_kb(
         title="中国海关商品编码·出口退税率（现行有效）",
-        field_note="本文件仅含出口退税率字段，不含增值税税率与暂定税率。",
-        records=current,
+        field_note=(
+            "本文件仅含 NOTE 中明确标注「退x」的出口退税率；"
+            "无「退x」的税号不收录（禁止默认 0%）。"
+        ),
+        records=rebate_known,
         std_map=std_map,
         record_fn=rebate_record,
         out_dirs=[OUT_REBATE, DESKTOP_REBATE],

@@ -5,7 +5,7 @@ Prefer the split knowledge bases instead:
   .venv-dbf/bin/python scripts/dbf_to_dify_split_kbs.py
 
 - 增值税税率 ← ZSSL_SET
-- 出口退税率 ← NOTE 中「退x;」；无则写 0%
+- 出口退税率 ← NOTE 中明确「退x;」（含退0）；无「退x」则跳过该条，禁止默认 0%
 - 暂定税率 ← TSL（不是退税）
 
 Usage:
@@ -29,6 +29,7 @@ RECORDS_PER_FILE = 80
 FILES_PER_BATCH = 5
 
 DEFAULT_CANDIDATES = [
+    Path.home() / "Desktop" / "出口退税率文库CMCODE2026B",
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b"),
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b-1"),
     Path("/Users/cheryl/Downloads/34ad0f0b7c4c460bb2a3bd137b4440ea"),
@@ -79,12 +80,16 @@ def fmt_pct(v) -> str:
         return f"{s}%" if not s.endswith("%") else s
 
 
-def parse_export_rebate(note: str) -> str:
-    """Parse NOTE like '退13;' / '退9;' / '退9;13;' → display string."""
+def parse_export_rebate(note: str) -> str | None:
+    """Parse NOTE like '退13;' / '退9;' / '退0;' → display string.
+
+    Returns None when NOTE has no explicit 「退x」.
+    Empty NOTE must NOT become 0% (that incorrectly zeroed phones etc.).
+    """
     text = clean(note)
     rates = re.findall(r"退\s*([0-9]+(?:\.[0-9]+)?)", text)
     if not rates:
-        return "0%"
+        return None
     parts = []
     for r in rates:
         try:
@@ -115,20 +120,26 @@ def record_txt(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
         vat = "0%"
 
     rebate = parse_export_rebate(cm.get("NOTE") or "")
+    rebate_display = rebate if rebate is not None else "未收录"
+    rebate_answer = (
+        rebate
+        if rebate is not None
+        else "未收录（海关商品编码 DBF 的 NOTE 无「退x」标注，禁止默认写成 0%）"
+    )
     tsl_raw = cm.get("TSL")
     tsl = fmt_pct(tsl_raw) if tsl_raw not in (None, "", 0, 0.0) else "0%"
 
     aliases = build_aliases(name)
 
-    # Put rebate Q&A first so retrieval + LLM latch onto 0% instead of VAT 13%.
+    # Put rebate Q&A first so retrieval + LLM latch onto rebate instead of VAT.
     lines = [
         f"【商品编码】{code}",
         f"【出口退税率问答】问：{code}、{name}"
         + (f"、{'、'.join(aliases)}" if aliases else "")
-        + f" 的出口退税率是多少？答：{rebate}。"
-        + f"请注意：增值税税率是{vat}，绝对不是出口退税率；出口退税率={rebate}。",
-        f"出口退税率：{rebate}",
-        f"出口退税率（仅此字段作答）：{rebate}",
+        + f" 的出口退税率是多少？答：{rebate_answer}。"
+        + f"请注意：增值税税率是{vat}，绝对不是出口退税率；出口退税率={rebate_display}。",
+        f"出口退税率：{rebate_display}",
+        f"出口退税率（仅此字段作答）：{rebate_display}",
         f"商品名称：{name}",
     ]
     if aliases:
@@ -141,10 +152,16 @@ def record_txt(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
 
     lines.append(f"增值税税率：{vat}（进口/内销征税率参考，严禁当作出口退税）")
     lines.append(f"暂定税率：{tsl}")
-    lines.append(
-        "说明：回答「出口退税率」问题时，只能使用上面的出口退税率字段；"
-        f"本题正确出口退税率为{rebate}，即使增值税为{vat}也不得改答{vat}。"
-    )
+    if rebate is None:
+        lines.append(
+            "说明：本条 NOTE 无「退x」，出口退税率标记为未收录；"
+            "禁止用增值税税率或默认 0% 代替。请以税局出口退税率文库终核。"
+        )
+    else:
+        lines.append(
+            "说明：回答「出口退税率」问题时，只能使用上面的出口退税率字段；"
+            f"本题正确出口退税率为{rebate}，即使增值税为{vat}也不得改答{vat}。"
+        )
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
@@ -162,7 +179,7 @@ def record_txt(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
         lines.append(f"有效期：{st} ~ {en}")
 
     lines.append(
-        f"关键词：出口退税率{rebate} 海关编码{code} HS{code} "
+        f"关键词：出口退税率{rebate_display} 海关编码{code} HS{code} "
         f"{name} {' '.join(aliases)} 增值税{vat}(非退税)"
     )
     lines.append("")
@@ -222,10 +239,11 @@ def main() -> None:
         current.append(dict(r))
 
     current.sort(key=lambda x: clean(x.get("CODE")))
-    rebate_nonzero = sum(
-        1 for r in current if parse_export_rebate(r.get("NOTE") or "") != "0%"
+    known = sum(1 for r in current if parse_export_rebate(r.get("NOTE") or "") is not None)
+    print(
+        f"valid current codes: {len(current)} | "
+        f"explicit 退x: {known} | unmarked→未收录: {len(current) - known}"
     )
-    print(f"valid current codes: {len(current)} (export rebate >0: {rebate_nonzero})")
 
     # verify sample
     sample = next(r for r in current if clean(r.get("CODE")) == "71131911")
@@ -250,7 +268,7 @@ def main() -> None:
             f"中国海关商品编码与出口退税率（现行有效）第 {idx} 批",
             f"编码范围：{start_code} ~ {end_code}",
             f"本文件共 {len(chunk)} 条。",
-            "字段说明：增值税税率≠出口退税率；出口退税只看「出口退税率」字段。",
+            "字段说明：NOTE 有「退x」才写具体退税率；无则出口退税率=未收录（禁止默认 0%）。",
             "",
         ]
         for r in chunk:
@@ -290,10 +308,10 @@ def main() -> None:
 4. 分段标识符用：---
 5. 分段最大长度建议 1500 字符，重叠 1。
 6. 本版已区分：增值税税率 / 出口退税率 / 暂定税率。
-7. NOTE 无「退x」时，出口退税率记为 0%。
+7. NOTE 无「退x」时，出口退税率记为「未收录」（禁止默认 0%）。
 
 应用提示词建议加一句：
-查询出口退税时只使用「出口退税率」字段，禁止用增值税税率代替。
+查询出口退税时只使用「出口退税率」字段，禁止用增值税税率代替；若为未收录则说明需查税局文库。
 """
     for root in (OUT_ROOT, DESKTOP):
         (root / "README上传说明.txt").write_text(guide, encoding="utf-8")

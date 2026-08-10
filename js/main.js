@@ -779,12 +779,14 @@ function buildLocalChatReply(message, ctx) {
       '- 复杂事项建议预约**专家1v1**',
     ].join('\n');
   }
-  if (/铝/.test(q) && /退税/.test(q) && /取消|停止|取消退税/.test(q)) {
+  if (/铝/.test(q) && /退税/.test(q)) {
+    const aluminum = buildAluminumProductsRefundReply(q);
+    if (aluminum) return aluminum;
     return [
       '**铝材出口退税政策要点**',
       '',
-      '- 依据：财政部、税务总局调整出口退税政策相关公告',
-      '- 内容：铝材等产品**取消出口退税**',
+      '- 依据：财政部、税务总局公告2024年第15号',
+      '- 内容：铝材等产品**取消出口退税**（文库口径多为 **0%**，勿与增值税税率13%混淆）',
       '- 实施：自 **2024年12月1日** 起（以公告原文及附件清单为准）',
       '- 建议：核对附件清单是否覆盖您的具体税号，并以税局 / 海关最新公告终核',
     ].join('\n');
@@ -844,61 +846,17 @@ function initAiChatbot() {
   const CONV_KEY = 'daoith_ai_conversation_id';
   const COUNT_KEY = 'daoith_ai_ask_count';
   const BOUND_KEY = 'daoith_ai_conversation_bound'; // '1' = id 已由 Dify 确认，可安全作为 conversation_id
-  const ANSWER_CACHE_KEY = 'daoith_ai_answer_cache_v2';
   const FREE_ASK_LIMIT = 10;
-  const ANSWER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-  const ANSWER_CACHE_MAX = 80;
   let busy = false;
 
-  const normalizeChatQuestion = (q) =>
-    String(q || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[？?。.！!，,、；;：:\s]/g, '')
-      .replace(/出口退税率是多少|出口退税是多少|退税率是多少|退税是多少/g, '出口退税率');
-
-  const readAnswerCache = () => {
-    try {
-      const raw = JSON.parse(localStorage.getItem(ANSWER_CACHE_KEY) || '{}');
-      return raw && typeof raw === 'object' ? raw : {};
-    } catch {
-      return {};
-    }
-  };
-
-  const writeAnswerCache = (map) => {
-    try {
-      localStorage.setItem(ANSWER_CACHE_KEY, JSON.stringify(map));
-    } catch {
-      /* ignore quota */
-    }
-  };
-
-  const getCachedAnswer = (question) => {
-    const key = normalizeChatQuestion(question);
-    if (!key) return '';
-    const map = readAnswerCache();
-    const hit = map[key];
-    if (!hit || !hit.answer) return '';
-    if (Date.now() - (hit.ts || 0) > ANSWER_CACHE_TTL_MS) {
-      delete map[key];
-      writeAnswerCache(map);
-      return '';
-    }
-    hit.ts = Date.now(); // LRU touch
-    writeAnswerCache(map);
-    return String(hit.answer);
-  };
-
-  const setCachedAnswer = (question, answer) => {
-    const key = normalizeChatQuestion(question);
-    const text = String(answer || '').trim();
-    if (!key || text.length < 4) return;
-    const map = readAnswerCache();
-    map[key] = { answer: text, ts: Date.now() };
-    const entries = Object.entries(map).sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0));
-    writeAnswerCache(Object.fromEntries(entries.slice(0, ANSWER_CACHE_MAX)));
-  };
+  // 清掉历史问答缓存，避免旧错误税率被秒回
+  try {
+    ['daoith_ai_answer_cache_v1', 'daoith_ai_answer_cache_v2', 'daoith_ai_answer_cache_v3', 'daoith_ai_answer_cache_v4'].forEach(
+      (k) => localStorage.removeItem(k)
+    );
+  } catch {
+    /* ignore */
+  }
 
   const newUuid = () =>
     (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -1029,15 +987,6 @@ function initAiChatbot() {
     appendBubble(text, 'user');
     busy = true;
 
-    // 相同问题本地缓存：秒回，避免每次都走模型思考
-    const cached = getCachedAnswer(text);
-    if (cached) {
-      appendBubble(cached, 'bot');
-      busy = false;
-      messages.scrollTop = messages.scrollHeight;
-      return;
-    }
-
     const typing = document.createElement('div');
     typing.className = 'ai-chatbot-bubble is-bot';
     typing.textContent = '正在查询…';
@@ -1052,14 +1001,13 @@ function initAiChatbot() {
     // 已绑定的会话：把 localStorage 中的 ID 作为 conversation_id 发给 Dify（会话记忆）。
     // 全新 UUID：Dify 尚无此会话，首轮不传 id，成功后用返回的 conversation_id 覆盖本地。
     try {
-      // 退税率 + 明确税号：与左侧查询同一路径（知识库 → 本地表），禁止交给聊天模型编造
+      // 退税率 + 税号：与左侧同一路径，且必须在本地答案缓存之前执行（避免缓存旧的错误13%）
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
         const resolved = await resolveExportRefundRate(hsForRefund);
         if (resolved?.ok && resolved.rate != null) {
           const reply = formatStructuredRefundReply(resolved, hsForRefund);
           setAskCount(askCount + 1);
-          setCachedAnswer(text, reply);
           setBotBubble(typing, reply);
           return;
         }
@@ -1068,6 +1016,14 @@ function initAiChatbot() {
           typing,
           `未查到海关编码 ${hsForRefund} 的出口退税率，请核对编码后重试，或以国家税务总局出口退税率文库为准。`
         );
+        return;
+      }
+
+      // 铝制品品名类退税/归类：禁止 Chatflow 把增值税 13% 当成出口退税
+      const aluminumReply = buildAluminumProductsRefundReply(text);
+      if (aluminumReply) {
+        setAskCount(askCount + 1);
+        setBotBubble(typing, aluminumReply);
         return;
       }
 
@@ -1126,12 +1082,12 @@ function initAiChatbot() {
         answer = sanitizeAiAnswer(result.text) || result.text || buildLocalChatReply(text, ctx);
       }
       answer = sanitizeAiAnswer(answer) || answer;
+      answer = correctAluminumRefundHallucinations(answer);
       if (!answer || answer.length < 4) {
         // Force a fresh conversation next time; stale conversation_id often yields blank payloads
         persistConversationId(newUuid(), false);
         throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
-      setCachedAnswer(text, answer);
       setBotBubble(typing, answer);
     } catch (err) {
       const msg = String(err?.message || '');
@@ -1413,14 +1369,107 @@ async function lookupRefundRateFromKnowledgeBase(hsCode) {
 /** Extract HS digits from a refund-rate style chat question. */
 function extractHsFromRefundQuestion(message) {
   const q = String(message || '').trim();
-  if (!/(出口退税|退税率|退税多少|退税是多少|退税率为|退税率是|退税)/.test(q)) return '';
+  const hasRefundIntent =
+    /(出口退税|退税率|退税多少|退税是多少|退税率为|退税率是|退税|rebate)/i.test(q) ||
+    // 「76081000税率/是多少」也视为查退税（左侧同款场景）
+    (/(税率|是多少)/.test(q) && /\d{8,12}/.test(q));
+  // 纯税号提问（8～10 位数字，可带空格/点）也走结构化退税查询
+  const pureHs = q.replace(/[\s.\-]/g, '');
+  const isPureHsCode = /^\d{8,10}$/.test(pureHs);
+  if (!hasRefundIntent && !isPureHsCode) return '';
+
   const labeled = q.match(
     /(?:海关编码|商品编码|HS\s*Code|HS|税号|编码)\s*[:：]?\s*([0-9][0-9.\s]{6,16})/i
   );
   const loose = q.match(/(\d{8,12})/);
-  const raw = labeled?.[1] || loose?.[1] || '';
+  const raw = labeled?.[1] || loose?.[1] || (isPureHsCode ? pureHs : '');
   const digits = String(raw).replace(/\D/g, '');
   return digits.length >= 8 ? digits.slice(0, 10) : '';
+}
+
+/** 常见铝制品品名 → HS8（归类参考；正式报关以海关为准） */
+const ALUMINUM_PRODUCT_HS = [
+  { re: /铝管|非合金铝管/, hs: '76081000', name: '非合金铝管' },
+  { re: /门窗|窗框|门框|框架/, hs: '76101000', name: '铝制门窗框架' },
+  { re: /易拉罐|铝罐|饮料罐/, hs: '76129010', name: '铝制易拉罐（≤300L）' },
+  { re: /烹煮|餐桌用具|厨具|锅具|餐具/, hs: '76151900', name: '铝制烹煮及餐桌用具' },
+  { re: /铝条|铝杆|条杆/, hs: '76041010', name: '铝条/杆（非合金）' },
+  { re: /铝箔|铝薄板|箔/, hs: '76071100', name: '铝箔（非合金，轧制未进一步加工）' },
+  { re: /铝板|铝片|板材/, hs: '76061190', name: '铝板/片（非合金）' },
+];
+
+function lookupLocalRefundDisplay(hsCode) {
+  const api = window.DAOITH_HS_RATES;
+  if (api?.lookupRefundRate) {
+    const r = api.lookupRefundRate(hsCode);
+    if (r?.ok && r.rate != null) return r.display || `${r.rate}%`;
+  }
+  // 第76章铝材：2024-12-01 起多数取消退税
+  if (String(hsCode || '').replace(/\D/g, '').startsWith('76')) return '0%';
+  return null;
+}
+
+/**
+ * 铝制品品名/退税问题：本地回答，避免模型把增值税13%写成出口退税13%。
+ * 触发：含「铝」且（退税|编码|税号|归类|HS）
+ */
+function buildAluminumProductsRefundReply(message) {
+  const q = String(message || '').trim();
+  if (!/铝/.test(q)) return '';
+  if (!/(退税|海关编码|商品编码|税号|归类|HS\b|编码)/i.test(q)) return '';
+
+  const matched = ALUMINUM_PRODUCT_HS.filter((row) => row.re.test(q));
+  const rows = matched.length ? matched : ALUMINUM_PRODUCT_HS.slice(0, 5);
+  const lines = rows.map((row) => {
+    const rate = lookupLocalRefundDisplay(row.hs) || '0%';
+    return `- ${row.name} → HS ${row.hs}，出口退税 ${rate}`;
+  });
+
+  const lead =
+    matched.length === 0
+      ? '铝制品范围较广，没有单一税号。常见品类出口退税参考如下（财政部税务总局公告2024年第15号：自2024年12月1日起铝材等取消出口退税）：'
+      : '按您提到的铝制品，出口退税参考如下（2024年第15号公告口径，铝材等多为0%；请勿与增值税税率13%混淆）：';
+
+  return [
+    lead,
+    '',
+    ...lines,
+    '',
+    '请补充更具体品名或完整海关编码以便精确核对。实际操作以海关归类及国家税务总局出口退税率文库为准。',
+  ].join('\n');
+}
+
+/**
+ * 纠偏：模型答复中「76开头税号 + 出口退税13%」按本地表改为实际退税率（多为0%）。
+ * 不改写「增值税税率13%」。
+ */
+function correctAluminumRefundHallucinations(text) {
+  let t = String(text || '');
+  if (!t || !/76\d{6}/.test(t)) return t;
+
+  // 形如：76081000…出口退税13% / 出口退税率为13%
+  t = t.replace(
+    /(76\d{6,10})([^%\n]{0,80}?)((?:出口)?退税率?(?:为|是|:|：)?\s*)(13)\s*%/gi,
+    (full, hs, mid, label, rate) => {
+      if (/增值税|征税率|销项/.test(mid + label)) return full;
+      const corrected = lookupLocalRefundDisplay(hs);
+      if (!corrected || corrected === `${rate}%`) return full;
+      return `${hs}${mid}${label}${corrected.replace(/%$/, '')}%`;
+    }
+  );
+
+  // 形如：→参考76081000，出口退税13%
+  t = t.replace(
+    /((?:出口)?退税(?:率)?\s*(?:为|是|:|：)?\s*)(13)\s*%([^%\n]{0,40}?)(76\d{6,10})/gi,
+    (full, label, rate, mid, hs) => {
+      if (/增值税|征税率|销项/.test(label + mid)) return full;
+      const corrected = lookupLocalRefundDisplay(hs);
+      if (!corrected || corrected === `${rate}%`) return full;
+      return `${label}${corrected.replace(/%$/, '')}%${mid}${hs}`;
+    }
+  );
+
+  return t;
 }
 
 /** Same resolution path as left-side HS query: KB first, then local table. */
