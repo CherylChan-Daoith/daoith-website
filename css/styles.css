@@ -4586,6 +4586,31 @@ body.modal-open {
   text-align: right;
 }
 
+.footer-bottom-inline {
+  justify-content: center;
+  flex-wrap: nowrap;
+}
+
+.footer-beian-inline,
+.footer-beian-links.footer-beian-inline {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-left: 0;
+  max-width: none;
+  width: 100%;
+  text-align: center;
+  white-space: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.footer-beian-inline .footer-copy {
+  flex: 0 0 auto;
+}
+
 .footer-beian-block {
   flex-direction: column !important;
   align-items: flex-start !important;
@@ -4661,11 +4686,22 @@ body.modal-open {
     align-items: stretch;
   }
 
+  .footer-bottom-inline {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .footer-beian {
     margin-left: 0;
     width: 100%;
     justify-content: flex-end;
     text-align: right;
+  }
+
+  .footer-beian-inline,
+  .footer-beian-links.footer-beian-inline {
+    justify-content: flex-start;
+    text-align: left;
   }
 }
 
