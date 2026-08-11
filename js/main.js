@@ -734,6 +734,11 @@ function stripDiagnosisIntroBoilerplate(text) {
       /我会一步一步了解您的跨境业务[^\n]*生成合规方案[^\n]*\n*/g,
       ''
     )
+    // Slow/redundant platform re-confirm before asking shipping
+    .replace(/我看到您提到了[^\n]*[！!。.]?\s*/g, '')
+    .replace(/让我确认一下[：:]?[^\n]*对吗[？?]?\s*/g, '')
+    .replace(/您是在[^？?]*平台上销售商品[，,]?对吗[？?]?\s*/g, '')
+    .replace(/确认后[，,]?我们继续下一步[：:]?\s*/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -885,10 +890,11 @@ const DIAG_QUICK_REPLY_SETS = {
     '其他平台',
   ],
   shipping: [
-    '平台海外仓（如FBA）',
-    '自发货（海外仓）',
+    '亚马逊FBA（平台仓）',
     '自发货（国内直发）',
+    '自发货（海外仓）',
     '平台国内仓',
+    '其他发货方式',
   ],
   entity: [
     '中国公司',
@@ -964,18 +970,51 @@ const DIAG_QUICK_REPLY_SETS = {
   yesNo: ['是', '否', '不确定'],
 };
 
+/** Split bot text into question sentences (handles multiple ？ in one line). */
+function extractQuestionSentences(botText) {
+  const t = String(botText || '').replace(/\r/g, '').trim();
+  if (!t) return [];
+  const parts = [];
+  for (const line of t.split(/\n+/)) {
+    const s = line.trim();
+    if (!s) continue;
+    s.split(/(?<=[？?])/).map((x) => x.trim()).filter(Boolean).forEach((c) => {
+      if (/[？?]/.test(c)) parts.push(c);
+    });
+  }
+  return parts;
+}
+
+function isMereConfirmQuestion(q) {
+  const t = String(q || '').trim();
+  if (!t) return false;
+  // e.g. 「您是在亚马逊平台上销售商品，对吗？」
+  if (!/(对吗|是吗|对不对|可以吗|确认一下)/.test(t)) return false;
+  // Still a real slot ask if it also asks shipping / invoice / etc.
+  if (/(发货|FBA|海外仓|国内直发|自发货|主体|发票|目的国|主销|出口方式|痛点)/.test(t)) return false;
+  return true;
+}
+
+function isShippingQuestionText(t) {
+  const s = String(t || '');
+  return (
+    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|自发货|FBA|海外仓|国内直发|平台仓|平台海外仓)/.test(s) &&
+    /(请问|哪|模式|是|还是|[？?])/.test(s)
+  );
+}
+
 /** Active ask text for quick-reply matching (avoid earlier-slot recap keywords). */
 function extractDiagActiveQuestion(botText) {
   const t = String(botText || '').replace(/\r/g, '').trim();
   if (!t) return '';
-  const lines = t.split(/\n+/).map((s) => s.trim()).filter(Boolean);
-  const withQ = lines.filter((p) => /[？?]/.test(p));
+  const withQ = extractQuestionSentences(t);
   if (withQ.length) {
-    // Join trailing question lines — agents often split one ask across 2–3 sentences
-    const start = Math.max(0, withQ.length - 3);
-    return withQ.slice(start).join(' ');
+    const substantive = withQ.filter((q) => !isMereConfirmQuestion(q));
+    const pool = substantive.length ? substantive : withQ;
+    // Prefer the last 1–2 substantive asks (invoice may span two ？ sentences)
+    const start = Math.max(0, pool.length - 2);
+    return pool.slice(start).join(' ');
   }
-  // Fallback: trailing chunk often holds the ask when no 「？」 was used
   return t.length > 240 ? t.slice(-240) : t;
 }
 
@@ -985,10 +1024,12 @@ function detectDiagQuickReplySet(botText) {
   const t = extractDiagActiveQuestion(full);
   if (!t) return null;
 
-  // Match the *current* ask; more specific slots before shipping/platform
+  // Shipping: prefer over platform confirmation noise in the same reply
+  if (isShippingQuestionText(t) || isShippingQuestionText(full.slice(-500))) return 'shipping';
+
+  // Match the *current* ask; more specific slots before platform
   if (/店铺主体|企业主体|注册主体|公司还是个人|主体是|什么主体|哪个主体/.test(t)) return 'entity';
   if (/目的国|主销市场|销售国家|哪个国家|哪个市场|销往哪/.test(t)) return 'country';
-  // Invoice: match even when the last sentence alone lacks 「请问」
   if (
     /(增值税专用发票|增值税普通发票|专用发票|普通发票|专票|普票|无法提供发票|不能提供发票|无票)/.test(t) ||
     (/(发票)/.test(t) && /(供应商|配合|提供|情况|类型|请问|能否|有无)/.test(t))
@@ -1002,17 +1043,12 @@ function detectDiagQuickReplySet(botText) {
   if (/(生成方案|出具方案|出方案|按现有信息|开始诊断|信息.*够|可以.*方案|是否.*方案)/.test(t)) {
     return 'readyPlan';
   }
-  if (
-    /(发货模式|仓储模式|履约模式|怎么发货|如何发货|FBA|海外仓|国内直发|平台仓|平台海外仓)/.test(t) &&
-    /(请问|哪|模式|是|还是|[？?])/.test(t) &&
-    !/(主体|公司还是个人|目的国|主销|发票|哪个平台|什么平台)/.test(t)
-  ) {
-    return 'shipping';
+  if (/电商平台|哪个平台|什么平台|主要在哪.*平台|在哪个平台/.test(t) && !isMereConfirmQuestion(t)) {
+    return 'platform';
   }
-  if (/电商平台|哪个平台|什么平台|主要在哪.*平台|在哪个平台/.test(t)) return 'platform';
-  if (/(是否|要不要|有没有做过|需要我)/.test(t) && /[？?]/.test(t)) return 'yesNo';
-  // Last-question fallback: any remaining ask still gets actionable chips
-  if (/[？?]/.test(t)) return 'painPoint';
+  if (/(是否|要不要|有没有做过|需要我|对吗|是吗)/.test(t) && /[？?]/.test(t)) return 'yesNo';
+  // Avoid dumping pain-point chips on generic confirms / soft asks
+  if (isMereConfirmQuestion(t)) return 'yesNo';
   return null;
 }
 
