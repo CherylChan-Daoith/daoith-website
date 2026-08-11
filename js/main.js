@@ -843,9 +843,10 @@ function initAiChatbot() {
   const messages = document.getElementById('aiChatbotMessages');
   if (!root || !fab || !panel || !form || !input || !messages) return;
 
-  const CONV_KEY = 'daoith_ai_conversation_id';
-  const COUNT_KEY = 'daoith_ai_ask_count';
-  const BOUND_KEY = 'daoith_ai_conversation_bound'; // '1' = id 已由 Dify 确认，可安全作为 conversation_id
+  // Dedicated keys for diagnosis Agent (avoid stale Chatflow conversation ids)
+  const CONV_KEY = 'daoith_diagnosis_conversation_id';
+  const COUNT_KEY = 'daoith_diagnosis_ask_count';
+  const BOUND_KEY = 'daoith_diagnosis_conversation_bound';
   const FREE_ASK_LIMIT = 10;
   let busy = false;
 
@@ -930,7 +931,13 @@ function initAiChatbot() {
 
   const showWelcome = () => {
     appendBubble(
-      '您好，我是道一合规助手，您可以针对跨境贸易场景下的财税合规问题进行提问。',
+      [
+        '您好，我是**道一财税诊断助手**。',
+        '',
+        '我会一步一步了解您的跨境业务，诊断财税风险，并生成合规方案（完整方案会同步到上方「AI方案生成区」）。',
+        '',
+        '我们先从第一个问题开始：**您主要在哪个电商平台销售？**',
+      ].join('\n'),
       'bot'
     );
   };
@@ -989,19 +996,16 @@ function initAiChatbot() {
 
     const typing = document.createElement('div');
     typing.className = 'ai-chatbot-bubble is-bot';
-    typing.textContent = '正在查询…';
+    typing.textContent = '正在诊断…';
     messages.appendChild(typing);
     messages.scrollTop = messages.scrollHeight;
 
     const ctx = window.__daoithLastPlanCtx || null;
-    // Keep query close to the user text — wrapping long context breaks classifier / answers.
     const query = text;
 
     const sessionId = ensureConversationId();
-    // 已绑定的会话：把 localStorage 中的 ID 作为 conversation_id 发给 Dify（会话记忆）。
-    // 全新 UUID：Dify 尚无此会话，首轮不传 id，成功后用返回的 conversation_id 覆盖本地。
     try {
-      // 退税率 + 税号：与左侧同一路径，且必须在本地答案缓存之前执行（避免缓存旧的错误13%）
+      // 退税率 + 税号：与左侧同一路径，快速直出
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
         const resolved = await resolveExportRefundRate(hsForRefund);
@@ -1019,7 +1023,6 @@ function initAiChatbot() {
         return;
       }
 
-      // 铝制品品名类退税/归类：禁止 Chatflow 把增值税 13% 当成出口退税
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
         setAskCount(askCount + 1);
@@ -1028,7 +1031,7 @@ function initAiChatbot() {
       }
 
       const { difyChatEndpoint } = getDifyConfig();
-      const endpoint = difyChatEndpoint || '/v1/chatbot/chat-messages';
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
 
       const paintStream = (partial) => {
         const clean = sanitizeAiAnswer(partial) || partial;
@@ -1045,37 +1048,17 @@ function initAiChatbot() {
         onChunk: paintStream,
       });
 
-      const isClassifierFail = (err) =>
-        /json block|invalid_param|Run failed|could not find json/i.test(String(err?.message || ''));
-
       let result;
       let conversationId = isConversationBound() ? sessionId : '';
       try {
         result = await callChat(conversationId);
       } catch (firstErr) {
         const msg = String(firstErr?.message || '');
-        // 本地 conversation 失效 → 重建会话再试
         if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
           conversationId = '';
           persistConversationId(sessionId, false);
-          typing.textContent = '正在查询…';
+          typing.textContent = '正在诊断…';
           result = await callChat('');
-        } else if (isClassifierFail(firstErr)) {
-          // Question Classifier 偶发失败：短暂重试 1～2 次（Dify 已发布版问题，控制台草稿可能正常）
-          let lastErr = firstErr;
-          for (let i = 0; i < 2; i += 1) {
-            await new Promise((r) => setTimeout(r, 400 + i * 400));
-            try {
-              typing.textContent = '正在查询…';
-              result = await callChat(conversationId);
-              lastErr = null;
-              break;
-            } catch (retryErr) {
-              lastErr = retryErr;
-              if (!isClassifierFail(retryErr)) break;
-            }
-          }
-          if (lastErr) throw lastErr;
         } else {
           throw firstErr;
         }
@@ -1085,7 +1068,6 @@ function initAiChatbot() {
       persistConversationId(nextId, true);
       setAskCount(askCount + 1);
 
-      // 优先完整展示 Dify 原文，不再用本地短回复覆盖有效答案
       let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
         answer = sanitizeAiAnswer(result.text) || result.text || buildLocalChatReply(text, ctx);
@@ -1093,27 +1075,22 @@ function initAiChatbot() {
       answer = sanitizeAiAnswer(answer) || answer;
       answer = correctAluminumRefundHallucinations(answer);
       if (!answer || answer.length < 4) {
-        // Force a fresh conversation next time; stale conversation_id often yields blank payloads
         persistConversationId(newUuid(), false);
         throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
       setBotBubble(typing, answer);
+
+      // 完整诊断方案 → 同步到上方 AI 方案生成区，并推荐相关服务
+      if (looksLikeFullDiagnosisPlan(answer)) {
+        publishDiagnosisPlanToResultPanel(answer);
+        appendBubble(
+          '完整合规方案已同步到上方 **AI方案生成区**，并附上了可加入询价单的相关服务。',
+          'bot'
+        );
+      }
     } catch (err) {
       const msg = String(err?.message || '');
-      if (/json block|invalid_param|Run failed|could not find json/i.test(msg)) {
-        setBotBubble(
-          typing,
-          [
-            '**道一助手当前发布版工作流异常**',
-            '',
-            '- 原因：问题分类节点未返回合法 JSON',
-            '- 请在 Dify 打开「道一聊天机器人」Chatflow',
-            '- 修复 Question Classifier 后点击**发布**再试',
-            '',
-            '控制台草稿预览正常，不代表已发布版可用。',
-          ].join('\n')
-        );
-      } else if (/HTTP|无法连接/i.test(msg)) {
+      if (/HTTP|无法连接/i.test(msg)) {
         setBotBubble(typing, `**暂时无法连接**\n\n- ${msg}\n- 请稍后重试`);
       } else {
         setBotBubble(
@@ -1126,6 +1103,95 @@ function initAiChatbot() {
       messages.scrollTop = messages.scrollHeight;
     }
   });
+}
+
+/** Detect structured full diagnosis / solution replies from the diagnosis Agent. */
+function looksLikeFullDiagnosisPlan(text) {
+  const t = String(text || '');
+  if (t.length < 260) return false;
+  const markers = [
+    /问题理解|业务画像|业务背景/,
+    /风险诊断|合规风险|税负影响/,
+    /解决方案|行动建议|落地建议/,
+    /业务流程图|流程图/,
+    /###\s*1[）).、]/,
+    /###\s*2[）).、]/,
+    /###\s*3[）).、]/,
+  ];
+  return markers.filter((re) => re.test(t)).length >= 3;
+}
+
+function pickDiagnosisServiceIds(text) {
+  const t = String(text || '');
+  const ids = [];
+  const add = (id) => {
+    if (id && !ids.includes(id)) ids.push(id);
+  };
+  add('consult-1v1');
+  if (/退税|免抵退|出口退|征退差/.test(t)) add('domestic-rebate');
+  if (/VAT|Oss|IOSS|增值税注册|远程销售/.test(t)) add('overseas-vat');
+  if (/销售税|Sales\s*Tax|Wayfair|经济关联/.test(t)) add('overseas-us-sales-tax');
+  if (/ODI|境外投资|境外直接/.test(t)) add('overseas-odi');
+  if (/香港公司|香港主体|香港审计/.test(t)) add('hk-company');
+  if (/记账|账务|做账|汇算清缴/.test(t)) add('domestic-bookkeeping');
+  if (/合规体检|全面诊断|架构诊断/.test(t)) add('domestic-diagnosis');
+  if (/全年|陪跑|持续跟进/.test(t)) add('consult-annual');
+  return ids.slice(0, 4);
+}
+
+function buildDiagnosisServiceRecsHtml(markdown) {
+  const getService = window.DAOITH_getService;
+  const ids = pickDiagnosisServiceIds(markdown);
+  const cards = ids
+    .map((id) => {
+      const s = typeof getService === 'function' ? getService(id) : (window.DAOITH_SERVICES || []).find((x) => x.id === id);
+      if (!s) return '';
+      return (
+        `<div class="diag-service-card">` +
+        `<div class="diag-service-card-body">` +
+        `<strong>${escapeHtml(s.title)}</strong>` +
+        `<span class="diag-service-card-desc">${escapeHtml(s.desc || '')}</span>` +
+        `<span class="diag-service-card-price">${escapeHtml(s.priceLabel || '')}${escapeHtml(s.unit || '')}</span>` +
+        `</div>` +
+        `<button type="button" class="btn btn-outline btn-sm tax-cart-btn" data-action="add" data-service-id="${escapeHtml(s.id)}">加入询价单</button>` +
+        `</div>`
+      );
+    })
+    .filter(Boolean)
+    .join('');
+  if (!cards) return '';
+  return (
+    `<div class="diag-services">` +
+    `<h5 class="result-section-title">相关服务推荐</h5>` +
+    `<p class="result-paragraph">可根据方案中的优先事项，将下列服务加入询价单，由顾问继续落地。</p>` +
+    `<div class="diag-services-grid">${cards}</div>` +
+    `</div>`
+  );
+}
+
+function publishDiagnosisPlanToResultPanel(markdown) {
+  const placeholder = document.getElementById('resultPlaceholder');
+  const content = document.getElementById('resultContent');
+  const items = document.getElementById('resultItems');
+  if (!items || !content) return;
+
+  if (placeholder) placeholder.style.display = 'none';
+  content.classList.add('active');
+
+  const clean = sanitizeAiAnswer(markdown) || String(markdown || '');
+  const body = renderAIPlanHtml(clean) || `<p class="result-paragraph">${escapeHtml(clean)}</p>`;
+  items.innerHTML =
+    `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
+    `<p class="result-paragraph result-from-chat">以下方案由右下角<strong>合规诊断</strong>对话生成：</p>` +
+    body +
+    buildDiagnosisServiceRecsHtml(clean);
+
+  window.DAOITH_CART?.bindAddButtons?.(content);
+  try {
+    content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch {
+    /* ignore */
+  }
 }
 
 /* Dify API (api.daoith.com) — no API keys in frontend */
@@ -1150,6 +1216,9 @@ function syncDifyUserConversation() {
   if (prev && prev !== current) {
     localStorage.removeItem('daoith_ai_conversation_id');
     localStorage.setItem('daoith_ai_conversation_bound', '0');
+    localStorage.removeItem('daoith_diagnosis_conversation_id');
+    localStorage.setItem('daoith_diagnosis_conversation_bound', '0');
+    localStorage.setItem('daoith_diagnosis_ask_count', '0');
   }
   localStorage.setItem(USER_MARK, current);
 }
@@ -1175,7 +1244,7 @@ function getDifyConfig() {
     difyDiagnosisEndpoint: '/v1/chat-messages',
     difyHsRateEndpoint: '/v1/chat-messages',
     difyTaxCalcEndpoint: '/v1/chat-messages',
-    difyChatEndpoint: '/v1/chatbot/chat-messages',
+    difyChatEndpoint: '/v1/diagnosis/chat-messages',
     hsRefundApiPath: '/api/hs-refund-rate',
   };
 }

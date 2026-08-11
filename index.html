@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260811b">
+  <link rel="stylesheet" href="/css/styles.css?v=20260811c">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -314,7 +314,7 @@
           <div class="result-placeholder" id="resultPlaceholder">
             <div class="icon icon-muted">AI</div>
             <h4>AI方案生成区</h4>
-            <p>填写左侧业务信息后<br>点击「AI智能生成方案」获取专属方案</p>
+            <p>可在左侧填写业务信息生成方案<br>或通过右下角「合规诊断」逐步问诊后同步到此处</p>
           </div>
           <div class="result-content" id="resultContent">
             <h4>您的专属合规方案</h4>
@@ -418,12 +418,12 @@
 
     <!-- Floating compliance assistant (AI 解决方案页内浮动) -->
     <div class="ai-chatbot" id="aiChatbot" data-state="collapsed">
-      <button type="button" class="ai-chatbot-fab" id="aiChatbotFab" aria-label="打开道一合规助手">
+      <button type="button" class="ai-chatbot-fab" id="aiChatbotFab" aria-label="打开道一财税诊断助手">
         <span class="ai-chatbot-fab-ring" aria-hidden="true"></span>
         <img src="/images/logo.png" alt="" width="32" height="32">
         <span class="ai-chatbot-fab-copy">
-          <span class="ai-chatbot-fab-label">合规咨询</span>
-          <span class="ai-chatbot-fab-sub">即时答疑</span>
+          <span class="ai-chatbot-fab-label">合规诊断</span>
+          <span class="ai-chatbot-fab-sub">逐步问诊</span>
         </span>
       </button>
       <div class="ai-chatbot-panel" id="aiChatbotPanel" hidden>
@@ -431,8 +431,8 @@
           <div class="ai-chatbot-title">
             <img src="/images/logo.png" alt="" width="28" height="28">
             <div class="ai-chatbot-title-text">
-              <strong>道一合规助手</strong>
-              <span>跨境财税 · 政策与实操答疑</span>
+              <strong>道一财税诊断助手</strong>
+              <span>逐步了解业务 · 生成合规方案</span>
             </div>
           </div>
           <div class="ai-chatbot-header-actions">
@@ -442,7 +442,7 @@
         </div>
         <div class="ai-chatbot-messages" id="aiChatbotMessages"></div>
         <form class="ai-chatbot-form" id="aiChatbotForm">
-          <input type="text" id="aiChatbotInput" placeholder="例如：铝制品海关编码是什么？" autocomplete="off" maxlength="500">
+          <input type="text" id="aiChatbotInput" placeholder="例如：我在亚马逊做FBA，想做合规诊断" autocomplete="off" maxlength="500">
           <button type="submit" class="btn btn-primary ai-chatbot-send">发送</button>
         </form>
       </div>
@@ -887,7 +887,7 @@
 
   <script src="/js/locales/en.js?v=20260810d"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
-  <script src="/js/config.js?v=20260807d"></script>
+  <script src="/js/config.js?v=20260811c"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
   <script src="/js/tax-systems.js?v=20260727u"></script>
   <script src="/js/articles.js?v=20260708j"></script>
@@ -896,6 +896,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260810e"></script>
+  <script src="/js/main.js?v=20260811c"></script>
 </body>
 </html>
