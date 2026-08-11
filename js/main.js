@@ -698,7 +698,44 @@ function sanitizeAiAnswer(text) {
         .replace(new RegExp(`<\\s*\\/?\\s*${think}\\b[^>]*>`, 'gi'), '')
     );
   }
+
+  // Opening welcome belongs in the first bubble only — strip if the model repeats it mid-chat
+  t = t
+    .replace(
+      /您好[，,]?\s*欢迎使用道一合规诊断助手！?\s*我们为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
+      ''
+    )
+    .replace(
+      /您好[，,]?\s*我是\*{0,2}道一(?:财税|合规)?诊断助手\*{0,2}[。.]?\s*/g,
+      ''
+    )
+    .replace(/^\s*\n+/, '')
+    .trim();
+
   return t;
+}
+
+/** Drop Dify re-intros; welcome already shown in the embedded chat opening. */
+function stripDiagnosisIntroBoilerplate(text) {
+  return String(text || '')
+    .replace(
+      /您好[，,]?\s*欢迎使用道一合规诊断助手！?\s*我们为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
+      ''
+    )
+    .replace(
+      /您好[，,]?\s*我是\*{0,2}道一合规诊断助手\*{0,2}[。.]?\s*/g,
+      ''
+    )
+    .replace(
+      /您好[，,]?\s*我是\*{0,2}道一财税诊断助手\*{0,2}[。.]?\s*/g,
+      ''
+    )
+    .replace(
+      /我会一步一步了解您的跨境业务[^\n]*生成合规方案[^\n]*\n*/g,
+      ''
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 /** 轻度排版：已有列表/加粗则原样渲染，避免改写 Dify 完整答复 */
@@ -1099,9 +1136,7 @@ function initAiChatbot() {
 
   const showWelcome = () => {
     const welcome = [
-      '您好，我是**道一合规诊断助手**。',
-      '',
-      '我会一步一步了解您的跨境业务，诊断财税风险，并生成合规方案（完整方案会显示在右侧「AI方案生成区」）。',
+      '您好，欢迎使用道一合规诊断助手！我们为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。',
       '',
       '我们先从第一个问题开始：**您主要在哪个电商平台销售？**',
     ].join('\n');
@@ -1205,7 +1240,7 @@ function initAiChatbot() {
       };
 
       const paintStream = (partial) => {
-        const clean = sanitizeAiAnswer(partial) || partial;
+        const clean = stripDiagnosisIntroBoilerplate(sanitizeAiAnswer(partial) || partial);
         if (!clean) return;
         // Full diagnosis → stream into right-hand plan panel, not the chat bubble
         if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
@@ -1260,6 +1295,7 @@ function initAiChatbot() {
         answer = sanitizeAiAnswer(result.text) || result.text || buildLocalChatReply(text, ctx);
       }
       answer = sanitizeAiAnswer(answer) || answer;
+      answer = stripDiagnosisIntroBoilerplate(answer);
       answer = correctAluminumRefundHallucinations(answer);
       if (!answer || answer.length < 4) {
         persistConversationId(newUuid(), false);
