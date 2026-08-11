@@ -2579,7 +2579,6 @@ function initAIForm() {
 function initTaxCalculator() {
   const calcBtn = document.getElementById('calcTax');
   const entitySelect = document.getElementById('taxEntity');
-  const aiEntitySelect = document.getElementById('entity');
   const resultEl = document.getElementById('taxResult');
   if (!calcBtn || !entitySelect || !resultEl) return;
 
