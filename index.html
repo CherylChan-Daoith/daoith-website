@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260811c">
+  <link rel="stylesheet" href="/css/styles.css?v=20260811d">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -144,86 +144,17 @@
       <div class="section-header">
         <span class="section-badge">AI-Powered</span>
         <h2>AI自动化解决方案生成</h2>
-        <p>填写电商平台与发货模式即可生成一般性方案；补充更多业务信息可获得细化建议</p>
+        <p>请根据合规诊断助手的提示提供业务信息，获取您的专属合规方案</p>
       </div>
 
       <div class="ai-grid">
         <div class="ai-left">
-        <div class="form-panel">
-          <h3>业务信息 <span class="tag">AI</span></h3>
-          <form id="aiForm" novalidate>
-            <p class="form-required-hint">仅「从事的电商平台」与「发货模式」为必填，其余可留空先看一般性方案。</p>
+        <div class="form-panel diag-panel">
+          <h3>合规诊断助手 <span class="tag">AI</span></h3>
+
+          <div class="diag-hs-block">
             <div class="form-group">
-              <label>从事的电商平台 <span class="req-mark" aria-hidden="true">*</span></label>
-              <select id="platform" required>
-                <option value="">请选择</option>
-                <option value="amazon">亚马逊 Amazon</option>
-                <option value="walmart">沃尔玛 Walmart</option>
-                <option value="shopify">Shopify独立站</option>
-                <option value="ebay">eBay</option>
-                <option value="aliexpress">速卖通</option>
-                <option value="temu">Temu</option>
-                <option value="tiktok">TikTok Shop</option>
-                <option value="mercadolibre">美客多 Mercado Libre</option>
-                <option value="alibaba">阿里国际站 Alibaba.com</option>
-                <option value="other">其他</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>发货模式 <span class="req-mark" aria-hidden="true">*</span></label>
-              <select id="shipping" required>
-                <option value="">请选择</option>
-                <option value="self_overseas">自发货（海外仓）</option>
-                <option value="self_domestic">自发货（国内直发）</option>
-                <option value="platform_domestic">平台国内仓</option>
-                <option value="platform_overseas">平台海外仓（如FBA）</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>店铺主体 <span class="opt-mark">可选</span></label>
-              <select id="entity">
-                <option value="">请选择</option>
-                <option value="cn">中国公司</option>
-                <option value="cn_individual">中国个人</option>
-                <option value="hk">香港公司</option>
-                <option value="us">美国公司</option>
-                <option value="uk">英国公司</option>
-                <option value="de">德国公司</option>
-                <option value="nl">荷兰公司</option>
-                <option value="mx">墨西哥公司</option>
-                <option value="sg">新加坡公司</option>
-                <option value="ru">俄罗斯公司</option>
-                <option value="br">巴西公司</option>
-                <option value="jp">日本公司</option>
-                <option value="vn">越南公司</option>
-                <option value="in">印度公司</option>
-                <option value="sa">沙特阿拉伯公司</option>
-                <option value="other_overseas">其他海外公司</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>目的国/地区 <span class="opt-mark">可选</span></label>
-              <select id="country">
-                <option value="">请选择</option>
-                <option value="us">美国</option>
-                <option value="uk">英国</option>
-                <option value="de">德国</option>
-                <option value="fr">法国</option>
-                <option value="jp">日本</option>
-                <option value="ca">加拿大</option>
-                <option value="au">澳大利亚</option>
-                <option value="it">意大利</option>
-                <option value="es">西班牙</option>
-                <option value="kr">韩国</option>
-                <option value="mx">墨西哥</option>
-                <option value="ru">俄罗斯</option>
-                <option value="sea">东南亚</option>
-                <option value="me">中东</option>
-                <option value="other">其他</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>产品海关编码（HS Code） <span class="opt-mark">可选</span></label>
+              <label>出口退税率查询</label>
               <div class="hs-input-group">
                 <input type="text" id="hsCode" placeholder="请填写10位海关编码以获得准确退税率" inputmode="numeric" autocomplete="off" maxlength="14">
               </div>
@@ -232,67 +163,23 @@
                   <button type="button" class="btn btn-outline btn-sm hs-query-btn" id="queryTax">查询出口退税率</button>
                   <input type="text" class="hs-rate-box" id="refundRateBox" readonly placeholder="—" aria-label="出口退税率">
                 </div>
-                <div class="hs-action-row">
-                  <button type="button" class="btn btn-outline btn-sm hs-query-btn" id="queryDuty">查询目的国关税税率</button>
-                  <input type="text" class="hs-rate-box" id="dutyRateBox" readonly placeholder="—" aria-label="目的国关税税率">
-                </div>
               </div>
-              <p class="hs-hint" id="hsHint">请填写10位海关编码以获得准确退税率（知识库按完整税号精确匹配；不足10位时将尝试按前8位匹配）。目的国关税请先选择目的国后再查。</p>
+              <p class="hs-hint" id="hsHint">请填写10位海关编码以获得准确退税率（知识库按完整税号精确匹配；不足10位时将尝试按前8位匹配）。</p>
               <p class="hs-rate-source" id="hsRateSource" hidden></p>
             </div>
-            <div class="form-group">
-              <label>年销售额（万元人民币） <span class="opt-mark">可选</span></label>
-              <select id="revenue">
-                <option value="">请选择</option>
-                <option value="under500">500以下</option>
-                <option value="500-2000">500-2000</option>
-                <option value="2000-5000">2000-5000</option>
-                <option value="5000-10000">5000-10000</option>
-                <option value="above10000">10000以上</option>
-              </select>
+          </div>
+
+          <div class="diag-chat" id="aiChatbot" data-state="open">
+            <div class="diag-chat-toolbar">
+              <button type="button" class="ai-chatbot-new" id="aiChatbotNew" title="新建对话">新建对话</button>
             </div>
-            <div class="form-group">
-              <label>团队人数 <span class="opt-mark">可选</span></label>
-              <select id="teamSize">
-                <option value="">请选择</option>
-                <option value="under10">10人以下</option>
-                <option value="10-50">10-50人</option>
-                <option value="50-200">50-200人</option>
-                <option value="above200">200人以上</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>供应商发票情况 <span class="opt-mark">可选</span></label>
-              <select id="invoice">
-                <option value="">请选择</option>
-                <option value="special">增值税专票</option>
-                <option value="general">增值税普票</option>
-                <option value="none">无法提供发票</option>
-                <option value="mixed">部分专票+部分普票</option>
-                <option value="special_none">部分专票+部分无票</option>
-                <option value="general_none">部分普票+部分无票</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>目前出口方式 <span class="opt-mark">可选</span></label>
-              <select id="exportMode">
-                <option value="">请选择</option>
-                <option value="trade_0110">0110一般贸易</option>
-                <option value="market_1039">1039市场采购出口</option>
-                <option value="cbec_9610">9610跨境电商零售出口</option>
-                <option value="cbec_9710">9710跨境电商B2B出口</option>
-                <option value="cbec_9810">9810出口海外仓</option>
-                <option value="bonded_1210">1210保税出口</option>
-                <option value="freight_forwarder">委托货代出口</option>
-                <option value="other">其他</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>补充说明 <span class="opt-mark">可选</span></label>
-              <textarea id="notes" placeholder="如：涉及多国VAT注册、转让定价、海外公司架构等..."></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary" style="width:100%">AI智能生成方案</button>
-          </form>
+            <div class="ai-chatbot-messages" id="aiChatbotMessages"></div>
+            <div class="diag-quick-replies" id="diagQuickReplies" hidden></div>
+            <form class="ai-chatbot-form" id="aiChatbotForm">
+              <input type="text" id="aiChatbotInput" placeholder="也可直接输入文字回复…" autocomplete="off" maxlength="500">
+              <button type="submit" class="btn btn-primary ai-chatbot-send">发送</button>
+            </form>
+          </div>
         </div>
 
         <div class="faq-panel faq-section" id="planFaqPanel" hidden>
@@ -314,7 +201,7 @@
           <div class="result-placeholder" id="resultPlaceholder">
             <div class="icon icon-muted">AI</div>
             <h4>AI方案生成区</h4>
-            <p>可在左侧填写业务信息生成方案<br>或通过右下角「合规诊断」逐步问诊后同步到此处</p>
+            <p>请根据左侧合规诊断助手的提示<br>提供业务信息，完整方案将显示在此处</p>
           </div>
           <div class="result-content" id="resultContent">
             <h4>您的专属合规方案</h4>
@@ -322,6 +209,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Recommended services (filled after diagnosis plan) -->
+      <div class="diag-services-section" id="diagServiceRecs" hidden></div>
 
       <!-- Tax Calculator -->
       <div class="tax-calc">
@@ -416,36 +306,6 @@
       </div>
     </div>
 
-    <!-- Floating compliance assistant (AI 解决方案页内浮动) -->
-    <div class="ai-chatbot" id="aiChatbot" data-state="collapsed">
-      <button type="button" class="ai-chatbot-fab" id="aiChatbotFab" aria-label="打开道一财税诊断助手">
-        <span class="ai-chatbot-fab-ring" aria-hidden="true"></span>
-        <img src="/images/logo.png" alt="" width="32" height="32">
-        <span class="ai-chatbot-fab-copy">
-          <span class="ai-chatbot-fab-label">合规诊断</span>
-          <span class="ai-chatbot-fab-sub">逐步问诊</span>
-        </span>
-      </button>
-      <div class="ai-chatbot-panel" id="aiChatbotPanel" hidden>
-        <div class="ai-chatbot-header">
-          <div class="ai-chatbot-title">
-            <img src="/images/logo.png" alt="" width="28" height="28">
-            <div class="ai-chatbot-title-text">
-              <strong>道一财税诊断助手</strong>
-              <span>逐步了解业务 · 生成合规方案</span>
-            </div>
-          </div>
-          <div class="ai-chatbot-header-actions">
-            <button type="button" class="ai-chatbot-new" id="aiChatbotNew" title="新建对话">新建对话</button>
-            <button type="button" class="ai-chatbot-close" id="aiChatbotClose" aria-label="关闭聊天">×</button>
-          </div>
-        </div>
-        <div class="ai-chatbot-messages" id="aiChatbotMessages"></div>
-        <form class="ai-chatbot-form" id="aiChatbotForm">
-          <input type="text" id="aiChatbotInput" placeholder="例如：我在亚马逊做FBA，想做合规诊断" autocomplete="off" maxlength="500">
-          <button type="submit" class="btn btn-primary ai-chatbot-send">发送</button>
-        </form>
-      </div>
     </div>
   </section>
 
@@ -885,7 +745,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260810d"></script>
+  <script src="/js/locales/en.js?v=20260811d"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260811c"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -896,6 +756,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260811c"></script>
+  <script src="/js/main.js?v=20260811d"></script>
 </body>
 </html>

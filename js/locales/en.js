@@ -255,9 +255,9 @@ window.DAOITH_I18N_EN = {
     },
     '#ai-solution .section-header h2': { text: 'AI Compliance Plan Generator' },
     '#ai-solution .section-header p': {
-      text: 'Platform and shipping mode are enough for a general plan; add more business details for tailored advice.',
+      text: 'Follow the compliance diagnosis assistant prompts to provide business details and get your tailored plan.',
     },
-    '.form-panel h3': { html: true, text: 'Business Info <span class="tag">AI</span>' },
+    '.form-panel h3': { html: true, text: 'Compliance Diagnosis <span class="tag">AI</span>' },
     '#aiForm .form-required-hint': {
       text: 'Only “E-commerce platform” and “Shipping model” are required; leave the rest blank for a general plan first.',
     },

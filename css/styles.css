@@ -680,7 +680,174 @@ ul {
   flex: 1 1 40%;
   min-height: 0;
   max-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.diag-panel {
+  gap: 10px;
+}
+
+.diag-hs-block {
+  flex: 0 0 auto;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.diag-chat {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diag-chat-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.diag-chat .ai-chatbot-messages {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  max-height: none;
+  padding: 8px 4px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.diag-quick-replies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  max-height: 96px;
+  overflow-y: auto;
+}
+
+.diag-quick-replies[hidden] {
+  display: none !important;
+}
+
+.diag-quick-reply-btn {
+  appearance: none;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #1f2937;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.diag-quick-reply-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.diag-chat .ai-chatbot-form {
+  flex-shrink: 0;
+  margin: 0;
+}
+
+#resultItems {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+}
+
+#resultItems .result-body-scroll,
+#resultItems .result-body {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+}
+
+.diag-services-section {
+  margin: 18px 0 8px;
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius);
+  background: #f8fafc;
+}
+
+.diag-services-section[hidden] {
+  display: none !important;
+}
+
+.diag-services-heading {
+  margin: 0 0 6px;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.diag-services-lead {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.diag-services-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.diag-service-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.diag-service-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.diag-service-card-body strong {
+  font-size: 0.84rem;
+  color: #111827;
+}
+
+.diag-service-card-desc {
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.diag-service-card-price {
+  font-size: 0.78rem;
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.result-from-chat {
+  color: #4b5563;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .diag-service-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .ai-grid .form-panel h3 {
@@ -4631,65 +4798,6 @@ body.modal-open {
 .footer-beian-links {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.65);
-}
-
-.diag-services {
-  margin-top: 18px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.diag-services-grid {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.diag-service-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.diag-service-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.diag-service-card-body strong {
-  font-size: 0.84rem;
-  color: #111827;
-}
-
-.diag-service-card-desc {
-  font-size: 0.72rem;
-  color: #6b7280;
-  line-height: 1.45;
-}
-
-.diag-service-card-price {
-  font-size: 0.78rem;
-  color: #0f766e;
-  font-weight: 600;
-}
-
-.result-from-chat {
-  color: #4b5563;
-  font-size: 0.8rem;
-}
-
-@media (max-width: 640px) {
-  .diag-service-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
 }
 
 .footer-beian-gongan {

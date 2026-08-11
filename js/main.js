@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavDropdown();
   initHeroFeatures();
   initFAQ();
-  initAIForm();
+  initHsRebateQuery();
   initAiChatbot();
   initTaxCalculator();
   initServicesMarketplace();
@@ -37,10 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('daoith-auth-pending', (event) => {
     const action = event.detail?.action;
     setTimeout(() => {
-      if (action === 'ai-generate') {
-        document.getElementById('aiForm')?.requestSubmit();
-      } else if (action === 'tax-calc') {
+      if (action === 'tax-calc') {
         document.getElementById('calcTax')?.click();
+      } else if (action === 'ai_chat') {
+        document.getElementById('aiChatbotInput')?.focus();
       }
     }, 400);
   });
@@ -832,25 +832,99 @@ function buildLocalChatReply(message, ctx) {
   ].join('\n');
 }
 
+const DIAG_QUICK_REPLY_SETS = {
+  platform: [
+    '亚马逊 Amazon',
+    'Temu',
+    'TikTok Shop',
+    '速卖通',
+    'Shopify独立站',
+    'eBay',
+    '美客多',
+    '阿里国际站',
+    '其他平台',
+  ],
+  shipping: [
+    '平台海外仓（如FBA）',
+    '自发货（海外仓）',
+    '自发货（国内直发）',
+    '平台国内仓',
+  ],
+  entity: [
+    '中国公司',
+    '中国个人',
+    '香港公司',
+    '美国公司',
+    '英国公司',
+    '其他海外公司',
+  ],
+  country: [
+    '美国',
+    '英国',
+    '德国',
+    '法国',
+    '日本',
+    '加拿大',
+    '澳大利亚',
+    '东南亚',
+    '中东',
+    '其他',
+  ],
+  invoice: [
+    '增值税专票',
+    '增值税普票',
+    '无法提供发票',
+    '部分专票+部分普票',
+    '部分专票+部分无票',
+  ],
+  exportMode: [
+    '0110一般贸易',
+    '9610跨境电商零售出口',
+    '9710跨境电商B2B出口',
+    '9810出口海外仓',
+    '1039市场采购出口',
+    '委托货代出口',
+    '其他',
+  ],
+  revenue: [
+    '500万以下',
+    '500-2000万',
+    '2000-5000万',
+    '5000-10000万',
+    '10000万以上',
+  ],
+  yesNo: ['是', '否', '不确定'],
+};
+
+function detectDiagQuickReplySet(botText) {
+  const t = String(botText || '');
+  if (looksLikeFullDiagnosisPlan(t)) return null;
+  if (/电商平台|哪个平台|什么平台|主要在哪.*平台/.test(t)) return 'platform';
+  if (/发货模式|FBA|海外仓|国内直发|仓储模式/.test(t) && /请问|哪|模式|是|还是/.test(t)) return 'shipping';
+  if (/店铺主体|企业主体|注册主体|公司还是个人|主体是/.test(t)) return 'entity';
+  if (/目的国|主销市场|销售国家|哪个国家|哪个市场/.test(t)) return 'country';
+  if (/发票|专票|普票|无票/.test(t) && /情况|类型|请问|哪/.test(t)) return 'invoice';
+  if (/出口方式|贸易方式|9610|9710|9810|一般贸易/.test(t)) return 'exportMode';
+  if (/销售额|营收|体量|规模/.test(t) && /年|大概|区间/.test(t)) return 'revenue';
+  if (/是否|要不要|有没有做过|需要我/.test(t) && /[？?]/.test(t)) return 'yesNo';
+  return null;
+}
+
 function initAiChatbot() {
   const root = document.getElementById('aiChatbot');
-  const fab = document.getElementById('aiChatbotFab');
-  const panel = document.getElementById('aiChatbotPanel');
-  const closeBtn = document.getElementById('aiChatbotClose');
   const newBtn = document.getElementById('aiChatbotNew');
   const form = document.getElementById('aiChatbotForm');
   const input = document.getElementById('aiChatbotInput');
   const messages = document.getElementById('aiChatbotMessages');
-  if (!root || !fab || !panel || !form || !input || !messages) return;
+  const quickEl = document.getElementById('diagQuickReplies');
+  if (!root || !form || !input || !messages) return;
 
-  // Dedicated keys for diagnosis Agent (avoid stale Chatflow conversation ids)
   const CONV_KEY = 'daoith_diagnosis_conversation_id';
   const COUNT_KEY = 'daoith_diagnosis_ask_count';
   const BOUND_KEY = 'daoith_diagnosis_conversation_bound';
   const FREE_ASK_LIMIT = 10;
   let busy = false;
 
-  // 清掉历史问答缓存，避免旧错误税率被秒回
   try {
     ['daoith_ai_answer_cache_v1', 'daoith_ai_answer_cache_v2', 'daoith_ai_answer_cache_v3', 'daoith_ai_answer_cache_v4'].forEach(
       (k) => localStorage.removeItem(k)
@@ -873,7 +947,6 @@ function initAiChatbot() {
     localStorage.setItem(COUNT_KEY, String(Math.max(0, n | 0)));
   };
 
-  /** 打开页面时确保有会话 UUID；已有则复用（会话记忆） */
   const ensureConversationId = () => {
     let id = localStorage.getItem(CONV_KEY);
     if (!id) {
@@ -885,7 +958,6 @@ function initAiChatbot() {
     return id;
   };
 
-  /** 新建对话 / 清空：清掉旧 UUID，生成新的 */
   const resetConversation = () => {
     const id = newUuid();
     localStorage.setItem(CONV_KEY, id);
@@ -902,7 +974,34 @@ function initAiChatbot() {
     localStorage.setItem(BOUND_KEY, bound ? '1' : '0');
   };
 
-  // 新用户打开页面即生成会话 ID
+  const clearQuickReplies = () => {
+    if (!quickEl) return;
+    quickEl.innerHTML = '';
+    quickEl.hidden = true;
+  };
+
+  const showQuickReplies = (botText) => {
+    if (!quickEl) return;
+    clearQuickReplies();
+    const setKey = detectDiagQuickReplySet(botText);
+    if (!setKey) return;
+    const options = DIAG_QUICK_REPLY_SETS[setKey] || [];
+    if (!options.length) return;
+    options.forEach((label) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'diag-quick-reply-btn';
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        if (busy) return;
+        input.value = label;
+        form.requestSubmit();
+      });
+      quickEl.appendChild(btn);
+    });
+    quickEl.hidden = false;
+  };
+
   ensureConversationId();
 
   const appendBubble = (text, who) => {
@@ -930,54 +1029,39 @@ function initAiChatbot() {
   };
 
   const showWelcome = () => {
-    appendBubble(
-      [
-        '您好，我是**道一财税诊断助手**。',
-        '',
-        '我会一步一步了解您的跨境业务，诊断财税风险，并生成合规方案（完整方案会同步到上方「AI方案生成区」）。',
-        '',
-        '我们先从第一个问题开始：**您主要在哪个电商平台销售？**',
-      ].join('\n'),
-      'bot'
-    );
-  };
-
-  const openChat = () => {
-    root.dataset.state = 'open';
-    panel.hidden = false;
-    ensureConversationId();
-    if (!messages.childElementCount) showWelcome();
-    input.focus();
-  };
-
-  const closeChat = () => {
-    root.dataset.state = 'collapsed';
-    panel.hidden = true;
+    const welcome = [
+      '您好，我是**道一财税诊断助手**。',
+      '',
+      '我会一步一步了解您的跨境业务，诊断财税风险，并生成合规方案（完整方案会显示在右侧「AI方案生成区」）。',
+      '',
+      '我们先从第一个问题开始：**您主要在哪个电商平台销售？**',
+    ].join('\n');
+    appendBubble(welcome, 'bot');
+    showQuickReplies(welcome);
   };
 
   const startNewConversation = () => {
     resetConversation();
     clearMessages();
+    clearQuickReplies();
     showWelcome();
     input.value = '';
     input.focus();
   };
 
-  fab.addEventListener('click', openChat);
-  closeBtn?.addEventListener('click', closeChat);
   newBtn?.addEventListener('click', (e) => {
     e.preventDefault();
     startNewConversation();
   });
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
+  // Embedded panel: show welcome immediately
+  if (!messages.childElementCount) showWelcome();
+
+  const sendMessage = async (text) => {
     if (!text || busy) return;
 
     const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
     const askCount = getAskCount();
-    // 未登录用户提问超过 10 次后需微信登录
     if (!loggedIn && askCount >= FREE_ASK_LIMIT) {
       appendBubble(
         '免费体验已达 10 次。请微信登录后继续咨询，登录后可保留当前会话记忆。',
@@ -990,6 +1074,7 @@ function initAiChatbot() {
       return;
     }
 
+    clearQuickReplies();
     input.value = '';
     appendBubble(text, 'user');
     busy = true;
@@ -1001,11 +1086,8 @@ function initAiChatbot() {
     messages.scrollTop = messages.scrollHeight;
 
     const ctx = window.__daoithLastPlanCtx || null;
-    const query = text;
-
     const sessionId = ensureConversationId();
     try {
-      // 退税率 + 税号：与左侧同一路径，快速直出
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
         const resolved = await resolveExportRefundRate(hsForRefund);
@@ -1013,13 +1095,13 @@ function initAiChatbot() {
           const reply = formatStructuredRefundReply(resolved, hsForRefund);
           setAskCount(askCount + 1);
           setBotBubble(typing, reply);
+          showQuickReplies(reply);
           return;
         }
         setAskCount(askCount + 1);
-        setBotBubble(
-          typing,
-          `未查到海关编码 ${hsForRefund} 的出口退税率，请核对编码后重试，或以国家税务总局出口退税率文库为准。`
-        );
+        const miss = `未查到海关编码 ${hsForRefund} 的出口退税率，请核对编码后重试，或以国家税务总局出口退税率文库为准。`;
+        setBotBubble(typing, miss);
+        showQuickReplies(miss);
         return;
       }
 
@@ -1027,6 +1109,7 @@ function initAiChatbot() {
       if (aluminumReply) {
         setAskCount(askCount + 1);
         setBotBubble(typing, aluminumReply);
+        showQuickReplies(aluminumReply);
         return;
       }
 
@@ -1042,7 +1125,7 @@ function initAiChatbot() {
 
       const callChat = (conversationId) => callDifyStream({
         endpoint,
-        query,
+        query: text,
         inputs: {},
         conversationId,
         onChunk: paintStream,
@@ -1054,7 +1137,17 @@ function initAiChatbot() {
         result = await callChat(conversationId);
       } catch (firstErr) {
         const msg = String(firstErr?.message || '');
-        if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
+        // Streaming/CORS失败时回退 blocking
+        if (/无法连接|Failed to fetch|NetworkError/i.test(msg)) {
+          typing.textContent = '正在诊断…';
+          result = await callDify({
+            endpoint,
+            query: text,
+            inputs: {},
+            conversationId,
+            returnMeta: true,
+          });
+        } else if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
           conversationId = '';
           persistConversationId(sessionId, false);
           typing.textContent = '正在诊断…';
@@ -1080,17 +1173,19 @@ function initAiChatbot() {
       }
       setBotBubble(typing, answer);
 
-      // 完整诊断方案 → 同步到上方 AI 方案生成区，并推荐相关服务
       if (looksLikeFullDiagnosisPlan(answer)) {
         publishDiagnosisPlanToResultPanel(answer);
         appendBubble(
-          '完整合规方案已同步到上方 **AI方案生成区**，并附上了可加入询价单的相关服务。',
+          '完整合规方案已同步到右侧 **AI方案生成区**；相关服务推荐在下方税负计算区上方，可加入询价单。',
           'bot'
         );
+        clearQuickReplies();
+      } else {
+        showQuickReplies(answer);
       }
     } catch (err) {
       const msg = String(err?.message || '');
-      if (/HTTP|无法连接/i.test(msg)) {
+      if (/HTTP|无法连接|Failed to fetch/i.test(msg)) {
         setBotBubble(typing, `**暂时无法连接**\n\n- ${msg}\n- 请稍后重试`);
       } else {
         setBotBubble(
@@ -1102,6 +1197,13 @@ function initAiChatbot() {
       busy = false;
       messages.scrollTop = messages.scrollHeight;
     }
+  };
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    await sendMessage(text);
   });
 }
 
@@ -1140,11 +1242,10 @@ function pickDiagnosisServiceIds(text) {
 }
 
 function buildDiagnosisServiceRecsHtml(markdown) {
-  const getService = window.DAOITH_getService;
   const ids = pickDiagnosisServiceIds(markdown);
   const cards = ids
     .map((id) => {
-      const s = typeof getService === 'function' ? getService(id) : (window.DAOITH_SERVICES || []).find((x) => x.id === id);
+      const s = (window.DAOITH_SERVICES || []).find((x) => x.id === id);
       if (!s) return '';
       return (
         `<div class="diag-service-card">` +
@@ -1161,11 +1262,9 @@ function buildDiagnosisServiceRecsHtml(markdown) {
     .join('');
   if (!cards) return '';
   return (
-    `<div class="diag-services">` +
-    `<h5 class="result-section-title">相关服务推荐</h5>` +
-    `<p class="result-paragraph">可根据方案中的优先事项，将下列服务加入询价单，由顾问继续落地。</p>` +
-    `<div class="diag-services-grid">${cards}</div>` +
-    `</div>`
+    `<h3 class="diag-services-heading">相关服务推荐</h3>` +
+    `<p class="diag-services-lead">可根据方案中的优先事项，将下列服务加入询价单，由顾问继续落地。</p>` +
+    `<div class="diag-services-grid">${cards}</div>`
   );
 }
 
@@ -1173,6 +1272,7 @@ function publishDiagnosisPlanToResultPanel(markdown) {
   const placeholder = document.getElementById('resultPlaceholder');
   const content = document.getElementById('resultContent');
   const items = document.getElementById('resultItems');
+  const serviceHost = document.getElementById('diagServiceRecs');
   if (!items || !content) return;
 
   if (placeholder) placeholder.style.display = 'none';
@@ -1181,14 +1281,27 @@ function publishDiagnosisPlanToResultPanel(markdown) {
   const clean = sanitizeAiAnswer(markdown) || String(markdown || '');
   const body = renderAIPlanHtml(clean) || `<p class="result-paragraph">${escapeHtml(clean)}</p>`;
   items.innerHTML =
+    `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
-    `<p class="result-paragraph result-from-chat">以下方案由右下角<strong>合规诊断</strong>对话生成：</p>` +
+    `<p class="result-paragraph result-from-chat">以下方案由左侧<strong>合规诊断助手</strong>生成：</p>` +
     body +
-    buildDiagnosisServiceRecsHtml(clean);
+    `</div>`;
 
-  window.DAOITH_CART?.bindAddButtons?.(content);
+  if (serviceHost) {
+    const html = buildDiagnosisServiceRecsHtml(clean);
+    if (html) {
+      serviceHost.innerHTML = html;
+      serviceHost.hidden = false;
+      window.DAOITH_CART?.bindAddButtons?.(serviceHost);
+    } else {
+      serviceHost.innerHTML = '';
+      serviceHost.hidden = true;
+    }
+  }
+
   try {
     content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    items.scrollTop = 0;
   } catch {
     /* ignore */
   }
@@ -2180,11 +2293,15 @@ const taxDedicatedEntityCountries = new Set([
 ]);
 
 function getFormContext() {
-  const platform = document.getElementById('platform').value;
-  const entity = document.getElementById('entity').value;
-  const country = document.getElementById('country').value;
-  const shipping = document.getElementById('shipping')?.value;
-  const exportMode = document.getElementById('exportMode')?.value;
+  const val = (id) => document.getElementById(id)?.value || '';
+  const platform = val('platform');
+  const entity = val('entity');
+  const country = val('country');
+  const shipping = val('shipping');
+  const exportMode = val('exportMode');
+  const revenue = val('revenue');
+  const teamSize = val('teamSize');
+  const invoice = val('invoice');
 
   return {
     platform,
@@ -2192,19 +2309,19 @@ function getFormContext() {
     country,
     shipping,
     exportMode,
-    hsCode: document.getElementById('hsCode').value.trim(),
-    revenue: document.getElementById('revenue').value,
-    teamSize: document.getElementById('teamSize').value,
-    invoice: document.getElementById('invoice').value,
-    notes: document.getElementById('notes').value.trim(),
+    hsCode: val('hsCode').trim(),
+    revenue,
+    teamSize,
+    invoice,
+    notes: val('notes').trim(),
     platformLabel: platformNames[platform] || platform,
     entityLabel: entity ? (entityNames[entity] || entity) : '',
     countryLabel: country ? (countryNames[country] || country) : '',
     shippingLabel: shippingModes[shipping] || shipping,
     exportModeLabel: exportMode ? (exportModeNames[exportMode] || exportMode) : '',
-    revenueLabel: revenueNames[document.getElementById('revenue').value] || '',
-    teamSizeLabel: teamSizeNames[document.getElementById('teamSize').value] || '',
-    invoiceLabel: invoiceNames[document.getElementById('invoice').value] || '',
+    revenueLabel: revenueNames[revenue] || '',
+    teamSizeLabel: teamSizeNames[teamSize] || '',
+    invoiceLabel: invoiceNames[invoice] || '',
   };
 }
 
@@ -2391,25 +2508,12 @@ function validateAiFormRequired() {
   return true;
 }
 
-function initAIForm() {
-  const form = document.getElementById('aiForm');
+function initHsRebateQuery() {
   const queryBtn = document.getElementById('queryTax');
-  const dutyBtn = document.getElementById('queryDuty');
-  if (!form) return;
-  const submitBtn = form.querySelector('button[type="submit"]');
-
-  for (const field of AI_REQUIRED_FIELDS) {
-    const el = document.getElementById(field.id);
-    if (!el) continue;
-    const clear = () => {
-      if (!field.empty(el)) clearAiFieldInvalid(el);
-    };
-    el.addEventListener('change', clear);
-    el.addEventListener('input', clear);
-  }
+  if (!queryBtn) return;
 
   queryBtn.addEventListener('click', async () => {
-    const hsCode = document.getElementById('hsCode').value.trim();
+    const hsCode = document.getElementById('hsCode')?.value.trim();
     if (!hsCode) {
       alert(window.DAOITH_t('alert.hsCode'));
       return;
@@ -2464,80 +2568,11 @@ function initAIForm() {
       setButtonLoading(queryBtn, false);
     }
   });
+}
 
-  dutyBtn.addEventListener('click', async () => {
-    const hsCode = document.getElementById('hsCode').value.trim();
-    const country = document.getElementById('country').value;
-    if (!hsCode) {
-      alert(window.DAOITH_t('alert.hsCode'));
-      return;
-    }
-    if (!country) {
-      alert(window.DAOITH_t('alert.countryForDuty'));
-      return;
-    }
-
-    const rateBox = document.getElementById('dutyRateBox');
-    if (rateBox) rateBox.value = '';
-    setHsRateSource('duty', null);
-
-    setButtonLoading(dutyBtn, true, window.DAOITH_t('ai.querying'));
-    try {
-      const api = window.DAOITH_HS_RATES;
-      if (!api?.lookupDutyRate) {
-        throw new Error('税率查询组件未加载，请刷新页面后重试');
-      }
-      const result = api.lookupDutyRate(hsCode, country);
-      if (rateBox) rateBox.value = result.display || '—';
-      setHsRateSource('duty', result);
-
-      if (!result.ok) {
-        alert(result.message || '未查到参考关税税率，请核对 HS 与目的国后重试');
-      }
-    } catch (err) {
-      if (rateBox) rateBox.value = '';
-      setHsRateSource('duty', null);
-      alert(err.message);
-    } finally {
-      setButtonLoading(dutyBtn, false);
-    }
-  });
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    if (!validateAiFormRequired()) return;
-    if (!ensureWeChatLogin('ai-generate')) return;
-
-    const ctx = getFormContext();
-
-    const placeholder = document.getElementById('resultPlaceholder');
-    const content = document.getElementById('resultContent');
-    const items = document.getElementById('resultItems');
-
-    placeholder.style.display = 'none';
-    content.classList.add('active');
-    items.innerHTML = `<div class="result-loading">${window.DAOITH_t('ai.loading')}</div>`;
-
-    setButtonLoading(submitBtn, true, window.DAOITH_t('ai.generating'));
-
-    try {
-      let text = '';
-      try {
-        text = await callDifyDiagnosis(ctx);
-      } catch {
-        text = '';
-      }
-      items.innerHTML = `<div class="result-body">${assembleSolutionHtml(ctx, text)}</div>`;
-      window.__daoithLastPlanCtx = ctx;
-      renderPlanFaqs(ctx);
-    } catch (err) {
-      items.innerHTML = `<div class="result-error"><strong>生成失败：</strong>${err.message}</div>`;
-    } finally {
-      setButtonLoading(submitBtn, false);
-      content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  });
+/* Legacy alias — form-based plan generator removed in favor of diagnosis chat */
+function initAIForm() {
+  initHsRebateQuery();
 }
 
 /* Tax Calculator */
@@ -2550,14 +2585,10 @@ function initTaxCalculator() {
 
   const countrySelect = document.getElementById('taxEntityCountry');
 
-  entitySelect.value = aiEntitySelect?.value || entitySelect.value || 'cn';
+  entitySelect.value = entitySelect.value || 'cn';
   syncTaxIncomeOptions();
   entitySelect.addEventListener('change', syncTaxIncomeOptions);
   countrySelect?.addEventListener('change', syncTaxIncomeOptions);
-  aiEntitySelect?.addEventListener('change', () => {
-    entitySelect.value = aiEntitySelect.value || 'cn';
-    syncTaxIncomeOptions();
-  });
 
   calcBtn.addEventListener('click', async () => {
     if (!ensureWeChatLogin('tax-calc')) return;
