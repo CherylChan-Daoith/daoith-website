@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('calcTax')?.click();
       } else if (action === 'ai_chat') {
         document.getElementById('aiChatbotInput')?.focus();
+      } else if (action === 'ai_plan') {
+        document.getElementById('resultContent')?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+        document.getElementById('diagServiceRecs')?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
       }
     }, 400);
   });
@@ -893,6 +896,34 @@ const DIAG_QUICK_REPLY_SETS = {
     '5000-10000万',
     '10000万以上',
   ],
+  category: [
+    '服装鞋包',
+    '消费电子',
+    '家居用品',
+    '美妆个护',
+    '母婴用品',
+    '汽配车饰',
+    '珠宝首饰',
+    '食品保健',
+    '其他品类',
+    '稍后提供HS编码',
+  ],
+  painPoint: [
+    '出口退税',
+    '目的国VAT/销售税',
+    '主体与架构',
+    '平台代扣代缴',
+    '发票与报关',
+    '税务稽查风险',
+    '先按现有信息出方案',
+    '其他',
+  ],
+  readyPlan: [
+    '可以，请生成方案',
+    '再补充一些信息',
+    '先看退税路径',
+    '先看VAT/销售税',
+  ],
   yesNo: ['是', '否', '不确定'],
 };
 
@@ -919,6 +950,11 @@ function detectDiagQuickReplySet(botText) {
   if (/(发票|专票|普票|无票)/.test(t) && /(情况|类型|请问|哪|能否|有无|怎么开)/.test(t)) return 'invoice';
   if (/出口方式|贸易方式|9610|9710|9810|一般贸易|报关方式/.test(t)) return 'exportMode';
   if (/(销售额|营收|体量|规模)/.test(t) && /(年|大概|区间|多少)/.test(t)) return 'revenue';
+  if (/(品类|产品类型|卖什么|什么产品|主要产品|海关编码|HS\s*编码|税号|什么货)/.test(t)) return 'category';
+  if (/(痛点|最关心|主要问题|想先解决|困扰|优先关心|最想解决)/.test(t)) return 'painPoint';
+  if (/(生成方案|出具方案|出方案|按现有信息|开始诊断|信息.*够|可以.*方案|是否.*方案)/.test(t)) {
+    return 'readyPlan';
+  }
   if (
     /(发货模式|仓储模式|履约模式|怎么发货|如何发货|FBA|海外仓|国内直发|平台仓|平台海外仓)/.test(t) &&
     /(请问|哪|模式|是|还是|[？?])/.test(t) &&
@@ -928,6 +964,8 @@ function detectDiagQuickReplySet(botText) {
   }
   if (/电商平台|哪个平台|什么平台|主要在哪.*平台|在哪个平台/.test(t)) return 'platform';
   if (/(是否|要不要|有没有做过|需要我)/.test(t) && /[？?]/.test(t)) return 'yesNo';
+  // Last-question fallback: any remaining ask still gets actionable chips
+  if (/[？?]/.test(t)) return 'painPoint';
   return null;
 }
 
@@ -1051,7 +1089,7 @@ function initAiChatbot() {
 
   const showWelcome = () => {
     const welcome = [
-      '您好，我是**道一财税诊断助手**。',
+      '您好，我是**道一合规诊断助手**。',
       '',
       '我会一步一步了解您的跨境业务，诊断财税风险，并生成合规方案（完整方案会显示在右侧「AI方案生成区」）。',
       '',
@@ -1138,13 +1176,30 @@ function initAiChatbot() {
       const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
 
       let streamingPlan = false;
+      let loginPromptedForPlan = false;
+      const beginPlanRouting = () => {
+        if (streamingPlan) return;
+        streamingPlan = true;
+        typing.classList.add('is-plan-status');
+        const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+        typing.textContent = loggedIn
+          ? DIAG_PLAN_STATUS_MSG
+          : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
+        if (!loginPromptedForPlan && !loggedIn) {
+          loginPromptedForPlan = true;
+          window.DAOITH_AUTH?.requireLogin?.(
+            'ai_plan',
+            `${window.location.pathname}${window.location.search}#ai-solution`
+          );
+        }
+      };
+
       const paintStream = (partial) => {
         const clean = sanitizeAiAnswer(partial) || partial;
         if (!clean) return;
         // Full diagnosis → stream into right-hand plan panel, not the chat bubble
-        if (streamingPlan || looksLikeFullDiagnosisPlan(clean) || looksLikeDiagnosisPlanStreaming(clean)) {
-          streamingPlan = true;
-          typing.textContent = '正在生成合规方案…';
+        if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
+          beginPlanRouting();
           publishDiagnosisPlanToResultPanel(clean);
           return;
         }
@@ -1201,12 +1256,14 @@ function initAiChatbot() {
         throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
 
-      if (streamingPlan || looksLikeFullDiagnosisPlan(answer)) {
+      if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
+        beginPlanRouting();
         publishDiagnosisPlanToResultPanel(answer);
-        setBotBubble(
-          typing,
-          '完整合规方案已生成在右侧 **AI方案生成区**。相关服务推荐在下方税负计算区上方，可加入询价单。'
-        );
+        typing.classList.add('is-plan-status');
+        const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+        typing.textContent = loggedIn
+          ? DIAG_PLAN_DONE_MSG
+          : `${DIAG_PLAN_DONE_MSG}。请先微信登录以保存方案并继续`;
         clearQuickReplies();
       } else {
         setBotBubble(typing, answer);
@@ -1239,41 +1296,82 @@ function initAiChatbot() {
 /** Detect structured full diagnosis / solution replies from the diagnosis Agent. */
 function looksLikeFullDiagnosisPlan(text) {
   const t = String(text || '');
-  if (t.length < 260) return false;
+  if (t.length < 180) return false;
   const markers = [
     /问题理解|业务画像|业务背景/,
-    /风险诊断|合规风险|税负影响/,
-    /解决方案|行动建议|落地建议/,
+    /风险诊断|合规风险|税负影响|风险点/,
+    /解决方案|行动建议|落地建议|立刻可做/,
     /业务流程图|流程图/,
-    /###\s*1[）).、]/,
-    /###\s*2[）).、]/,
-    /###\s*3[）).、]/,
+    /###?\s*1[）).、]|[一二三]、\s*问题|[一二三]、\s*风险/,
+    /###?\s*2[）).、]|###?\s*3[）).、]/
   ];
-  return markers.filter((re) => re.test(t)).length >= 3;
+  if (markers.filter((re) => re.test(t)).length >= 2) return true;
+  if (t.length >= 650 && /#{1,3}\s+/.test(t) && /(风险|方案|建议)/.test(t)) return true;
+  return false;
 }
 
 /** Earlier mid-stream hint that the Agent started a formal plan (before all sections arrive). */
 function looksLikeDiagnosisPlanStreaming(text) {
   const t = String(text || '');
-  if (t.length < 120) return false;
-  return /###\s*1[）).、]/.test(t) && /(问题理解|业务画像|风险诊断|解决方案)/.test(t);
+  if (t.length < 80) return false;
+  if (/#{1,3}\s*1[）).、]/.test(t) && /(问题理解|业务画像|风险诊断|解决方案)/.test(t)) return true;
+  if (t.length >= 220 && /#{1,3}\s+/.test(t) && /(业务画像|风险诊断|解决方案|行动建议)/.test(t)) return true;
+  return false;
+}
+
+/** Route long formal plans to the right panel; keep short Q&A in chat. */
+function shouldRouteDiagnosisToPlanPanel(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (looksLikeFullDiagnosisPlan(t) || looksLikeDiagnosisPlanStreaming(t)) return true;
+
+  const activeQ = extractDiagActiveQuestion(t);
+  const looksLikeShortAsk =
+    t.length < 420 &&
+    /[？?]/.test(t) &&
+    !/#{1,3}\s/.test(t) &&
+    activeQ &&
+    activeQ.length < 160 &&
+    t.length < activeQ.length + 220;
+  if (looksLikeShortAsk) return false;
+
+  if (t.length >= 380 && /(?:^|\n)\s*#{1,3}\s+/.test(t) && /(风险|方案|建议|画像|流程)/.test(t)) return true;
+  if (t.length >= 700 && /(风险诊断|解决方案|行动建议|业务画像|问题理解)/.test(t)) return true;
+  if (t.length >= 1100 && /(合规|退税|VAT|税负)/.test(t) && /(建议|方案|路径|风险)/.test(t)) return true;
+  return false;
+}
+
+const DIAG_PLAN_STATUS_MSG = '道一合规诊断助手正在为您生成专属合规方案，请查看右侧方案生成区';
+const DIAG_PLAN_DONE_MSG = '道一合规诊断助手已为您生成专属合规方案，请查看右侧方案生成区';
+
+function extractDiagnosisActionAdvice(markdown) {
+  const t = String(markdown || '');
+  const m = t.match(
+    /#{1,3}\s*[三3][）).、]?\s*(解决方案|行动建议|落地建议)[\s\S]*?(?=#{1,3}\s*[四五4-9]|$)/i
+  );
+  if (m) return m[0];
+  const m2 = t.match(/(立刻可做|30\s*天内|需要专家介入)[\s\S]{80,}/);
+  return m2 ? m2[0] : t;
 }
 
 function pickDiagnosisServiceIds(text) {
-  const t = String(text || '');
+  const full = String(text || '');
+  const action = extractDiagnosisActionAdvice(full);
+  const t = `${action}\n${full}`;
   const ids = [];
   const add = (id) => {
     if (id && !ids.includes(id)) ids.push(id);
   };
-  add('consult-1v1');
-  if (/退税|免抵退|出口退|征退差/.test(t)) add('domestic-rebate');
-  if (/VAT|Oss|IOSS|增值税注册|远程销售/.test(t)) add('overseas-vat');
+  if (/退税|免抵退|出口退|征退差|报关退税/.test(t)) add('domestic-rebate');
+  if (/VAT|Oss|IOSS|增值税注册|远程销售|欧盟.*税/.test(t)) add('overseas-vat');
   if (/销售税|Sales\s*Tax|Wayfair|经济关联/.test(t)) add('overseas-us-sales-tax');
   if (/ODI|境外投资|境外直接/.test(t)) add('overseas-odi');
-  if (/香港公司|香港主体|香港审计/.test(t)) add('hk-company');
-  if (/记账|账务|做账|汇算清缴/.test(t)) add('domestic-bookkeeping');
-  if (/合规体检|全面诊断|架构诊断/.test(t)) add('domestic-diagnosis');
-  if (/全年|陪跑|持续跟进/.test(t)) add('consult-annual');
+  if (/香港公司|香港主体|香港审计|双层架构/.test(t)) add('hk-company');
+  if (/记账|账务|做账|汇算清缴|账册/.test(t)) add('domestic-bookkeeping');
+  if (/合规体检|全面诊断|架构诊断|风险排查/.test(t)) add('domestic-diagnosis');
+  if (/全年|陪跑|持续跟进|常年顾问/.test(t)) add('consult-annual');
+  // Always include expert consult; keep action matches first
+  if (!ids.includes('consult-1v1')) ids.push('consult-1v1');
   return ids.slice(0, 4);
 }
 
@@ -1298,8 +1396,8 @@ function buildDiagnosisServiceRecsHtml(markdown) {
     .join('');
   if (!cards) return '';
   return (
-    `<h3 class="diag-services-heading">相关服务推荐</h3>` +
-    `<p class="diag-services-lead">可根据方案中的优先事项，将下列服务加入询价单，由顾问继续落地。</p>` +
+    `<h3 class="diag-services-heading">您可能需要的服务</h3>` +
+    `<p class="diag-services-lead">根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。</p>` +
     `<div class="diag-services-grid">${cards}</div>`
   );
 }
@@ -1319,7 +1417,7 @@ function publishDiagnosisPlanToResultPanel(markdown) {
   items.innerHTML =
     `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
-    `<p class="result-paragraph result-from-chat">以下方案由左侧<strong>合规诊断助手</strong>生成：</p>` +
+    `<p class="result-paragraph result-from-chat">以下方案由左侧<strong>道一合规诊断助手</strong>生成：</p>` +
     body +
     `</div>`;
 

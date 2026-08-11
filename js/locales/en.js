@@ -257,7 +257,7 @@ window.DAOITH_I18N_EN = {
     '#ai-solution .section-header p': {
       text: 'Follow the compliance diagnosis assistant prompts to provide business details and get your tailored plan.',
     },
-    '.form-panel h3': { html: true, text: 'Compliance Diagnosis <span class="tag">AI</span>' },
+    '.diag-chat-title strong': { text: 'Daoith Compliance Diagnosis' },
     '#aiForm .form-required-hint': {
       text: 'Only “E-commerce platform” and “Shipping model” are required; leave the rest blank for a general plan first.',
     },

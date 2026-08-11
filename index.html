@@ -150,8 +150,6 @@
       <div class="ai-grid">
         <div class="ai-left">
         <div class="form-panel diag-panel">
-          <h3>合规诊断助手 <span class="tag">AI</span></h3>
-
           <div class="diag-hs-block">
             <div class="form-group">
               <label>出口退税率查询</label>
@@ -170,7 +168,11 @@
           </div>
 
           <div class="diag-chat" id="aiChatbot" data-state="open">
-            <div class="diag-chat-toolbar">
+            <div class="diag-chat-header">
+              <div class="diag-chat-title">
+                <strong>道一合规诊断助手</strong>
+                <span class="tag">AI</span>
+              </div>
               <button type="button" class="ai-chatbot-new" id="aiChatbotNew" title="新建对话">新建对话</button>
             </div>
             <div class="ai-chatbot-messages" id="aiChatbotMessages"></div>
@@ -201,7 +203,7 @@
           <div class="result-placeholder" id="resultPlaceholder">
             <div class="icon icon-muted">AI</div>
             <h4>AI方案生成区</h4>
-            <p>请根据左侧合规诊断助手的提示<br>提供业务信息，完整方案将显示在此处</p>
+            <p>请根据左侧道一合规诊断助手的提示<br>提供业务信息，完整方案将显示在此处</p>
           </div>
           <div class="result-content" id="resultContent">
             <h4>您的专属合规方案</h4>
@@ -210,8 +212,8 @@
         </div>
       </div>
 
-      <!-- Recommended services (filled after diagnosis plan) -->
-      <div class="diag-services-section" id="diagServiceRecs" hidden></div>
+      <!-- Recommended services (filled after diagnosis plan, above tax calc) -->
+      <div class="diag-services-section" id="diagServiceRecs" hidden aria-live="polite"></div>
 
       <!-- Tax Calculator -->
       <div class="tax-calc">
