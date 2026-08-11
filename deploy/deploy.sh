@@ -9,8 +9,9 @@ REMOTE_DIR="/var/www/daoith-website"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [[ -z "$REMOTE" ]]; then
-  echo "Usage: ./deploy/deploy.sh user@server-ip"
-  echo "Example: ./deploy/deploy.sh root@123.45.67.89"
+  echo "Usage: ./deploy/deploy.sh <ssh-host>"
+  echo "Example: ./deploy/deploy.sh daoith-pm"
+  echo "Note: use SSH config host (IdentityFile), not bare root@IP — that IP rejects password/default keys."
   exit 1
 fi
 
@@ -20,6 +21,10 @@ rsync -avz --delete \
   --exclude '.env' \
   --exclude '.DS_Store' \
   --exclude '__pycache__' \
+  --exclude '.venv' \
+  --exclude '.venv-pdf' \
+  --exclude 'node_modules' \
+  --exclude 'data/' \
   "$ROOT/" "$REMOTE:$REMOTE_DIR/"
 
 echo "==> Restarting auth API"

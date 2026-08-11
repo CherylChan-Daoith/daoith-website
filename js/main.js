@@ -896,17 +896,38 @@ const DIAG_QUICK_REPLY_SETS = {
   yesNo: ['是', '否', '不确定'],
 };
 
+/** Last question sentence only — avoid matching recap of earlier answers (e.g. FBA). */
+function extractDiagActiveQuestion(botText) {
+  const t = String(botText || '').replace(/\r/g, '').trim();
+  if (!t) return '';
+  const lines = t.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  const withQ = lines.filter((p) => /[？?]/.test(p));
+  if (withQ.length) return withQ[withQ.length - 1];
+  // Fallback: trailing chunk often holds the ask when no 「？」 was used
+  return t.length > 240 ? t.slice(-240) : t;
+}
+
 function detectDiagQuickReplySet(botText) {
-  const t = String(botText || '');
-  if (looksLikeFullDiagnosisPlan(t)) return null;
-  if (/电商平台|哪个平台|什么平台|主要在哪.*平台/.test(t)) return 'platform';
-  if (/发货模式|FBA|海外仓|国内直发|仓储模式/.test(t) && /请问|哪|模式|是|还是/.test(t)) return 'shipping';
-  if (/店铺主体|企业主体|注册主体|公司还是个人|主体是/.test(t)) return 'entity';
-  if (/目的国|主销市场|销售国家|哪个国家|哪个市场/.test(t)) return 'country';
-  if (/发票|专票|普票|无票/.test(t) && /情况|类型|请问|哪/.test(t)) return 'invoice';
-  if (/出口方式|贸易方式|9610|9710|9810|一般贸易/.test(t)) return 'exportMode';
-  if (/销售额|营收|体量|规模/.test(t) && /年|大概|区间/.test(t)) return 'revenue';
-  if (/是否|要不要|有没有做过|需要我/.test(t) && /[？?]/.test(t)) return 'yesNo';
+  const full = String(botText || '');
+  if (looksLikeFullDiagnosisPlan(full)) return null;
+  const t = extractDiagActiveQuestion(full);
+  if (!t) return null;
+
+  // Match the *current* ask; more specific slots before shipping/platform
+  if (/店铺主体|企业主体|注册主体|公司还是个人|主体是|什么主体|哪个主体/.test(t)) return 'entity';
+  if (/目的国|主销市场|销售国家|哪个国家|哪个市场|销往哪/.test(t)) return 'country';
+  if (/(发票|专票|普票|无票)/.test(t) && /(情况|类型|请问|哪|能否|有无|怎么开)/.test(t)) return 'invoice';
+  if (/出口方式|贸易方式|9610|9710|9810|一般贸易|报关方式/.test(t)) return 'exportMode';
+  if (/(销售额|营收|体量|规模)/.test(t) && /(年|大概|区间|多少)/.test(t)) return 'revenue';
+  if (
+    /(发货模式|仓储模式|履约模式|怎么发货|如何发货|FBA|海外仓|国内直发|平台仓|平台海外仓)/.test(t) &&
+    /(请问|哪|模式|是|还是|[？?])/.test(t) &&
+    !/(主体|公司还是个人|目的国|主销|发票|哪个平台|什么平台)/.test(t)
+  ) {
+    return 'shipping';
+  }
+  if (/电商平台|哪个平台|什么平台|主要在哪.*平台|在哪个平台/.test(t)) return 'platform';
+  if (/(是否|要不要|有没有做过|需要我)/.test(t) && /[？?]/.test(t)) return 'yesNo';
   return null;
 }
 
@@ -1116,9 +1137,17 @@ function initAiChatbot() {
       const { difyChatEndpoint } = getDifyConfig();
       const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
 
+      let streamingPlan = false;
       const paintStream = (partial) => {
         const clean = sanitizeAiAnswer(partial) || partial;
         if (!clean) return;
+        // Full diagnosis → stream into right-hand plan panel, not the chat bubble
+        if (streamingPlan || looksLikeFullDiagnosisPlan(clean) || looksLikeDiagnosisPlanStreaming(clean)) {
+          streamingPlan = true;
+          typing.textContent = '正在生成合规方案…';
+          publishDiagnosisPlanToResultPanel(clean);
+          return;
+        }
         setBotBubble(typing, clean);
         messages.scrollTop = messages.scrollHeight;
       };
@@ -1171,16 +1200,16 @@ function initAiChatbot() {
         persistConversationId(newUuid(), false);
         throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
-      setBotBubble(typing, answer);
 
-      if (looksLikeFullDiagnosisPlan(answer)) {
+      if (streamingPlan || looksLikeFullDiagnosisPlan(answer)) {
         publishDiagnosisPlanToResultPanel(answer);
-        appendBubble(
-          '完整合规方案已同步到右侧 **AI方案生成区**；相关服务推荐在下方税负计算区上方，可加入询价单。',
-          'bot'
+        setBotBubble(
+          typing,
+          '完整合规方案已生成在右侧 **AI方案生成区**。相关服务推荐在下方税负计算区上方，可加入询价单。'
         );
         clearQuickReplies();
       } else {
+        setBotBubble(typing, answer);
         showQuickReplies(answer);
       }
     } catch (err) {
@@ -1221,6 +1250,13 @@ function looksLikeFullDiagnosisPlan(text) {
     /###\s*3[）).、]/,
   ];
   return markers.filter((re) => re.test(t)).length >= 3;
+}
+
+/** Earlier mid-stream hint that the Agent started a formal plan (before all sections arrive). */
+function looksLikeDiagnosisPlanStreaming(text) {
+  const t = String(text || '');
+  if (t.length < 120) return false;
+  return /###\s*1[）).、]/.test(t) && /(问题理解|业务画像|风险诊断|解决方案)/.test(t);
 }
 
 function pickDiagnosisServiceIds(text) {
