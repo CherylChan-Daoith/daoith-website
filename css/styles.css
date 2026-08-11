@@ -4800,6 +4800,13 @@ body.modal-open {
   color: rgba(255, 255, 255, 0.65);
 }
 
+.footer-beian-mps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
+}
+
 .footer-beian-gongan {
   width: 14px;
   height: 16px;
