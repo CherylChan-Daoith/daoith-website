@@ -874,8 +874,8 @@ const DIAG_QUICK_REPLY_SETS = {
     '其他',
   ],
   invoice: [
-    '增值税专票',
-    '增值税普票',
+    '能提供增值税专用发票',
+    '只能提供增值税普通发票',
     '无法提供发票',
     '部分专票+部分普票',
     '部分专票+部分无票',
@@ -927,13 +927,17 @@ const DIAG_QUICK_REPLY_SETS = {
   yesNo: ['是', '否', '不确定'],
 };
 
-/** Last question sentence only — avoid matching recap of earlier answers (e.g. FBA). */
+/** Active ask text for quick-reply matching (avoid earlier-slot recap keywords). */
 function extractDiagActiveQuestion(botText) {
   const t = String(botText || '').replace(/\r/g, '').trim();
   if (!t) return '';
   const lines = t.split(/\n+/).map((s) => s.trim()).filter(Boolean);
   const withQ = lines.filter((p) => /[？?]/.test(p));
-  if (withQ.length) return withQ[withQ.length - 1];
+  if (withQ.length) {
+    // Join trailing question lines — agents often split one ask across 2–3 sentences
+    const start = Math.max(0, withQ.length - 3);
+    return withQ.slice(start).join(' ');
+  }
   // Fallback: trailing chunk often holds the ask when no 「？」 was used
   return t.length > 240 ? t.slice(-240) : t;
 }
@@ -947,7 +951,13 @@ function detectDiagQuickReplySet(botText) {
   // Match the *current* ask; more specific slots before shipping/platform
   if (/店铺主体|企业主体|注册主体|公司还是个人|主体是|什么主体|哪个主体/.test(t)) return 'entity';
   if (/目的国|主销市场|销售国家|哪个国家|哪个市场|销往哪/.test(t)) return 'country';
-  if (/(发票|专票|普票|无票)/.test(t) && /(情况|类型|请问|哪|能否|有无|怎么开)/.test(t)) return 'invoice';
+  // Invoice: match even when the last sentence alone lacks 「请问」
+  if (
+    /(增值税专用发票|增值税普通发票|专用发票|普通发票|专票|普票|无法提供发票|不能提供发票|无票)/.test(t) ||
+    (/(发票)/.test(t) && /(供应商|配合|提供|情况|类型|请问|能否|有无)/.test(t))
+  ) {
+    return 'invoice';
+  }
   if (/出口方式|贸易方式|9610|9710|9810|一般贸易|报关方式/.test(t)) return 'exportMode';
   if (/(销售额|营收|体量|规模)/.test(t) && /(年|大概|区间|多少)/.test(t)) return 'revenue';
   if (/(品类|产品类型|卖什么|什么产品|主要产品|海关编码|HS\s*编码|税号|什么货)/.test(t)) return 'category';
@@ -2236,6 +2246,7 @@ function renderAIPlanHtml(text) {
   let inList = false;
   let listTag = 'ul';
   let listClass = 'result-list';
+  let flowMode = false;
 
   const closeList = () => {
     if (inList) {
@@ -2245,8 +2256,13 @@ function renderAIPlanHtml(text) {
   };
 
   const openList = (ordered) => {
-    listTag = ordered ? 'ol' : 'ul';
-    listClass = ordered ? 'result-list result-list-ordered' : 'result-list';
+    if (flowMode) {
+      listTag = 'ol';
+      listClass = 'result-flow';
+    } else {
+      listTag = ordered ? 'ol' : 'ul';
+      listClass = ordered ? 'result-list result-list-ordered' : 'result-list';
+    }
     html += `<${listTag} class="${listClass}">`;
     inList = true;
   };
@@ -2267,9 +2283,11 @@ function renderAIPlanHtml(text) {
       closeList();
       const level = (line.match(/^#+/) || ['##'])[0].length;
       const title = line.replace(/^#{1,4}\s+/, '').replace(/\*\*/g, '');
+      flowMode = /业务流程图|流程图/.test(title);
       const cls =
         level >= 3 ? 'result-section-subtitle' : 'result-section-title';
-      html += `<h5 class="${cls}">${escapeHtml(title)}</h5>`;
+      const flowCls = flowMode ? ' result-flow-heading' : '';
+      html += `<h5 class="${cls}${flowCls}">${escapeHtml(title)}</h5>`;
       continue;
     }
 
@@ -2278,12 +2296,41 @@ function renderAIPlanHtml(text) {
     if (orderedMatch || bulletMatch) {
       const ordered = Boolean(orderedMatch);
       const content = ordered ? orderedMatch[1] : bulletMatch[1];
-      if (!inList || (ordered && listTag !== 'ol') || (!ordered && listTag !== 'ul')) {
+      if (!inList || (flowMode && listClass !== 'result-flow') || (!flowMode && ((ordered && listTag !== 'ol') || (!ordered && listTag !== 'ul')))) {
         closeList();
         openList(ordered);
       }
-      html += `<li>${formatInline(content)}</li>`;
+      if (flowMode) {
+        html +=
+          `<li class="result-flow-step">` +
+          `<span class="result-flow-badge" aria-hidden="true"></span>` +
+          `<span class="result-flow-card">${formatInline(content)}</span>` +
+          `</li>`;
+      } else {
+        html += `<li>${formatInline(content)}</li>`;
+      }
       continue;
+    }
+
+    // Single-line arrow flow: 采购 → 报关 → 履约
+    if (flowMode && /→|⟶|->|➜|➔/.test(line) && !/^#{1,4}\s+/.test(line)) {
+      const parts = line
+        .split(/\s*(?:→|⟶|->|➜|➔)\s*/)
+        .map((s) => s.replace(/^[\d]+[.)、]\s*/, '').trim())
+        .filter(Boolean);
+      if (parts.length >= 2) {
+        closeList();
+        html += `<ol class="result-flow result-flow-inline">`;
+        parts.forEach((part) => {
+          html +=
+            `<li class="result-flow-step">` +
+            `<span class="result-flow-badge" aria-hidden="true"></span>` +
+            `<span class="result-flow-card">${formatInline(part)}</span>` +
+            `</li>`;
+        });
+        html += `</ol>`;
+        continue;
+      }
     }
 
     closeList();
