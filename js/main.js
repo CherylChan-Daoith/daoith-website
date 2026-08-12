@@ -965,6 +965,7 @@ const DIAG_QUICK_REPLY_SETS = {
     '9610跨境电商零售出口',
     '9810出口海外仓',
     '1039市场采购出口',
+    '由平台安排出口',
     '其他',
   ],
   revenue: [
@@ -1080,7 +1081,7 @@ function detectDiagQuickReplySet(botText) {
   }
   // Step-4 出口方式 — avoid matching step-2 Alibaba options that end with「…出口」
   if (
-    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|一般贸易|委托货代|小包快递|0110|9610|9810|1039|报关方式)/.test(
+    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|一般贸易|委托货代|小包快递|0110|9610|9810|1039|报关方式|由平台安排出口)/.test(
       t
     ) &&
     !/(发货方式|一达通|便捷发货出口|自营出口)/.test(t)
@@ -1229,6 +1230,44 @@ function diagQuickReplySetForStep(step, platformLabel) {
   }
 }
 
+/** Vague answers that need free-text clarification before advancing the wizard. */
+function isVagueDiagnosisAnswer(text, step) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (/^(不清楚|不知道|暂不清楚|不太清楚|不确定)$/.test(t)) return true;
+  if (/^(其他|其它|其他发货方式)$/.test(t)) return step === 2 || step === 3 || step === 4;
+  return false;
+}
+
+/** Agent is clarifying a prior vague answer — no chips, free-text only. */
+function looksLikeDiagnosisClarificationAsk(botText) {
+  const t = String(botText || '');
+  if (!t) return false;
+  if (/(回到第|先回到|先确认一下|再确认一下|能否具体说明|请具体说明|可以具体说明|请补充说明|补充一下)/.test(t)) {
+    return true;
+  }
+  if (/(提到|您说|选择了).{0,12}(其他|其它)/.test(t) && /(具体|说明|哪一种|还是)/.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+function inferClarificationStepFromBotText(botText) {
+  const t = String(botText || '');
+  const m = t.match(/第\s*([一二三四五六1-6])\s*步/);
+  if (!m) {
+    if (/出口方式/.test(t)) return 4;
+    if (/注册主体|店铺主体/.test(t)) return 3;
+    if (/发货方式|发货模式/.test(t)) return 2;
+    return 0;
+  }
+  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
+  const raw = m[1];
+  if (map[raw]) return map[raw];
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 && n <= 6 ? n : 0;
+}
+
 /** Infer step number from bot copy like「第三步」when present. */
 function inferDiagStepFromBotText(botText) {
   const t = String(botText || '');
@@ -1375,6 +1414,8 @@ function initAiChatbot() {
     }
     if (getUiMode() !== 'diagnosis') return;
     const step = getUiStep();
+    // 「其他」等模糊答复先不跳步，等 Agent/用户补全后再前进
+    if (isVagueDiagnosisAnswer(t, step)) return;
     if (step === 1) setUiWizard('diagnosis', 2, t);
     else if (step >= 2 && step <= 6) setUiWizard('diagnosis', Math.min(7, step + 1), getUiPlatform());
   };
@@ -1435,6 +1476,16 @@ function initAiChatbot() {
   const showQuickReplies = (botText) => {
     if (!quickEl) return;
     if (looksLikeFullDiagnosisPlan(botText) || looksLikeDiagnosisPlanStreaming(botText)) {
+      clearQuickReplies();
+      return;
+    }
+
+    // 澄清追问：只让用户打字，不展示快捷选项
+    if (looksLikeDiagnosisClarificationAsk(botText)) {
+      const clarifyStep = inferClarificationStepFromBotText(botText);
+      if (getUiMode() === 'diagnosis' && clarifyStep >= 1 && clarifyStep <= 6) {
+        setUiWizard('diagnosis', clarifyStep, getUiPlatform());
+      }
       clearQuickReplies();
       return;
     }
