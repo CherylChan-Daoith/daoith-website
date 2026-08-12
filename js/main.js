@@ -1965,8 +1965,15 @@ function initAiChatbot() {
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
         setAskCount(askCount + 1);
-        setBotBubble(typing, aluminumReply);
-        showQuickReplies(aluminumReply);
+        if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
+          publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
+          typing.classList.add('is-plan-status');
+          typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+          clearQuickReplies();
+        } else {
+          setBotBubble(typing, aluminumReply);
+          showQuickReplies(aluminumReply);
+        }
         return;
       }
 
@@ -1974,6 +1981,7 @@ function initAiChatbot() {
       const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
 
       let streamingPlan = false;
+      let streamingLongQa = false;
       let loginPromptedForPlan = false;
       let planCountedThisTurn = false;
       const beginPlanRouting = () => {
@@ -1993,6 +2001,13 @@ function initAiChatbot() {
         }
       };
 
+      const beginLongQaRouting = () => {
+        if (streamingLongQa) return;
+        streamingLongQa = true;
+        typing.classList.add('is-plan-status');
+        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+      };
+
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
         const cleaned = sanitizeAiAnswer(partial);
@@ -2008,10 +2023,10 @@ function initAiChatbot() {
           if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
           return;
         }
-        // Full diagnosis → stream into right-hand plan panel, not the chat bubble
+        // Full diagnosis → right-hand plan panel
         if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
           beginPlanRouting();
-          publishDiagnosisPlanToResultPanel(clean);
+          publishDiagnosisPlanToResultPanel(clean, { kind: 'diagnosis' });
           return;
         }
         // Mid-report CoT that slipped past sanitize: still never show in chat
@@ -2022,6 +2037,12 @@ function initAiChatbot() {
           !/(【核心风险诊断】|【合规方案】)/.test(clean)
         ) {
           beginPlanRouting();
+          return;
+        }
+        // Specific Q&A (and other non-plan replies) longer than 100 chars → right panel
+        if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(clean)) {
+          beginLongQaRouting();
+          publishDiagnosisPlanToResultPanel(clean, { kind: 'qa' });
           return;
         }
         setBotBubble(typing, clean);
@@ -2106,7 +2127,7 @@ function initAiChatbot() {
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
-        publishDiagnosisPlanToResultPanel(answer);
+        publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis' });
         if (!planCountedThisTurn) {
           planCountedThisTurn = true;
           bumpDiagnosisPlanCount();
@@ -2116,6 +2137,12 @@ function initAiChatbot() {
         typing.textContent = loggedInNow
           ? DIAG_PLAN_DONE_MSG
           : `${DIAG_PLAN_DONE_MSG}。请先微信登录以保存方案并继续`;
+        clearQuickReplies();
+      } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
+        beginLongQaRouting();
+        publishDiagnosisPlanToResultPanel(answer, { kind: 'qa' });
+        typing.classList.add('is-plan-status');
+        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
         clearQuickReplies();
       } else {
         setBotBubble(typing, answer);
@@ -2197,8 +2224,15 @@ function shouldRouteDiagnosisToPlanPanel(text) {
   return false;
 }
 
+/** Mode B / general replies longer than 100 characters → right panel. */
+function shouldRouteLongAnswerToPlanPanel(text) {
+  return String(text || '').trim().length > 100;
+}
+
 const DIAG_PLAN_STATUS_MSG = '道一合规诊断助手正在为您生成专属合规方案，请查看右侧方案生成区';
 const DIAG_PLAN_DONE_MSG = '道一合规诊断助手已为您生成专属合规方案，请查看右侧方案生成区';
+const QA_LONG_ANSWER_CHAT_TIP =
+  '由于内容较多，道一合规诊断助手已将回复展示在右侧方案生成区，请查看。';
 const DIAG_PLAN_LIMIT = 5;
 const DIAG_PLAN_LIMIT_MSG =
   '理解您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
@@ -2282,7 +2316,7 @@ function buildDiagnosisServiceRecsHtml(markdown) {
   );
 }
 
-function publishDiagnosisPlanToResultPanel(markdown) {
+function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const placeholder = document.getElementById('resultPlaceholder');
   const content = document.getElementById('resultContent');
   const items = document.getElementById('resultItems');
@@ -2295,20 +2329,31 @@ function publishDiagnosisPlanToResultPanel(markdown) {
   const clean = sanitizeAiAnswer(markdown);
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
+  const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
   const body = renderAIPlanHtml(clean) || `<p class="result-paragraph">${escapeHtml(clean)}</p>`;
+  const fromChat =
+    kind === 'qa'
+      ? `以下回复由左侧<strong>道一合规诊断助手</strong>生成：`
+      : `以下方案由左侧<strong>道一合规诊断助手</strong>生成：`;
   items.innerHTML =
     `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
-    `<p class="result-paragraph result-from-chat">以下方案由左侧<strong>道一合规诊断助手</strong>生成：</p>` +
+    `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
     body +
     `</div>`;
 
   if (serviceHost) {
-    const html = buildDiagnosisServiceRecsHtml(clean);
-    if (html) {
-      serviceHost.innerHTML = html;
-      serviceHost.hidden = false;
-      window.DAOITH_CART?.bindAddButtons?.(serviceHost);
+    // Service cards mainly for full diagnosis plans
+    if (kind === 'diagnosis') {
+      const html = buildDiagnosisServiceRecsHtml(clean);
+      if (html) {
+        serviceHost.innerHTML = html;
+        serviceHost.hidden = false;
+        window.DAOITH_CART?.bindAddButtons?.(serviceHost);
+      } else {
+        serviceHost.innerHTML = '';
+        serviceHost.hidden = true;
+      }
     } else {
       serviceHost.innerHTML = '';
       serviceHost.hidden = true;
