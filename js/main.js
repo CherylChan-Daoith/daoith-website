@@ -962,9 +962,6 @@ const DIAG_QUICK_REPLY_SETS = {
     '0110一般贸易出口',
     '委托货代出口',
     '小包快递出口',
-    '9610跨境电商零售出口',
-    '9810出口海外仓',
-    '1039市场采购出口',
     '由平台安排出口',
     '其他',
   ],
@@ -1023,7 +1020,7 @@ function isShippingQuestionText(t) {
 function isPlatformQuestionText(t) {
   const s = String(t || '');
   // Later-step asks / acknowledgments mentioning「销售平台」must not map to platform chips
-  if (/(发货方式|第二步|注册主体|第三步|年销售额|供应商.*发票)/.test(s)) return false;
+  if (/(发货方式|注册主体|店铺主体|第三步|第四步|年销售额|供应商.*发票)/.test(s)) return false;
   if (/(记录为|已将|已记录).{0,24}(销售平台|电商平台)/.test(s) && !/(哪个|什么)平台/.test(s)) {
     return false;
   }
@@ -1163,14 +1160,35 @@ function localDiagnosisPlatformAsk() {
   );
 }
 
+function localDiagnosisEntityAsk(platformLabel) {
+  const platform = String(platformLabel || '').trim();
+  return (
+    (platform ? `好的，已将「${platform}」记录为您的销售平台。\n\n` : '好的。\n\n') +
+    '第二步：您平台店铺的注册主体是大陆公司、香港公司还是其他？'
+  );
+}
+
 function localDiagnosisShippingAsk(platformLabel) {
   const platform = String(platformLabel || '').trim() || '该平台';
   const setKey = shippingQuickReplySetForPlatform(platform);
   const opts = DIAG_QUICK_REPLY_SETS[setKey] || DIAG_QUICK_REPLY_SETS.shipping;
   const lines = opts.map((o) => `- ${o}`).join('\n');
+  return `第三步：请问您的发货方式是以下哪一种？\n${lines}`;
+}
+
+function localDiagnosisInvoiceAsk(preface) {
+  const head = String(preface || '').trim();
   return (
-    `好的，已将「${platform}」记录为您的销售平台。\n\n` +
-    `第二步：请问您的发货方式是以下哪一种？\n${lines}`
+    (head ? `${head}\n\n` : '') +
+    '第五步：您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？'
+  );
+}
+
+/** 平台国内仓类发货 → 出口通常由平台安排 */
+function isPlatformDomesticWarehouseShipping(text) {
+  const t = String(text || '');
+  return /(全托管（国内仓）|半托管（国内仓）|发货到平台国内仓|平台国内仓|供货\s*SHEIN（国内仓）|平台商家·发国内仓)/.test(
+    t
   );
 }
 
@@ -1189,9 +1207,9 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
   const platform = String(platformLabel || '').trim();
   const stepHints = {
-    2: '请执行第二步：只询问发货方式，并按该平台给出对应选项。',
-    3: '请执行第三步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
-    4: '请执行第四步：只询问目前出口方式。',
+    2: '请执行第二步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
+    3: '请执行第三步：只询问发货方式，并按该平台给出对应选项。',
+    4: '请执行第四步：只询问目前出口方式（0110一般贸易/委托货代/小包快递/由平台安排出口/其他）。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
     6: '请执行第六步：只询问年销售额。',
     7: '第1-6步已齐，请检索知识库并输出诊断报告，不要再提问。',
@@ -1201,7 +1219,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
     `【专属合规诊断进行中·模式A】用户本轮答复：${String(text || '').trim()}。` +
     (platform ? `已确认销售平台：${platform}。` : '') +
     `${hint}` +
-    '禁止重新询问模式选择，禁止输出欢迎语，禁止说“仅凭…无法判断需求”。'
+    '禁止重新询问模式选择，禁止输出欢迎语，禁止说“仅凭…无法判断需求”；步号必须正确（2=主体，3=发货）。'
   );
 }
 
@@ -1210,15 +1228,17 @@ function looksLikeRejectedDiagnosisStart(text) {
   return /不是.*自动命令|不是一个自动命令|具体想了解什么|告诉我具体|需要您告诉我具体/.test(t);
 }
 
-/** Fallback chips by diagnosis wizard step when bot wording is atypical. */
+/** Fallback chips by diagnosis wizard step when bot wording is atypical.
+ *  Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6销售额
+ */
 function diagQuickReplySetForStep(step, platformLabel) {
   switch (step) {
     case 1:
       return 'platform';
     case 2:
-      return shippingQuickReplySetForPlatform(platformLabel);
-    case 3:
       return 'entity';
+    case 3:
+      return shippingQuickReplySetForPlatform(platformLabel);
     case 4:
       return 'exportMode';
     case 5:
@@ -1235,6 +1255,7 @@ function isVagueDiagnosisAnswer(text, step) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (/^(不清楚|不知道|暂不清楚|不太清楚|不确定)$/.test(t)) return true;
+  // 2=主体其他, 3=发货其他, 4=出口其他
   if (/^(其他|其它|其他发货方式)$/.test(t)) return step === 2 || step === 3 || step === 4;
   return false;
 }
@@ -1257,8 +1278,8 @@ function inferClarificationStepFromBotText(botText) {
   const m = t.match(/第\s*([一二三四五六1-6])\s*步/);
   if (!m) {
     if (/出口方式/.test(t)) return 4;
-    if (/注册主体|店铺主体/.test(t)) return 3;
-    if (/发货方式|发货模式/.test(t)) return 2;
+    if (/注册主体|店铺主体/.test(t)) return 2;
+    if (/发货方式|发货模式/.test(t)) return 3;
     return 0;
   }
   const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
@@ -1305,9 +1326,10 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
   }
 
   // If wizard/bot step is known, never let prior-slot keyword echoes override the step chips
+  // Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6销售额
   const slotStep = {
     platform: 1,
-    entity: 3,
+    entity: 2,
     exportMode: 4,
     invoice: 5,
     revenue: 6,
@@ -1327,10 +1349,10 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
     return detected;
   }
 
-  // Shipping text match: past step 2 → step chips (FBA echo); at step 2 → platform-specific chips
+  // Shipping: only on step 3; otherwise prefer wizard step (acks often echo 全托管/FBA)
   if (detected && /^shipping/.test(detected)) {
-    if (step > 2 && stepKey) return stepKey;
-    if (step === 2 && stepKey && /^shipping/.test(stepKey)) return stepKey;
+    if (step !== 3 && stepKey) return stepKey;
+    if (step === 3 && stepKey && /^shipping/.test(stepKey)) return stepKey;
     return detected;
   }
 
@@ -1652,10 +1674,10 @@ function initAiChatbot() {
       return;
     }
 
-    // Fast path: after platform answer, show step-2 shipping locally (avoid Dify mode-select restart)
+    // Fast path: after platform → step-2 注册主体
     if (prevMode === 'diagnosis' && prevStep === 1 && getUiStep() === 2) {
       const platform = getUiPlatform() || String(text || '').trim();
-      const localAsk = localDiagnosisShippingAsk(platform);
+      const localAsk = localDiagnosisEntityAsk(platform);
       appendBubble(localAsk, 'bot');
       showQuickReplies(localAsk);
 
@@ -1677,7 +1699,81 @@ function initAiChatbot() {
           if (result?.conversationId) persistConversationId(result.conversationId, true);
           return result;
         } catch (err) {
-          console.warn('[diagnosis] step2 sync failed', err);
+          console.warn('[diagnosis] step2 entity sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: after entity → step-3 发货方式
+    if (prevMode === 'diagnosis' && prevStep === 2 && getUiStep() === 3) {
+      const platform = getUiPlatform();
+      const localAsk = localDiagnosisShippingAsk(platform);
+      appendBubble(`好的，已记录注册主体。\n\n${localAsk}`, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 3, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step3 shipping sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: 平台国内仓发货 → 自动记「由平台安排出口」，跳到第五步发票
+    if (
+      prevMode === 'diagnosis' &&
+      prevStep === 3 &&
+      getUiStep() === 4 &&
+      isPlatformDomesticWarehouseShipping(text)
+    ) {
+      setUiWizard('diagnosis', 5, getUiPlatform());
+      const note =
+        `好的，已记录发货方式为「${String(text).trim()}」。` +
+        `该情形通常由平台统一安排出口，已记为「由平台安排出口」。`;
+      const localAsk = localDiagnosisInvoiceAsk(note);
+      appendBubble(localAsk, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query =
+            buildDiagnosisApiQuery(text, 'diagnosis', 5, getUiPlatform()) +
+            '发货为平台国内仓类，出口已记为「由平台安排出口」，请直接问第五步发票，不要再问第四步。';
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] auto platform-export sync failed', err);
           return null;
         }
       })();
@@ -1825,7 +1921,8 @@ function initAiChatbot() {
 
       // If Agent restarts mode-select mid-diagnosis, keep wizard on track locally
       if (getUiMode() === 'diagnosis' && getUiStep() >= 2 && looksLikeModeSelectReply(answer)) {
-        if (getUiStep() === 2) answer = localDiagnosisShippingAsk(getUiPlatform());
+        if (getUiStep() === 2) answer = localDiagnosisEntityAsk(getUiPlatform());
+        else if (getUiStep() === 3) answer = localDiagnosisShippingAsk(getUiPlatform());
         else answer = `好的，已记录。请继续回答第${getUiStep()}步相关问题。`;
       }
 
