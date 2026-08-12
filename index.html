@@ -241,36 +241,8 @@
             </select>
           </div>
           <div class="form-group">
-            <label>店铺主体</label>
-            <select id="taxEntity">
-              <option value="">请选择</option>
-              <option value="cn">中国公司</option>
-              <option value="cn_individual">中国个人</option>
-              <option value="hk">香港公司</option>
-              <option value="us">美国公司</option>
-              <option value="uk">英国公司</option>
-              <option value="de">德国公司</option>
-              <option value="nl">荷兰公司</option>
-              <option value="mx">墨西哥公司</option>
-              <option value="sg">新加坡公司</option>
-              <option value="ru">俄罗斯公司</option>
-              <option value="br">巴西公司</option>
-              <option value="jp">日本公司</option>
-              <option value="vn">越南公司</option>
-              <option value="in">印度公司</option>
-              <option value="sa">沙特阿拉伯公司</option>
-              <option value="other_overseas">其他海外公司</option>
-            </select>
-          </div>
-          <div class="form-group is-hidden" id="taxEntityCountryGroup">
-            <label>店铺主体国家/地区</label>
-            <select id="taxEntityCountry">
-              <option value="">请选择</option>
-            </select>
-          </div>
-          <div class="form-group">
             <label>适用所得税税率（%）</label>
-            <select id="taxIncome"></select>
+            <input type="number" id="taxIncome" value="25" min="0" max="100" step="0.1">
           </div>
           <div class="form-group">
             <label>产品成本率（%）</label>

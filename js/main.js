@@ -31,7 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateExpertArticles();
     refreshPaginationLabels();
     refreshShowMoreServicesLabel();
-    syncTaxIncomeOptions();
   });
 
   window.addEventListener('daoith-auth-pending', (event) => {
@@ -3043,6 +3042,128 @@ function matchBoldKvContent(content) {
   return String(content || '').match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
 }
 
+/**
+ * Dify 批注回复常为无 Markdown 的纯文本。将其整理为可嵌套渲染的标题 + 多级列表。
+ * 已有较多 `-` / `1.` / `#` 结构时不改写，避免破坏正常 Agent 输出。
+ */
+function structureAnnotationPlainText(text) {
+  let t = String(text || '').replace(/\r\n/g, '\n').trim();
+  if (!t) return t;
+
+  // Keep existing hard newlines.
+  const lines = t.split('\n').map((ln) => ln.trim());
+
+  const nonEmpty = lines.filter(Boolean);
+  if (nonEmpty.length < 3) return t;
+
+  const structuredCount = nonEmpty.filter((ln) =>
+    /^#{1,4}\s/.test(ln) ||
+    /^[-*•]\s+/.test(ln) ||
+    /^\d+[.)、．]\s+/.test(ln) ||
+    /^【[^】]+】/.test(ln)
+  ).length;
+  if (structuredCount / nonEmpty.length >= 0.35) return t;
+
+  const isMajorTitle = (ln) => {
+    const s = ln.replace(/\*/g, '').trim();
+    if (/^方式[一二三四五六七八九十\d]+[：:]/.test(s)) return true;
+    if (/^(?:路径|方案|情形)[一二三四五六七八九十ABC\d]+[：:]/.test(s)) return true;
+    if (/^[一二三四五六七八九十]+[、.．]\s*\S/.test(s) && s.length <= 40) return true;
+    if (/^【[^】]{2,40}】$/.test(s)) return true;
+    if (/^#{1,4}\s+\S/.test(ln)) return true;
+    return false;
+  };
+
+  const isSubIntro = (ln) => {
+    const s = ln.replace(/\*/g, '').trim();
+    return /[：:]$/.test(s) && s.length >= 4 && s.length <= 48 && !/[。！？]/.test(s);
+  };
+
+  const isStepTitle = (ln) => {
+    const s = ln.replace(/\*/g, '').trim();
+    if (!s || s.length > 28) return false;
+    if (isMajorTitle(s) || isSubIntro(s)) return false;
+    if (/^[-*•\d#]/.test(s)) return false;
+    if (/[。！？；;]/.test(s)) return false;
+    if (/^[「『“"]/.test(s)) return false;
+    if (/^以下|如上|综上|注意|说明|备注/.test(s)) return false;
+    // Short noun-like step labels: 货物出口报关 / 核算期（关键步骤）
+    return s.length >= 2;
+  };
+
+  const isFieldDetail = (ln) => {
+    const s = ln.replace(/\*/g, '').trim();
+    if (/^[「『]/.test(s)) return true;
+    if (/^[“"].+[”"]/.test(s) && s.length <= 60) return true;
+    if (/」（|」选择|」勾选|」填写|」栏/.test(s)) return true;
+    if (/[；;]$/.test(s) && s.length <= 80) return true;
+    return false;
+  };
+
+  const out = [];
+  let mode = 'root'; // root | major | step | sub
+
+  for (const raw of lines) {
+    const ln = raw.trim();
+    if (!ln) {
+      if (out.length && out[out.length - 1] !== '') out.push('');
+      continue;
+    }
+
+    if (isMajorTitle(ln)) {
+      const title = ln.replace(/^#{1,4}\s+/, '').replace(/\*/g, '').trim();
+      if (out.length && out[out.length - 1] !== '') out.push('');
+      out.push(`## ${title}`);
+      mode = 'major';
+      continue;
+    }
+
+    if (isStepTitle(ln)) {
+      const title = ln.replace(/\*/g, '').trim();
+      out.push(`- **${title}**`);
+      mode = 'step';
+      continue;
+    }
+
+    if (isSubIntro(ln)) {
+      const title = ln.replace(/\*/g, '').replace(/[：:]\s*$/, '').trim();
+      out.push(`  - **${title}**`);
+      mode = 'sub';
+      continue;
+    }
+
+    // Details
+    const content = ln.replace(/\*/g, '').trim();
+    if (mode === 'sub') {
+      if (isFieldDetail(ln)) {
+        out.push(`    - ${content}`);
+      } else {
+        // Leave the 「字段」子列表，回到步骤细则
+        mode = 'step';
+        out.push(`  - ${content}`);
+      }
+      continue;
+    }
+    if (mode === 'step' && isFieldDetail(ln)) {
+      out.push(`    - ${content}`);
+      mode = 'sub';
+      continue;
+    }
+    if (mode === 'step') {
+      out.push(`  - ${content}`);
+      continue;
+    }
+    if (mode === 'major') {
+      // Lead sentence under major title — keep as paragraph
+      out.push(content);
+      continue;
+    }
+    out.push(content);
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /** Same hierarchy text as numbered actions — never the blue key-value card. */
 function formatPlanListItem(content) {
   const kv = matchBoldKvContent(content);
@@ -3410,7 +3531,9 @@ function buildLocalSolutionMarkdown(ctx) {
 
 function renderAIPlanHtml(text) {
   const lines = nestPlanBulletHierarchy(
-    convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+    structureAnnotationPlainText(
+      convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+    )
   ).split('\n');
   let html = '';
   let listMode = null; // 'flow' | 'ol' | 'ul' | null
@@ -3842,20 +3965,6 @@ const exportModeNames = {
   other: '其他',
 };
 
-/** User-specified income-tax tiers; other jurisdictions use 各地区税制介绍 */
-const taxEntityRateOptions = {
-  cn: [5, 15, 25],
-  cn_individual: [5, 10, 20, 30, 35],
-  hk: [8.25, 16.5],
-  us: [21],
-  uk: [19, 25],
-};
-
-/** Entity keys that already have a dedicated shop-entity option */
-const taxDedicatedEntityCountries = new Set([
-  'us', 'uk', 'de', 'nl', 'mx', 'sg', 'ru', 'br', 'jp', 'vn', 'in', 'sa', 'hk',
-]);
-
 function getFormContext() {
   const val = (id) => document.getElementById(id)?.value || '';
   const platform = val('platform');
@@ -3920,103 +4029,6 @@ function setHsRateSource(kind, result) {
 
 function formatWan(value) {
   return `${(Number(value) || 0).toFixed(2)} 万元`;
-}
-
-function resolveTaxSystemRates(countryId) {
-  if (!countryId) return [];
-  if (taxEntityRateOptions[countryId]) return taxEntityRateOptions[countryId].slice();
-  if (typeof window.getTaxSystemIncomeRates === 'function') {
-    return window.getTaxSystemIncomeRates(countryId);
-  }
-  const aliases = { uk: 'gb' };
-  const system = window.getTaxSystemById?.(aliases[countryId] || countryId);
-  return system?.incomeTaxRates ? system.incomeTaxRates.slice() : [];
-}
-
-function buildTaxRateOptions(entity, entityCountry) {
-  if (!entity) return [];
-  if (entity === 'other_overseas') {
-    return resolveTaxSystemRates(entityCountry);
-  }
-  if (taxEntityRateOptions[entity]) {
-    return taxEntityRateOptions[entity].slice();
-  }
-  return resolveTaxSystemRates(entity);
-}
-
-function syncTaxEntityCountryOptions() {
-  const countrySelect = document.getElementById('taxEntityCountry');
-  if (!countrySelect) return;
-
-  const locale = window.DAOITH_getLocale?.() || 'zh';
-  const systems = window.DAOITH_TAX_SYSTEMS || [];
-  const current = countrySelect.value;
-  const placeholder = locale === 'en' ? 'Select…' : '请选择';
-
-  const options = systems
-    .filter((c) => {
-      const entityKey = c.id === 'gb' ? 'uk' : c.id;
-      return !taxDedicatedEntityCountries.has(entityKey);
-    })
-    .map((c) => {
-      const value = c.id === 'gb' ? 'uk' : c.id;
-      const label = locale === 'en' ? (c.nameEn || c.name) : c.name;
-      return { value, label };
-    });
-
-  countrySelect.innerHTML = [
-    `<option value="">${placeholder}</option>`,
-    ...options.map((o) => `<option value="${o.value}">${o.label}</option>`),
-  ].join('');
-
-  if (options.some((o) => o.value === current)) {
-    countrySelect.value = current;
-  }
-}
-
-function syncTaxEntityCountryVisibility() {
-  const entitySelect = document.getElementById('taxEntity');
-  const countryGroup = document.getElementById('taxEntityCountryGroup');
-  if (!entitySelect || !countryGroup) return;
-  const show = entitySelect.value === 'other_overseas';
-  countryGroup.classList.toggle('is-hidden', !show);
-  if (show) syncTaxEntityCountryOptions();
-}
-
-function syncTaxIncomeOptions() {
-  const entitySelect = document.getElementById('taxEntity');
-  const countrySelect = document.getElementById('taxEntityCountry');
-  const incomeSelect = document.getElementById('taxIncome');
-  if (!entitySelect || !incomeSelect) return;
-
-  syncTaxEntityCountryVisibility();
-
-  const entity = entitySelect.value || '';
-  const entityCountry = countrySelect?.value || '';
-  const current = incomeSelect.value;
-  const options = buildTaxRateOptions(entity, entityCountry);
-  const locale = window.DAOITH_getLocale?.() || 'zh';
-
-  if (!entity) {
-    incomeSelect.innerHTML = `<option value="">${locale === 'en' ? 'Select entity first' : '请先选择店铺主体'}</option>`;
-    return;
-  }
-
-  if (!options.length) {
-    const msg = entity === 'other_overseas'
-      ? (locale === 'en' ? 'Select country/region first' : '请先选择店铺主体国家/地区')
-      : (locale === 'en' ? 'No rate found in regional tax guide' : '未在各地区税制介绍中找到税率');
-    incomeSelect.innerHTML = `<option value="">${msg}</option>`;
-    return;
-  }
-
-  incomeSelect.innerHTML = options
-    .map((rate) => `<option value="${rate}">${rate}%</option>`)
-    .join('');
-
-  if (options.map(String).includes(current)) {
-    incomeSelect.value = current;
-  }
 }
 
 function ensureWeChatLogin(action) {
@@ -4142,16 +4154,8 @@ function initAIForm() {
 /* Tax Calculator */
 function initTaxCalculator() {
   const calcBtn = document.getElementById('calcTax');
-  const entitySelect = document.getElementById('taxEntity');
   const resultEl = document.getElementById('taxResult');
-  if (!calcBtn || !entitySelect || !resultEl) return;
-
-  const countrySelect = document.getElementById('taxEntityCountry');
-
-  entitySelect.value = entitySelect.value || 'cn';
-  syncTaxIncomeOptions();
-  entitySelect.addEventListener('change', syncTaxIncomeOptions);
-  countrySelect?.addEventListener('change', syncTaxIncomeOptions);
+  if (!calcBtn || !resultEl) return;
 
   calcBtn.addEventListener('click', async () => {
     if (!ensureWeChatLogin('tax-calc')) return;
