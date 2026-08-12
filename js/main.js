@@ -645,11 +645,12 @@ function sanitizeAiAnswer(text) {
   const clean = (s) =>
     String(s || '')
       .replace(/^\s*thinking[:：].*$/gim, '')
+      .replace(/^\s*思考过程[:：].*$/gim, '')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
 
   const looksLikeCot = (s) =>
-    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库/.test(
+    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考/.test(
       s || ''
     );
 
@@ -690,6 +691,15 @@ function sanitizeAiAnswer(text) {
   }
 
   t = clean(t);
+
+  // Strip visible “思考过程” sections some models print without XML tags
+  t = t
+    .replace(/```(?:thinking|thought|reason|reasoning)[\s\S]*?```/gi, '\n')
+    .replace(/(?:^|\n)#{0,3}\s*思考过程[:：]?[\s\S]*?(?=\n#{1,3}\s|\n\*\*|【|$)/g, '\n')
+    .replace(/(?:^|\n)思考过程[:：][\s\S]*?(?=\n{2,}|$)/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
   // Last resort: never show a blank bubble if the model did return something
   if (!t && raw.trim()) {
     t = clean(
@@ -1073,6 +1083,37 @@ function shippingQuickReplySetForPlatform(platformLabel) {
   return 'shipping';
 }
 
+/** Rewrite mode-select clicks into explicit instructions for the Agent API. */
+function normalizeDiagnosisModeQuery(text) {
+  const t = String(text || '').trim();
+  if (/开启专属合规诊断/.test(t)) {
+    return (
+      '【模式选择】用户选择：开启专属合规诊断。' +
+      '请立即进入模式A专属合规诊断，执行第一步：只提问销售平台（可列举亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN等）。' +
+      '禁止说“这不是自动命令”，禁止要求用户改提其他具体问题，禁止输出欢迎语。'
+    );
+  }
+  if (/我有特定问题想直接提问|特定问题想直接提问/.test(t)) {
+    return (
+      '【模式选择】用户选择：我有特定问题想直接提问。' +
+      '请进入模式B：用一两句邀请用户描述具体问题；不要展开7步诊断问卷。'
+    );
+  }
+  return t;
+}
+
+function localDiagnosisPlatformAsk() {
+  return (
+    '好的，已为您开启专属合规诊断。\n\n' +
+    '您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN）'
+  );
+}
+
+function looksLikeRejectedDiagnosisStart(text) {
+  const t = String(text || '');
+  return /不是.*自动命令|不是一个自动命令|具体想了解什么|告诉我具体|需要您告诉我具体/.test(t);
+}
+
 /** Fallback chips by diagnosis wizard step when bot wording is atypical. */
 function diagQuickReplySetForStep(step, platformLabel) {
   switch (step) {
@@ -1330,6 +1371,13 @@ function initAiChatbot() {
     clearQuickReplies();
     input.value = '';
     appendBubble(text, 'user');
+
+    // Mode switch: always start a fresh Dify conversation (avoid stale上下文跑偏)
+    const isModeSelect =
+      /开启专属合规诊断/.test(text) || /我有特定问题想直接提问|特定问题想直接提问/.test(text);
+    if (isModeSelect) {
+      resetConversation();
+    }
     trackUserWizardAnswer(text);
     busy = true;
 
@@ -1341,6 +1389,7 @@ function initAiChatbot() {
 
     const ctx = window.__daoithLastPlanCtx || null;
     const sessionId = ensureConversationId();
+    const apiQuery = normalizeDiagnosisModeQuery(text);
     try {
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
@@ -1404,14 +1453,14 @@ function initAiChatbot() {
 
       const callChat = (conversationId) => callDifyStream({
         endpoint,
-        query: text,
+        query: apiQuery,
         inputs: {},
         conversationId,
         onChunk: paintStream,
       });
 
       let result;
-      let conversationId = isConversationBound() ? sessionId : '';
+      let conversationId = isModeSelect ? '' : (isConversationBound() ? sessionId : '');
       try {
         result = await callChat(conversationId);
       } catch (firstErr) {
@@ -1421,7 +1470,7 @@ function initAiChatbot() {
           typing.textContent = '正在诊断…';
           result = await callDify({
             endpoint,
-            query: text,
+            query: apiQuery,
             inputs: {},
             conversationId,
             returnMeta: true,
@@ -1452,12 +1501,21 @@ function initAiChatbot() {
         throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
 
+      // If API app ignores mode-A start, fall back to local step-1 so官网仍可点选继续
+      if (
+        getUiMode() === 'diagnosis' &&
+        getUiStep() === 1 &&
+        (looksLikeRejectedDiagnosisStart(answer) || !/电商平台|哪个平台|什么平台|在哪个平台/.test(answer))
+      ) {
+        answer = localDiagnosisPlatformAsk();
+      }
+
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
         publishDiagnosisPlanToResultPanel(answer);
         typing.classList.add('is-plan-status');
-        const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-        typing.textContent = loggedIn
+        const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+        typing.textContent = loggedInNow
           ? DIAG_PLAN_DONE_MSG
           : `${DIAG_PLAN_DONE_MSG}。请先微信登录以保存方案并继续`;
         clearQuickReplies();
@@ -1744,16 +1802,10 @@ function extractDifyAnswer(data) {
   if (typeof data.text === 'string') candidates.push(data.text);
 
   // Some builds put usable text only under metadata / reasoning payloads
+  // Never prefer raw reasoning/thinking as the user-visible answer
   const meta = data.metadata;
   if (meta && typeof meta === 'object') {
     if (typeof meta.annotation_reply === 'string') candidates.push(meta.annotation_reply);
-    const reasoning = meta.reasoning;
-    if (typeof reasoning === 'string') candidates.push(reasoning);
-    else if (reasoning && typeof reasoning === 'object') {
-      for (const key of ['text', 'content', 'answer', 'summary']) {
-        if (typeof reasoning[key] === 'string') candidates.push(reasoning[key]);
-      }
-    }
   }
 
   for (const c of candidates) {
@@ -1862,6 +1914,18 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       return;
     }
 
+    // Never surface agent thinking / tool traces in the chat UI
+    if (
+      event === 'agent_thought' ||
+      event === 'thought' ||
+      event === 'agent_log' ||
+      event === 'message_file' ||
+      event === 'tts_message' ||
+      event === 'tts_message_end'
+    ) {
+      return;
+    }
+
     // Token deltas (chat / agent / Chatflow LLM nodes)
     if (
       event === 'message' ||
@@ -1881,9 +1945,13 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     }
 
     if (event === 'message_end' || event === 'workflow_finished') {
-      const finalText = extractDifyAnswer(data) || extractDifyAnswer(data.data) || '';
-      if (finalText && finalText.length > answer.length) {
-        answer = finalText;
+      // Prefer accumulated message tokens; only fill from final payload answer field
+      const finalAnswer =
+        (typeof data.answer === 'string' && data.answer) ||
+        (typeof data.data?.answer === 'string' && data.data.answer) ||
+        '';
+      if (finalAnswer && finalAnswer.length > answer.length) {
+        answer = finalAnswer;
       }
       emit(true);
     }
