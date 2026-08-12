@@ -662,7 +662,7 @@ function sanitizeAiAnswer(text) {
       .trim();
 
   const looksLikeCot = (s) =>
-    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:|让我回顾一下|用户已经完成了第|缺少第二步|我需要汇总信息/.test(
+    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:|让我回顾一下|用户已经完成了第|缺少第二步|我需要汇总信息|让我检索知识库|让我再尝试|知识库返回为空|需要检索的知识库|属于路径[ABC]|路径A·|路径B·|路径C·/.test(
       s || ''
     );
 
@@ -696,8 +696,21 @@ function sanitizeAiAnswer(text) {
       /(?:^|\n)(?:我先|让我|首先|接下来|现在)?(?:需要|正在|开始)?(?:检索|思考|分析|调用|查阅).{0,80}(?:知识库|工具|资料)[^\n]*/g,
       '\n'
     )
+    .replace(/(?:^|\n)需要检索的知识库[：:][\s\S]*?(?=\n【|\n#{1,3}\s|$)/g, '\n')
+    .replace(/(?:^|\n)知识库返回为空[^\n]*/g, '\n')
+    .replace(/(?:^|\n)让我再尝试[^\n]*/g, '\n')
+    .replace(/(?:^|\n)根据发货方式[^\n]{0,40}属于路径[ABC][^\n]*/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+
+  // If only a “诊断档案 / 路径判断 / 检索中” draft remains (no formal report), drop it
+  if (
+    t &&
+    !/(【核心风险诊断】|【合规方案】|【行动建议】|好的[，,]|请问|第[一二三四五六七1-7]步)/.test(t) &&
+    /(诊断档案|销售平台[：:]|让我检索|知识库返回|属于路径[ABC]|需要检索的知识库)/.test(t)
+  ) {
+    t = '';
+  }
 
   // If the whole bubble is still CoT-like or still contains think tags, drop it
   if (
@@ -1966,12 +1979,34 @@ function initAiChatbot() {
       };
 
       const paintStream = (partial) => {
-        const clean = stripDiagnosisIntroBoilerplate(sanitizeAiAnswer(partial) || partial);
-        if (!clean) return;
+        // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
+        const cleaned = sanitizeAiAnswer(partial);
+        if (!cleaned) {
+          // While model is still thinking / retrieving, keep status text only
+          if (getUiMode() === 'diagnosis' && getUiStep() >= 6) {
+            beginPlanRouting();
+          }
+          return;
+        }
+        const clean = stripDiagnosisIntroBoilerplate(cleaned);
+        if (!clean) {
+          if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
+          return;
+        }
         // Full diagnosis → stream into right-hand plan panel, not the chat bubble
         if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
           beginPlanRouting();
           publishDiagnosisPlanToResultPanel(clean);
+          return;
+        }
+        // Mid-report CoT that slipped past sanitize: still never show in chat
+        if (
+          getUiMode() === 'diagnosis' &&
+          getUiStep() >= 6 &&
+          /(让我检索|知识库返回|属于路径[ABC]|需要检索的知识库|诊断档案)/.test(clean) &&
+          !/(【核心风险诊断】|【合规方案】)/.test(clean)
+        ) {
+          beginPlanRouting();
           return;
         }
         setBotBubble(typing, clean);
@@ -2018,12 +2053,22 @@ function initAiChatbot() {
 
       let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
-        answer = sanitizeAiAnswer(result.text) || result.text || buildLocalChatReply(text, ctx);
+        // Do NOT fall back to raw result.text (often still contains think / CoT)
+        const retry = sanitizeAiAnswer(result.text);
+        answer = retry || buildLocalChatReply(text, ctx) || '';
       }
-      answer = sanitizeAiAnswer(answer) || answer;
-      answer = stripDiagnosisIntroBoilerplate(answer);
+      answer = sanitizeAiAnswer(answer);
+      answer = stripDiagnosisIntroBoilerplate(answer || '');
       answer = correctAluminumRefundHallucinations(answer);
       if (!answer || answer.length < 4) {
+        if (streamingPlan || (getUiMode() === 'diagnosis' && getUiStep() >= 6)) {
+          beginPlanRouting();
+          typing.classList.add('is-plan-status');
+          typing.textContent =
+            '方案仍在生成中；若右侧暂无内容，请稍后重试或点击「新建对话」。思考过程不会显示在对话框中。';
+          clearQuickReplies();
+          return;
+        }
         persistConversationId(newUuid(), false);
         throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
       }
