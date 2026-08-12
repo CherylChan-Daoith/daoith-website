@@ -626,25 +626,32 @@ function sanitizeAiAnswer(text) {
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
   const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
 
+  // Decode common escaped forms first
+  t = t
+    .replace(/&lt;\s*(\/?)\s*(think|thinking|reason|reasoning)\b[^&]*&gt;/gi, '<$1$2>')
+    .replace(/＜\s*(\/?)\s*(think|thinking|reason|reasoning)[^＞]*＞/gi, '<$1$2>');
+
   // Prefer text after the last closed think block (formal answer usually follows)
   for (const name of tagNames) {
     const afterClose = new RegExp(`<\\s*\\/\\s*${name}\\s*>\\s*([\\s\\S]*)$`, 'i');
     const m = t.match(afterClose);
-    if (m && m[1] && m[1].trim().length >= 8) {
+    if (m && m[1] && m[1].trim().length >= 8 && !new RegExp(`<\\s*${name}\\b`, 'i').test(m[1])) {
       t = m[1];
       break;
     }
   }
 
-  // 默认：丢弃思考标签内容，只用标签外正式答复。
-  let outside = t;
-  for (const name of tagNames) {
-    const blockRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*?)<\\s*\\/\\s*${name}\\s*>`, 'gi');
-    outside = outside.replace(blockRe, '\n');
-    // 未闭合的思考块：整段丢弃（不当作答复）
-    const unclosedRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*)$`, 'i');
-    outside = outside.replace(unclosedRe, '\n');
-    outside = outside.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+  // Iteratively drop all think / reasoning blocks (including nested / consecutive)
+  let prev = '';
+  let guard = 0;
+  while (t !== prev && guard < 12) {
+    prev = t;
+    guard += 1;
+    for (const name of tagNames) {
+      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '\n');
+      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*$`, 'i'), '\n');
+      t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+    }
   }
 
   const clean = (s) =>
@@ -655,14 +662,11 @@ function sanitizeAiAnswer(text) {
       .trim();
 
   const looksLikeCot = (s) =>
-    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:/.test(
+    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:|让我回顾一下|用户已经完成了第|缺少第二步|我需要汇总信息/.test(
       s || ''
     );
 
-  outside = clean(outside);
-
-  // Never surface raw CoT / <think> insides as the user-visible answer
-  t = outside || '';
+  t = clean(t);
 
   // Drop leading CoT if it ends with a short final refusal / conclusion
   if (
@@ -673,7 +677,7 @@ function sanitizeAiAnswer(text) {
     if (m) t = m[0];
   }
 
-  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想/.test(t)) {
+  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想|让我回顾一下/.test(t)) {
     const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
       t = parts[parts.length - 1];
@@ -695,23 +699,28 @@ function sanitizeAiAnswer(text) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // If the whole bubble is still CoT-like, drop it rather than show planning text
+  // If the whole bubble is still CoT-like or still contains think tags, drop it
   if (
-    t &&
-    looksLikeCot(t) &&
-    !/(好的|请问|第[一二三四五六七1-7]步|【核心风险|【合规方案|您在哪个|发货方式)/.test(t)
+    !t ||
+    looksLikeCot(t) ||
+    new RegExp(`<\\s*${think}\\b`, 'i').test(t) ||
+    (/知识库检索|让我回顾|缺少第[二三四五]步/.test(t) &&
+      !/(【核心风险诊断】|【合规方案】|好的|请问|第[一二三四五六]步：)/.test(t))
   ) {
-    t = '';
-  }
-
-  // Last resort: never show a blank bubble if the model did return something usable outside tags
-  if (!t && raw.trim()) {
-    const stripped = clean(
-      raw
-        .replace(new RegExp(`<\\s*${think}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${think}\\s*>`, 'gi'), '\n')
-        .replace(new RegExp(`<\\s*\\/?\\s*${think}\\b[^>]*>`, 'gi'), '')
-    );
-    t = looksLikeCot(stripped) ? '' : stripped;
+    // Prefer any trailing formal section after last think-ish paragraph
+    if (/(【核心风险诊断】|【合规方案】)/.test(raw)) {
+      const m = raw.match(/【核心风险诊断】[\s\S]*$/);
+      if (m) t = clean(m[0]);
+      else t = '';
+    } else if (
+      t &&
+      /(好的|请问|第[一二三四五六七1-7]步|【核心风险|【合规方案|您在哪个|发货方式)/.test(t) &&
+      !looksLikeCot(t)
+    ) {
+      /* keep */
+    } else {
+      t = '';
+    }
   }
 
   // Opening welcome belongs in the first bubble only — strip if the model repeats it mid-chat
@@ -1192,6 +1201,52 @@ function isPlatformDomesticWarehouseShipping(text) {
   );
 }
 
+const DIAG_SLOTS_KEY = 'daoith_diagnosis_ui_slots';
+
+function getDiagSlots() {
+  try {
+    const raw = localStorage.getItem(DIAG_SLOTS_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    return obj && typeof obj === 'object' ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+function setDiagSlot(key, value) {
+  const slots = getDiagSlots();
+  slots[key] = String(value || '').trim();
+  localStorage.setItem(DIAG_SLOTS_KEY, JSON.stringify(slots));
+  return slots;
+}
+
+function clearDiagSlots() {
+  localStorage.removeItem(DIAG_SLOTS_KEY);
+}
+
+function formatDiagSlotsForApi() {
+  const s = getDiagSlots();
+  const exportMode =
+    s.exportMode ||
+    (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '') ||
+    '未填写';
+  const lines = [
+    `销售平台：${s.platform || '未填写'}`,
+    `注册主体：${s.entity || '未填写'}`,
+    `发货方式：${s.shipping || '未填写'}`,
+    `出口方式：${exportMode}`,
+    `供应商发票：${s.invoice || '未填写'}`,
+    `年销售额：${s.revenue || '未填写'}`,
+  ];
+  let hard = '';
+  if (exportMode === '由平台安排出口') {
+    hard =
+      '【硬约束】出口方式已确定为「由平台安排出口」。禁止写“未提供出口信息/出口方式未知”；' +
+      '【合规方案】只围绕平台统一安排出口撰写，禁止罗列其他出口方式分支情形。';
+  }
+  return `【诊断档案·必须采信】\n${lines.join('\n')}\n${hard}`;
+}
+
 function looksLikeModeSelectReply(text) {
   const t = String(text || '');
   return (
@@ -1205,21 +1260,23 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   const normalized = normalizeDiagnosisModeQuery(text);
   if (normalized !== String(text || '').trim()) return normalized;
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
-  const platform = String(platformLabel || '').trim();
+  const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
     2: '请执行第二步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
     3: '请执行第三步：只询问发货方式，并按该平台给出对应选项。',
     4: '请执行第四步：只询问目前出口方式（0110一般贸易/委托货代/小包快递/由平台安排出口/其他）。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
     6: '请执行第六步：只询问年销售额。',
-    7: '第1-6步已齐，请检索知识库并输出诊断报告，不要再提问。',
+    7: '第1-6步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
   };
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
+  const archive = formatDiagSlotsForApi();
   return (
     `【专属合规诊断进行中·模式A】用户本轮答复：${String(text || '').trim()}。` +
     (platform ? `已确认销售平台：${platform}。` : '') +
     `${hint}` +
-    '禁止重新询问模式选择，禁止输出欢迎语，禁止说“仅凭…无法判断需求”；步号必须正确（2=主体，3=发货）。'
+    '禁止重新询问模式选择，禁止输出欢迎语，禁止说“仅凭…无法判断需求”；步号必须正确（2=主体，3=发货）。' +
+    `\n${archive}`
   );
 }
 
@@ -1417,12 +1474,14 @@ function initAiChatbot() {
     localStorage.setItem(MODE_KEY, '');
     localStorage.setItem(STEP_KEY, '0');
     localStorage.setItem(PLATFORM_KEY, '');
+    clearDiagSlots();
   };
 
   /** Track mode/step so diagnosis keeps clickable answer chips each turn. */
   const trackUserWizardAnswer = (text) => {
     const t = String(text || '').trim();
     if (/开启专属合规诊断/.test(t)) {
+      clearDiagSlots();
       setUiWizard('diagnosis', 1, '');
       return;
     }
@@ -1431,6 +1490,7 @@ function initAiChatbot() {
       return;
     }
     if (/重新诊断|换个模式|我要逐步诊断/.test(t)) {
+      clearDiagSlots();
       setUiWizard('diagnosis', 1, '');
       return;
     }
@@ -1438,8 +1498,49 @@ function initAiChatbot() {
     const step = getUiStep();
     // 「其他」等模糊答复先不跳步，等 Agent/用户补全后再前进
     if (isVagueDiagnosisAnswer(t, step)) return;
-    if (step === 1) setUiWizard('diagnosis', 2, t);
-    else if (step >= 2 && step <= 6) setUiWizard('diagnosis', Math.min(7, step + 1), getUiPlatform());
+    if (step === 1) {
+      setDiagSlot('platform', t);
+      setUiWizard('diagnosis', 2, t);
+    } else if (step === 2) {
+      setDiagSlot('entity', t);
+      setUiWizard('diagnosis', 3, getUiPlatform());
+    } else if (step === 3) {
+      setDiagSlot('shipping', t);
+      if (isPlatformDomesticWarehouseShipping(t)) {
+        setDiagSlot('exportMode', '由平台安排出口');
+      }
+      setUiWizard('diagnosis', 4, getUiPlatform());
+    } else if (step === 4) {
+      setDiagSlot('exportMode', t);
+      setUiWizard('diagnosis', 5, getUiPlatform());
+    } else if (step === 5) {
+      setDiagSlot('invoice', t);
+      setUiWizard('diagnosis', 6, getUiPlatform());
+    } else if (step === 6) {
+      setDiagSlot('revenue', t);
+      setUiWizard('diagnosis', 7, getUiPlatform());
+    }
+  };
+
+  const scrollDiagChatToBottom = () => {
+    const run = () => {
+      try {
+        messages.scrollTop = messages.scrollHeight;
+        const last = messages.lastElementChild;
+        last?.scrollIntoView?.({ block: 'end', behavior: 'auto' });
+        if (quickEl && !quickEl.hidden) {
+          quickEl.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+        }
+        messages.scrollTop = messages.scrollHeight;
+      } catch {
+        /* ignore */
+      }
+    };
+    run();
+    requestAnimationFrame(() => {
+      run();
+      requestAnimationFrame(run);
+    });
   };
 
   const ensureConversationId = () => {
@@ -1528,6 +1629,7 @@ function initAiChatbot() {
       return;
     }
     renderQuickReplyButtons(options);
+    scrollDiagChatToBottom();
   };
 
   ensureConversationId();
@@ -1542,7 +1644,7 @@ function initAiChatbot() {
       div.textContent = text;
     }
     messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    scrollDiagChatToBottom();
     return div;
   };
 
@@ -1550,6 +1652,7 @@ function initAiChatbot() {
     if (!el) return;
     el.classList.add('is-bot', 'is-rich');
     el.innerHTML = renderChatBubbleHtml(text);
+    scrollDiagChatToBottom();
   };
 
   const clearMessages = () => {
@@ -1573,7 +1676,7 @@ function initAiChatbot() {
 
     appendBubble(ask, 'bot');
     showQuickReplies('请选择：开启专属合规诊断，还是我有特定问题想直接提问？');
-    messages.scrollTop = messages.scrollHeight;
+    scrollDiagChatToBottom();
   };
 
   const startNewConversation = () => {
@@ -1746,6 +1849,8 @@ function initAiChatbot() {
       isPlatformDomesticWarehouseShipping(text)
     ) {
       setUiWizard('diagnosis', 5, getUiPlatform());
+      setDiagSlot('shipping', String(text).trim());
+      setDiagSlot('exportMode', '由平台安排出口');
       const note =
         `好的，已记录发货方式为「${String(text).trim()}」。` +
         `该情形通常由平台统一安排出口，已记为「由平台安排出口」。`;
@@ -1762,7 +1867,7 @@ function initAiChatbot() {
           const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
           const query =
             buildDiagnosisApiQuery(text, 'diagnosis', 5, getUiPlatform()) +
-            '发货为平台国内仓类，出口已记为「由平台安排出口」，请直接问第五步发票，不要再问第四步。';
+            '发货为平台国内仓类，出口已记为「由平台安排出口」，请直接问第五步发票，不要再问第四步，后续报告必须采信该出口方式。';
           const result = await callDify({
             endpoint,
             query,
@@ -1786,7 +1891,7 @@ function initAiChatbot() {
     typing.className = 'ai-chatbot-bubble is-bot';
     typing.textContent = '正在诊断…';
     messages.appendChild(typing);
-    messages.scrollTop = messages.scrollHeight;
+    scrollDiagChatToBottom();
 
     const ctx = window.__daoithLastPlanCtx || null;
     try {
@@ -1857,7 +1962,7 @@ function initAiChatbot() {
           return;
         }
         setBotBubble(typing, clean);
-        messages.scrollTop = messages.scrollHeight;
+        scrollDiagChatToBottom();
       };
 
       const callChat = (conversationId) => callDifyStream({
@@ -1955,7 +2060,7 @@ function initAiChatbot() {
       }
     } finally {
       busy = false;
-      messages.scrollTop = messages.scrollHeight;
+      scrollDiagChatToBottom();
     }
   };
 
@@ -2114,7 +2219,9 @@ function publishDiagnosisPlanToResultPanel(markdown) {
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
 
-  const clean = sanitizeAiAnswer(markdown) || String(markdown || '');
+  const clean = sanitizeAiAnswer(markdown);
+  // Never fall back to raw model text that still contains think / CoT
+  if (!clean) return;
   const body = renderAIPlanHtml(clean) || `<p class="result-paragraph">${escapeHtml(clean)}</p>`;
   items.innerHTML =
     `<div class="result-body result-body-scroll">` +
@@ -2781,7 +2888,67 @@ function escapeHtml(text) {
 }
 
 function formatInline(text) {
-  return escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  let s = escapeHtml(String(text || ''));
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong class="result-em">$1</strong>');
+  // Highlight common customs / regime codes
+  s = s.replace(
+    /\b(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)\b/g,
+    '<span class="result-code">$1</span>'
+  );
+  return s;
+}
+
+/** Turn markdown pipe-tables into bullet lines (tables break layout in the plan panel). */
+function splitMarkdownTableRow(line) {
+  return String(line || '')
+    .replace(/^\s*\|/, '')
+    .replace(/\|\s*$/, '')
+    .split('|')
+    .map((c) => c.trim());
+}
+
+function convertMarkdownTablesToBullets(text) {
+  const lines = String(text || '').split('\n');
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const next = lines[i + 1] || '';
+    const isHeader = /^\s*\|/.test(line) && /\|/.test(line);
+    const isSep = /^\s*\|?\s*:?-{3,}/.test(next);
+    if (isHeader && isSep) {
+      const headers = splitMarkdownTableRow(line).filter((c) => c && !/^[-:]+$/.test(c));
+      i += 2;
+      while (i < lines.length && /^\s*\|/.test(lines[i])) {
+        const cells = splitMarkdownTableRow(lines[i]).filter((c) => c && !/^[-:]+$/.test(c));
+        if (cells.length >= 2) {
+          out.push(`- **${cells[0]}**：${cells.slice(1).join('；')}`);
+        } else if (cells.length === 1 && headers[0]) {
+          out.push(`- **${headers[0]}**：${cells[0]}`);
+        } else if (cells.length === 1) {
+          out.push(`- ${cells[0]}`);
+        }
+        i += 1;
+      }
+      continue;
+    }
+    // Lone separator or broken table row
+    if (/^\s*\|?\s*[-:|]+\s*$/.test(line)) {
+      i += 1;
+      continue;
+    }
+    if (/^\s*\|/.test(line) && /\|/.test(line)) {
+      const cells = splitMarkdownTableRow(line).filter((c) => c && !/^[-:]+$/.test(c));
+      if (cells.length >= 2) {
+        out.push(`- **${cells[0]}**：${cells.slice(1).join('；')}`);
+        i += 1;
+        continue;
+      }
+    }
+    out.push(line);
+    i += 1;
+  }
+  return out.join('\n');
 }
 
 const SOLUTION_GREETING =
@@ -2950,7 +3117,7 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const lines = String(text || '').split('\n');
+  const lines = convertMarkdownTablesToBullets(String(text || '')).split('\n');
   let html = '';
   let inList = false;
   let listTag = 'ul';
@@ -2980,6 +3147,11 @@ function renderAIPlanHtml(text) {
     const line = rawLine.trim();
     if (!line) {
       closeList();
+      continue;
+    }
+
+    // Drop raw table junk that slipped through
+    if (/^\|?\s*[-:|]+\s*$/.test(line) || (/^\|/.test(line) && /\|/.test(line) && !/[^\s|\-:]/.test(line))) {
       continue;
     }
 
@@ -3027,7 +3199,17 @@ function renderAIPlanHtml(text) {
           `<span class="result-flow-card">${formatInline(content)}</span>` +
           `</li>`;
       } else {
-        html += `<li>${formatInline(content)}</li>`;
+        // Key-value style bullets: **标签**：内容
+        const kv = content.match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
+        if (kv) {
+          html +=
+            `<li class="result-kv">` +
+            `<span class="result-kv-key">${escapeHtml(kv[1])}</span>` +
+            `<span class="result-kv-val">${formatInline(kv[2])}</span>` +
+            `</li>`;
+        } else {
+          html += `<li>${formatInline(content)}</li>`;
+        }
       }
       continue;
     }
