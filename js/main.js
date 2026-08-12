@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (action === 'tax-calc') {
         document.getElementById('calcTax')?.click();
       } else if (action === 'ai_diagnosis_start') {
-        // Resume专属合规诊断 after WeChat login
+        // Resume专属合规诊断 after WeChat login (fast local step-1 inside sendMessage)
         document.getElementById('ai-solution')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
         const form = document.getElementById('aiChatbotForm');
         const input = document.getElementById('aiChatbotInput');
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('resultContent')?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
         document.getElementById('diagServiceRecs')?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
       }
-    }, 400);
+    }, 0);
   });
 });
 
@@ -1455,6 +1455,9 @@ function initAiChatbot() {
   // Embedded panel: show welcome immediately
   if (!messages.childElementCount) showWelcome();
 
+  /** Background Dify warm-up after instant local step-1 (login resume). */
+  let diagnosisWarmPromise = null;
+
   const sendMessage = async (text) => {
     if (!text || busy) return;
 
@@ -1465,7 +1468,17 @@ function initAiChatbot() {
 
     // 专属合规诊断：选模式时即要求微信登录（不要等到出方案才拦）
     if (wantsExclusiveDiagnosis && !loggedIn) {
-      window.DAOITH_AUTH?.requireLogin?.('ai_diagnosis_start', returnToAi);
+      window.DAOITH_AUTH?.requireLogin?.('ai_diagnosis_start', returnToAi, { silent: true });
+      return;
+    }
+
+    // 专属方案生成次数上限（按登录用户）
+    if (wantsExclusiveDiagnosis && loggedIn && isDiagnosisPlanLimitReached()) {
+      clearQuickReplies();
+      input.value = '';
+      appendBubble(text, 'user');
+      appendBubble(DIAG_PLAN_LIMIT_MSG, 'bot');
+      renderQuickReplyButtons(DIAG_QUICK_REPLY_SETS.consultFollowup);
       return;
     }
 
@@ -1486,10 +1499,40 @@ function initAiChatbot() {
     // Mode switch: always start a fresh Dify conversation (avoid stale上下文跑偏)
     const isModeSelect =
       /开启专属合规诊断/.test(text) || /我有特定问题想直接提问|特定问题想直接提问/.test(text);
-    if (isModeSelect) {
+    if (isModeSelect || wantsExclusiveDiagnosis) {
       resetConversation();
     }
     trackUserWizardAnswer(text);
+
+    // Fast path: show step-1 locally immediately (don't block on Dify after login)
+    if (wantsExclusiveDiagnosis && loggedIn) {
+      const localAsk = localDiagnosisPlatformAsk();
+      appendBubble(localAsk, 'bot');
+      showQuickReplies(localAsk);
+
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      const warmQuery = normalizeDiagnosisModeQuery('开启专属合规诊断');
+      diagnosisWarmPromise = (async () => {
+        try {
+          const result = await callDify({
+            endpoint,
+            query: warmQuery,
+            inputs: {},
+            conversationId: '',
+            returnMeta: true,
+          });
+          const nextId = result?.conversationId;
+          if (nextId) persistConversationId(nextId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] warm start failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
     busy = true;
 
     const typing = document.createElement('div');
@@ -1502,6 +1545,11 @@ function initAiChatbot() {
     const sessionId = ensureConversationId();
     const apiQuery = normalizeDiagnosisModeQuery(text);
     try {
+      if (diagnosisWarmPromise) {
+        await diagnosisWarmPromise;
+        diagnosisWarmPromise = null;
+      }
+
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
         const resolved = await resolveExportRefundRate(hsForRefund);
@@ -1532,15 +1580,16 @@ function initAiChatbot() {
 
       let streamingPlan = false;
       let loginPromptedForPlan = false;
+      let planCountedThisTurn = false;
       const beginPlanRouting = () => {
         if (streamingPlan) return;
         streamingPlan = true;
         typing.classList.add('is-plan-status');
-        const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-        typing.textContent = loggedIn
+        const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+        typing.textContent = loggedInNow
           ? DIAG_PLAN_STATUS_MSG
           : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
-        if (!loginPromptedForPlan && !loggedIn) {
+        if (!loginPromptedForPlan && !loggedInNow) {
           loginPromptedForPlan = true;
           window.DAOITH_AUTH?.requireLogin?.(
             'ai_plan',
@@ -1624,6 +1673,10 @@ function initAiChatbot() {
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
         publishDiagnosisPlanToResultPanel(answer);
+        if (!planCountedThisTurn) {
+          planCountedThisTurn = true;
+          bumpDiagnosisPlanCount();
+        }
         typing.classList.add('is-plan-status');
         const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
         typing.textContent = loggedInNow
@@ -1712,6 +1765,30 @@ function shouldRouteDiagnosisToPlanPanel(text) {
 
 const DIAG_PLAN_STATUS_MSG = '道一合规诊断助手正在为您生成专属合规方案，请查看右侧方案生成区';
 const DIAG_PLAN_DONE_MSG = '道一合规诊断助手已为您生成专属合规方案，请查看右侧方案生成区';
+const DIAG_PLAN_LIMIT = 5;
+const DIAG_PLAN_LIMIT_MSG =
+  '理解您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
+
+function diagnosisPlanCountStorageKey() {
+  const openid = String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
+  if (openid) return `daoith_diagnosis_plan_count:${openid}`;
+  return `daoith_diagnosis_plan_count:${getDifyUserId()}`;
+}
+
+function getDiagnosisPlanCount() {
+  const n = parseInt(localStorage.getItem(diagnosisPlanCountStorageKey()) || '0', 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function bumpDiagnosisPlanCount() {
+  const next = Math.min(DIAG_PLAN_LIMIT, getDiagnosisPlanCount() + 1);
+  localStorage.setItem(diagnosisPlanCountStorageKey(), String(next));
+  return next;
+}
+
+function isDiagnosisPlanLimitReached() {
+  return getDiagnosisPlanCount() >= DIAG_PLAN_LIMIT;
+}
 
 function extractDiagnosisActionAdvice(markdown) {
   const t = String(markdown || '');

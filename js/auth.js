@@ -93,19 +93,25 @@
     }
   }
 
-  function requireLogin(action, returnUrl) {
+  function requireLogin(action, returnUrl, options) {
     try {
       if (isLoggedIn()) return true;
       if (action) sessionStorage.setItem(PENDING_KEY, action);
       saveFormState();
       const fallbackReturn = `${window.location.pathname}${window.location.search}${window.location.hash || '#ai-solution'}`;
       sessionStorage.setItem(RETURN_KEY, returnUrl || fallbackReturn);
-      window.alert(t('auth.loginRequired') || '请先微信登录后再使用该功能，登录后将自动继续。');
+      // 诊断开场已提示需登录；跳过 alert 以免打断后还要多点一次确认
+      const silent = Boolean(options?.silent) || action === 'ai_diagnosis_start';
+      if (!silent) {
+        window.alert(t('auth.loginRequired') || '请先微信登录后再使用该功能，登录后将自动继续。');
+      }
       startWeChatLogin();
       return false;
     } catch (err) {
       console.error('requireLogin failed', err);
-      window.alert('请先微信登录后再使用该功能');
+      if (!(options?.silent || action === 'ai_diagnosis_start')) {
+        window.alert('请先微信登录后再使用该功能');
+      }
       try { startWeChatLogin(); } catch (_) { /* ignore */ }
       return false;
     }
@@ -234,17 +240,19 @@
     if (initDone) return;
     initDone = true;
 
-    const cached = getUser();
-    if (cached && getToken()) {
-      await fetchCurrentUser().catch(() => null);
-    }
     renderAuthSlot();
-
     window.addEventListener('localechange', renderAuthSlot);
 
+    // Fire pending action immediately (e.g. resume诊断) — don't wait on profile refresh
     const pending = consumePendingAction();
     if (pending) {
       window.dispatchEvent(new CustomEvent('daoith-auth-pending', { detail: { action: pending } }));
+    }
+
+    if (getUser() && getToken()) {
+      fetchCurrentUser()
+        .catch(() => null)
+        .finally(() => renderAuthSlot());
     }
   }
 
