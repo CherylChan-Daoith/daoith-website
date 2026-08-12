@@ -1150,6 +1150,63 @@ function diagQuickReplySetForStep(step, platformLabel) {
   }
 }
 
+/** Infer step number from bot copy like「第三步」when present. */
+function inferDiagStepFromBotText(botText) {
+  const t = String(botText || '');
+  const m = t.match(/第\s*([一二三四五六七1-7])\s*步/);
+  if (!m) return 0;
+  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7 };
+  const raw = m[1];
+  if (map[raw]) return map[raw];
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 1 && n <= 7 ? n : 0;
+}
+
+/**
+ * Resolve quick-reply chip set for the current bot message.
+ * Priority: clear text match > wizard step fallback.
+ * Never let stale wizard state override mode-select / consult / yes-no.
+ */
+function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
+  const detected = detectDiagQuickReplySet(botText);
+  const inferred = inferDiagStepFromBotText(botText);
+  const step =
+    inferred >= 1 && inferred <= 6
+      ? inferred
+      : uiMode === 'diagnosis'
+        ? uiStep
+        : 0;
+  const stepKey =
+    uiMode === 'diagnosis' || inferred >= 1
+      ? diagQuickReplySetForStep(step, platformLabel)
+      : null;
+
+  // Mode / consult / yes-no from the live ask always win (welcome must not show entity chips)
+  if (detected === 'modeSelect' || detected === 'consultFollowup' || detected === 'yesNo') {
+    return detected;
+  }
+
+  // Strong slot matches from the active question
+  if (
+    detected === 'platform' ||
+    detected === 'entity' ||
+    detected === 'invoice' ||
+    detected === 'exportMode' ||
+    detected === 'revenue'
+  ) {
+    return detected;
+  }
+
+  // Shipping text match: if wizard/bot already past step 2, prefer step chips (FBA echo defense)
+  if (detected && /^shipping/.test(detected)) {
+    if (step > 2 && stepKey) return stepKey;
+    return detected;
+  }
+
+  if (!detected && stepKey) return stepKey;
+  return detected;
+}
+
 function initAiChatbot() {
   const root = document.getElementById('aiChatbot');
   const newBtn = document.getElementById('aiChatbotNew');
@@ -1290,30 +1347,12 @@ function initAiChatbot() {
       return;
     }
 
-    let setKey = detectDiagQuickReplySet(botText);
-    // Diagnosis wizard: step tracker is source of truth for chips (avoids FBA/发货 echoes
-    // in the bot reply mis-mapping later steps back to shipping options).
-    if (getUiMode() === 'diagnosis') {
-      const step = getUiStep();
-      const stepKey = diagQuickReplySetForStep(step, getUiPlatform());
-      if (step >= 1 && step <= 6 && stepKey) {
-        if (!setKey || setKey === 'modeSelect') {
-          setKey = stepKey;
-        } else if (/^shipping/.test(setKey) && stepKey !== setKey && step !== 2) {
-          setKey = stepKey;
-        } else if (
-          (setKey === 'platform' && step !== 1) ||
-          (setKey === 'entity' && step !== 3) ||
-          (setKey === 'exportMode' && step !== 4) ||
-          (setKey === 'invoice' && step !== 5) ||
-          (setKey === 'revenue' && step !== 6)
-        ) {
-          setKey = stepKey;
-        }
-      } else if (!setKey && stepKey) {
-        setKey = stepKey;
-      }
-    }
+    const setKey = resolveDiagQuickReplySet(
+      botText,
+      getUiMode(),
+      getUiStep(),
+      getUiPlatform()
+    );
     if (!setKey) {
       clearQuickReplies();
       return;
@@ -1353,6 +1392,9 @@ function initAiChatbot() {
   };
 
   const showWelcome = () => {
+    // Welcome always restarts mode choice — clear stale diagnosis step chips from prior sessions
+    resetUiWizard();
+
     const greeting =
       '您好，欢迎使用道一合规诊断助手，为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。';
     const ask =
