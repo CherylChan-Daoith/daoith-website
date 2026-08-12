@@ -878,42 +878,59 @@ function buildLocalChatReply(message, ctx) {
 }
 
 const DIAG_QUICK_REPLY_SETS = {
+  modeSelect: [
+    '开启专属合规诊断',
+    '我有特定问题想直接提问',
+  ],
   platform: [
     '亚马逊 Amazon',
     'Temu',
     'TikTok Shop',
     '速卖通',
-    'Shopify独立站',
-    'eBay',
-    '美客多',
+    'SHEIN',
     '阿里国际站',
+    'eBay',
+    'Shopify独立站',
+    '美客多',
     '其他平台',
   ],
-  shipping: [
-    '亚马逊FBA（平台仓）',
+  shippingAmazon: [
+    '亚马逊FBA',
     '自发货（国内直发）',
     '自发货（海外仓）',
+  ],
+  shippingAlibaba: [
+    '自营出口',
+    '一达通代理出口',
+    '便捷发货出口',
+    '其他',
+  ],
+  shippingShein: [
+    '供货给SHEIN',
+    '平台商家·发国内仓',
+    '平台商家·发保税仓',
+    '其他',
+  ],
+  shippingAliExpress: [
+    '全托管',
+    '半托管',
+    'POP商家',
+  ],
+  shippingTemu: [
+    '全托管·发Temu国内仓',
+    '半托管',
+    '其他模式',
+  ],
+  shipping: [
+    '平台海外仓',
     '平台国内仓',
+    '自发货（国内直发）',
+    '自发货（海外仓）',
     '其他发货方式',
   ],
   entity: [
-    '中国公司',
-    '中国个人',
+    '大陆公司',
     '香港公司',
-    '美国公司',
-    '英国公司',
-    '其他海外公司',
-  ],
-  country: [
-    '美国',
-    '英国',
-    '德国',
-    '法国',
-    '日本',
-    '加拿大',
-    '澳大利亚',
-    '东南亚',
-    '中东',
     '其他',
   ],
   invoice: [
@@ -924,12 +941,12 @@ const DIAG_QUICK_REPLY_SETS = {
     '部分专票+部分无票',
   ],
   exportMode: [
-    '0110一般贸易',
+    '0110一般贸易出口',
+    '委托货代出口',
+    '小包快递出口',
     '9610跨境电商零售出口',
-    '9710跨境电商B2B出口',
     '9810出口海外仓',
     '1039市场采购出口',
-    '委托货代出口',
     '其他',
   ],
   revenue: [
@@ -939,35 +956,12 @@ const DIAG_QUICK_REPLY_SETS = {
     '5000-10000万',
     '10000万以上',
   ],
-  category: [
-    '服装鞋包',
-    '消费电子',
-    '家居用品',
-    '美妆个护',
-    '母婴用品',
-    '汽配车饰',
-    '珠宝首饰',
-    '食品保健',
-    '其他品类',
-    '稍后提供HS编码',
-  ],
-  painPoint: [
-    '出口退税',
-    '目的国VAT/销售税',
-    '主体与架构',
-    '平台代扣代缴',
-    '发票与报关',
-    '税务稽查风险',
-    '先按现有信息出方案',
-    '其他',
-  ],
-  readyPlan: [
-    '可以，请生成方案',
-    '再补充一些信息',
-    '先看退税路径',
-    '先看VAT/销售税',
-  ],
   yesNo: ['是', '否', '不确定'],
+  consultFollowup: [
+    '需要，想预约专家1v1',
+    '先不用，我再看看方案',
+    '想了解服务报价',
+  ],
 };
 
 /** Split bot text into question sentences (handles multiple ？ in one line). */
@@ -998,8 +992,9 @@ function isMereConfirmQuestion(q) {
 function isShippingQuestionText(t) {
   const s = String(t || '');
   return (
-    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|自发货|FBA|海外仓|国内直发|平台仓|平台海外仓)/.test(s) &&
-    /(请问|哪|模式|是|还是|[？?])/.test(s)
+    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|自发货|FBA|海外仓|国内直发|平台仓|平台海外仓|全托管|半托管|POP|一达通|便捷发货|保税仓|供货给\s*SHEIN|SHEIN)/.test(
+      s
+    ) && /(请问|哪|模式|是|还是|[？?])/.test(s)
   );
 }
 
@@ -1011,7 +1006,6 @@ function extractDiagActiveQuestion(botText) {
   if (withQ.length) {
     const substantive = withQ.filter((q) => !isMereConfirmQuestion(q));
     const pool = substantive.length ? substantive : withQ;
-    // Prefer the last 1–2 substantive asks (invoice may span two ？ sentences)
     const start = Math.max(0, pool.length - 2);
     return pool.slice(start).join(' ');
   }
@@ -1023,33 +1017,80 @@ function detectDiagQuickReplySet(botText) {
   if (looksLikeFullDiagnosisPlan(full)) return null;
   const t = extractDiagActiveQuestion(full);
   if (!t) return null;
+  const zone = `${t}\n${full.slice(-500)}`;
 
-  // Shipping: prefer over platform confirmation noise in the same reply
+  // Mode selection after welcome
+  if (
+    /(开启专属合规诊断|特定问题想直接提问|专属合规诊断|直接提问)/.test(zone) &&
+    /(请选择|还是|或者|两种|模式)/.test(zone)
+  ) {
+    return 'modeSelect';
+  }
+  if (/请选择/.test(zone) && /(合规诊断|直接提问|特定问题)/.test(zone)) return 'modeSelect';
+
+  // Platform-specific step-2 questions first
+  if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(zone)) return 'shippingAmazon';
+  if (/(一达通|便捷发货|自营出口|国际站)/.test(zone) && /(出口方式|发货)/.test(zone)) {
+    return 'shippingAlibaba';
+  }
+  if (/SHEIN|希音/.test(zone) && /(供货|国内仓|保税仓|入驻)/.test(zone)) return 'shippingShein';
+  if (/(速卖通|AliExpress)/.test(zone) && /(全托管|半托管|POP)/.test(zone)) return 'shippingAliExpress';
+  if (/Temu|TEMU|拼多多/.test(zone) && /(全托管|国内仓|半托管)/.test(zone)) return 'shippingTemu';
   if (isShippingQuestionText(t) || isShippingQuestionText(full.slice(-500))) return 'shipping';
 
-  // Match the *current* ask; more specific slots before platform
-  if (/店铺主体|企业主体|注册主体|公司还是个人|主体是|什么主体|哪个主体/.test(t)) return 'entity';
-  if (/目的国|主销市场|销售国家|哪个国家|哪个市场|销往哪/.test(t)) return 'country';
+  if (/注册主体|店铺主体|大陆公司|香港公司|主体是/.test(t)) return 'entity';
   if (
     /(增值税专用发票|增值税普通发票|专用发票|普通发票|专票|普票|无法提供发票|不能提供发票|无票)/.test(t) ||
     (/(发票)/.test(t) && /(供应商|配合|提供|情况|类型|请问|能否|有无)/.test(t))
   ) {
     return 'invoice';
   }
-  if (/出口方式|贸易方式|9610|9710|9810|一般贸易|报关方式/.test(t)) return 'exportMode';
-  if (/(销售额|营收|体量|规模)/.test(t) && /(年|大概|区间|多少)/.test(t)) return 'revenue';
-  if (/(品类|产品类型|卖什么|什么产品|主要产品|海关编码|HS\s*编码|税号|什么货)/.test(t)) return 'category';
-  if (/(痛点|最关心|主要问题|想先解决|困扰|优先关心|最想解决)/.test(t)) return 'painPoint';
-  if (/(生成方案|出具方案|出方案|按现有信息|开始诊断|信息.*够|可以.*方案|是否.*方案)/.test(t)) {
-    return 'readyPlan';
+  if (
+    /出口方式|一般贸易|委托货代|小包快递|0110|9610|9810|1039|报关方式/.test(t)
+  ) {
+    return 'exportMode';
   }
-  if (/电商平台|哪个平台|什么平台|主要在哪.*平台|在哪个平台/.test(t) && !isMereConfirmQuestion(t)) {
+  if (/(销售额|营收|年销售|大概多少)/.test(t)) return 'revenue';
+  if (/(付费咨询|专家\s*1\s*v\s*1|是否需要进一步|预约专家)/.test(t)) return 'consultFollowup';
+  if (
+    /电商平台|哪个平台|什么平台|在哪个电商平台|在哪个平台上销售/.test(t) &&
+    !isMereConfirmQuestion(t)
+  ) {
     return 'platform';
   }
   if (/(是否|要不要|有没有做过|需要我|对吗|是吗)/.test(t) && /[？?]/.test(t)) return 'yesNo';
-  // Avoid dumping pain-point chips on generic confirms / soft asks
   if (isMereConfirmQuestion(t)) return 'yesNo';
   return null;
+}
+
+function shippingQuickReplySetForPlatform(platformLabel) {
+  const t = String(platformLabel || '');
+  if (/亚马逊|Amazon/i.test(t)) return 'shippingAmazon';
+  if (/国际站|阿里国际|Alibaba\.com/i.test(t)) return 'shippingAlibaba';
+  if (/SHEIN|希音/i.test(t)) return 'shippingShein';
+  if (/速卖通|AliExpress/i.test(t)) return 'shippingAliExpress';
+  if (/Temu|TEMU/i.test(t)) return 'shippingTemu';
+  return 'shipping';
+}
+
+/** Fallback chips by diagnosis wizard step when bot wording is atypical. */
+function diagQuickReplySetForStep(step, platformLabel) {
+  switch (step) {
+    case 1:
+      return 'platform';
+    case 2:
+      return shippingQuickReplySetForPlatform(platformLabel);
+    case 3:
+      return 'entity';
+    case 4:
+      return 'exportMode';
+    case 5:
+      return 'invoice';
+    case 6:
+      return 'revenue';
+    default:
+      return null;
+  }
 }
 
 function initAiChatbot() {
@@ -1064,6 +1105,9 @@ function initAiChatbot() {
   const CONV_KEY = 'daoith_diagnosis_conversation_id';
   const COUNT_KEY = 'daoith_diagnosis_ask_count';
   const BOUND_KEY = 'daoith_diagnosis_conversation_bound';
+  const MODE_KEY = 'daoith_diagnosis_ui_mode';
+  const STEP_KEY = 'daoith_diagnosis_ui_step';
+  const PLATFORM_KEY = 'daoith_diagnosis_ui_platform';
   const FREE_ASK_LIMIT = 10;
   let busy = false;
 
@@ -1089,6 +1133,46 @@ function initAiChatbot() {
     localStorage.setItem(COUNT_KEY, String(Math.max(0, n | 0)));
   };
 
+  const getUiMode = () => localStorage.getItem(MODE_KEY) || '';
+  const getUiStep = () => {
+    const n = parseInt(localStorage.getItem(STEP_KEY) || '0', 10);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  };
+  const getUiPlatform = () => localStorage.getItem(PLATFORM_KEY) || '';
+
+  const setUiWizard = (mode, step, platform) => {
+    if (mode != null) localStorage.setItem(MODE_KEY, mode);
+    if (step != null) localStorage.setItem(STEP_KEY, String(Math.max(0, step | 0)));
+    if (platform != null) localStorage.setItem(PLATFORM_KEY, platform);
+  };
+
+  const resetUiWizard = () => {
+    localStorage.setItem(MODE_KEY, '');
+    localStorage.setItem(STEP_KEY, '0');
+    localStorage.setItem(PLATFORM_KEY, '');
+  };
+
+  /** Track mode/step so diagnosis keeps clickable answer chips each turn. */
+  const trackUserWizardAnswer = (text) => {
+    const t = String(text || '').trim();
+    if (/开启专属合规诊断/.test(t)) {
+      setUiWizard('diagnosis', 1, '');
+      return;
+    }
+    if (/我有特定问题想直接提问|特定问题想直接提问/.test(t)) {
+      setUiWizard('qa', 0, '');
+      return;
+    }
+    if (/重新诊断|换个模式|我要逐步诊断/.test(t)) {
+      setUiWizard('diagnosis', 1, '');
+      return;
+    }
+    if (getUiMode() !== 'diagnosis') return;
+    const step = getUiStep();
+    if (step === 1) setUiWizard('diagnosis', 2, t);
+    else if (step >= 2 && step <= 6) setUiWizard('diagnosis', Math.min(7, step + 1), getUiPlatform());
+  };
+
   const ensureConversationId = () => {
     let id = localStorage.getItem(CONV_KEY);
     if (!id) {
@@ -1096,6 +1180,7 @@ function initAiChatbot() {
       localStorage.setItem(CONV_KEY, id);
       localStorage.setItem(BOUND_KEY, '0');
       setAskCount(0);
+      resetUiWizard();
     }
     return id;
   };
@@ -1105,6 +1190,7 @@ function initAiChatbot() {
     localStorage.setItem(CONV_KEY, id);
     localStorage.setItem(BOUND_KEY, '0');
     setAskCount(0);
+    resetUiWizard();
     return id;
   };
 
@@ -1122,13 +1208,9 @@ function initAiChatbot() {
     quickEl.hidden = true;
   };
 
-  const showQuickReplies = (botText) => {
-    if (!quickEl) return;
+  const renderQuickReplyButtons = (options) => {
+    if (!quickEl || !options?.length) return;
     clearQuickReplies();
-    const setKey = detectDiagQuickReplySet(botText);
-    if (!setKey) return;
-    const options = DIAG_QUICK_REPLY_SETS[setKey] || [];
-    if (!options.length) return;
     options.forEach((label) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -1142,6 +1224,30 @@ function initAiChatbot() {
       quickEl.appendChild(btn);
     });
     quickEl.hidden = false;
+  };
+
+  const showQuickReplies = (botText) => {
+    if (!quickEl) return;
+    if (looksLikeFullDiagnosisPlan(botText) || looksLikeDiagnosisPlanStreaming(botText)) {
+      clearQuickReplies();
+      return;
+    }
+
+    let setKey = detectDiagQuickReplySet(botText);
+    // Diagnosis wizard: always keep clickable options even if model wording drifts
+    if (!setKey && getUiMode() === 'diagnosis') {
+      setKey = diagQuickReplySetForStep(getUiStep(), getUiPlatform());
+    }
+    if (!setKey) {
+      clearQuickReplies();
+      return;
+    }
+    const options = DIAG_QUICK_REPLY_SETS[setKey] || [];
+    if (!options.length) {
+      clearQuickReplies();
+      return;
+    }
+    renderQuickReplyButtons(options);
   };
 
   ensureConversationId();
@@ -1173,7 +1279,8 @@ function initAiChatbot() {
   const showWelcome = () => {
     const greeting =
       '您好，欢迎使用道一合规诊断助手，为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。';
-    const ask = '我们先从第一个问题开始：**您主要在哪个电商平台销售？**';
+    const ask =
+      '请选择：**开启专属合规诊断**（按步骤生成诊断报告），或 **我有特定问题想直接提问**（基于知识库即时解答）。';
 
     // Plain welcome bubble — avoid markdown pipeline rewriting/dropping the intro
     const greetEl = document.createElement('div');
@@ -1182,7 +1289,7 @@ function initAiChatbot() {
     messages.appendChild(greetEl);
 
     appendBubble(ask, 'bot');
-    showQuickReplies(ask);
+    showQuickReplies('请选择：开启专属合规诊断，还是我有特定问题想直接提问？');
     messages.scrollTop = messages.scrollHeight;
   };
 
@@ -1223,6 +1330,7 @@ function initAiChatbot() {
     clearQuickReplies();
     input.value = '';
     appendBubble(text, 'user');
+    trackUserWizardAnswer(text);
     busy = true;
 
     const typing = document.createElement('div');
@@ -1384,16 +1492,17 @@ function initAiChatbot() {
 /** Detect structured full diagnosis / solution replies from the diagnosis Agent. */
 function looksLikeFullDiagnosisPlan(text) {
   const t = String(text || '');
-  if (t.length < 180) return false;
+  if (t.length < 160) return false;
   const markers = [
+    /核心风险诊断|风险诊断|合规风险/,
+    /合规方案|解决方案|行动建议/,
+    /注意事项|业务流程图|流程图/,
     /问题理解|业务画像|业务背景/,
-    /风险诊断|合规风险|税负影响|风险点/,
-    /解决方案|行动建议|落地建议|立刻可做/,
-    /业务流程图|流程图/,
-    /###?\s*1[）).、]|[一二三]、\s*问题|[一二三]、\s*风险/,
-    /###?\s*2[）).、]|###?\s*3[）).、]/
+    /【核心风险诊断】|【合规方案】|【行动建议】/,
+    /###?\s*1[）).、]|情形一|情形二|情形三/,
   ];
   if (markers.filter((re) => re.test(t)).length >= 2) return true;
+  if (t.length >= 500 && /【核心风险诊断】|【合规方案】/.test(t)) return true;
   if (t.length >= 650 && /#{1,3}\s+/.test(t) && /(风险|方案|建议)/.test(t)) return true;
   return false;
 }
@@ -1402,8 +1511,11 @@ function looksLikeFullDiagnosisPlan(text) {
 function looksLikeDiagnosisPlanStreaming(text) {
   const t = String(text || '');
   if (t.length < 80) return false;
+  if (/【核心风险诊断】|【合规方案】/.test(t)) return true;
   if (/#{1,3}\s*1[）).、]/.test(t) && /(问题理解|业务画像|风险诊断|解决方案)/.test(t)) return true;
-  if (t.length >= 220 && /#{1,3}\s+/.test(t) && /(业务画像|风险诊断|解决方案|行动建议)/.test(t)) return true;
+  if (t.length >= 220 && /#{1,3}\s+/.test(t) && /(业务画像|风险诊断|解决方案|行动建议|核心风险)/.test(t)) {
+    return true;
+  }
   return false;
 }
 
@@ -2361,11 +2473,22 @@ function renderAIPlanHtml(text) {
       closeList();
       const level = (line.match(/^#+/) || ['##'])[0].length;
       const title = line.replace(/^#{1,4}\s+/, '').replace(/\*\*/g, '');
-      flowMode = /业务流程图|流程图/.test(title);
+      flowMode = /业务流程图|流程图|核心风险诊断/.test(title);
       const cls =
         level >= 3 ? 'result-section-subtitle' : 'result-section-title';
       const flowCls = flowMode ? ' result-flow-heading' : '';
       html += `<h5 class="${cls}${flowCls}">${escapeHtml(title)}</h5>`;
+      continue;
+    }
+
+    // Diagnosis report section headers like 【核心风险诊断】
+    const bracketTitle = line.replace(/\*/g, '').match(/^【([^】]+)】\s*$/);
+    if (bracketTitle) {
+      closeList();
+      const title = `【${bracketTitle[1]}】`;
+      flowMode = /核心风险诊断|流程图/.test(title);
+      const flowCls = flowMode ? ' result-flow-heading' : '';
+      html += `<h5 class="result-section-title${flowCls}">${escapeHtml(title)}</h5>`;
       continue;
     }
 
