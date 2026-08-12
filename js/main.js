@@ -1001,12 +1001,14 @@ function isMereConfirmQuestion(q) {
 
 function isShippingQuestionText(t) {
   const s = String(t || '');
-  // Do NOT match bare platform brand names (SHEIN/Temu etc. often appear in the platform question examples)
-  return (
-    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|自发货|FBA|海外仓|国内直发|平台仓|平台海外仓|全托管|半托管|POP商家|一达通|便捷发货|保税仓|供货给\s*SHEIN)/.test(
+  // Match the ask itself — not “明白了，FBA发货” acknowledgments before the next step.
+  // Do NOT match bare brand names (SHEIN/Temu often appear in platform-question examples).
+  const asksShipping =
+    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|发货是|还是自发货|亚马逊\s*FBA|FBA还是|自发货|平台海外仓|平台国内仓|平台仓|全托管|半托管|POP商家|一达通|便捷发货|保税仓|供货给\s*SHEIN|国内直发还是|先发到海外仓)/.test(
       s
-    ) && /(请问|哪|模式|是|还是|[？?])/.test(s)
-  );
+    );
+  // Bare “FBA/海外仓” alone is too weak (echoed in confirmations).
+  return asksShipping && /(请问|哪|模式|是|还是|[？?])/.test(s);
 }
 
 function isPlatformQuestionText(t) {
@@ -1050,22 +1052,7 @@ function detectDiagQuickReplySet(botText) {
   // Platform question first — examples often list SHEIN/Temu and must not map to shipping
   if (isPlatformQuestionText(t) || isPlatformQuestionText(zone)) return 'platform';
 
-  // Platform-specific step-2 questions
-  if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(zone)) return 'shippingAmazon';
-  if (/(一达通|便捷发货|自营出口)/.test(zone) && /(国际站|阿里国际)/.test(zone)) {
-    return 'shippingAlibaba';
-  }
-  if (/SHEIN|希音/.test(zone) && /(供货|国内仓|保税仓|入驻)/.test(zone) && !isPlatformQuestionText(zone)) {
-    return 'shippingShein';
-  }
-  if (/(速卖通|AliExpress)/.test(zone) && /(全托管|半托管|POP)/.test(zone) && !isPlatformQuestionText(zone)) {
-    return 'shippingAliExpress';
-  }
-  if (/Temu|TEMU/.test(zone) && /(全托管|国内仓|半托管)/.test(zone) && !isPlatformQuestionText(zone)) {
-    return 'shippingTemu';
-  }
-  if (isShippingQuestionText(t) || isShippingQuestionText(full.slice(-500))) return 'shipping';
-
+  // Later-slot asks on the active question beat shipping (bot often echoes “FBA发货” before 第三步)
   if (/注册主体|店铺主体|大陆公司|香港公司|主体是/.test(t)) return 'entity';
   if (
     /(增值税专用发票|增值税普通发票|专用发票|普通发票|专票|普票|无法提供发票|不能提供发票|无票)/.test(t) ||
@@ -1079,6 +1066,23 @@ function detectDiagQuickReplySet(botText) {
     return 'exportMode';
   }
   if (/(销售额|营收|年销售|大概多少)/.test(t)) return 'revenue';
+
+  // Platform-specific step-2 questions — match the active ask only (not prior-step echoes)
+  if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(t)) return 'shippingAmazon';
+  if (/(一达通|便捷发货|自营出口)/.test(t) && /(国际站|阿里国际)/.test(zone)) {
+    return 'shippingAlibaba';
+  }
+  if (/SHEIN|希音/.test(t) && /(供货|国内仓|保税仓|入驻)/.test(t) && !isPlatformQuestionText(t)) {
+    return 'shippingShein';
+  }
+  if (/(速卖通|AliExpress)/.test(t) && /(全托管|半托管|POP)/.test(t) && !isPlatformQuestionText(t)) {
+    return 'shippingAliExpress';
+  }
+  if (/Temu|TEMU/.test(t) && /(全托管|国内仓|半托管)/.test(t) && !isPlatformQuestionText(t)) {
+    return 'shippingTemu';
+  }
+  if (isShippingQuestionText(t)) return 'shipping';
+
   if (/(付费咨询|专家\s*1\s*v\s*1|是否需要进一步|预约专家)/.test(t)) return 'consultFollowup';
   if (/(是否|要不要|有没有做过|需要我|对吗|是吗)/.test(t) && /[？?]/.test(t)) return 'yesNo';
   if (isMereConfirmQuestion(t)) return 'yesNo';
@@ -1287,9 +1291,28 @@ function initAiChatbot() {
     }
 
     let setKey = detectDiagQuickReplySet(botText);
-    // Diagnosis wizard: always keep clickable options even if model wording drifts
-    if (!setKey && getUiMode() === 'diagnosis') {
-      setKey = diagQuickReplySetForStep(getUiStep(), getUiPlatform());
+    // Diagnosis wizard: step tracker is source of truth for chips (avoids FBA/发货 echoes
+    // in the bot reply mis-mapping later steps back to shipping options).
+    if (getUiMode() === 'diagnosis') {
+      const step = getUiStep();
+      const stepKey = diagQuickReplySetForStep(step, getUiPlatform());
+      if (step >= 1 && step <= 6 && stepKey) {
+        if (!setKey || setKey === 'modeSelect') {
+          setKey = stepKey;
+        } else if (/^shipping/.test(setKey) && stepKey !== setKey && step !== 2) {
+          setKey = stepKey;
+        } else if (
+          (setKey === 'platform' && step !== 1) ||
+          (setKey === 'entity' && step !== 3) ||
+          (setKey === 'exportMode' && step !== 4) ||
+          (setKey === 'invoice' && step !== 5) ||
+          (setKey === 'revenue' && step !== 6)
+        ) {
+          setKey = stepKey;
+        }
+      } else if (!setKey && stepKey) {
+        setKey = stepKey;
+      }
     }
     if (!setKey) {
       clearQuickReplies();
