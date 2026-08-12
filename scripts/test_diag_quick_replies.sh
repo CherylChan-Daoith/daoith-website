@@ -29,6 +29,7 @@ const cases = [
   { name: "step3-entity-with-fba-echo", text: "明白了，FBA发货。第三步：您平台店铺的注册主体是大陆公司、香港公司还是其他？", mode: "diagnosis", step: 3, platform: "亚马逊 Amazon", expect: "entity" },
   { name: "step2-amazon-shipping", text: "第二步：您的发货方式是亚马逊FBA还是自发货？", mode: "diagnosis", step: 2, platform: "亚马逊 Amazon", expect: "shippingAmazon" },
   { name: "step1-platform-shein-example", text: "您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN）", mode: "diagnosis", step: 1, platform: "", expect: "platform" },
+  { name: "step2-alibaba-echo-platform-ack", text: "好的，已将「阿里国际站」记录为您的销售平台，直接进入下一步。\n\n第二步：请问您的发货方式是以下哪一种？\n- 自营出口\n- 一达通代理出口\n- 市场采购出口\n- 便捷发货出口", mode: "diagnosis", step: 2, platform: "阿里国际站", expect: "shippingAlibaba" },
   { name: "step2-generic-shipping", text: "好的。请问您的发货方式是以下哪一种？选项：发货到平台海外仓、发货到平台国内仓、自发货（国内直发）、自发货（海外仓发货）", mode: "diagnosis", step: 2, platform: "eBay", expect: "shipping" },
   { name: "step2-temu-by-platform", text: "请问您的发货方式是以下哪一种？", mode: "diagnosis", step: 2, platform: "Temu", expect: "shippingTemu" },
   { name: "step2-shein-by-platform", text: "请问您的发货方式是以下哪一种？", mode: "diagnosis", step: 2, platform: "SHEIN", expect: "shippingShein" },

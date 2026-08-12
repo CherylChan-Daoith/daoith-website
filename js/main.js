@@ -638,13 +638,9 @@ function sanitizeAiAnswer(text) {
 
   // 默认：丢弃思考标签内容，只用标签外正式答复。
   let outside = t;
-  const insides = [];
   for (const name of tagNames) {
     const blockRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*?)<\\s*\\/\\s*${name}\\s*>`, 'gi');
-    outside = outside.replace(blockRe, (_, inner) => {
-      if (inner && String(inner).trim()) insides.push(String(inner).trim());
-      return '\n';
-    });
+    outside = outside.replace(blockRe, '\n');
     // 未闭合的思考块：整段丢弃（不当作答复）
     const unclosedRe = new RegExp(`<\\s*${name}\\b[^>]*>([\\s\\S]*)$`, 'i');
     outside = outside.replace(unclosedRe, '\n');
@@ -659,29 +655,14 @@ function sanitizeAiAnswer(text) {
       .trim();
 
   const looksLikeCot = (s) =>
-    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考/.test(
+    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:/.test(
       s || ''
     );
 
   outside = clean(outside);
-  const inside = clean(insides.join('\n\n'));
 
-  const outsideLooksStub =
-    !outside ||
-    outside.length < 24 ||
-    (/的海关编码归类|常见归类参考|归类提示/.test(outside) && outside.length < 80);
-
-  if (!outsideLooksStub) {
-    t = outside;
-  } else if (inside && !looksLikeCot(inside)) {
-    t = inside;
-  } else if (inside) {
-    const parts = inside.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-    const last = parts[parts.length - 1] || '';
-    t = (!looksLikeCot(last) && last.length < 220 ? last : '') || outside || '';
-  } else {
-    t = outside;
-  }
+  // Never surface raw CoT / <think> insides as the user-visible answer
+  t = outside || '';
 
   // Drop leading CoT if it ends with a short final refusal / conclusion
   if (
@@ -701,21 +682,36 @@ function sanitizeAiAnswer(text) {
 
   t = clean(t);
 
-  // Strip visible “思考过程” sections some models print without XML tags
+  // Strip visible “思考过程” / agent planning sections (with or without XML tags)
   t = t
     .replace(/```(?:thinking|thought|reason|reasoning)[\s\S]*?```/gi, '\n')
     .replace(/(?:^|\n)#{0,3}\s*思考过程[:：]?[\s\S]*?(?=\n#{1,3}\s|\n\*\*|【|$)/g, '\n')
     .replace(/(?:^|\n)思考过程[:：][\s\S]*?(?=\n{2,}|$)/g, '\n')
+    .replace(/(?:^|\n)(?:Thought|Action|Observation)\s*[:：][^\n]*/gi, '\n')
+    .replace(
+      /(?:^|\n)(?:我先|让我|首先|接下来|现在)?(?:需要|正在|开始)?(?:检索|思考|分析|调用|查阅).{0,80}(?:知识库|工具|资料)[^\n]*/g,
+      '\n'
+    )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
-  // Last resort: never show a blank bubble if the model did return something
+  // If the whole bubble is still CoT-like, drop it rather than show planning text
+  if (
+    t &&
+    looksLikeCot(t) &&
+    !/(好的|请问|第[一二三四五六七1-7]步|【核心风险|【合规方案|您在哪个|发货方式)/.test(t)
+  ) {
+    t = '';
+  }
+
+  // Last resort: never show a blank bubble if the model did return something usable outside tags
   if (!t && raw.trim()) {
-    t = clean(
+    const stripped = clean(
       raw
         .replace(new RegExp(`<\\s*${think}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${think}\\s*>`, 'gi'), '\n')
         .replace(new RegExp(`<\\s*\\/?\\s*${think}\\b[^>]*>`, 'gi'), '')
     );
+    t = looksLikeCot(stripped) ? '' : stripped;
   }
 
   // Opening welcome belongs in the first bubble only — strip if the model repeats it mid-chat
@@ -1025,7 +1021,17 @@ function isShippingQuestionText(t) {
 
 function isPlatformQuestionText(t) {
   const s = String(t || '');
-  if (/(销售平台|电商平台|哪个平台|什么平台|在哪个电商平台|在哪个平台上销售|了解销售平台)/.test(s)) {
+  // Later-step asks / acknowledgments mentioning「销售平台」must not map to platform chips
+  if (/(发货方式|第二步|注册主体|第三步|年销售额|供应商.*发票)/.test(s)) return false;
+  if (/(记录为|已将|已记录).{0,24}(销售平台|电商平台)/.test(s) && !/(哪个|什么)平台/.test(s)) {
+    return false;
+  }
+  if (/(哪个平台|什么平台|在哪个电商平台|在哪个平台上销售|哪个电商平台)/.test(s)) return true;
+  if (
+    /(销售平台|电商平台)/.test(s) &&
+    /(请问|哪|什么|选择|[？?])/.test(s) &&
+    !/(记录为|已将|已记录)/.test(s)
+  ) {
     return true;
   }
   return false;
@@ -1061,8 +1067,8 @@ function detectDiagQuickReplySet(botText) {
   }
   if (/请选择/.test(zone) && /(合规诊断|直接提问|特定问题)/.test(zone)) return 'modeSelect';
 
-  // Platform question first — examples often list SHEIN/Temu and must not map to shipping
-  if (isPlatformQuestionText(t) || isPlatformQuestionText(zone)) return 'platform';
+  // Platform question — only when actively asking; do not use zone (often echoes prior platform)
+  if (isPlatformQuestionText(t)) return 'platform';
 
   // Later-slot asks on the active question beat shipping (bot often echoes “FBA发货” before 第三步)
   if (/注册主体|店铺主体|大陆公司|香港公司|主体是/.test(t)) return 'entity';
@@ -1072,8 +1078,12 @@ function detectDiagQuickReplySet(botText) {
   ) {
     return 'invoice';
   }
+  // Step-4 出口方式 — avoid matching step-2 Alibaba options that end with「…出口」
   if (
-    /出口方式|一般贸易|委托货代|小包快递|0110|9610|9810|1039|报关方式/.test(t)
+    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|一般贸易|委托货代|小包快递|0110|9610|9810|1039|报关方式)/.test(
+      t
+    ) &&
+    !/(发货方式|一达通|便捷发货出口|自营出口)/.test(t)
   ) {
     return 'exportMode';
   }
@@ -1081,9 +1091,10 @@ function detectDiagQuickReplySet(botText) {
 
   // Platform-specific step-2 questions — match the active ask only (not prior-step echoes)
   if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(t)) return 'shippingAmazon';
+  // 阿里国际站：选项清单即可识别（不必再要求正文出现「国际站」）
   if (
     (/(一达通|便捷发货|自营出口|市场采购出口)/.test(t) && /(国际站|阿里国际)/.test(zone)) ||
-    (/(一达通|便捷发货|自营出口|市场采购出口)/.test(t) && /(国际站|阿里国际)/.test(t))
+    (/(自营出口)/.test(t) && /(一达通)/.test(t) && /(市场采购|便捷发货)/.test(t))
   ) {
     return 'shippingAlibaba';
   }
@@ -1212,7 +1223,19 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
     return detected;
   }
 
-  // Strong slot matches from the active question
+  // If wizard/bot step is known, never let prior-slot keyword echoes override the step chips
+  const slotStep = {
+    platform: 1,
+    entity: 3,
+    exportMode: 4,
+    invoice: 5,
+    revenue: 6,
+  };
+  if (detected && slotStep[detected] && step >= 1 && step <= 6 && stepKey) {
+    if (slotStep[detected] !== step) return stepKey;
+  }
+
+  // Strong slot matches from the active question (aligned with current step)
   if (
     detected === 'platform' ||
     detected === 'entity' ||
@@ -2109,7 +2132,12 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       event === 'agent_log' ||
       event === 'message_file' ||
       event === 'tts_message' ||
-      event === 'tts_message_end'
+      event === 'tts_message_end' ||
+      event === 'node_started' ||
+      event === 'node_finished' ||
+      event === 'parallel_branch_started' ||
+      event === 'parallel_branch_finished' ||
+      /thought|tool|retriev|log/i.test(event)
     ) {
       return;
     }
@@ -2125,6 +2153,8 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
         (typeof data.text === 'string' && data.text) ||
         (typeof data.data?.text === 'string' && data.data.text) ||
         '';
+      // Skip pure thought payloads some Agent builds put in answer
+      if (delta && typeof data.thought === 'string' && data.thought === delta) return;
       if (delta) {
         answer += delta;
         emit(false);
