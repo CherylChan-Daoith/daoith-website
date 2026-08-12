@@ -39,6 +39,15 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
       if (action === 'tax-calc') {
         document.getElementById('calcTax')?.click();
+      } else if (action === 'ai_diagnosis_start') {
+        // Resume专属合规诊断 after WeChat login
+        document.getElementById('ai-solution')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+        const form = document.getElementById('aiChatbotForm');
+        const input = document.getElementById('aiChatbotInput');
+        if (input && form) {
+          input.value = '开启专属合规诊断';
+          form.requestSubmit();
+        }
       } else if (action === 'ai_chat') {
         document.getElementById('aiChatbotInput')?.focus();
       } else if (action === 'ai_plan') {
@@ -907,36 +916,39 @@ const DIAG_QUICK_REPLY_SETS = {
   shippingAmazon: [
     '亚马逊FBA',
     '自发货（国内直发）',
-    '自发货（海外仓）',
+    '自发货（海外仓发货）',
   ],
   shippingAlibaba: [
     '自营出口',
     '一达通代理出口',
+    '市场采购出口',
     '便捷发货出口',
-    '其他',
   ],
   shippingShein: [
-    '供货给SHEIN',
-    '平台商家·发国内仓',
-    '平台商家·发保税仓',
-    '其他',
+    '供货 SHEIN（国内仓）',
+    '供货 SHEIN（保税仓）',
+    'SHEIN平台入驻商家（国内直发）',
+    'SHEIN平台入驻商家（海外仓发货）',
   ],
   shippingAliExpress: [
-    '全托管',
-    '半托管',
-    'POP商家',
+    '全托管（国内仓）',
+    '半托管（国内仓）',
+    '半托管（海外仓）',
+    'POP（国内直发）',
+    'POP（海外仓发货）',
   ],
   shippingTemu: [
-    '全托管·发Temu国内仓',
-    '半托管',
-    '其他模式',
+    '全托管（国内仓）',
+    '半托管（国内仓）',
+    '半托管（海外仓）',
+    'POP（国内直发）',
+    'POP（海外仓发货）',
   ],
   shipping: [
-    '平台海外仓',
-    '平台国内仓',
+    '发货到平台海外仓',
+    '发货到平台国内仓',
     '自发货（国内直发）',
-    '自发货（海外仓）',
-    '其他发货方式',
+    '自发货（海外仓发货）',
   ],
   entity: [
     '大陆公司',
@@ -1004,7 +1016,7 @@ function isShippingQuestionText(t) {
   // Match the ask itself — not “明白了，FBA发货” acknowledgments before the next step.
   // Do NOT match bare brand names (SHEIN/Temu often appear in platform-question examples).
   const asksShipping =
-    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|发货是|还是自发货|亚马逊\s*FBA|FBA还是|自发货|平台海外仓|平台国内仓|平台仓|全托管|半托管|POP商家|一达通|便捷发货|保税仓|供货给\s*SHEIN|国内直发还是|先发到海外仓)/.test(
+    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|发货是|还是自发货|亚马逊\s*FBA|FBA还是|自发货|发货到平台海外仓|发货到平台国内仓|平台海外仓|平台国内仓|平台仓|全托管|半托管|POP商家|POP（|一达通|便捷发货|市场采购出口|保税仓|供货\s*SHEIN|供货给\s*SHEIN|国内直发还是|先发到海外仓|海外仓发货)/.test(
       s
     );
   // Bare “FBA/海外仓” alone is too weak (echoed in confirmations).
@@ -1069,16 +1081,30 @@ function detectDiagQuickReplySet(botText) {
 
   // Platform-specific step-2 questions — match the active ask only (not prior-step echoes)
   if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(t)) return 'shippingAmazon';
-  if (/(一达通|便捷发货|自营出口)/.test(t) && /(国际站|阿里国际)/.test(zone)) {
+  if (
+    (/(一达通|便捷发货|自营出口|市场采购出口)/.test(t) && /(国际站|阿里国际)/.test(zone)) ||
+    (/(一达通|便捷发货|自营出口|市场采购出口)/.test(t) && /(国际站|阿里国际)/.test(t))
+  ) {
     return 'shippingAlibaba';
   }
-  if (/SHEIN|希音/.test(t) && /(供货|国内仓|保税仓|入驻)/.test(t) && !isPlatformQuestionText(t)) {
+  if (
+    (/SHEIN|希音/.test(t) && /(供货|国内仓|保税仓|入驻)/.test(t) && !isPlatformQuestionText(t)) ||
+    /供货\s*SHEIN|SHEIN平台入驻/.test(t)
+  ) {
     return 'shippingShein';
   }
-  if (/(速卖通|AliExpress)/.test(t) && /(全托管|半托管|POP)/.test(t) && !isPlatformQuestionText(t)) {
+  if (
+    (/(速卖通|AliExpress)/.test(t) && /(全托管|半托管|POP)/.test(t) && !isPlatformQuestionText(t)) ||
+    (/(全托管（国内仓）|半托管（国内仓）|半托管（海外仓）|POP（国内直发）|POP（海外仓发货）)/.test(t) &&
+      /(速卖通|AliExpress)/.test(zone))
+  ) {
     return 'shippingAliExpress';
   }
-  if (/Temu|TEMU/.test(t) && /(全托管|国内仓|半托管)/.test(t) && !isPlatformQuestionText(t)) {
+  if (
+    (/Temu|TEMU/.test(t) && /(全托管|国内仓|半托管|POP)/.test(t) && !isPlatformQuestionText(t)) ||
+    (/Temu|TEMU/.test(zone) &&
+      /(全托管（国内仓）|半托管（国内仓）|半托管（海外仓）|POP（国内直发）|POP（海外仓发货）)/.test(t))
+  ) {
     return 'shippingTemu';
   }
   if (isShippingQuestionText(t)) return 'shipping';
@@ -1197,9 +1223,10 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
     return detected;
   }
 
-  // Shipping text match: if wizard/bot already past step 2, prefer step chips (FBA echo defense)
+  // Shipping text match: past step 2 → step chips (FBA echo); at step 2 → platform-specific chips
   if (detected && /^shipping/.test(detected)) {
     if (step > 2 && stepKey) return stepKey;
+    if (step === 2 && stepKey && /^shipping/.test(stepKey)) return stepKey;
     return detected;
   }
 
@@ -1398,7 +1425,7 @@ function initAiChatbot() {
     const greeting =
       '您好，欢迎使用道一合规诊断助手，为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。';
     const ask =
-      '请选择：**开启专属合规诊断**（按步骤生成诊断报告），或 **我有特定问题想直接提问**（基于知识库即时解答）。';
+      '请选择：**开启专属合规诊断**（需微信登录，按步骤生成诊断报告），或 **我有特定问题想直接提问**（基于知识库即时解答）。';
 
     // Plain welcome bubble — avoid markdown pipeline rewriting/dropping the intro
     const greetEl = document.createElement('div');
@@ -1432,16 +1459,23 @@ function initAiChatbot() {
     if (!text || busy) return;
 
     const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+    const returnToAi = `${window.location.pathname}${window.location.search}#ai-solution`;
+    const wantsExclusiveDiagnosis =
+      /开启专属合规诊断/.test(text) || /重新诊断|换个模式|我要逐步诊断/.test(text);
+
+    // 专属合规诊断：选模式时即要求微信登录（不要等到出方案才拦）
+    if (wantsExclusiveDiagnosis && !loggedIn) {
+      window.DAOITH_AUTH?.requireLogin?.('ai_diagnosis_start', returnToAi);
+      return;
+    }
+
     const askCount = getAskCount();
     if (!loggedIn && askCount >= FREE_ASK_LIMIT) {
       appendBubble(
         '免费体验已达 10 次。请微信登录后继续咨询，登录后可保留当前会话记忆。',
         'bot'
       );
-      window.DAOITH_AUTH?.requireLogin?.(
-        'ai_chat',
-        `${window.location.pathname}${window.location.search}#ai-solution`
-      );
+      window.DAOITH_AUTH?.requireLogin?.('ai_chat', returnToAi);
       return;
     }
 
@@ -2788,7 +2822,7 @@ const teamSizeNames = {
 };
 
 const shippingModes = {
-  self_overseas: '自发货（海外仓）',
+  self_overseas: '自发货（海外仓发货）',
   self_domestic: '自发货（国内直发）',
   platform_domestic: '平台国内仓',
   platform_overseas: '平台海外仓（如FBA）',
