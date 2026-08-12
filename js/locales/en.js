@@ -247,7 +247,7 @@ window.DAOITH_I18N_EN = {
     },
     '#heroFeatures .feature-card[data-step="2"] h4': { text: 'Tax Burden Calculator' },
     '#heroFeatures .feature-card[data-step="2"] p': {
-      text: 'Automated domestic tax estimation covering domestic VAT, export rebate, and corporate income tax.',
+      text: 'Automated domestic tax estimation covering corporate income tax and VAT / export rebate.',
     },
     '#heroFeatures .feature-card[data-step="3"] h4': { text: 'Online Ordering' },
     '#heroFeatures .feature-card[data-step="3"] p': {
@@ -318,8 +318,16 @@ window.DAOITH_I18N_EN = {
     '.faq-panel h3': { text: 'FAQ' },
     '.tax-calc h3': { text: 'Compliance Tax Calculator' },
     '.tax-calc > p': {
-      text: 'Estimate domestic sales VAT, export rebate gap, and corporate income tax from your sales and cost ratios.',
+      text: 'Estimate domestic corporate income tax and VAT / export rebate from your sales and cost ratios.',
     },
+    '.tax-form-grid .form-group:has(#taxRevenue) label': {
+      html: true,
+      text: 'Annual export sales <span class="label-sub">(CNY 10k)</span>',
+    },
+    '.tax-form-grid .form-group:has(#taxRefund) label': { text: 'Export rebate rate (%)' },
+    '.tax-form-grid .form-group:has(#taxRefundEligible) label': { text: 'Eligible for export rebate / exemption?' },
+    '#taxRefundEligible option[value="yes"]': { text: 'Yes' },
+    '#taxRefundEligible option[value="no"]': { text: 'No' },
     '.tax-form-grid .form-group:has(#taxEntity) label': { text: 'Store entity' },
     '#taxEntityCountryGroup label': { text: 'Store entity country/region' },
     '.tax-form-grid .form-group:has(#taxIncome) label': { text: 'Applicable income tax rate (%)' },
@@ -332,24 +340,7 @@ window.DAOITH_I18N_EN = {
     '.tax-form-grid .form-group:has(#taxStaffRate) label': { text: 'Staff cost ratio (%)' },
     '.tax-form-grid .form-group:has(#taxOtherRate) label': { text: 'Other expense ratio (%)' },
     '.tax-form-note': {
-      text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue. Corporate income tax uses domestic + export sales combined.',
-    },
-    '.tax-subblock:has(#taxDomesticRevenue) h4': { text: 'Domestic sales VAT' },
-    '.tax-form-grid .form-group:has(#taxDomesticRevenue) label': {
-      html: true,
-      text: 'Annual domestic sales <span class="label-sub">(CNY 10k)</span>',
-    },
-    '.tax-subblock:has(#taxDomesticRevenue) .tax-subblock-note': {
-      text: 'Formula: domestic VAT ≈ domestic sales × (1 − product cost ratio) × 13%',
-    },
-    '.tax-subblock:has(#taxRevenue) h4': { text: 'Export rebate calculation' },
-    '.tax-form-grid .form-group:has(#taxRevenue) label': {
-      html: true,
-      text: 'Annual export sales <span class="label-sub">(CNY 10k)</span>',
-    },
-    '.tax-form-grid .form-group:has(#taxRefund) label': { text: 'Export rebate rate (%)' },
-    '.tax-subblock:has(#taxRevenue) .tax-subblock-note': {
-      text: 'Formula: export levy–rebate gap ≈ export sales × product cost ratio × max(0, 13% − rebate rate)',
+      text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue. If eligible for rebate/exemption, export rebate is used; otherwise domestic VAT is used.',
     },
     '#calcTax': { text: 'Calculate tax burden' },
     '.tax-result-label': { text: 'Estimated annual compliance tax' },

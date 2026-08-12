@@ -63,7 +63,7 @@
   function saveFormState() {
     const ids = [
       'platform', 'entity', 'country', 'hsCode', 'revenue', 'teamSize', 'invoice', 'shipping', 'notes',
-      'taxRevenue', 'taxDomesticRevenue', 'taxRefund', 'taxEntity', 'taxEntityCountry', 'taxIncome',
+      'taxRevenue', 'taxRefund', 'taxRefundEligible', 'taxEntity', 'taxEntityCountry', 'taxIncome',
       'taxProductCostRate', 'taxMarketingRate', 'taxShippingRate', 'taxStaffRate', 'taxOtherRate',
     ];
     const state = {};

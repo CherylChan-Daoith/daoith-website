@@ -4019,9 +4019,9 @@ function initTaxCalculator() {
   calcBtn.addEventListener('click', async () => {
     if (!ensureWeChatLogin('tax-calc')) return;
 
-    const domesticRevenue = parseFloat(document.getElementById('taxDomesticRevenue')?.value) || 0;
-    const exportRevenue = parseFloat(document.getElementById('taxRevenue').value) || 0;
+    const revenue = parseFloat(document.getElementById('taxRevenue').value) || 0;
     const refundRate = parseFloat(document.getElementById('taxRefund').value) || 0;
+    const refundEligible = (document.getElementById('taxRefundEligible')?.value || 'yes') === 'yes';
     const productCostRate = parseFloat(document.getElementById('taxProductCostRate').value) || 0;
     const marketingRate = parseFloat(document.getElementById('taxMarketingRate').value) || 0;
     const shippingRate = parseFloat(document.getElementById('taxShippingRate').value) || 0;
@@ -4029,7 +4029,6 @@ function initTaxCalculator() {
     const otherRate = parseFloat(document.getElementById('taxOtherRate').value) || 0;
     const incomeRate = parseFloat(document.getElementById('taxIncome').value) || 0;
     const vatLevyRate = 13; // 国内货物增值税征税率（简化）
-    const totalRevenue = domesticRevenue + exportRevenue;
 
     resultEl.textContent = window.DAOITH_t('tax.calcLoading');
     setButtonLoading(calcBtn, true, window.DAOITH_t('tax.calcLoading'));
@@ -4042,41 +4041,43 @@ function initTaxCalculator() {
         note.className = 'tax-result-note';
         resultEl.parentElement.appendChild(note);
       }
-      // 内销增值税 ≈ 内销销售额 × (1 − 产品成本率) × 13%
-      const domesticVat = domesticRevenue * (1 - productCostRate / 100) * (vatLevyRate / 100);
-      // 出口征退差税负 ≈ 出口销售额 × 产品成本率 × max(0, 13% − 退税率)
-      const vatGap = Math.max(0, (vatLevyRate - refundRate) / 100);
-      const exportVatGap = exportRevenue * (productCostRate / 100) * vatGap;
       const profitRate = 1
         - (productCostRate / 100)
         - (marketingRate / 100)
         - (shippingRate / 100)
         - (staffRate / 100)
         - (otherRate / 100);
-      const incomeTax = Math.max(0, totalRevenue * profitRate * (incomeRate / 100));
-      const total = domesticVat + exportVatGap + incomeTax;
+      const incomeTax = Math.max(0, revenue * profitRate * (incomeRate / 100));
+      // 满足退免税：出口退税 = 销售额 × 产品成本率 × 出口退税率
+      // 不满足：按内销增值税 = 销售额 × (1 − 产品成本率) × 13%
+      const exportRebate = revenue * (productCostRate / 100) * (refundRate / 100);
+      const domesticVat = revenue * (1 - productCostRate / 100) * (vatLevyRate / 100);
+      const vatOrRebate = refundEligible ? exportRebate : domesticVat;
+      const total = refundEligible ? incomeTax - exportRebate : incomeTax + domesticVat;
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const copy = locale === 'en'
         ? {
             income: '1) Corporate income tax',
-            incomeFormula: '(Domestic + export sales) × (1 − product − marketing − shipping − staff − other) × CIT rate',
-            domesticVat: '2) Domestic sales VAT',
-            domesticVatFormula: 'Domestic sales × (1 − product cost ratio) × 13%',
-            exportVat: '3) Export levy–rebate gap',
-            exportVatFormula: 'Export sales × product cost ratio × max(0, 13% − rebate rate)',
-            total: 'Total domestic tax burden',
+            incomeFormula: 'Sales × (1 − product − marketing − shipping − staff − other) × CIT rate',
+            vatYes: '2) Export rebate',
+            vatYesFormula: 'Export sales × product cost ratio × export rebate rate',
+            vatNo: '2) Domestic sales VAT',
+            vatNoFormula: 'Sales × (1 − product cost ratio) × 13%',
+            total: 'Net domestic tax burden',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
         : {
             income: '1）企业所得税',
-            incomeFormula: '(内销 + 出口)销售额 × (1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率) × 适用所得税税率',
-            domesticVat: '2）内销增值税',
-            domesticVatFormula: '内销销售额 × (1 − 产品成本率) × 13%',
-            exportVat: '3）出口征退差税负',
-            exportVatFormula: '出口销售额 × 产品成本率 × max(0, 13% − 出口退税率)',
-            total: '国内税负合计',
+            incomeFormula: '销售额 × (1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率) × 适用所得税税率',
+            vatYes: '2）出口退税',
+            vatYesFormula: '出口销售额 × 产品成本率 × 出口退税率',
+            vatNo: '2）内销增值税',
+            vatNoFormula: '销售额 × (1 − 产品成本率) × 13%',
+            total: '国内税负合计（净额）',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
+      const vatLabel = refundEligible ? copy.vatYes : copy.vatNo;
+      const vatFormula = refundEligible ? copy.vatYesFormula : copy.vatNoFormula;
 
       resultEl.textContent = formatWan(total);
       note.innerHTML = `
@@ -4086,12 +4087,8 @@ function initTaxCalculator() {
             <div class="tax-breakdown-formula">${copy.incomeFormula}</div>
           </div>
           <div class="tax-breakdown-section">
-            <div><strong>${copy.domesticVat}</strong>：${formatWan(domesticVat)}</div>
-            <div class="tax-breakdown-formula">${copy.domesticVatFormula}</div>
-          </div>
-          <div class="tax-breakdown-section">
-            <div><strong>${copy.exportVat}</strong>：${formatWan(exportVatGap)}</div>
-            <div class="tax-breakdown-formula">${copy.exportVatFormula}</div>
+            <div><strong>${vatLabel}</strong>：${formatWan(vatOrRebate)}</div>
+            <div class="tax-breakdown-formula">${vatFormula}</div>
           </div>
           <div class="tax-breakdown-summary">
             <strong>${copy.total}：${formatWan(total)}</strong>

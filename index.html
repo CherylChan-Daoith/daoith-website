@@ -127,7 +127,7 @@
         <div class="feature-card is-hidden" data-step="2">
           <div class="feature-label">Capability 02</div>
           <h4>合规税负计算</h4>
-          <p>自动化计算国内合规税负，分项测算内销增值税、出口退税与企业所得税</p>
+          <p>自动化计算国内合规税负，测算企业所得税与增值税/出口退税</p>
         </div>
         <div class="feature-card is-hidden" data-step="3">
           <div class="feature-label">Capability 03</div>
@@ -218,8 +218,28 @@
       <!-- Tax Calculator -->
       <div class="tax-calc">
         <h3>自动化计算合规税负</h3>
-        <p>基于业务参数，分项测算内销增值税、出口退税与企业所得税。您也可以手动调整参数重新计算。</p>
+        <p>基于业务参数，自动测算国内企业所得税与增值税/出口退税。您也可以手动调整参数重新计算。</p>
         <div class="tax-form-grid">
+          <div class="form-group">
+            <label>年出口销售额<span class="label-sub">（万元人民币）</span></label>
+            <input type="number" id="taxRevenue" value="1000" min="0">
+          </div>
+          <div class="form-group">
+            <label>出口退税率（%）</label>
+            <select id="taxRefund">
+              <option value="13" selected>13%</option>
+              <option value="9">9%</option>
+              <option value="6">6%</option>
+              <option value="0">0%</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>是否满足退免税条件</label>
+            <select id="taxRefundEligible">
+              <option value="yes" selected>是</option>
+              <option value="no">否</option>
+            </select>
+          </div>
           <div class="form-group">
             <label>店铺主体</label>
             <select id="taxEntity">
@@ -273,39 +293,7 @@
             <input type="number" id="taxOtherRate" value="2" min="0" max="100" step="0.1">
           </div>
         </div>
-        <p class="tax-form-note">以上费率指一年的成本费用占销售收入的比例；企业所得税按内销+出口合计销售额测算。</p>
-
-        <div class="tax-subblock">
-          <h4>内销增值税</h4>
-          <div class="tax-form-grid">
-            <div class="form-group">
-              <label>年内销销售额<span class="label-sub">（万元人民币）</span></label>
-              <input type="number" id="taxDomesticRevenue" value="200" min="0">
-            </div>
-          </div>
-          <p class="tax-subblock-note">测算口径：内销增值税 ≈ 内销销售额 × (1 − 产品成本率) × 13%</p>
-        </div>
-
-        <div class="tax-subblock">
-          <h4>出口退税计算</h4>
-          <div class="tax-form-grid">
-            <div class="form-group">
-              <label>年出口销售额<span class="label-sub">（万元人民币）</span></label>
-              <input type="number" id="taxRevenue" value="1000" min="0">
-            </div>
-            <div class="form-group">
-              <label>出口退税率（%）</label>
-              <select id="taxRefund">
-                <option value="13" selected>13%</option>
-                <option value="9">9%</option>
-                <option value="6">6%</option>
-                <option value="0">0%</option>
-              </select>
-            </div>
-          </div>
-          <p class="tax-subblock-note">测算口径：出口征退差税负 ≈ 出口销售额 × 产品成本率 × max(0, 13% − 出口退税率)</p>
-        </div>
-
+        <p class="tax-form-note">以上费率指一年的成本费用占销售收入的比例。满足退免税条件时按出口退税测算；不满足时按内销增值税测算。</p>
         <button class="btn btn-primary" id="calcTax">计算合规税负</button>
         <div class="tax-result">
           <div class="tax-result-label">年度合规税负预估</div>
