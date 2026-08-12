@@ -702,7 +702,7 @@ function sanitizeAiAnswer(text) {
   // Opening welcome belongs in the first bubble only — strip if the model repeats it mid-chat
   t = t
     .replace(
-      /您好[，,]?\s*欢迎使用道一合规诊断助手！?\s*我们为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
+      /您好[，,]?\s*欢迎使用道一合规诊断助手[！!]?\s*(?:我们)?为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
       ''
     )
     .replace(
@@ -719,7 +719,7 @@ function sanitizeAiAnswer(text) {
 function stripDiagnosisIntroBoilerplate(text) {
   return String(text || '')
     .replace(
-      /您好[，,]?\s*欢迎使用道一合规诊断助手！?\s*我们为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
+      /您好[，,]?\s*欢迎使用道一合规诊断助手[！!]?\s*(?:我们)?为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
       ''
     )
     .replace(
@@ -1171,13 +1171,19 @@ function initAiChatbot() {
   };
 
   const showWelcome = () => {
-    const welcome = [
-      '您好，欢迎使用道一合规诊断助手！我们为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。',
-      '',
-      '我们先从第一个问题开始：**您主要在哪个电商平台销售？**',
-    ].join('\n');
-    appendBubble(welcome, 'bot');
-    showQuickReplies(welcome);
+    const greeting =
+      '您好，欢迎使用道一合规诊断助手，为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。';
+    const ask = '我们先从第一个问题开始：**您主要在哪个电商平台销售？**';
+
+    // Plain welcome bubble — avoid markdown pipeline rewriting/dropping the intro
+    const greetEl = document.createElement('div');
+    greetEl.className = 'ai-chatbot-bubble is-bot is-welcome';
+    greetEl.textContent = greeting;
+    messages.appendChild(greetEl);
+
+    appendBubble(ask, 'bot');
+    showQuickReplies(ask);
+    messages.scrollTop = messages.scrollHeight;
   };
 
   const startNewConversation = () => {

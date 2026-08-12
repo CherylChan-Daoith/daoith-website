@@ -909,14 +909,14 @@ ul {
   color: var(--text-muted);
 }
 
-.diag-chat .ai-chatbot-bubble.is-plan-status {
+.diag-chat .ai-chatbot-bubble.is-welcome {
   max-width: 100%;
   background: #eef2ff;
   border: 1px solid #c7d2fe;
   color: #1e3a5f;
   font-size: 0.8rem;
-  font-weight: 550;
-  line-height: 1.45;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .diag-services-grid {
