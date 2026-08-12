@@ -1523,15 +1523,18 @@ function initAiChatbot() {
   };
 
   const scrollDiagChatToBottom = () => {
+    // Only scroll the messages pane — never scrollIntoView (that jumps the whole page to top).
     const run = () => {
       try {
+        const pageX = window.scrollX;
+        const pageY = window.scrollY;
         messages.scrollTop = messages.scrollHeight;
-        const last = messages.lastElementChild;
-        last?.scrollIntoView?.({ block: 'end', behavior: 'auto' });
-        if (quickEl && !quickEl.hidden) {
-          quickEl.scrollIntoView?.({ block: 'nearest', behavior: 'auto' });
+        if (quickEl && !quickEl.hidden && quickEl.scrollHeight > quickEl.clientHeight) {
+          quickEl.scrollTop = 0;
         }
-        messages.scrollTop = messages.scrollHeight;
+        if (window.scrollX !== pageX || window.scrollY !== pageY) {
+          window.scrollTo(pageX, pageY);
+        }
       } catch {
         /* ignore */
       }
@@ -1541,6 +1544,8 @@ function initAiChatbot() {
       run();
       requestAnimationFrame(run);
     });
+    // Chips / rich HTML can settle after paint
+    setTimeout(run, 50);
   };
 
   const ensureConversationId = () => {
@@ -2243,7 +2248,7 @@ function publishDiagnosisPlanToResultPanel(markdown) {
   }
 
   try {
-    content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Keep page position; only reset the right-hand plan panel scroll
     items.scrollTop = 0;
   } catch {
     /* ignore */

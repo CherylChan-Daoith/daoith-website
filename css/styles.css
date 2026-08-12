@@ -777,6 +777,8 @@ ul {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
   max-height: none;
   padding: 10px 12px;
   gap: 8px;
