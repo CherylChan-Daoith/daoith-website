@@ -63,9 +63,8 @@
   function saveFormState() {
     const ids = [
       'platform', 'entity', 'country', 'hsCode', 'revenue', 'teamSize', 'invoice', 'shipping', 'notes',
-      'taxRevenue', 'taxRefund', 'taxEntity', 'taxEntityCountry', 'taxIncome',
+      'taxRevenue', 'taxDomesticRevenue', 'taxRefund', 'taxEntity', 'taxEntityCountry', 'taxIncome',
       'taxProductCostRate', 'taxMarketingRate', 'taxShippingRate', 'taxStaffRate', 'taxOtherRate',
-      'taxIitRate',
     ];
     const state = {};
     ids.forEach((id) => {

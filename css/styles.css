@@ -2018,6 +2018,32 @@ ul {
   margin-bottom: 12px;
 }
 
+.tax-subblock {
+  margin: 16px 0 12px;
+  padding: 14px 14px 10px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}
+
+.tax-subblock h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+.tax-subblock .tax-form-grid {
+  margin-bottom: 8px;
+}
+
+.tax-subblock-note {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
 .tax-calc .form-group {
   margin-bottom: 0;
 }
