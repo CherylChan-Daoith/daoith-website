@@ -38,6 +38,9 @@ const cases = [
   { name: "step5-invoice", text: "第五步：您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？", mode: "diagnosis", step: 5, platform: "亚马逊 Amazon", expect: "invoice" },
   { name: "step6-revenue", text: "第六步：您目前年销售额大概多少？", mode: "diagnosis", step: 6, platform: "亚马逊 Amazon", expect: "revenue" },
   { name: "step2-entity-atypical-fallback", text: "好的，那请问主体方面您怎么安排呢？", mode: "diagnosis", step: 2, platform: "亚马逊 Amazon", expect: "entity" },
+  { name: "qa-mode-no-export-chips", text: "Temu商家能否使用9610出口?\n有条件可以，关键取决于您的Temu经营模式：\n- 可以走 9610 的情况：POP模式（国内直发）", mode: "qa", step: 0, platform: "", expect: null },
+  { name: "empty-mode-no-export-chips", text: "有条件可以走9610出口，正式报关或小包快递均可评估。", mode: "", step: 0, platform: "", expect: null },
+  { name: "diagnosis-step7-no-chips", text: "【核心风险诊断】\n【合规方案】走9610", mode: "diagnosis", step: 7, platform: "Temu", expect: null },
 ];
 let failed = 0;
 for (const c of cases) {

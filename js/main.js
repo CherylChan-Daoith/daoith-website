@@ -1381,27 +1381,31 @@ function inferDiagStepFromBotText(botText) {
 
 /**
  * Resolve quick-reply chip set for the current bot message.
- * Priority: clear text match > wizard step fallback.
- * Never let stale wizard state override mode-select / consult / yes-no.
+ * Wizard chips (平台/主体/发货/出口/发票/销售额) ONLY in Mode A steps 1–6.
+ * Mode-select chips only for the welcome choice. Never show wizard chips in 特定问题直答.
  */
 function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
   const detected = detectDiagQuickReplySet(botText);
+
+  // Welcome / mode choice — allowed outside the 6-step wizard
+  if (detected === 'modeSelect') return 'modeSelect';
+
+  // Hard gate: no diagnosis option chips unless exclusive diagnosis is collecting answers
+  if (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 6) {
+    return null;
+  }
+
+  // Do not show yes/no or consult chips during the 6-step collection
+  if (detected === 'consultFollowup' || detected === 'yesNo') {
+    return null;
+  }
+
   const inferred = inferDiagStepFromBotText(botText);
   const step =
     inferred >= 1 && inferred <= 6
       ? inferred
-      : uiMode === 'diagnosis'
-        ? uiStep
-        : 0;
-  const stepKey =
-    uiMode === 'diagnosis' || inferred >= 1
-      ? diagQuickReplySetForStep(step, platformLabel)
-      : null;
-
-  // Mode / consult / yes-no from the live ask always win (welcome must not show entity chips)
-  if (detected === 'modeSelect' || detected === 'consultFollowup' || detected === 'yesNo') {
-    return detected;
-  }
+      : uiStep;
+  const stepKey = diagQuickReplySetForStep(step, platformLabel);
 
   // If wizard/bot step is known, never let prior-slot keyword echoes override the step chips
   // Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6销售额
@@ -1639,16 +1643,27 @@ function initAiChatbot() {
       return;
     }
 
-    const setKey = resolveDiagQuickReplySet(
-      botText,
-      getUiMode(),
-      getUiStep(),
-      getUiPlatform()
-    );
+    const uiMode = getUiMode();
+    const uiStep = getUiStep();
+    const setKey = resolveDiagQuickReplySet(botText, uiMode, uiStep, getUiPlatform());
     if (!setKey) {
       clearQuickReplies();
       return;
     }
+
+    // Double gate: wizard option chips only while Mode A is collecting steps 1–6
+    const isWizardChip =
+      setKey === 'platform' ||
+      setKey === 'entity' ||
+      setKey === 'exportMode' ||
+      setKey === 'invoice' ||
+      setKey === 'revenue' ||
+      /^shipping/.test(setKey);
+    if (isWizardChip && (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 6)) {
+      clearQuickReplies();
+      return;
+    }
+
     const options = DIAG_QUICK_REPLY_SETS[setKey] || [];
     if (!options.length) {
       clearQuickReplies();
