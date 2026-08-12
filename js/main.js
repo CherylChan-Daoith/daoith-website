@@ -1001,11 +1001,20 @@ function isMereConfirmQuestion(q) {
 
 function isShippingQuestionText(t) {
   const s = String(t || '');
+  // Do NOT match bare platform brand names (SHEIN/Temu etc. often appear in the platform question examples)
   return (
-    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|自发货|FBA|海外仓|国内直发|平台仓|平台海外仓|全托管|半托管|POP|一达通|便捷发货|保税仓|供货给\s*SHEIN|SHEIN)/.test(
+    /(发货方式|发货模式|仓储模式|履约模式|怎么发货|如何发货|自发货|FBA|海外仓|国内直发|平台仓|平台海外仓|全托管|半托管|POP商家|一达通|便捷发货|保税仓|供货给\s*SHEIN)/.test(
       s
     ) && /(请问|哪|模式|是|还是|[？?])/.test(s)
   );
+}
+
+function isPlatformQuestionText(t) {
+  const s = String(t || '');
+  if (/(销售平台|电商平台|哪个平台|什么平台|在哪个电商平台|在哪个平台上销售|了解销售平台)/.test(s)) {
+    return true;
+  }
+  return false;
 }
 
 /** Active ask text for quick-reply matching (avoid earlier-slot recap keywords). */
@@ -1038,14 +1047,23 @@ function detectDiagQuickReplySet(botText) {
   }
   if (/请选择/.test(zone) && /(合规诊断|直接提问|特定问题)/.test(zone)) return 'modeSelect';
 
-  // Platform-specific step-2 questions first
+  // Platform question first — examples often list SHEIN/Temu and must not map to shipping
+  if (isPlatformQuestionText(t) || isPlatformQuestionText(zone)) return 'platform';
+
+  // Platform-specific step-2 questions
   if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(zone)) return 'shippingAmazon';
-  if (/(一达通|便捷发货|自营出口|国际站)/.test(zone) && /(出口方式|发货)/.test(zone)) {
+  if (/(一达通|便捷发货|自营出口)/.test(zone) && /(国际站|阿里国际)/.test(zone)) {
     return 'shippingAlibaba';
   }
-  if (/SHEIN|希音/.test(zone) && /(供货|国内仓|保税仓|入驻)/.test(zone)) return 'shippingShein';
-  if (/(速卖通|AliExpress)/.test(zone) && /(全托管|半托管|POP)/.test(zone)) return 'shippingAliExpress';
-  if (/Temu|TEMU|拼多多/.test(zone) && /(全托管|国内仓|半托管)/.test(zone)) return 'shippingTemu';
+  if (/SHEIN|希音/.test(zone) && /(供货|国内仓|保税仓|入驻)/.test(zone) && !isPlatformQuestionText(zone)) {
+    return 'shippingShein';
+  }
+  if (/(速卖通|AliExpress)/.test(zone) && /(全托管|半托管|POP)/.test(zone) && !isPlatformQuestionText(zone)) {
+    return 'shippingAliExpress';
+  }
+  if (/Temu|TEMU/.test(zone) && /(全托管|国内仓|半托管)/.test(zone) && !isPlatformQuestionText(zone)) {
+    return 'shippingTemu';
+  }
   if (isShippingQuestionText(t) || isShippingQuestionText(full.slice(-500))) return 'shipping';
 
   if (/注册主体|店铺主体|大陆公司|香港公司|主体是/.test(t)) return 'entity';
@@ -1062,12 +1080,6 @@ function detectDiagQuickReplySet(botText) {
   }
   if (/(销售额|营收|年销售|大概多少)/.test(t)) return 'revenue';
   if (/(付费咨询|专家\s*1\s*v\s*1|是否需要进一步|预约专家)/.test(t)) return 'consultFollowup';
-  if (
-    /电商平台|哪个平台|什么平台|在哪个电商平台|在哪个平台上销售/.test(t) &&
-    !isMereConfirmQuestion(t)
-  ) {
-    return 'platform';
-  }
   if (/(是否|要不要|有没有做过|需要我|对吗|是吗)/.test(t) && /[？?]/.test(t)) return 'yesNo';
   if (isMereConfirmQuestion(t)) return 'yesNo';
   return null;
