@@ -1510,13 +1510,52 @@ ul {
 }
 
 .result-list li {
-  list-style: disc !important;
+  list-style: inherit !important;
   display: list-item;
   font-size: 0.75rem;
   color: var(--text-secondary);
   line-height: 1.65;
   margin-bottom: 6px;
   padding-left: 2px;
+}
+
+/* 二级 ● — section 下第一层 */
+.result-list-l2 {
+  list-style-type: disc !important;
+}
+
+/* 三级 ○ */
+.result-list-l3,
+.result-list .result-list {
+  list-style-type: circle !important;
+  margin: 4px 0 8px 0.85rem;
+  padding-left: 0.25rem;
+}
+
+/* 四级 ■ */
+.result-list-l4,
+.result-list .result-list .result-list {
+  list-style-type: square !important;
+  margin: 3px 0 6px 0.75rem;
+}
+
+/* 五级 ─ */
+.result-list-l5,
+.result-list .result-list .result-list .result-list {
+  list-style-type: '–  ' !important;
+  margin: 2px 0 4px 0.65rem;
+}
+
+@supports not (list-style-type: '–  ') {
+  .result-list-l5,
+  .result-list .result-list .result-list .result-list {
+    list-style-type: disc !important;
+  }
+}
+
+.result-list > li > .result-list {
+  margin-top: 4px;
+  margin-bottom: 8px;
 }
 
 .result-em {
@@ -1587,6 +1626,11 @@ ul {
 
 .result-list-ordered > li > .result-list {
   margin: 4px 0 10px 0.15rem;
+  list-style-type: circle !important;
+}
+
+.result-list-ordered > li > .result-list .result-list {
+  list-style-type: square !important;
 }
 
 /* Business flow chart under 业务流程图 */

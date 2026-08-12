@@ -3052,6 +3052,61 @@ function formatPlanListItem(content) {
   return formatRiskOrBulletContent(content);
 }
 
+/** Parse leading indent + list marker. depth 0–3 → display levels 2–5 under section titles. */
+function parsePlanListMarker(rawLine) {
+  const m = String(rawLine || '').match(/^([ \t]*)([-*•]|\d+[.)、．])\s+(.*)$/);
+  if (!m) return null;
+  const spaces = m[1].replace(/\t/g, '  ').length;
+  const depth = Math.min(3, Math.floor(spaces / 2));
+  return {
+    depth,
+    ordered: /^\d+[.)、．]$/.test(m[2]),
+    content: m[3],
+  };
+}
+
+/** Bold-only titles (e.g. **前期备案**) act as parents for following flat detail bullets. */
+function isBoldNestParentBullet(content) {
+  return /^\*\*[^*]{1,40}\*\*\s*[:：]?\s*$/.test(String(content || '').trim());
+}
+
+/**
+ * If the model emits a flat list of bold step titles + detail bullets,
+ * indent details under each bold title so the renderer can nest 二/三/四级.
+ * Preserve existing markdown indentation when already nested.
+ */
+function nestPlanBulletHierarchy(text) {
+  const lines = String(text || '').split('\n');
+  const alreadyNested = lines.some((ln) => /^[ \t]{2,}[-*•]\s+/.test(ln));
+  if (alreadyNested) return text;
+
+  const out = [];
+  let underParent = false;
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      out.push(raw);
+      continue;
+    }
+    const bm = trimmed.match(/^[-*•]\s+(.*)$/);
+    if (!bm) {
+      underParent = false;
+      out.push(raw);
+      continue;
+    }
+    const content = String(bm[1] || '').trim();
+    if (isBoldNestParentBullet(content)) {
+      underParent = true;
+      out.push(`- ${content}`);
+    } else if (underParent) {
+      out.push(`  - ${content}`);
+    } else {
+      out.push(`- ${content}`);
+    }
+  }
+  return out.join('\n');
+}
+
 /** `- **留存全流程资料**：……` should continue as peer action #6, not a nested card. */
 function looksLikePeerActionItem(content) {
   const kv = matchBoldKvContent(content);
@@ -3354,13 +3409,18 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const lines = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text)).split('\n');
+  const lines = nestPlanBulletHierarchy(
+    convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+  ).split('\n');
   let html = '';
   let listMode = null; // 'flow' | 'ol' | 'ul' | null
   let nestedUl = false;
   let liOpen = false;
   let flowMode = false;
   let sectionKind = 'default'; // 'flow' | 'risk' | 'plan' | 'default'
+  /** Open nested <ul> depths under the current top-level ul (1 = first nest / 三级). */
+  let ulNestDepth = 0;
+  let ulLiOpenAt = []; // bool per nest depth whether <li> is open
 
   const closeNestedUl = () => {
     if (nestedUl) {
@@ -3369,12 +3429,25 @@ function renderAIPlanHtml(text) {
     }
   };
 
+  const closeUlNestsTo = (targetDepth) => {
+    while (ulNestDepth > targetDepth) {
+      if (ulLiOpenAt[ulNestDepth]) {
+        html += '</li>';
+        ulLiOpenAt[ulNestDepth] = false;
+      }
+      html += '</ul>';
+      ulNestDepth -= 1;
+    }
+  };
+
   const closeLi = () => {
+    closeUlNestsTo(0);
     closeNestedUl();
     if (liOpen) {
       html += '</li>';
       liOpen = false;
     }
+    ulLiOpenAt = [];
   };
 
   const closeList = () => {
@@ -3386,6 +3459,8 @@ function renderAIPlanHtml(text) {
       html += '</ul>';
     }
     listMode = null;
+    ulNestDepth = 0;
+    ulLiOpenAt = [];
   };
 
   const openList = (mode) => {
@@ -3397,9 +3472,50 @@ function renderAIPlanHtml(text) {
     } else if (mode === 'ol') {
       html += `<ol class="result-list result-list-ordered">`;
     } else {
-      html += `<ul class="result-list">`;
+      html += `<ul class="result-list result-list-l2">`;
     }
     listMode = mode;
+  };
+
+  /** Emit a ul item at indent depth (0=二级, 1=三级, 2=四级, 3=五级). */
+  const appendUlItem = (depth, contentHtml, asKv = false) => {
+    const d = Math.max(0, Math.min(3, depth));
+    if (listMode !== 'ul') openList('ul');
+
+    if (d === 0) {
+      closeUlNestsTo(0);
+      if (liOpen) {
+        html += '</li>';
+        liOpen = false;
+      }
+      if (asKv) {
+        html += `<li class="result-kv">${contentHtml}</li>`;
+        liOpen = false;
+      } else {
+        html += `<li>${contentHtml}`;
+        liOpen = true;
+      }
+      return;
+    }
+
+    // Nested levels need an open parent <li>
+    if (!liOpen) {
+      html += `<li>`;
+      liOpen = true;
+    }
+    closeUlNestsTo(d - 1);
+    while (ulNestDepth < d) {
+      const next = ulNestDepth + 1;
+      const levelClass = next === 1 ? 'result-list-l3' : next === 2 ? 'result-list-l4' : 'result-list-l5';
+      html += `<ul class="result-list ${levelClass}">`;
+      ulNestDepth = next;
+      ulLiOpenAt[ulNestDepth] = false;
+    }
+    if (ulLiOpenAt[d]) {
+      html += '</li>';
+    }
+    html += `<li>${contentHtml}`;
+    ulLiOpenAt[d] = true;
   };
 
   const isFlowchartTitle = (title) =>
@@ -3444,8 +3560,26 @@ function renderAIPlanHtml(text) {
       html += `<h5 class="result-section-subtitle">主要风险：</h5>`;
       const rest = line.replace(/\*/g, '').replace(/^主要风险[:：]\s*/, '').trim();
       if (rest) {
-        html += `<ul class="result-list"><li>${formatRiskOrBulletContent(rest)}</li></ul>`;
+        html += `<ul class="result-list result-list-l2"><li>${formatRiskOrBulletContent(rest)}</li></ul>`;
       }
+      continue;
+    }
+
+    // Chinese chapter headings: 一、基本流程
+    if (
+      /^[一二三四五六七八九十]+[、.．]\s*\S/.test(line.replace(/\*/g, '')) &&
+      line.replace(/\*/g, '').length <= 36 &&
+      !/^[-*•]/.test(line) &&
+      !/^\d+[.)、．]/.test(line)
+    ) {
+      closeList();
+      const title = cleanSectionTitle(line);
+      flowMode = isFlowchartTitle(title);
+      if (flowMode) sectionKind = 'flow';
+      else if (/风险/.test(title)) sectionKind = 'risk';
+      else if (/行动建议/.test(title)) sectionKind = 'actions';
+      else if (/合规方案|注意事项|流程|资料/.test(title)) sectionKind = 'plan';
+      html += `<h5 class="result-section-subtitle${flowMode ? ' result-flow-heading' : ''}">${escapeHtml(title)}</h5>`;
       continue;
     }
 
@@ -3480,11 +3614,13 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    const orderedMatch = line.match(/^\d+[.)、．]\s*(.*)$/);
-    const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
+    const listInfo = parsePlanListMarker(rawLine);
+    const orderedMatch = listInfo?.ordered ? [null, listInfo.content] : line.match(/^\d+[.)、．]\s*(.*)$/);
+    const bulletMatch = listInfo && !listInfo.ordered ? [null, listInfo.content] : (!listInfo ? line.match(/^[-*•]\s+(.*)$/) : null);
     if (orderedMatch || bulletMatch) {
       let content = (orderedMatch ? orderedMatch[1] : bulletMatch[1]) || '';
       content = stripLeadingListIndex(content);
+      const depth = listInfo ? listInfo.depth : 0;
       const looksLikeFlowStep =
         (flowMode || sectionKind === 'flow') &&
         content.length <= 36 &&
@@ -3504,6 +3640,7 @@ function renderAIPlanHtml(text) {
       // Under 行动建议 / numbered plan: promote `- **标题**：说明` to next numbered peer
       if (
         bulletMatch &&
+        depth === 0 &&
         listMode === 'ol' &&
         liOpen &&
         looksLikePeerActionItem(content) &&
@@ -3519,7 +3656,7 @@ function renderAIPlanHtml(text) {
       // Nested detail bullets under a numbered item (no kv cards)
       if (bulletMatch && listMode === 'ol' && liOpen) {
         if (!nestedUl) {
-          html += `<ul class="result-list">`;
+          html += `<ul class="result-list result-list-l3">`;
           nestedUl = true;
         }
         html += `<li>${formatPlanListItem(content)}</li>`;
@@ -3528,6 +3665,7 @@ function renderAIPlanHtml(text) {
 
       // Risks → plain bullets; 合规方案/行动建议 → continuous ol (1…6)
       const useOrdered =
+        depth === 0 &&
         content.length <= 220 &&
         ((Boolean(orderedMatch) && (sectionKind === 'plan' || sectionKind === 'actions')) ||
           (sectionKind === 'actions' && looksLikePeerActionItem(content)));
@@ -3539,19 +3677,18 @@ function renderAIPlanHtml(text) {
         liOpen = true;
       } else {
         if (listMode === 'ol' || listMode === 'flow') closeList();
-        openList('ul');
         const kv = matchBoldKvContent(content);
         // kv cards only for 合规方案对照（非定制/定制等）
-        if (kv && sectionKind === 'plan') {
-          html +=
-            `<li class="result-kv">` +
+        if (kv && sectionKind === 'plan' && depth === 0) {
+          appendUlItem(
+            0,
             `<span class="result-kv-key">${escapeHtml(kv[1])}</span>` +
-            `<span class="result-kv-val">${formatInline(kv[2])}</span>` +
-            `</li>`;
+              `<span class="result-kv-val">${formatInline(kv[2])}</span>`,
+            true
+          );
         } else {
-          html += `<li>${formatPlanListItem(content)}</li>`;
+          appendUlItem(depth, formatPlanListItem(content), false);
         }
-        liOpen = false;
       }
       continue;
     }
