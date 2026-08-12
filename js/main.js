@@ -1162,6 +1162,48 @@ function localDiagnosisPlatformAsk() {
   );
 }
 
+function localDiagnosisShippingAsk(platformLabel) {
+  const platform = String(platformLabel || '').trim() || '该平台';
+  const setKey = shippingQuickReplySetForPlatform(platform);
+  const opts = DIAG_QUICK_REPLY_SETS[setKey] || DIAG_QUICK_REPLY_SETS.shipping;
+  const lines = opts.map((o) => `- ${o}`).join('\n');
+  return (
+    `好的，已将「${platform}」记录为您的销售平台。\n\n` +
+    `第二步：请问您的发货方式是以下哪一种？\n${lines}`
+  );
+}
+
+function looksLikeModeSelectReply(text) {
+  const t = String(text || '');
+  return (
+    /(开启专属合规诊断|特定问题想直接提问)/.test(t) &&
+    /(请选择|还是|无法判断|仅凭)/.test(t)
+  );
+}
+
+/** Enrich diagnosis-step user replies so Dify never restarts mode selection. */
+function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
+  const normalized = normalizeDiagnosisModeQuery(text);
+  if (normalized !== String(text || '').trim()) return normalized;
+  if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
+  const platform = String(platformLabel || '').trim();
+  const stepHints = {
+    2: '请执行第二步：只询问发货方式，并按该平台给出对应选项。',
+    3: '请执行第三步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
+    4: '请执行第四步：只询问目前出口方式。',
+    5: '请执行第五步：只询问供应商发票情况。',
+    6: '请执行第六步：只询问年销售额。',
+    7: '第1-6步已齐，请检索知识库并输出诊断报告，不要再提问。',
+  };
+  const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
+  return (
+    `【专属合规诊断进行中·模式A】用户本轮答复：${String(text || '').trim()}。` +
+    (platform ? `已确认销售平台：${platform}。` : '') +
+    `${hint}` +
+    '禁止重新询问模式选择，禁止输出欢迎语，禁止说“仅凭…无法判断需求”。'
+  );
+}
+
 function looksLikeRejectedDiagnosisStart(text) {
   const t = String(text || '');
   return /不是.*自动命令|不是一个自动命令|具体想了解什么|告诉我具体|需要您告诉我具体/.test(t);
@@ -1478,7 +1520,7 @@ function initAiChatbot() {
   // Embedded panel: show welcome immediately
   if (!messages.childElementCount) showWelcome();
 
-  /** Background Dify warm-up after instant local step-1 (login resume). */
+  /** Background Dify warm-up / step sync after instant local wizard UI. */
   let diagnosisWarmPromise = null;
 
   const sendMessage = async (text) => {
@@ -1525,6 +1567,9 @@ function initAiChatbot() {
     if (isModeSelect || wantsExclusiveDiagnosis) {
       resetConversation();
     }
+
+    const prevMode = getUiMode();
+    const prevStep = getUiStep();
     trackUserWizardAnswer(text);
 
     // Fast path: show step-1 locally immediately (don't block on Dify after login)
@@ -1556,6 +1601,38 @@ function initAiChatbot() {
       return;
     }
 
+    // Fast path: after platform answer, show step-2 shipping locally (avoid Dify mode-select restart)
+    if (prevMode === 'diagnosis' && prevStep === 1 && getUiStep() === 2) {
+      const platform = getUiPlatform() || String(text || '').trim();
+      const localAsk = localDiagnosisShippingAsk(platform);
+      appendBubble(localAsk, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 2, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step2 sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
     busy = true;
 
     const typing = document.createElement('div');
@@ -1565,13 +1642,15 @@ function initAiChatbot() {
     messages.scrollTop = messages.scrollHeight;
 
     const ctx = window.__daoithLastPlanCtx || null;
-    const sessionId = ensureConversationId();
-    const apiQuery = normalizeDiagnosisModeQuery(text);
     try {
       if (diagnosisWarmPromise) {
         await diagnosisWarmPromise;
         diagnosisWarmPromise = null;
       }
+
+      // Re-read after warm — do not use a stale id from before warm finished
+      const sessionId = ensureConversationId();
+      const apiQuery = buildDiagnosisApiQuery(text, getUiMode(), getUiStep(), getUiPlatform());
 
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
@@ -1691,6 +1770,12 @@ function initAiChatbot() {
         (looksLikeRejectedDiagnosisStart(answer) || !/电商平台|哪个平台|什么平台|在哪个平台/.test(answer))
       ) {
         answer = localDiagnosisPlatformAsk();
+      }
+
+      // If Agent restarts mode-select mid-diagnosis, keep wizard on track locally
+      if (getUiMode() === 'diagnosis' && getUiStep() >= 2 && looksLikeModeSelectReply(answer)) {
+        if (getUiStep() === 2) answer = localDiagnosisShippingAsk(getUiPlatform());
+        else answer = `好的，已记录。请继续回答第${getUiStep()}步相关问题。`;
       }
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
