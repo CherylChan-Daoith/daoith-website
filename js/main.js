@@ -2895,12 +2895,74 @@ function escapeHtml(text) {
 function formatInline(text) {
   let s = escapeHtml(String(text || ''));
   s = s.replace(/\*\*(.+?)\*\*/g, '<strong class="result-em">$1</strong>');
+  // Drop leftover markdown asterisks (avoid showing raw **)
+  s = s.replace(/\*{1,2}/g, '');
   // Highlight common customs / regime codes
   s = s.replace(
     /\b(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)\b/g,
     '<span class="result-code">$1</span>'
   );
   return s;
+}
+
+/** Clean diagnosis/plan markdown for display (no URLs, no 情形 labels, no bullet+number mix). */
+function sanitizeDiagnosisPlanText(text) {
+  let t = String(text || '');
+
+  // Strip agent-only「情形X」labels from section titles
+  t = t.replace(
+    /(\*{0,2}【[^】]+】\*{0,2})\s*[（(]\s*情形[一二三四五六七八九十\d]+[：:][^）)]*[）)]/g,
+    '$1'
+  );
+  t = t.replace(
+    /(\*{0,2}(?:合规方案|核心风险诊断|行动建议|注意事项)\*{0,2})\s*[（(]\s*情形[一二三四五六七八九十\d]+[：:][^）)]*[）)]/g,
+    '$1'
+  );
+
+  // Export-rebate links → point to left-side HS query box
+  t = t.replace(
+    /可至\s*\[[^\]]*(?:出口退税|退税率)[^\]]*\]\([^)]+\)\s*核实/gi,
+    '可在本页左侧「查询出口退税率」核实'
+  );
+  t = t.replace(
+    /\[[^\]]*(?:出口退税|退税率|退税查询)[^\]]*\]\([^)]+\)/gi,
+    '本页左侧「查询出口退税率」'
+  );
+  // Other markdown links: keep label, drop URL
+  t = t.replace(/\[([^\]]+)\]\(\s*https?:\/\/[^)]+\)/gi, '$1');
+  // Bare URLs / domains in parentheses
+  t = t.replace(/https?:\/\/[^\s)\]>（）<>"']+/gi, '');
+  t = t.replace(/[（(]\s*(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}(?:\/[^\s)）]*)?\s*[）)]/gi, '');
+  // Tidy phrases left after URL removal
+  t = t.replace(/可至\s*核实/g, '可核实');
+  t = t.replace(/可至\s{2,}核实/g, '可核实');
+  t = t.replace(/详见\s*[。．]?/g, '');
+  t = t.replace(/[ \t]{2,}/g, ' ');
+  // Drop lines that became empty after URL cleanup
+  t = t
+    .split('\n')
+    .map((ln) => ln.replace(/\s+$/g, ''))
+    .filter((ln) => !/^[-*•]\s*$/.test(ln))
+    .join('\n');
+
+  // Bullet + number mix: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only)
+  t = t.replace(/^(\s*[-*•]\s+)\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/gm, '$1');
+  t = t.replace(/^(\s*[-*•]\s+)\*\*\d+\*\*\s*[.、)）]?\s*/gm, '$1');
+  t = t.replace(/^(\s*[-*•]\s+)\d+\s*[.、)）]\s+/gm, '$1');
+  // Ordered list with redundant bold number already in marker: "1. **1** 内容"
+  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/gm, '$1');
+  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\d+\*\*\s*[.、)）]?\s*/gm, '$1');
+
+  return t;
+}
+
+/** Strip leading list index from item text (avoid ● + 1 / **1**). */
+function stripLeadingListIndex(content) {
+  return String(content || '')
+    .replace(/^\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/, '')
+    .replace(/^\*\*\d+\*\*\s*[.、)）]?\s*/, '')
+    .replace(/^\d+\s*[.、)）]\s+/, '')
+    .trim();
 }
 
 /** Turn markdown pipe-tables into bullet lines (tables break layout in the plan panel). */
@@ -3122,7 +3184,7 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const lines = convertMarkdownTablesToBullets(String(text || '')).split('\n');
+  const lines = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text)).split('\n');
   let html = '';
   let inList = false;
   let listTag = 'ul';
@@ -3148,6 +3210,13 @@ function renderAIPlanHtml(text) {
     inList = true;
   };
 
+  const cleanSectionTitle = (title) =>
+    String(title || '')
+      .replace(/\*\*/g, '')
+      .replace(/[（(]\s*情形[一二三四五六七八九十\d]+[：:][^）)]*[）)]/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) {
@@ -3168,7 +3237,7 @@ function renderAIPlanHtml(text) {
     if (/^#{1,4}\s+/.test(line)) {
       closeList();
       const level = (line.match(/^#+/) || ['##'])[0].length;
-      const title = line.replace(/^#{1,4}\s+/, '').replace(/\*\*/g, '');
+      const title = cleanSectionTitle(line.replace(/^#{1,4}\s+/, ''));
       flowMode = /业务流程图|流程图|核心风险诊断/.test(title);
       const cls =
         level >= 3 ? 'result-section-subtitle' : 'result-section-title';
@@ -3177,8 +3246,9 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    // Diagnosis report section headers like 【核心风险诊断】
-    const bracketTitle = line.replace(/\*/g, '').match(/^【([^】]+)】\s*$/);
+    // Diagnosis report section headers like 【核心风险诊断】 / 【合规方案】（情形二：…）
+    const cleanedBracketLine = cleanSectionTitle(line.replace(/\*/g, ''));
+    const bracketTitle = cleanedBracketLine.match(/^【([^】]+)】\s*$/);
     if (bracketTitle) {
       closeList();
       const title = `【${bracketTitle[1]}】`;
@@ -3192,7 +3262,9 @@ function renderAIPlanHtml(text) {
     const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
     if (orderedMatch || bulletMatch) {
       const ordered = Boolean(orderedMatch);
-      const content = ordered ? orderedMatch[1] : bulletMatch[1];
+      let content = ordered ? orderedMatch[1] : bulletMatch[1];
+      // Drop duplicate index in body text (badge/CSS already shows order; bullets use ● only)
+      content = stripLeadingListIndex(content);
       if (!inList || (flowMode && listClass !== 'result-flow') || (!flowMode && ((ordered && listTag !== 'ol') || (!ordered && listTag !== 'ul')))) {
         closeList();
         openList(ordered);
