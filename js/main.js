@@ -968,9 +968,11 @@ const DIAG_QUICK_REPLY_SETS = {
     '部分专票+部分无票',
   ],
   exportMode: [
-    '0110一般贸易出口',
+    '正式报关出口（0110/9710/9810）',
+    '小包快递出口（9610/1210）',
+    '小包快递出口（未报关）',
+    '市场采购出口（1039）',
     '委托货代出口',
-    '小包快递出口',
     '由平台安排出口',
     '其他',
   ],
@@ -1087,7 +1089,7 @@ function detectDiagQuickReplySet(botText) {
   }
   // Step-4 出口方式 — avoid matching step-2 Alibaba options that end with「…出口」
   if (
-    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|一般贸易|委托货代|小包快递|0110|9610|9810|1039|报关方式|由平台安排出口)/.test(
+    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|正式报关|一般贸易|委托货代|小包快递|市场采购|未报关|0110|9610|9710|9810|1039|1210|报关方式|由平台安排出口)/.test(
       t
     ) &&
     !/(发货方式|一达通|便捷发货出口|自营出口)/.test(t)
@@ -1127,7 +1129,13 @@ function detectDiagQuickReplySet(botText) {
   }
   if (isShippingQuestionText(t)) return 'shipping';
 
-  if (/(付费咨询|专家\s*1\s*v\s*1|是否需要进一步|预约专家)/.test(t)) return 'consultFollowup';
+  // Only offer consult chips when the bot actually asks a yes/no consult question
+  if (
+    /(是否需要|要不要|需不需要|是否想要)[^\n]*?(?:付费咨询|预约专家|专家\s*1\s*[vV]\s*1|深度咨询)/.test(t) &&
+    /[？?]/.test(t)
+  ) {
+    return 'consultFollowup';
+  }
   if (/(是否|要不要|有没有做过|需要我|对吗|是吗)/.test(t) && /[？?]/.test(t)) return 'yesNo';
   if (isMereConfirmQuestion(t)) return 'yesNo';
   return null;
@@ -1264,7 +1272,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   const stepHints = {
     2: '请执行第二步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
     3: '请执行第三步：只询问发货方式，并按该平台给出对应选项。',
-    4: '请执行第四步：只询问目前出口方式（0110一般贸易/委托货代/小包快递/由平台安排出口/其他）。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
+    4: '请执行第四步：只询问目前出口方式（正式报关出口（0110/9710/9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他）。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
     6: '请执行第六步：只询问年销售额。',
     7: '第1-6步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
@@ -2897,12 +2905,54 @@ function formatInline(text) {
   s = s.replace(/\*\*(.+?)\*\*/g, '<strong class="result-em">$1</strong>');
   // Drop leftover markdown asterisks (avoid showing raw **)
   s = s.replace(/\*{1,2}/g, '');
+  // Auto-emphasize common high-risk tax phrases
+  const emphasis = ['视同内销征税', '视同内销', '三流不一致', '金税四期', '无法申请出口退税', '无法出口退税'];
+  for (const phrase of emphasis) {
+    const esc = escapeHtml(phrase);
+    if (!esc || s.includes(`>${esc}<`)) continue;
+    s = s.split(esc).join(`<strong class="result-em">${esc}</strong>`);
+  }
   // Highlight common customs / regime codes
   s = s.replace(
     /\b(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)\b/g,
     '<span class="result-code">$1</span>'
   );
   return s;
+}
+
+/** Bold a short lead title before 。/： when the rest is a longer explanation. */
+function formatRiskOrBulletContent(content) {
+  const raw = String(content || '').trim();
+  const lead = raw.match(/^(.{4,36}?)([。：:])([\s\S]{20,})$/);
+  if (lead && !/^\*\*/.test(raw) && !lead[1].includes('→')) {
+    return (
+      `<strong class="result-em">${escapeHtml(lead[1])}</strong>` +
+      escapeHtml(lead[2]) +
+      formatInline(lead[3])
+    );
+  }
+  return formatInline(raw);
+}
+
+function matchBoldKvContent(content) {
+  return String(content || '').match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
+}
+
+/** Same hierarchy text as numbered actions — never the blue key-value card. */
+function formatPlanListItem(content) {
+  const kv = matchBoldKvContent(content);
+  if (kv) {
+    return `<strong class="result-em">${escapeHtml(kv[1])}</strong>：${formatInline(kv[2])}`;
+  }
+  return formatRiskOrBulletContent(content);
+}
+
+/** `- **留存全流程资料**：……` should continue as peer action #6, not a nested card. */
+function looksLikePeerActionItem(content) {
+  const kv = matchBoldKvContent(content);
+  if (kv && kv[1].length <= 28 && String(kv[2] || '').trim().length >= 6) return true;
+  const plain = String(content || '').match(/^([^：:＊*]{2,28})[:：]\s*(.{6,})$/);
+  return Boolean(plain);
 }
 
 /** Clean diagnosis/plan markdown for display (no URLs, no 情形 labels, no bullet+number mix). */
@@ -2953,15 +3003,30 @@ function sanitizeDiagnosisPlanText(text) {
   t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/gm, '$1');
   t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\d+\*\*\s*[.、)）]?\s*/gm, '$1');
 
+  // Replace closing consult questions with a fixed tip (no 问句)
+  const expertTip = '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。';
+  t = t.replace(
+    /(?:是否需要|要不要|需不需要)[^\n？?]*?(?:预约|付费)?[^\n？?]*(?:专家|1\s*[vV]\s*1|深度咨询|付费咨询)[^\n]*[？?]/g,
+    expertTip
+  );
+  t = t.replace(
+    /如需进一步[^\n]*?(?:专家|1\s*[vV]\s*1|咨询)[^\n]*[。．]?/g,
+    expertTip
+  );
+  // Ensure tip appears once at end of a full diagnosis report
+  if (/【行动建议】|【合规方案】|【注意事项】/.test(t) && !/专家1v1财税咨询服务/.test(t)) {
+    t = `${t.replace(/\s+$/, '')}\n\n${expertTip}`;
+  }
+
   return t;
 }
 
 /** Strip leading list index from item text (avoid ● + 1 / **1**). */
 function stripLeadingListIndex(content) {
   return String(content || '')
-    .replace(/^\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/, '')
-    .replace(/^\*\*\d+\*\*\s*[.、)）]?\s*/, '')
-    .replace(/^\d+\s*[.、)）]\s+/, '')
+    .replace(/^\*\*\s*\d+\s*[.、)）．]?\s*\*\*\s*/, '')
+    .replace(/^\*\*\d+\*\*\s*[.、)）．]?\s*/, '')
+    .replace(/^\d+\s*[.、)）．]\s*/, '')
     .trim();
 }
 
@@ -3186,29 +3251,54 @@ function buildLocalSolutionMarkdown(ctx) {
 function renderAIPlanHtml(text) {
   const lines = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text)).split('\n');
   let html = '';
-  let inList = false;
-  let listTag = 'ul';
-  let listClass = 'result-list';
+  let listMode = null; // 'flow' | 'ol' | 'ul' | null
+  let nestedUl = false;
+  let liOpen = false;
   let flowMode = false;
+  let sectionKind = 'default'; // 'flow' | 'risk' | 'plan' | 'default'
+
+  const closeNestedUl = () => {
+    if (nestedUl) {
+      html += '</ul>';
+      nestedUl = false;
+    }
+  };
+
+  const closeLi = () => {
+    closeNestedUl();
+    if (liOpen) {
+      html += '</li>';
+      liOpen = false;
+    }
+  };
 
   const closeList = () => {
-    if (inList) {
-      html += `</${listTag}>`;
-      inList = false;
+    closeLi();
+    if (listMode === 'flow' || listMode === 'ol') {
+      html += '</ol>';
+      if (listMode === 'flow') flowMode = false;
+    } else if (listMode === 'ul') {
+      html += '</ul>';
     }
+    listMode = null;
   };
 
-  const openList = (ordered) => {
-    if (flowMode) {
-      listTag = 'ol';
-      listClass = 'result-flow';
+  const openList = (mode) => {
+    if (listMode === mode) return;
+    closeList();
+    if (mode === 'flow') {
+      html += `<ol class="result-flow">`;
+      flowMode = true;
+    } else if (mode === 'ol') {
+      html += `<ol class="result-list result-list-ordered">`;
     } else {
-      listTag = ordered ? 'ol' : 'ul';
-      listClass = ordered ? 'result-list result-list-ordered' : 'result-list';
+      html += `<ul class="result-list">`;
     }
-    html += `<${listTag} class="${listClass}">`;
-    inList = true;
+    listMode = mode;
   };
+
+  const isFlowchartTitle = (title) =>
+    /业务流程图|业务流程现状|流程图/.test(String(title || '')) && !/主要风险|核心风险诊断/.test(String(title || ''));
 
   const cleanSectionTitle = (title) =>
     String(title || '')
@@ -3219,10 +3309,8 @@ function renderAIPlanHtml(text) {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    if (!line) {
-      closeList();
-      continue;
-    }
+    // Keep list open across blank lines so 1/2/3/4 numbering does not reset
+    if (!line) continue;
 
     // Drop raw table junk that slipped through
     if (/^\|?\s*[-:|]+\s*$/.test(line) || (/^\|/.test(line) && /\|/.test(line) && !/[^\s|\-:]/.test(line))) {
@@ -3234,11 +3322,37 @@ function renderAIPlanHtml(text) {
     if (/请您提供|请提供以下信息|请提供具体信息/.test(line)) continue;
     if (/通用框架|在您提供信息前|由于您尚未提供/.test(line)) continue;
 
+    // Sub-labels like「主要风险：」「业务流程现状：」
+    const subLabel = line.replace(/\*/g, '').match(/^(业务流程图|业务流程现状|主要风险|核心风险)[:：]\s*$/);
+    if (subLabel) {
+      closeList();
+      const label = subLabel[1];
+      flowMode = isFlowchartTitle(label);
+      sectionKind = flowMode ? 'flow' : /风险/.test(label) ? 'risk' : sectionKind;
+      html += `<h5 class="result-section-subtitle${flowMode ? ' result-flow-heading' : ''}">${escapeHtml(label)}：</h5>`;
+      continue;
+    }
+    if (/^主要风险[:：]/.test(line.replace(/\*/g, ''))) {
+      closeList();
+      flowMode = false;
+      sectionKind = 'risk';
+      html += `<h5 class="result-section-subtitle">主要风险：</h5>`;
+      const rest = line.replace(/\*/g, '').replace(/^主要风险[:：]\s*/, '').trim();
+      if (rest) {
+        html += `<ul class="result-list"><li>${formatRiskOrBulletContent(rest)}</li></ul>`;
+      }
+      continue;
+    }
+
     if (/^#{1,4}\s+/.test(line)) {
       closeList();
       const level = (line.match(/^#+/) || ['##'])[0].length;
       const title = cleanSectionTitle(line.replace(/^#{1,4}\s+/, ''));
-      flowMode = /业务流程图|流程图|核心风险诊断/.test(title);
+      flowMode = isFlowchartTitle(title);
+      if (flowMode) sectionKind = 'flow';
+      else if (/风险/.test(title)) sectionKind = 'risk';
+      else if (/行动建议/.test(title)) sectionKind = 'actions';
+      else if (/合规方案|注意事项/.test(title)) sectionKind = 'plan';
       const cls =
         level >= 3 ? 'result-section-subtitle' : 'result-section-title';
       const flowCls = flowMode ? ' result-flow-heading' : '';
@@ -3246,60 +3360,107 @@ function renderAIPlanHtml(text) {
       continue;
     }
 
-    // Diagnosis report section headers like 【核心风险诊断】 / 【合规方案】（情形二：…）
+    // Diagnosis report section headers like 【核心风险诊断】 / 【合规方案】
     const cleanedBracketLine = cleanSectionTitle(line.replace(/\*/g, ''));
     const bracketTitle = cleanedBracketLine.match(/^【([^】]+)】\s*$/);
     if (bracketTitle) {
       closeList();
       const title = `【${bracketTitle[1]}】`;
-      flowMode = /核心风险诊断|流程图/.test(title);
-      const flowCls = flowMode ? ' result-flow-heading' : '';
-      html += `<h5 class="result-section-title${flowCls}">${escapeHtml(title)}</h5>`;
+      flowMode = false;
+      if (/核心风险/.test(title)) sectionKind = 'risk';
+      else if (/行动建议/.test(title)) sectionKind = 'actions';
+      else if (/合规方案|注意事项/.test(title)) sectionKind = 'plan';
+      else sectionKind = 'default';
+      html += `<h5 class="result-section-title">${escapeHtml(title)}</h5>`;
       continue;
     }
 
-    const orderedMatch = line.match(/^\d+[.)、]\s+(.*)$/);
+    const orderedMatch = line.match(/^\d+[.)、．]\s*(.*)$/);
     const bulletMatch = line.match(/^[-*•]\s+(.*)$/);
     if (orderedMatch || bulletMatch) {
-      const ordered = Boolean(orderedMatch);
-      let content = ordered ? orderedMatch[1] : bulletMatch[1];
-      // Drop duplicate index in body text (badge/CSS already shows order; bullets use ● only)
+      let content = (orderedMatch ? orderedMatch[1] : bulletMatch[1]) || '';
       content = stripLeadingListIndex(content);
-      if (!inList || (flowMode && listClass !== 'result-flow') || (!flowMode && ((ordered && listTag !== 'ol') || (!ordered && listTag !== 'ul')))) {
-        closeList();
-        openList(ordered);
-      }
-      if (flowMode) {
+      const looksLikeFlowStep =
+        (flowMode || sectionKind === 'flow') &&
+        content.length <= 36 &&
+        !/[。；;]/.test(content);
+
+      if (looksLikeFlowStep) {
+        closeLi();
+        openList('flow');
         html +=
           `<li class="result-flow-step">` +
           `<span class="result-flow-badge" aria-hidden="true"></span>` +
-          `<span class="result-flow-card">${formatInline(content)}</span>` +
-          `</li>`;
+          `<span class="result-flow-card">${formatInline(content)}</span>`;
+        liOpen = true;
+        continue;
+      }
+
+      // Under 行动建议 / numbered plan: promote `- **标题**：说明` to next numbered peer
+      if (
+        bulletMatch &&
+        listMode === 'ol' &&
+        liOpen &&
+        looksLikePeerActionItem(content) &&
+        (sectionKind === 'actions' || sectionKind === 'plan')
+      ) {
+        closeLi();
+        openList('ol');
+        html += `<li>${formatPlanListItem(content)}`;
+        liOpen = true;
+        continue;
+      }
+
+      // Nested detail bullets under a numbered item (no kv cards)
+      if (bulletMatch && listMode === 'ol' && liOpen) {
+        if (!nestedUl) {
+          html += `<ul class="result-list">`;
+          nestedUl = true;
+        }
+        html += `<li>${formatPlanListItem(content)}</li>`;
+        continue;
+      }
+
+      // Risks → plain bullets; 合规方案/行动建议 → continuous ol (1…6)
+      const useOrdered =
+        content.length <= 220 &&
+        ((Boolean(orderedMatch) && (sectionKind === 'plan' || sectionKind === 'actions')) ||
+          (sectionKind === 'actions' && looksLikePeerActionItem(content)));
+
+      if (useOrdered) {
+        closeLi();
+        openList('ol');
+        html += `<li>${formatPlanListItem(content)}`;
+        liOpen = true;
       } else {
-        // Key-value style bullets: **标签**：内容
-        const kv = content.match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
-        if (kv) {
+        if (listMode === 'ol' || listMode === 'flow') closeList();
+        openList('ul');
+        const kv = matchBoldKvContent(content);
+        // kv cards only for 合规方案对照（非定制/定制等）
+        if (kv && sectionKind === 'plan') {
           html +=
             `<li class="result-kv">` +
             `<span class="result-kv-key">${escapeHtml(kv[1])}</span>` +
             `<span class="result-kv-val">${formatInline(kv[2])}</span>` +
             `</li>`;
         } else {
-          html += `<li>${formatInline(content)}</li>`;
+          html += `<li>${formatPlanListItem(content)}</li>`;
         }
+        liOpen = false;
       }
       continue;
     }
 
     // Single-line arrow flow: 采购 → 报关 → 履约
-    if (flowMode && /→|⟶|->|➜|➔/.test(line) && !/^#{1,4}\s+/.test(line)) {
+    if ((flowMode || sectionKind === 'flow') && /→|⟶|->|➜|➔/.test(line) && !/^#{1,4}\s+/.test(line)) {
       const parts = line
         .split(/\s*(?:→|⟶|->|➜|➔)\s*/)
-        .map((s) => s.replace(/^[\d]+[.)、]\s*/, '').trim())
+        .map((s) => s.replace(/^[\d]+[.)、．]\s*/, '').trim())
         .filter(Boolean);
       if (parts.length >= 2) {
         closeList();
-        html += `<ol class="result-flow result-flow-inline">`;
+        const inline = parts.length <= 4;
+        html += `<ol class="result-flow${inline ? ' result-flow-inline' : ''}">`;
         parts.forEach((part) => {
           html +=
             `<li class="result-flow-step">` +
@@ -3308,6 +3469,7 @@ function renderAIPlanHtml(text) {
             `</li>`;
         });
         html += `</ol>`;
+        flowMode = false;
         continue;
       }
     }

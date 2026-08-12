@@ -34,7 +34,7 @@ const cases = [
   { name: "step3-temu-by-platform", text: "请问您的发货方式是以下哪一种？", mode: "diagnosis", step: 3, platform: "Temu", expect: "shippingTemu" },
   { name: "step3-shein-by-platform", text: "请问您的发货方式是以下哪一种？", mode: "diagnosis", step: 3, platform: "SHEIN", expect: "shippingShein" },
   { name: "step2-entity", text: "第二步：您平台店铺的注册主体是大陆公司、香港公司还是其他？", mode: "diagnosis", step: 2, platform: "速卖通", expect: "entity" },
-  { name: "step4-export", text: "第四步：您目前货物的出口方式是怎么样的？是0110一般贸易出口、委托货代出口、小包快递出口、由平台安排出口，还是其他？", mode: "diagnosis", step: 4, platform: "亚马逊 Amazon", expect: "exportMode" },
+  { name: "step4-export", text: "第四步：您目前货物的出口方式是怎么样的？选项：正式报关出口（0110/9710/9810）、小包快递出口（9610/1210）、小包快递出口（未报关）、市场采购出口（1039）、委托货代出口、由平台安排出口、其他。", mode: "diagnosis", step: 4, platform: "亚马逊 Amazon", expect: "exportMode" },
   { name: "step5-invoice", text: "第五步：您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？", mode: "diagnosis", step: 5, platform: "亚马逊 Amazon", expect: "invoice" },
   { name: "step6-revenue", text: "第六步：您目前年销售额大概多少？", mode: "diagnosis", step: 6, platform: "亚马逊 Amazon", expect: "revenue" },
   { name: "step2-entity-atypical-fallback", text: "好的，那请问主体方面您怎么安排呢？", mode: "diagnosis", step: 2, platform: "亚马逊 Amazon", expect: "entity" },
