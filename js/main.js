@@ -1865,13 +1865,15 @@ function initAiChatbot() {
 
   const clearQuickReplies = () => {
     if (!quickEl) return;
+    quickEl.classList.remove('is-stacked');
     quickEl.innerHTML = '';
     quickEl.hidden = true;
   };
 
-  const renderQuickReplyButtons = (options) => {
+  const renderQuickReplyButtons = (options, layout) => {
     if (!quickEl || !options?.length) return;
     clearQuickReplies();
+    if (layout === 'stacked') quickEl.classList.add('is-stacked');
     const label = document.createElement('div');
     label.className = 'diag-quick-replies-label';
     label.textContent = '请选择下方选项继续';
@@ -1938,7 +1940,7 @@ function initAiChatbot() {
       clearQuickReplies();
       return;
     }
-    renderQuickReplyButtons(options);
+    renderQuickReplyButtons(options, setKey === 'productCategory' ? 'stacked' : 'wrap');
     scrollDiagChatToBottom();
   };
 
