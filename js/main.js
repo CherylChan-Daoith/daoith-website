@@ -1891,8 +1891,8 @@ function initAiChatbot() {
     const greetEl = document.createElement('div');
     greetEl.className = 'ai-chatbot-bubble is-bot is-welcome';
     greetEl.innerHTML =
-      `<p class="welcome-lead">您好，欢迎使用道一合规诊断助手</p>` +
-      `<p class="welcome-ask">为跨境电商企业提供合规解决方案。请选择：` +
+      `<p class="welcome-lead">您好，欢迎使用道一合规诊断助手！</p>` +
+      `<p class="welcome-ask">请选择：` +
       `<strong>开启专属合规诊断</strong>（需微信登录，按步骤生成诊断报告），或 ` +
       `<strong>我有特定问题想直接提问</strong>（基于知识库即时解答）。</p>`;
     messages.appendChild(greetEl);
