@@ -1132,8 +1132,9 @@ const DIAG_QUICK_REPLY_SETS = {
     '自发货（海外仓发货）',
   ],
   entity: [
-    '中国个人',
     '中国大陆公司',
+    '中国个人',
+    '个体户',
     '中国香港公司',
     '外籍个人',
     '其他境外公司',
@@ -1259,7 +1260,7 @@ function detectDiagQuickReplySet(botText) {
   if (isPlatformQuestionText(t)) return 'platform';
 
   // Later-slot asks on the active question beat shipping (bot often echoes “FBA发货” before 第三步)
-  if (/注册主体|店铺主体|中国个人|中国大陆公司|中国香港公司|外籍个人|其他境外公司|大陆公司|香港公司|主体是/.test(t)) {
+  if (/注册主体|店铺主体|中国个人|中国大陆公司|个体户|中国香港公司|外籍个人|其他境外公司|大陆公司|香港公司|主体是/.test(t)) {
     return 'entity';
   }
   if (
@@ -1362,7 +1363,7 @@ function localDiagnosisEntityAsk(platformLabel) {
   const platform = String(platformLabel || '').trim();
   return (
     (platform ? `好的，已将「${platform}」记录为您的销售平台。\n\n` : '好的。\n\n') +
-    '2. 您平台店铺的注册主体是中国个人、中国大陆公司、中国香港公司、外籍个人、其他境外公司？'
+    '2. 您平台店铺的注册主体是中国大陆公司、中国个人、个体户、中国香港公司、外籍个人、其他境外公司？'
   );
 }
 
@@ -1447,7 +1448,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
   const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
-    2: '请执行第二步：只提问一句「2. 您平台店铺的注册主体是中国个人、中国大陆公司、中国香港公司、外籍个人、其他境外公司？」不要在正文罗列选项。',
+    2: '请执行第二步：只提问一句「2. 您平台店铺的注册主体是中国大陆公司、中国个人、个体户、中国香港公司、外籍个人、其他境外公司？」不要在正文罗列选项。',
     3: '请执行第三步：只提问一句「3. 请问您的发货方式是以下哪一种？」不要在正文罗列选项；官网会按平台显示按钮。',
     4: '请执行第四步：只提问出口方式一句「4. 您目前货物的出口方式是怎么样的？」不要在正文列出选项；官网会提供按钮：正式报关出口（0110/9710）/正式报关出口（9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
