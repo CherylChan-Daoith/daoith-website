@@ -940,8 +940,8 @@ ul {
   flex: 0 0 100%;
   margin: 0 0 1px;
   font-size: 0.62rem;
-  font-weight: 500;
-  color: #64748b;
+  font-weight: 600;
+  color: #2251ff;
   letter-spacing: 0.02em;
 }
 
@@ -957,14 +957,17 @@ ul {
   font-weight: 400;
   cursor: pointer;
   box-shadow: none;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
-.diag-quick-reply-btn:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
-  color: #111827;
+.diag-quick-reply-btn:hover,
+.diag-quick-reply-btn:focus-visible,
+.diag-quick-reply-btn:active {
+  background: #eef3ff;
+  border-color: #2251ff;
+  color: #1a41cc;
   box-shadow: none;
+  outline: none;
 }
 
 .diag-chat .ai-chatbot-form {
@@ -1065,7 +1068,7 @@ ul {
 }
 
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask strong {
-  color: #1a41cc;
+  color: #3b6cff;
   font-weight: 500;
 }
 
