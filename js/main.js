@@ -1371,12 +1371,21 @@ function localDiagnosisShippingAsk(platformLabel) {
   return '3. 请问您的发货方式是以下哪一种？';
 }
 
+function localDiagnosisExportAsk() {
+  return '4. 您目前货物的出口方式是怎么样的？';
+}
+
 function localDiagnosisInvoiceAsk(preface) {
   const head = String(preface || '').trim();
   return (
     (head ? `${head}\n\n` : '') +
     '5. 您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？'
   );
+}
+
+function localDiagnosisRevenueAsk(preface) {
+  const head = String(preface || '').trim();
+  return (head ? `${head}\n\n` : '') + '6. 您目前年销售额大概多少？';
 }
 
 /** 平台国内仓类发货 → 出口通常由平台安排 */
@@ -2102,6 +2111,102 @@ function initAiChatbot() {
           return result;
         } catch (err) {
           console.warn('[diagnosis] auto platform-export sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: after shipping → step-4 出口方式
+    if (prevMode === 'diagnosis' && prevStep === 3 && getUiStep() === 4) {
+      const platform = getUiPlatform();
+      const localAsk = localDiagnosisExportAsk();
+      appendBubble(`好的，已记录发货方式。\n\n${localAsk}`, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 4, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step4 export sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: after export → step-5 发票
+    if (prevMode === 'diagnosis' && prevStep === 4 && getUiStep() === 5) {
+      const platform = getUiPlatform();
+      const localAsk = localDiagnosisInvoiceAsk('好的，已记录出口方式。');
+      appendBubble(localAsk, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 5, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step5 invoice sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: after invoice → step-6 销售额
+    if (prevMode === 'diagnosis' && prevStep === 5 && getUiStep() === 6) {
+      const platform = getUiPlatform();
+      const localAsk = localDiagnosisRevenueAsk('好的，已记录发票情况。');
+      appendBubble(localAsk, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 6, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step6 revenue sync failed', err);
           return null;
         }
       })();
