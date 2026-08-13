@@ -1089,6 +1089,8 @@ const DIAG_QUICK_REPLY_SETS = {
     '速卖通',
     'SHEIN',
     '阿里国际站',
+    'Shopee',
+    'Lazada',
     'eBay',
     'Shopify独立站',
     '美客多',
@@ -1125,6 +1127,18 @@ const DIAG_QUICK_REPLY_SETS = {
     '半托管（海外仓）',
     'POP（国内直发）',
     'POP（海外仓发货）',
+  ],
+  shippingShopee: [
+    '全托管（国内仓）',
+    'Shopee海外仓',
+    '自发货（国内直发）',
+    '自发货（海外仓发货）',
+  ],
+  shippingLazada: [
+    '全托管（国内仓）',
+    'FBL海外仓',
+    '自发货（国内直发）',
+    '自发货（海外仓发货）',
   ],
   shipping: [
     '发货到平台海外仓',
@@ -1263,7 +1277,7 @@ function detectDiagQuickReplySet(botText) {
   if (isPlatformQuestionText(t)) return 'platform';
 
   // Later-slot asks on the active question beat shipping (bot often echoes “FBA发货” before 第三步)
-  if (/注册主体|店铺主体|中国个人|中国大陆公司|个体户|中国香港公司|外籍个人|其他境外公司|大陆公司|香港公司|主体是/.test(t)) {
+  if (/注册主体|店铺主体|中国个人|中国大陆公司|个体户|中国香港公司|外籍个人|其他境外公司|东南亚本土公司|南美洲本土公司|大陆公司|香港公司|主体是/.test(t)) {
     return 'entity';
   }
   if (
@@ -1312,6 +1326,18 @@ function detectDiagQuickReplySet(botText) {
   ) {
     return 'shippingTemu';
   }
+  if (
+    (/Shopee/i.test(t) && /(全托管|海外仓|自发货)/.test(t) && !isPlatformQuestionText(t)) ||
+    /Shopee海外仓/.test(t)
+  ) {
+    return 'shippingShopee';
+  }
+  if (
+    (/Lazada/i.test(t) && /(全托管|FBL|自发货)/.test(t) && !isPlatformQuestionText(t)) ||
+    /FBL海外仓/.test(t)
+  ) {
+    return 'shippingLazada';
+  }
   if (isShippingQuestionText(t)) return 'shipping';
 
   // Only offer consult chips when the bot actually asks a yes/no consult question
@@ -1333,7 +1359,29 @@ function shippingQuickReplySetForPlatform(platformLabel) {
   if (/SHEIN|希音/i.test(t)) return 'shippingShein';
   if (/速卖通|AliExpress/i.test(t)) return 'shippingAliExpress';
   if (/Temu|TEMU/i.test(t)) return 'shippingTemu';
+  if (/Shopee/i.test(t)) return 'shippingShopee';
+  if (/Lazada/i.test(t)) return 'shippingLazada';
   return 'shipping';
+}
+
+/** Extra regional entity option by marketplace, if any. */
+function regionalEntityOptionForPlatform(platformLabel) {
+  const t = String(platformLabel || '');
+  if (/Shopee|Lazada/i.test(t)) return '东南亚本土公司';
+  if (/美客多|Mercado/i.test(t)) return '南美洲本土公司';
+  return '';
+}
+
+/** Entity chips for step 2 — base list + optional local-overseas company by platform. */
+function entityOptionsForPlatform(platformLabel) {
+  const base = DIAG_QUICK_REPLY_SETS.entity || [];
+  const regional = regionalEntityOptionForPlatform(platformLabel);
+  if (!regional) return base.slice();
+  const out = base.slice();
+  const idx = out.indexOf('外籍个人');
+  if (idx >= 0) out.splice(idx, 0, regional);
+  else out.splice(Math.max(0, out.length - 1), 0, regional);
+  return out;
 }
 
 /** Rewrite mode-select clicks into explicit instructions for the Agent API. */
@@ -1342,7 +1390,7 @@ function normalizeDiagnosisModeQuery(text) {
   if (/开启专属合规诊断/.test(t)) {
     return (
       '【模式选择】用户选择：开启专属合规诊断。' +
-      '请立即进入模式A专属合规诊断，执行第一步：只提问销售平台（可列举亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN等）。' +
+      '请立即进入模式A专属合规诊断，执行第一步：只提问销售平台（可列举亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN、Shopee、Lazada、美客多等）。' +
       '禁止说“这不是自动命令”，禁止要求用户改提其他具体问题，禁止输出欢迎语。'
     );
   }
@@ -1358,15 +1406,16 @@ function normalizeDiagnosisModeQuery(text) {
 function localDiagnosisPlatformAsk() {
   return (
     '好的，已为您开启专属合规诊断。\n\n' +
-    '1. 您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN）'
+    '1. 您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN、Shopee、Lazada）'
   );
 }
 
 function localDiagnosisEntityAsk(platformLabel) {
   const platform = String(platformLabel || '').trim();
+  const opts = entityOptionsForPlatform(platform);
   return (
     (platform ? `好的，已将「${platform}」记录为您的销售平台。\n\n` : '好的。\n\n') +
-    '2. 您平台店铺的注册主体是中国大陆公司、中国个人、个体户、中国香港公司、外籍个人、其他境外公司？'
+    `2. 您平台店铺的注册主体是${opts.join('、')}？`
   );
 }
 
@@ -1460,7 +1509,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
   const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
-    2: '请执行第二步：只提问一句「2. 您平台店铺的注册主体是中国大陆公司、中国个人、个体户、中国香港公司、外籍个人、其他境外公司？」不要在正文罗列选项。',
+    2: '请执行第二步：只提问店铺注册主体一句；官网会按平台显示按钮（含对应海外本土公司选项，如 Shopee/Lazada→东南亚本土公司，美客多→南美洲本土公司）。不要在正文罗列全部选项。',
     3: '请执行第三步：只提问一句「3. 请问您的发货方式是以下哪一种？」不要在正文罗列选项；官网会按平台显示按钮。',
     4: '请执行第四步：只提问出口方式一句「4. 您目前货物的出口方式是怎么样的？」不要在正文列出选项；官网会提供按钮：正式报关出口（0110/9710）/正式报关出口（9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
@@ -1850,7 +1899,10 @@ function initAiChatbot() {
       return;
     }
 
-    const options = DIAG_QUICK_REPLY_SETS[setKey] || [];
+    const options =
+      setKey === 'entity'
+        ? entityOptionsForPlatform(getUiPlatform())
+        : DIAG_QUICK_REPLY_SETS[setKey] || [];
     if (!options.length) {
       clearQuickReplies();
       return;
