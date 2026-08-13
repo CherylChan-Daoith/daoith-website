@@ -807,12 +807,47 @@ function enhanceChatMarkdown(text) {
 }
 
 /**
- * Bold only the active diagnosis step question (e.g.「第三步：请问您的发货方式是以下哪一种？」).
+ * Display diagnosis asks as「1. …」「2. …」instead of「第一步 / 第二步».
+ */
+function normalizeDiagStepLabels(text) {
+  const map = { 一: '1', 二: '2', 三: '3', 四: '4', 五: '5', 六: '6', 七: '7' };
+  return String(text || '').replace(/第\s*([一二三四五六七1-7])\s*步[：:\s]*/g, (_, raw) => {
+    const n = map[raw] || raw;
+    return `${n}. `;
+  });
+}
+
+/**
+ * Bold only the active diagnosis step question (e.g.「3. 请问您的发货方式是以下哪一种？」).
  * Confirmation lines and option lists stay unbolded.
  */
 function emphasizeDiagStepQuestion(text) {
-  const t = String(text || '').replace(/\r/g, '');
+  let t = normalizeDiagStepLabels(String(text || '').replace(/\r/g, ''));
   if (!t.trim() || looksLikeFullDiagnosisPlan(t)) return t;
+
+  // If Dify omits the number, prefix from current wizard step
+  try {
+    const mode = localStorage.getItem('daoith_diagnosis_ui_mode') || '';
+    const step = parseInt(localStorage.getItem('daoith_diagnosis_ui_step') || '0', 10);
+    if (mode === 'diagnosis' && step >= 1 && step <= 6 && !/(?:^|\n)\s*\*{0,2}\d+\.\s+/.test(t)) {
+      const lines = t.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const tr = lines[i].trim().replace(/^\*\*|\*\*$/g, '');
+        if (
+          /[？?]/.test(tr) &&
+          /(平台|主体|发货|出口|发票|销售额|请问|哪一种)/.test(tr) &&
+          !/^\d+\./.test(tr)
+        ) {
+          const indent = lines[i].match(/^\s*/)[0];
+          lines[i] = `${indent}${step}. ${tr}`;
+          break;
+        }
+      }
+      t = lines.join('\n');
+    }
+  } catch {
+    /* ignore */
+  }
 
   const lines = t.split('\n');
   let hit = false;
@@ -820,17 +855,17 @@ function emphasizeDiagStepQuestion(text) {
     const trimmed = line.trim();
     if (!trimmed || /^[-*•]/.test(trimmed) || /^选项[：:]/.test(trimmed)) return line;
     const indent = line.match(/^\s*/)[0];
-    // 「第三步：……？」整行加粗
-    const stepMatch = trimmed.match(/^(?:\*\*)?(第\s*[一二三四五六1-6]\s*步[：:].+?[？?])(?:\*\*)?$/);
-    if (stepMatch) {
+    // 「3. ……？」——只加粗问句，问号后的补充说明保持普通
+    const stepMatch = trimmed.match(/^(?:\*\*)?(\d+\.\s+[^？?\n]*[？?])(?:\*\*)?(.*)$/);
+    if (stepMatch && !/^选项/.test(stepMatch[2].trim())) {
       hit = true;
-      return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**`;
+      return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**${stepMatch[2]}`;
     }
     // 「……？ 选项：A、B…」只加粗问句，选项保持普通
     const withOpts = trimmed.match(/^(?:\*\*)?(.+?[？?])(?:\*\*)?\s*(选项[：:].+)$/);
     if (
       withOpts &&
-      ( /第\s*[一二三四五六1-6]\s*步/.test(withOpts[1]) ||
+      ( /^\d+\.\s+/.test(withOpts[1]) ||
         /(请问|发货方式|出口方式|注册主体|发票|销售额|平台)/.test(withOpts[1]) )
     ) {
       hit = true;
@@ -861,8 +896,11 @@ function emphasizeDiagStepQuestion(text) {
 }
 
 function renderChatBubbleHtml(text) {
-  const md = enhanceChatMarkdown(sanitizeAiAnswer(emphasizeDiagStepQuestion(text)));
-  const html = renderAIPlanHtml(md);
+  let md = enhanceChatMarkdown(sanitizeAiAnswer(emphasizeDiagStepQuestion(text)));
+  // Keep「1. 问题？」as prose in chat (avoid ordered-list rendering)
+  md = md.replace(/(^|\n)(\*\*)?(\d+)\.(?=\s)/gm, '$1$2@@N$3@@');
+  let html = renderAIPlanHtml(md);
+  html = String(html || '').replace(/@@N(\d+)@@/g, '$1.');
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
 }
 
@@ -1239,7 +1277,7 @@ function normalizeDiagnosisModeQuery(text) {
 function localDiagnosisPlatformAsk() {
   return (
     '好的，已为您开启专属合规诊断。\n\n' +
-    '您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN）'
+    '1. 您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN）'
   );
 }
 
@@ -1247,7 +1285,7 @@ function localDiagnosisEntityAsk(platformLabel) {
   const platform = String(platformLabel || '').trim();
   return (
     (platform ? `好的，已将「${platform}」记录为您的销售平台。\n\n` : '好的。\n\n') +
-    '第二步：您平台店铺的注册主体是大陆公司、香港公司还是其他？'
+    '2. 您平台店铺的注册主体是大陆公司、香港公司还是其他？'
   );
 }
 
@@ -1256,14 +1294,14 @@ function localDiagnosisShippingAsk(platformLabel) {
   const setKey = shippingQuickReplySetForPlatform(platform);
   const opts = DIAG_QUICK_REPLY_SETS[setKey] || DIAG_QUICK_REPLY_SETS.shipping;
   const lines = opts.map((o) => `- ${o}`).join('\n');
-  return `第三步：请问您的发货方式是以下哪一种？\n${lines}`;
+  return `3. 请问您的发货方式是以下哪一种？\n${lines}`;
 }
 
 function localDiagnosisInvoiceAsk(preface) {
   const head = String(preface || '').trim();
   return (
     (head ? `${head}\n\n` : '') +
-    '第五步：您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？'
+    '5. 您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？'
   );
 }
 
@@ -1420,9 +1458,14 @@ function inferClarificationStepFromBotText(botText) {
   return Number.isFinite(n) && n >= 1 && n <= 6 ? n : 0;
 }
 
-/** Infer step number from bot copy like「第三步」when present. */
+/** Infer step number from bot copy like「第三步」or「3.」when present. */
 function inferDiagStepFromBotText(botText) {
   const t = String(botText || '');
+  const mNum = t.match(/(?:^|\n)\s*(\d+)\.\s+\S/);
+  if (mNum) {
+    const n = parseInt(mNum[1], 10);
+    if (Number.isFinite(n) && n >= 1 && n <= 7) return n;
+  }
   const m = t.match(/第\s*([一二三四五六七1-7])\s*步/);
   if (!m) return 0;
   const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7 };
@@ -1765,7 +1808,6 @@ function initAiChatbot() {
     const greetEl = document.createElement('div');
     greetEl.className = 'ai-chatbot-bubble is-bot is-welcome';
     greetEl.innerHTML =
-      `<div class="welcome-kicker">道一合规诊断助手</div>` +
       `<p class="welcome-lead">您好，欢迎使用道一合规诊断助手</p>` +
       `<p class="welcome-ask">为跨境电商企业提供合规解决方案。请选择：` +
       `<strong>开启专属合规诊断</strong>（需微信登录，按步骤生成诊断报告），或 ` +
@@ -2188,7 +2230,7 @@ function initAiChatbot() {
       if (getUiMode() === 'diagnosis' && getUiStep() >= 2 && looksLikeModeSelectReply(answer)) {
         if (getUiStep() === 2) answer = localDiagnosisEntityAsk(getUiPlatform());
         else if (getUiStep() === 3) answer = localDiagnosisShippingAsk(getUiPlatform());
-        else answer = `好的，已记录。请继续回答第${getUiStep()}步相关问题。`;
+        else answer = `好的，已记录。请继续回答 ${getUiStep()}. 相关问题。`;
       }
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
@@ -2283,7 +2325,12 @@ function isDiagnosisWizardCollecting() {
 function looksLikeDiagnosisWizardAsk(text) {
   const t = String(text || '').trim();
   if (!t || looksLikeFullDiagnosisPlan(t) || looksLikeDiagnosisPlanStreaming(t)) return false;
-  if (/第\s*[一二三四五六1-6]\s*步/.test(t) && /[？?]/.test(t)) return true;
+  if (
+    (/第\s*[一二三四五六1-6]\s*步/.test(t) || /(?:^|\n)\s*\d+\.\s+\S/.test(t)) &&
+    /[？?]/.test(t)
+  ) {
+    return true;
+  }
   if (
     t.length < 900 &&
     /[？?]/.test(t) &&

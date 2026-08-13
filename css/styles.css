@@ -921,15 +921,15 @@ ul {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
   max-height: none;
   overflow-y: visible;
-  padding: 10px 12px 8px;
+  padding: 6px 10px 6px;
   margin: 0;
-  border-top: 1px solid #dbe4ff;
-  background: linear-gradient(180deg, #eef3ff 0%, #f8faff 100%);
-  box-shadow: 0 -4px 12px rgba(34, 81, 255, 0.06);
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  box-shadow: none;
 }
 
 .diag-quick-replies[hidden] {
@@ -938,33 +938,33 @@ ul {
 
 .diag-quick-replies-label {
   flex: 0 0 100%;
-  margin: 0 0 2px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: #1a41cc;
-  letter-spacing: 0.04em;
+  margin: 0 0 1px;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: #64748b;
+  letter-spacing: 0.02em;
 }
 
 .diag-quick-reply-btn {
   appearance: none;
-  border: 1.5px solid #2251ff;
+  border: 1px solid #d1d5db;
   background: #fff;
-  color: #1a41cc;
-  border-radius: 999px;
-  padding: 7px 12px;
-  font-size: 0.76rem;
+  color: #1f2937;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
   line-height: 1.25;
-  font-weight: 600;
+  font-weight: 400;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(34, 81, 255, 0.08);
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .diag-quick-reply-btn:hover {
-  background: #2251ff;
-  border-color: #2251ff;
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(34, 81, 255, 0.25);
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #111827;
+  box-shadow: none;
 }
 
 .diag-chat .ai-chatbot-form {
@@ -1045,21 +1045,13 @@ ul {
 }
 
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-kicker {
-  display: inline-block;
-  margin: 0 0 8px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(34, 81, 255, 0.12);
-  color: #1a41cc;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  display: none;
 }
 
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-lead {
   margin: 0 0 8px;
-  font-size: 0.92rem;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 500;
   color: #0f1c3f;
   line-height: 1.45;
 }
@@ -1067,14 +1059,33 @@ ul {
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask {
   margin: 0;
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 400;
   color: #334155;
   line-height: 1.5;
 }
 
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask strong {
   color: #1a41cc;
+  font-weight: 500;
+}
+
+/* Chat: emphasize with bold only (no blue); keep codes plain. Plan panel keeps chips. */
+.diag-chat .ai-chatbot-bubble.is-rich .result-em,
+.diag-chat .ai-chatbot-bubble.is-rich strong {
   font-weight: 700;
+  color: inherit;
+}
+
+.diag-chat .ai-chatbot-bubble.is-rich .result-code {
+  display: inline;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
 }
 
 .diag-services-grid {
@@ -2708,7 +2719,7 @@ body:not([data-active-view="ai-solution"]) .ai-chatbot {
 
 .ai-chatbot-bubble.is-rich strong {
   font-weight: 700;
-  color: #0f1c3f;
+  color: inherit;
 }
 
 .ai-chatbot-bubble.is-bot {
