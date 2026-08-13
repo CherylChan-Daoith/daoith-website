@@ -1100,7 +1100,8 @@ const DIAG_QUICK_REPLY_SETS = {
   ],
   shippingAlibaba: [
     '自营出口',
-    '一达通代理出口',
+    '一达通代理出口3+N',
+    '一达通代理出口2+N',
     '市场采购出口',
     '便捷发货出口',
   ],
@@ -1131,9 +1132,11 @@ const DIAG_QUICK_REPLY_SETS = {
     '自发货（海外仓发货）',
   ],
   entity: [
-    '大陆公司',
-    '香港公司',
-    '其他',
+    '中国个人',
+    '中国大陆公司',
+    '中国香港公司',
+    '外籍个人',
+    '其他境外公司',
   ],
   invoice: [
     '能提供增值税专用发票',
@@ -1256,7 +1259,9 @@ function detectDiagQuickReplySet(botText) {
   if (isPlatformQuestionText(t)) return 'platform';
 
   // Later-slot asks on the active question beat shipping (bot often echoes “FBA发货” before 第三步)
-  if (/注册主体|店铺主体|大陆公司|香港公司|主体是/.test(t)) return 'entity';
+  if (/注册主体|店铺主体|中国个人|中国大陆公司|中国香港公司|外籍个人|其他境外公司|大陆公司|香港公司|主体是/.test(t)) {
+    return 'entity';
+  }
   if (
     /(增值税专用发票|增值税普通发票|专用发票|普通发票|专票|普票|无法提供发票|不能提供发票|无票)/.test(t) ||
     (/(发票)/.test(t) && /(供应商|配合|提供|情况|类型|请问|能否|有无)/.test(t))
@@ -1357,16 +1362,12 @@ function localDiagnosisEntityAsk(platformLabel) {
   const platform = String(platformLabel || '').trim();
   return (
     (platform ? `好的，已将「${platform}」记录为您的销售平台。\n\n` : '好的。\n\n') +
-    '2. 您平台店铺的注册主体是大陆公司、香港公司还是其他？'
+    '2. 您平台店铺的注册主体是中国个人、中国大陆公司、中国香港公司、外籍个人、其他境外公司？'
   );
 }
 
 function localDiagnosisShippingAsk(platformLabel) {
-  const platform = String(platformLabel || '').trim() || '该平台';
-  const setKey = shippingQuickReplySetForPlatform(platform);
-  const opts = DIAG_QUICK_REPLY_SETS[setKey] || DIAG_QUICK_REPLY_SETS.shipping;
-  const lines = opts.map((o) => `- ${o}`).join('\n');
-  return `3. 请问您的发货方式是以下哪一种？\n${lines}`;
+  return '3. 请问您的发货方式是以下哪一种？';
 }
 
 function localDiagnosisInvoiceAsk(preface) {
@@ -1446,8 +1447,8 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
   const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
-    2: '请执行第二步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
-    3: '请执行第三步：只询问发货方式，并按该平台给出对应选项。',
+    2: '请执行第二步：只提问一句「2. 您平台店铺的注册主体是中国个人、中国大陆公司、中国香港公司、外籍个人、其他境外公司？」不要在正文罗列选项。',
+    3: '请执行第三步：只提问一句「3. 请问您的发货方式是以下哪一种？」不要在正文罗列选项；官网会按平台显示按钮。',
     4: '请执行第四步：只提问出口方式一句「4. 您目前货物的出口方式是怎么样的？」不要在正文列出选项；官网会提供按钮：正式报关出口（0110/9710）/正式报关出口（9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
     6: '请执行第六步：只询问年销售额。',
@@ -1496,8 +1497,8 @@ function isVagueDiagnosisAnswer(text, step) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (/^(不清楚|不知道|暂不清楚|不太清楚|不确定)$/.test(t)) return true;
-  // 2=主体其他, 3=发货其他, 4=出口其他
-  if (/^(其他|其它|其他发货方式)$/.test(t)) return step === 2 || step === 3 || step === 4;
+  // 3=发货其他, 4=出口其他（主体已改为「其他境外公司」完整选项，不再视为模糊）
+  if (/^(其他|其它|其他发货方式)$/.test(t)) return step === 3 || step === 4;
   return false;
 }
 
@@ -2114,6 +2115,24 @@ function initAiChatbot() {
     messages.appendChild(typing);
     scrollDiagChatToBottom();
 
+    // Q6 answered → immediately show plan-generating status + right-panel working scene
+    const shouldGeneratePlanNow =
+      prevMode === 'diagnosis' && prevStep === 6 && getUiStep() >= 7;
+    if (shouldGeneratePlanNow) {
+      showResultWorking();
+      typing.classList.add('is-plan-status');
+      const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+      typing.textContent = loggedInNow
+        ? DIAG_PLAN_STATUS_MSG
+        : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
+      if (!loggedInNow) {
+        window.DAOITH_AUTH?.requireLogin?.(
+          'ai_plan',
+          `${window.location.pathname}${window.location.search}#ai-solution`
+        );
+      }
+    }
+
     const ctx = window.__daoithLastPlanCtx || null;
     try {
       if (diagnosisWarmPromise) {
@@ -2162,10 +2181,18 @@ function initAiChatbot() {
 
       let streamingPlan = false;
       let streamingLongQa = false;
-      let loginPromptedForPlan = false;
+      let loginPromptedForPlan = shouldGeneratePlanNow && !loggedIn;
       let planCountedThisTurn = false;
       const beginPlanRouting = () => {
-        if (streamingPlan) return;
+        if (streamingPlan) {
+          typing.classList.add('is-plan-status');
+          const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+          typing.textContent = loggedInNow
+            ? DIAG_PLAN_STATUS_MSG
+            : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
+          if (!document.getElementById('resultWorking')) showResultWorking();
+          return;
+        }
         streamingPlan = true;
         showResultWorking();
         typing.classList.add('is-plan-status');
@@ -2181,6 +2208,7 @@ function initAiChatbot() {
           );
         }
       };
+      if (shouldGeneratePlanNow) beginPlanRouting();
 
       const beginLongQaRouting = () => {
         if (streamingLongQa) return;
@@ -3545,6 +3573,60 @@ function nestPlanBulletHierarchy(text) {
   return out.join('\n');
 }
 
+/**
+ * If the model emits flat numbered peers that restart at 1 under a prior item,
+ * indent the restart block so the renderer can nest 二/三级列表。
+ */
+function nestPlanNumberedHierarchy(text) {
+  const lines = String(text || '').split('\n');
+  const alreadyNested = lines.some((ln) => /^[ \t]{2,}\d+[.)、．]\s+/.test(ln));
+  if (alreadyNested) return text;
+
+  const out = [];
+  let lastTop = 0;
+  let nestSeq = 0;
+  for (const raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      out.push(raw);
+      continue;
+    }
+    const om = trimmed.match(/^(\d+)[.)、．]\s+(.*)$/);
+    if (!om) {
+      if (lastTop >= 1 && /^[-*•]\s+/.test(trimmed)) {
+        out.push(`  ${trimmed}`);
+        continue;
+      }
+      nestSeq = 0;
+      out.push(raw);
+      continue;
+    }
+    const n = parseInt(om[1], 10);
+    const content = om[2] || '';
+    if (!Number.isFinite(n) || n < 1) {
+      out.push(raw);
+      continue;
+    }
+    // Continue top-level sequence: 1,2,3…
+    if (n === lastTop + 1 || (n === 1 && lastTop === 0)) {
+      lastTop = n;
+      nestSeq = 0;
+      out.push(`${n}. ${content}`);
+      continue;
+    }
+    // Restart at 1 (or continue 1,2,3…) under current top-level item
+    if (lastTop >= 1 && (n === 1 || (nestSeq > 0 && n === nestSeq + 1))) {
+      nestSeq = n;
+      out.push(`  ${n}. ${content}`);
+      continue;
+    }
+    lastTop = n;
+    nestSeq = 0;
+    out.push(`${n}. ${content}`);
+  }
+  return out.join('\n');
+}
+
 /** `- **留存全流程资料**：……` should continue as peer action #6, not a nested card. */
 function looksLikePeerActionItem(content) {
   const kv = matchBoldKvContent(content);
@@ -3847,9 +3929,11 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const lines = nestPlanBulletHierarchy(
-    structureAnnotationPlainText(
-      convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+  const lines = nestPlanNumberedHierarchy(
+    nestPlanBulletHierarchy(
+      structureAnnotationPlainText(
+        convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+      )
     )
   ).split('\n');
   let html = '';
@@ -4093,8 +4177,8 @@ function renderAIPlanHtml(text) {
         continue;
       }
 
-      // Nested detail bullets under a numbered item (no kv cards)
-      if (bulletMatch && listMode === 'ol' && liOpen) {
+      // Nested detail under a numbered item (bullets or indented numbered sub-points)
+      if (listMode === 'ol' && liOpen && (bulletMatch || (orderedMatch && depth > 0))) {
         if (!nestedUl) {
           html += `<ul class="result-list result-list-l3">`;
           nestedUl = true;

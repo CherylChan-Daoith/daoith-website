@@ -1923,13 +1923,13 @@ ul {
 }
 
 .result-list-ordered {
-  list-style: decimal !important;
+  list-style-type: decimal !important;
   margin: 0 0 12px 1.1rem;
   padding: 0 0 0 0.35rem;
 }
 
-.result-list-ordered li {
-  list-style: decimal !important;
+.result-list-ordered > li {
+  list-style-type: decimal !important;
   display: list-item;
   font-size: 0.75rem;
   color: var(--text-secondary);
@@ -1937,13 +1937,21 @@ ul {
   margin-bottom: 6px;
 }
 
-.result-list-ordered > li > .result-list {
+/* 二级：a b c — do not inherit decimal from parent ol */
+#resultItems .result-list-ordered > li > .result-list,
+#resultItems .result-list-ordered > li > .result-list > li,
+.result-list-ordered > li > .result-list,
+.result-list-ordered > li > .result-list > li {
+  list-style-type: lower-alpha !important;
   margin: 4px 0 10px 0.15rem;
-  list-style-type: circle !important;
 }
 
-.result-list-ordered > li > .result-list .result-list {
-  list-style-type: square !important;
+/* 三级：i ii iii */
+#resultItems .result-list-ordered > li > .result-list .result-list,
+#resultItems .result-list-ordered > li > .result-list .result-list > li,
+.result-list-ordered > li > .result-list .result-list,
+.result-list-ordered > li > .result-list .result-list > li {
+  list-style-type: lower-roman !important;
 }
 
 /* Business flow chart under 业务流程图 */
