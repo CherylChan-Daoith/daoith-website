@@ -43,7 +43,7 @@ const cases = [
   { name: "step4-export", text: "第四步：您目前货物的出口方式是怎么样的？选项：正式报关出口（0110/9710）、正式报关出口（9810）、小包快递出口（9610/1210）、小包快递出口（未报关）、市场采购出口（1039）、委托货代出口、由平台安排出口、其他。", mode: "diagnosis", step: 4, platform: "亚马逊 Amazon", expect: "exportMode" },
   { name: "step5-invoice", text: "第五步：您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？", mode: "diagnosis", step: 5, platform: "亚马逊 Amazon", expect: "invoice" },
   { name: "step6-product-category", text: "6. 您的产品属于以下哪种类别？", mode: "diagnosis", step: 6, platform: "亚马逊 Amazon", expect: "productCategory" },
-  { name: "step6-product-by-options", text: "产品类别？选项：普货，能正常报关出口和退税、0退税率产品（如贵重金属、珠宝玉石、钢材、铝材、玻璃、木材）", mode: "diagnosis", step: 6, platform: "Temu", expect: "productCategory" },
+  { name: "step6-product-by-options", text: "产品类别？选项：普货，能正常报关出口和退税、0退税率产品（如贵重金属、珠宝玉石、钢材、铝材、木材）", mode: "diagnosis", step: 6, platform: "Temu", expect: "productCategory" },
   { name: "step7-revenue", text: "第七步：您目前年销售额约多少人民币？", mode: "diagnosis", step: 7, platform: "亚马逊 Amazon", expect: "revenue" },
   { name: "step2-entity-atypical-fallback", text: "好的，那请问主体方面您怎么安排呢？", mode: "diagnosis", step: 2, platform: "亚马逊 Amazon", expect: "entity" },
   { name: "qa-mode-no-export-chips", text: "Temu商家能否使用9610出口?\n有条件可以，关键取决于您的Temu经营模式：\n- 可以走 9610 的情况：POP模式（国内直发）", mode: "qa", step: 0, platform: "", expect: null },
