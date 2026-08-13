@@ -2285,13 +2285,24 @@ function getDiagnosisPlanCount() {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** Test / internal accounts: unlimited exclusive diagnosis plans. */
+function isDiagnosisPlanLimitBypassed() {
+  const openid = String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
+  if (!openid) return false;
+  const list = window.DAOITH_CONFIG?.diagnosisPlanLimitBypassOpenids;
+  if (!Array.isArray(list) || !list.length) return false;
+  return list.some((id) => String(id || '').trim() === openid);
+}
+
 function bumpDiagnosisPlanCount() {
+  if (isDiagnosisPlanLimitBypassed()) return getDiagnosisPlanCount();
   const next = Math.min(DIAG_PLAN_LIMIT, getDiagnosisPlanCount() + 1);
   localStorage.setItem(diagnosisPlanCountStorageKey(), String(next));
   return next;
 }
 
 function isDiagnosisPlanLimitReached() {
+  if (isDiagnosisPlanLimitBypassed()) return false;
   return getDiagnosisPlanCount() >= DIAG_PLAN_LIMIT;
 }
 

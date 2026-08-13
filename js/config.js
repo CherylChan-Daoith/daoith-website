@@ -21,6 +21,11 @@ window.DAOITH_CONFIG = {
   // Notify bind / status live on Aliyun (OA AppSecret + DB)
   notifyApiBase: 'https://api.daoith.com',
 
+  // 诊断方案次数免限（按微信 openid；控制台可执行：DAOITH_AUTH.getUser()?.openid）
+  diagnosisPlanLimitBypassOpenids: [
+    'oqURV2STObg-wXYNoeRrcA9-JJcg',
+  ],
+
   // 公安备案 / 网站公示信息（须与营业执照及实际办公地一致；勿使用虚拟地址）
   companyLegalName: '道一天成企业管理（深圳）有限责任公司',
   companyAddress: '深圳市龙华区龙华街道清华社区和平路和平时代广场一单元1412',
