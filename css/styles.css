@@ -1585,9 +1585,152 @@ ul {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--ink);
-  margin: 14px 0 6px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid #d5dee9;
+  margin: 18px 0 10px;
+  padding-bottom: 8px;
+  border-bottom: none;
+  position: relative;
+}
+
+#resultItems .result-section-title::after {
+  content: '';
+  display: block;
+  height: 2px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #2251ff 0%,
+    #5b8cff 42%,
+    rgba(34, 81, 255, 0.18) 78%,
+    rgba(34, 81, 255, 0) 100%
+  );
+}
+
+.result-working {
+  flex: 1;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(34, 81, 255, 0.08), transparent 58%),
+    #f8faff;
+  border-radius: 10px;
+}
+
+.result-working-scene {
+  width: min(220px, 72%);
+}
+
+.result-working-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.result-working-svg .rw-desk,
+.result-working-svg .rw-base {
+  fill: #c7d2fe;
+}
+
+.result-working-svg .rw-screen {
+  fill: #1e3a8a;
+}
+
+.result-working-svg .rw-screen-inner {
+  fill: #eff6ff;
+}
+
+.result-working-svg .rw-code-lines rect {
+  fill: #93c5fd;
+}
+
+.result-working-svg .rw-cursor {
+  fill: #2251ff;
+  transform-origin: left center;
+  animation: rw-cursor 0.9s steps(2, end) infinite;
+}
+
+.result-working-svg .rw-head {
+  fill: #93c5fd;
+}
+
+.result-working-svg .rw-body {
+  fill: none;
+  stroke: #60a5fa;
+  stroke-width: 10;
+  stroke-linecap: round;
+}
+
+.result-working-svg .rw-arms path {
+  fill: none;
+  stroke: #60a5fa;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.result-working-svg .rw-arm-r {
+  transform-origin: 124px 88px;
+  animation: rw-type 0.55s ease-in-out infinite;
+}
+
+.result-working-title {
+  margin: 4px 0 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f1c3f;
+}
+
+.result-working-sub {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.result-working-dots::after {
+  content: '';
+  animation: rw-dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes rw-type {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-6deg) translateY(2px);
+  }
+}
+
+@keyframes rw-cursor {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+@keyframes rw-dots {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75%,
+  100% {
+    content: '...';
+  }
 }
 
 .result-section-subtitle {

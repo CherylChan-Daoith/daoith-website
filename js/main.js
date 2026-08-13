@@ -817,29 +817,52 @@ function normalizeDiagStepLabels(text) {
   });
 }
 
+/** Drop meta lines like「4. 了解目前出口方式」; keep the real numbered question. */
+function stripDiagMetaHeadings(text) {
+  return String(text || '')
+    .replace(
+      /(^|\n)\s*\*{0,2}\d+\.\s*了解(?:目前)?(?:出口方式|供应商发票情况|年销售额|发货方式|注册主体|销售平台|店铺主体)[^\n？?]*\*{0,2}\s*(?=\n|$)/g,
+      '$1'
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /**
  * Bold only the active diagnosis step question (e.g.「3. 请问您的发货方式是以下哪一种？」).
  * Confirmation lines and option lists stay unbolded.
  */
 function emphasizeDiagStepQuestion(text) {
-  let t = normalizeDiagStepLabels(String(text || '').replace(/\r/g, ''));
+  let t = stripDiagMetaHeadings(normalizeDiagStepLabels(String(text || '').replace(/\r/g, '')));
   if (!t.trim() || looksLikeFullDiagnosisPlan(t)) return t;
 
-  // If Dify omits the number, prefix from current wizard step
+  // Prefer number from a stripped meta heading, else current wizard step
+  let stepHint = 0;
+  const raw = String(text || '');
+  const metaNum = raw.match(/(?:^|\n)\s*\*{0,2}(\d+)\.\s*了解/);
+  if (metaNum) stepHint = parseInt(metaNum[1], 10) || 0;
+
   try {
     const mode = localStorage.getItem('daoith_diagnosis_ui_mode') || '';
     const step = parseInt(localStorage.getItem('daoith_diagnosis_ui_step') || '0', 10);
-    if (mode === 'diagnosis' && step >= 1 && step <= 6 && !/(?:^|\n)\s*\*{0,2}\d+\.\s+/.test(t)) {
+    const useStep =
+      stepHint >= 1 && stepHint <= 6
+        ? stepHint
+        : mode === 'diagnosis' && step >= 1 && step <= 6
+          ? step
+          : 0;
+    if (useStep && !/(?:^|\n)\s*\*{0,2}\d+\.\s+\S*[？?]/.test(t)) {
       const lines = t.split('\n');
       for (let i = 0; i < lines.length; i++) {
         const tr = lines[i].trim().replace(/^\*\*|\*\*$/g, '');
         if (
           /[？?]/.test(tr) &&
-          /(平台|主体|发货|出口|发票|销售额|请问|哪一种)/.test(tr) &&
-          !/^\d+\./.test(tr)
+          /(平台|主体|发货|出口|发票|销售额|请问|哪一种|怎样|多少)/.test(tr) &&
+          !/^\d+\./.test(tr) &&
+          !/^了解/.test(tr)
         ) {
           const indent = lines[i].match(/^\s*/)[0];
-          lines[i] = `${indent}${step}. ${tr}`;
+          lines[i] = `${indent}${useStep}. ${tr}`;
           break;
         }
       }
@@ -854,10 +877,11 @@ function emphasizeDiagStepQuestion(text) {
   const mapped = lines.map((line) => {
     const trimmed = line.trim();
     if (!trimmed || /^[-*•]/.test(trimmed) || /^选项[：:]/.test(trimmed)) return line;
+    if (/^\d+\.\s*了解/.test(trimmed.replace(/^\*\*|\*\*$/g, ''))) return '';
     const indent = line.match(/^\s*/)[0];
     // 「3. ……？」——只加粗问句，问号后的补充说明保持普通
     const stepMatch = trimmed.match(/^(?:\*\*)?(\d+\.\s+[^？?\n]*[？?])(?:\*\*)?(.*)$/);
-    if (stepMatch && !/^选项/.test(stepMatch[2].trim())) {
+    if (stepMatch && !/^选项/.test(stepMatch[2].trim()) && !/了解/.test(stepMatch[1])) {
       hit = true;
       return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**${stepMatch[2]}`;
     }
@@ -866,14 +890,15 @@ function emphasizeDiagStepQuestion(text) {
     if (
       withOpts &&
       ( /^\d+\.\s+/.test(withOpts[1]) ||
-        /(请问|发货方式|出口方式|注册主体|发票|销售额|平台)/.test(withOpts[1]) )
+        /(请问|发货方式|出口方式|注册主体|发票|销售额|平台|怎样|多少)/.test(withOpts[1]) )
     ) {
       hit = true;
       return `${indent}**${withOpts[1].replace(/\*\*/g, '').trim()}** ${withOpts[2]}`;
     }
     return line;
   });
-  if (hit) return mapped.join('\n');
+  t = mapped.filter((ln, i, arr) => !(ln === '' && (i === 0 || arr[i - 1] === ''))).join('\n');
+  if (hit) return t;
 
   const q = extractDiagActiveQuestion(t);
   const plainQ = String(q || '')
@@ -885,7 +910,7 @@ function emphasizeDiagStepQuestion(text) {
     plainQ.length >= 6 &&
     plainQ.length <= 180 &&
     /[？?]/.test(plainQ) &&
-    /(平台|主体|发货|出口|发票|销售额|请选择|哪一种)/.test(plainQ)
+    /(平台|主体|发货|出口|发票|销售额|请选择|哪一种|怎样|多少)/.test(plainQ)
   ) {
     const idx = t.indexOf(plainQ);
     if (idx >= 0) {
@@ -2095,6 +2120,7 @@ function initAiChatbot() {
       const beginPlanRouting = () => {
         if (streamingPlan) return;
         streamingPlan = true;
+        showResultWorking();
         typing.classList.add('is-plan-status');
         const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
         typing.textContent = loggedInNow
@@ -2134,7 +2160,14 @@ function initAiChatbot() {
         // Full diagnosis → right-hand plan panel
         if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
           beginPlanRouting();
-          publishDiagnosisPlanToResultPanel(clean, { kind: 'diagnosis' });
+          // Keep typing animation until enough plan content arrives
+          if (
+            looksLikeDiagnosisPlanStreaming(clean) ||
+            looksLikeFullDiagnosisPlan(clean) ||
+            clean.length >= 280
+          ) {
+            publishDiagnosisPlanToResultPanel(clean, { kind: 'diagnosis' });
+          }
           return;
         }
         // Mid-report CoT that slipped past sanitize: still never show in chat
@@ -2506,6 +2539,50 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
     (lead ? `<p class="diag-services-lead">${escapeHtml(lead)}</p>` : '') +
     `<div class="diag-services-grid">${cards}</div>`
   );
+}
+
+function buildResultWorkingHtml() {
+  return (
+    `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
+    `<div class="result-working-scene" aria-hidden="true">` +
+    `<svg class="result-working-svg" viewBox="0 0 220 160" xmlns="http://www.w3.org/2000/svg">` +
+    `<rect class="rw-desk" x="28" y="118" width="164" height="10" rx="3"/>` +
+    `<rect class="rw-screen" x="58" y="48" width="104" height="68" rx="6"/>` +
+    `<rect class="rw-screen-inner" x="66" y="56" width="88" height="46" rx="3"/>` +
+    `<g class="rw-code-lines">` +
+    `<rect x="72" y="62" width="52" height="4" rx="2"/>` +
+    `<rect x="72" y="72" width="70" height="4" rx="2"/>` +
+    `<rect x="72" y="82" width="40" height="4" rx="2"/>` +
+    `<rect class="rw-cursor" x="72" y="92" width="18" height="4" rx="2"/>` +
+    `</g>` +
+    `<rect class="rw-base" x="78" y="116" width="64" height="6" rx="2"/>` +
+    `<circle class="rw-head" cx="110" cy="36" r="12"/>` +
+    `<path class="rw-body" d="M88 118c4-22 14-32 22-32s18 10 22 32"/>` +
+    `<g class="rw-arms">` +
+    `<path d="M96 88c6 8 12 14 18 16"/>` +
+    `<path class="rw-arm-r" d="M124 88c-6 8-12 14-18 16"/>` +
+    `</g>` +
+    `</svg>` +
+    `</div>` +
+    `<p class="result-working-title">道一 AI 正在生成专属合规方案</p>` +
+    `<p class="result-working-sub">正在检索知识库并整理诊断报告<span class="result-working-dots" aria-hidden="true"></span></p>` +
+    `</div>`
+  );
+}
+
+function showResultWorking() {
+  const placeholder = document.getElementById('resultPlaceholder');
+  const content = document.getElementById('resultContent');
+  const items = document.getElementById('resultItems');
+  if (!items || !content) return;
+  if (placeholder) placeholder.style.display = 'none';
+  content.classList.add('active');
+  items.innerHTML = buildResultWorkingHtml();
+  try {
+    items.scrollTop = 0;
+  } catch {
+    /* ignore */
+  }
 }
 
 function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
