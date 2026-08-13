@@ -828,12 +828,53 @@ function stripDiagMetaHeadings(text) {
     .trim();
 }
 
+/** Options are shown as chips — remove「选项/可选」dumps and duplicate bullet lists from chat text. */
+function stripDiagChoiceDump(text) {
+  let t = String(text || '');
+  // Same-line dumps: 「……？可选：…」「……？选项：…」
+  t = t.replace(/([？?])\s*(?:\*\*)?\s*(?:选项|可选)[：:][^\n]*/g, '$1');
+  // Whole option-dump lines
+  t = t.replace(/^\s*(?:选项|可选)[：:].*$/gm, '');
+
+  const lines = t.split('\n');
+  const out = [];
+  let afterAsk = false;
+  for (const line of lines) {
+    const tr = line.trim();
+    if (/^\*{0,2}\d+\.\s+/.test(tr) && /[？?]/.test(tr)) {
+      afterAsk = true;
+      out.push(line);
+      continue;
+    }
+    if (afterAsk) {
+      if (!tr) {
+        out.push(line);
+        continue;
+      }
+      // Drop bullet choices / long comma option lists after the ask
+      if (/^[-*•]/.test(tr)) continue;
+      if (/(?:选项|可选)[：:]/.test(tr)) continue;
+      if (
+        /正式报关出口|小包快递出口|市场采购出口|委托货代出口|由平台安排出口/.test(tr) &&
+        /(、|,|\/)/.test(tr)
+      ) {
+        continue;
+      }
+      afterAsk = false;
+    }
+    out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /**
  * Bold only the active diagnosis step question (e.g.「3. 请问您的发货方式是以下哪一种？」).
  * Confirmation lines and option lists stay unbolded.
  */
 function emphasizeDiagStepQuestion(text) {
-  let t = stripDiagMetaHeadings(normalizeDiagStepLabels(String(text || '').replace(/\r/g, '')));
+  let t = stripDiagChoiceDump(
+    stripDiagMetaHeadings(normalizeDiagStepLabels(String(text || '').replace(/\r/g, '')))
+  );
   if (!t.trim() || looksLikeFullDiagnosisPlan(t)) return t;
 
   // Prefer number from a stripped meta heading, else current wizard step
@@ -879,21 +920,26 @@ function emphasizeDiagStepQuestion(text) {
     if (!trimmed || /^[-*•]/.test(trimmed) || /^选项[：:]/.test(trimmed)) return line;
     if (/^\d+\.\s*了解/.test(trimmed.replace(/^\*\*|\*\*$/g, ''))) return '';
     const indent = line.match(/^\s*/)[0];
-    // 「3. ……？」——只加粗问句，问号后的补充说明保持普通
+    // 「3. ……？」——只加粗问句；选项已在下方 chips，正文不再带出
     const stepMatch = trimmed.match(/^(?:\*\*)?(\d+\.\s+[^？?\n]*[？?])(?:\*\*)?(.*)$/);
-    if (stepMatch && !/^选项/.test(stepMatch[2].trim()) && !/了解/.test(stepMatch[1])) {
+    if (stepMatch && !/了解/.test(stepMatch[1])) {
       hit = true;
-      return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**${stepMatch[2]}`;
+      const tail = String(stepMatch[2] || '').trim();
+      // Keep short parenthetical hints like（例如：…）；drop 选项/可选 dumps
+      if (tail && !/^(?:选项|可选)[：:]/.test(tail) && /^[（(]/.test(tail) && tail.length <= 80) {
+        return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**${stepMatch[2]}`;
+      }
+      return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**`;
     }
-    // 「……？ 选项：A、B…」只加粗问句，选项保持普通
-    const withOpts = trimmed.match(/^(?:\*\*)?(.+?[？?])(?:\*\*)?\s*(选项[：:].+)$/);
+    // 「……？ 选项：A、B…」只保留问句
+    const withOpts = trimmed.match(/^(?:\*\*)?(.+?[？?])(?:\*\*)?\s*(?:选项|可选)[：:].+$/);
     if (
       withOpts &&
       ( /^\d+\.\s+/.test(withOpts[1]) ||
         /(请问|发货方式|出口方式|注册主体|发票|销售额|平台|怎样|多少)/.test(withOpts[1]) )
     ) {
       hit = true;
-      return `${indent}**${withOpts[1].replace(/\*\*/g, '').trim()}** ${withOpts[2]}`;
+      return `${indent}**${withOpts[1].replace(/\*\*/g, '').trim()}**`;
     }
     return line;
   });
@@ -1097,7 +1143,8 @@ const DIAG_QUICK_REPLY_SETS = {
     '部分专票+部分无票',
   ],
   exportMode: [
-    '正式报关出口（0110/9710/9810）',
+    '正式报关出口（0110/9710）',
+    '正式报关出口（9810）',
     '小包快递出口（9610/1210）',
     '小包快递出口（未报关）',
     '市场采购出口（1039）',
@@ -1401,7 +1448,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   const stepHints = {
     2: '请执行第二步：只询问店铺注册主体（大陆公司/香港公司/其他）。',
     3: '请执行第三步：只询问发货方式，并按该平台给出对应选项。',
-    4: '请执行第四步：只询问目前出口方式（正式报关出口（0110/9710/9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他）。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
+    4: '请执行第四步：只提问出口方式一句「4. 您目前货物的出口方式是怎么样的？」不要在正文列出选项；官网会提供按钮：正式报关出口（0110/9710）/正式报关出口（9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
     6: '请执行第六步：只询问年销售额。',
     7: '第1-6步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
