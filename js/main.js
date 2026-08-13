@@ -811,8 +811,8 @@ function enhanceChatMarkdown(text) {
  * Display diagnosis asks as「1. …」「2. …」instead of「第一步 / 第二步».
  */
 function normalizeDiagStepLabels(text) {
-  const map = { 一: '1', 二: '2', 三: '3', 四: '4', 五: '5', 六: '6', 七: '7' };
-  return String(text || '').replace(/第\s*([一二三四五六七1-7])\s*步[：:\s]*/g, (_, raw) => {
+  const map = { 一: '1', 二: '2', 三: '3', 四: '4', 五: '5', 六: '6', 七: '7', 八: '8' };
+  return String(text || '').replace(/第\s*([一二三四五六七八1-8])\s*步[：:\s]*/g, (_, raw) => {
     const n = map[raw] || raw;
     return `${n}. `;
   });
@@ -822,7 +822,7 @@ function normalizeDiagStepLabels(text) {
 function stripDiagMetaHeadings(text) {
   return String(text || '')
     .replace(
-      /(^|\n)\s*\*{0,2}\d+\.\s*了解(?:目前)?(?:出口方式|供应商发票情况|年销售额|发货方式|注册主体|销售平台|店铺主体)[^\n？?]*\*{0,2}\s*(?=\n|$)/g,
+      /(^|\n)\s*\*{0,2}\d+\.\s*了解(?:目前)?(?:出口方式|供应商发票情况|年销售额|产品类别|发货方式|注册主体|销售平台|店铺主体)[^\n？?]*\*{0,2}\s*(?=\n|$)/g,
       '$1'
     )
     .replace(/\n{3,}/g, '\n\n')
@@ -888,9 +888,9 @@ function emphasizeDiagStepQuestion(text) {
     const mode = localStorage.getItem('daoith_diagnosis_ui_mode') || '';
     const step = parseInt(localStorage.getItem('daoith_diagnosis_ui_step') || '0', 10);
     const useStep =
-      stepHint >= 1 && stepHint <= 6
+      stepHint >= 1 && stepHint <= 7
         ? stepHint
-        : mode === 'diagnosis' && step >= 1 && step <= 6
+        : mode === 'diagnosis' && step >= 1 && step <= 7
           ? step
           : 0;
     if (useStep && !/(?:^|\n)\s*\*{0,2}\d+\.\s+\S*[？?]/.test(t)) {
@@ -899,7 +899,7 @@ function emphasizeDiagStepQuestion(text) {
         const tr = lines[i].trim().replace(/^\*\*|\*\*$/g, '');
         if (
           /[？?]/.test(tr) &&
-          /(平台|主体|发货|出口|发票|销售额|请问|哪一种|怎样|多少)/.test(tr) &&
+          /(平台|主体|发货|出口|发票|产品|类别|销售额|请问|哪一种|怎样|多少)/.test(tr) &&
           !/^\d+\./.test(tr) &&
           !/^了解/.test(tr)
         ) {
@@ -937,7 +937,7 @@ function emphasizeDiagStepQuestion(text) {
     if (
       withOpts &&
       ( /^\d+\.\s+/.test(withOpts[1]) ||
-        /(请问|发货方式|出口方式|注册主体|发票|销售额|平台|怎样|多少)/.test(withOpts[1]) )
+        /(请问|发货方式|出口方式|注册主体|发票|产品类别|销售额|平台|怎样|多少|属于以下)/.test(withOpts[1]) )
     ) {
       hit = true;
       return `${indent}**${withOpts[1].replace(/\*\*/g, '').trim()}**`;
@@ -957,7 +957,7 @@ function emphasizeDiagStepQuestion(text) {
     plainQ.length >= 6 &&
     plainQ.length <= 180 &&
     /[？?]/.test(plainQ) &&
-    /(平台|主体|发货|出口|发票|销售额|请选择|哪一种|怎样|多少)/.test(plainQ)
+    /(平台|主体|发货|出口|发票|产品|类别|销售额|请选择|哪一种|怎样|多少|属于以下)/.test(plainQ)
   ) {
     const idx = t.indexOf(plainQ);
     if (idx >= 0) {
@@ -1171,6 +1171,13 @@ const DIAG_QUICK_REPLY_SETS = {
     '由平台安排出口',
     '其他',
   ],
+  productCategory: [
+    '普货，能正常报关出口和退税',
+    '0退税率产品（如贵重金属、珠宝玉石、钢材、铝材、玻璃、木材）',
+    '产品涉及商检（如食品、化妆品、危险化学品、木制品、医疗用品）',
+    '产品涉及海关备案品牌但暂未获得授权',
+    '其他（不在以上分类）',
+  ],
   revenue: [
     '500万以下',
     '500-2000万',
@@ -1228,7 +1235,7 @@ function isShippingQuestionText(t) {
 function isPlatformQuestionText(t) {
   const s = String(t || '');
   // Later-step asks / acknowledgments mentioning「销售平台」must not map to platform chips
-  if (/(发货方式|注册主体|店铺主体|第三步|第四步|年销售额|供应商.*发票)/.test(s)) return false;
+  if (/(发货方式|注册主体|店铺主体|第三步|第四步|年销售额|产品类别|供应商.*发票)/.test(s)) return false;
   if (/(记录为|已将|已记录).{0,24}(销售平台|电商平台)/.test(s) && !/(哪个|什么)平台/.test(s)) {
     return false;
   }
@@ -1296,6 +1303,11 @@ function detectDiagQuickReplySet(botText) {
     return 'exportMode';
   }
   if (/(销售额|营收|年销售|大概多少)/.test(t)) return 'revenue';
+  if (
+    /(产品属于|产品类别|哪种类别|普货|0退税率|退税率产品|涉及商检|海关备案品牌|能正常报关出口和退税)/.test(t)
+  ) {
+    return 'productCategory';
+  }
 
   // Platform-specific step-2 questions — match the active ask only (not prior-step echoes)
   if (/(亚马逊\s*FBA|FBA还是自发货|发货方式是亚马逊)/.test(t)) return 'shippingAmazon';
@@ -1435,9 +1447,14 @@ function localDiagnosisInvoiceAsk(preface) {
   );
 }
 
+function localDiagnosisProductCategoryAsk(preface) {
+  const head = String(preface || '').trim();
+  return (head ? `${head}\n\n` : '') + '6. 您的产品属于以下哪种类别？';
+}
+
 function localDiagnosisRevenueAsk(preface) {
   const head = String(preface || '').trim();
-  return (head ? `${head}\n\n` : '') + '6. 您目前年销售额约多少人民币？';
+  return (head ? `${head}\n\n` : '') + '7. 您目前年销售额约多少人民币？';
 }
 
 /** 平台国内仓类发货 → 出口通常由平台安排 */
@@ -1483,6 +1500,7 @@ function formatDiagSlotsForApi() {
     `发货方式：${s.shipping || '未填写'}`,
     `出口方式：${exportMode}`,
     `供应商发票：${s.invoice || '未填写'}`,
+    `产品类别：${s.productCategory || '未填写'}`,
     `年销售额：${s.revenue || '未填写'}`,
   ];
   let hard = '';
@@ -1513,8 +1531,9 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
     3: '请执行第三步：只提问一句「3. 请问您的发货方式是以下哪一种？」不要在正文罗列选项；官网会按平台显示按钮。',
     4: '请执行第四步：只提问出口方式一句「4. 您目前货物的出口方式是怎么样的？」不要在正文列出选项；官网会提供按钮：正式报关出口（0110/9710）/正式报关出口（9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
     5: '请执行第五步：只询问供应商发票情况。',
-    6: '请执行第六步：只提问一句「6. 您目前年销售额约多少人民币？」不要在正文罗列选项；官网会提供按钮。',
-    7: '第1-6步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
+    6: '请执行第六步：只提问一句「6. 您的产品属于以下哪种类别？」不要在正文罗列选项；官网会提供按钮：普货，能正常报关出口和退税 / 0退税率产品… / 产品涉及商检… / 产品涉及海关备案品牌但暂未获得授权 / 其他（不在以上分类）。',
+    7: '请执行第七步：只提问一句「7. 您目前年销售额约多少人民币？」不要在正文罗列选项；官网会提供按钮。',
+    8: '第1-7步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
   };
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
   const archive = formatDiagSlotsForApi();
@@ -1533,7 +1552,7 @@ function looksLikeRejectedDiagnosisStart(text) {
 }
 
 /** Fallback chips by diagnosis wizard step when bot wording is atypical.
- *  Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6销售额
+ *  Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6产品类别 → 7销售额
  */
 function diagQuickReplySetForStep(step, platformLabel) {
   switch (step) {
@@ -1548,6 +1567,8 @@ function diagQuickReplySetForStep(step, platformLabel) {
     case 5:
       return 'invoice';
     case 6:
+      return 'productCategory';
+    case 7:
       return 'revenue';
     default:
       return null;
@@ -1559,8 +1580,10 @@ function isVagueDiagnosisAnswer(text, step) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (/^(不清楚|不知道|暂不清楚|不太清楚|不确定)$/.test(t)) return true;
-  // 3=发货其他, 4=出口其他（主体已改为「其他境外公司」完整选项，不再视为模糊）
-  if (/^(其他|其它|其他发货方式)$/.test(t)) return step === 3 || step === 4;
+  // 3=发货其他, 4=出口其他, 6=产品类别其他（主体已改为「其他境外公司」完整选项，不再视为模糊）
+  if (/^(其他|其它|其他发货方式|其他（不在以上分类）)$/.test(t)) {
+    return step === 3 || step === 4 || step === 6;
+  }
   return false;
 }
 
@@ -1579,18 +1602,20 @@ function looksLikeDiagnosisClarificationAsk(botText) {
 
 function inferClarificationStepFromBotText(botText) {
   const t = String(botText || '');
-  const m = t.match(/第\s*([一二三四五六1-6])\s*步/);
+  const m = t.match(/第\s*([一二三四五六七1-7])\s*步/);
   if (!m) {
     if (/出口方式/.test(t)) return 4;
     if (/注册主体|店铺主体/.test(t)) return 2;
     if (/发货方式|发货模式/.test(t)) return 3;
+    if (/产品属于|产品类别/.test(t)) return 6;
+    if (/年销售额|销售额/.test(t)) return 7;
     return 0;
   }
-  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6 };
+  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7 };
   const raw = m[1];
   if (map[raw]) return map[raw];
   const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n >= 1 && n <= 6 ? n : 0;
+  return Number.isFinite(n) && n >= 1 && n <= 7 ? n : 0;
 }
 
 /** Infer step number from bot copy like「第三步」or「3.」when present. */
@@ -1599,55 +1624,56 @@ function inferDiagStepFromBotText(botText) {
   const mNum = t.match(/(?:^|\n)\s*(\d+)\.\s+\S/);
   if (mNum) {
     const n = parseInt(mNum[1], 10);
-    if (Number.isFinite(n) && n >= 1 && n <= 7) return n;
+    if (Number.isFinite(n) && n >= 1 && n <= 8) return n;
   }
-  const m = t.match(/第\s*([一二三四五六七1-7])\s*步/);
+  const m = t.match(/第\s*([一二三四五六七八1-8])\s*步/);
   if (!m) return 0;
-  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7 };
+  const map = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8 };
   const raw = m[1];
   if (map[raw]) return map[raw];
   const n = parseInt(raw, 10);
-  return Number.isFinite(n) && n >= 1 && n <= 7 ? n : 0;
+  return Number.isFinite(n) && n >= 1 && n <= 8 ? n : 0;
 }
 
 /**
  * Resolve quick-reply chip set for the current bot message.
- * Wizard chips (平台/主体/发货/出口/发票/销售额) ONLY in Mode A steps 1–6.
+ * Wizard chips (平台/主体/发货/出口/发票/产品类别/销售额) ONLY in Mode A steps 1–7.
  * Mode-select chips only for the welcome choice. Never show wizard chips in 特定问题直答.
  */
 function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
   const detected = detectDiagQuickReplySet(botText);
 
-  // Welcome / mode choice — allowed outside the 6-step wizard
+  // Welcome / mode choice — allowed outside the 7-step wizard
   if (detected === 'modeSelect') return 'modeSelect';
 
   // Hard gate: no diagnosis option chips unless exclusive diagnosis is collecting answers
-  if (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 6) {
+  if (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 7) {
     return null;
   }
 
-  // Do not show yes/no or consult chips during the 6-step collection
+  // Do not show yes/no or consult chips during the 7-step collection
   if (detected === 'consultFollowup' || detected === 'yesNo') {
     return null;
   }
 
   const inferred = inferDiagStepFromBotText(botText);
   const step =
-    inferred >= 1 && inferred <= 6
+    inferred >= 1 && inferred <= 7
       ? inferred
       : uiStep;
   const stepKey = diagQuickReplySetForStep(step, platformLabel);
 
   // If wizard/bot step is known, never let prior-slot keyword echoes override the step chips
-  // Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6销售额
+  // Order: 1平台 → 2主体 → 3发货 → 4出口 → 5发票 → 6产品类别 → 7销售额
   const slotStep = {
     platform: 1,
     entity: 2,
     exportMode: 4,
     invoice: 5,
-    revenue: 6,
+    productCategory: 6,
+    revenue: 7,
   };
-  if (detected && slotStep[detected] && step >= 1 && step <= 6 && stepKey) {
+  if (detected && slotStep[detected] && step >= 1 && step <= 7 && stepKey) {
     if (slotStep[detected] !== step) return stepKey;
   }
 
@@ -1657,6 +1683,7 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
     detected === 'entity' ||
     detected === 'invoice' ||
     detected === 'exportMode' ||
+    detected === 'productCategory' ||
     detected === 'revenue'
   ) {
     return detected;
@@ -1773,8 +1800,11 @@ function initAiChatbot() {
       setDiagSlot('invoice', t);
       setUiWizard('diagnosis', 6, getUiPlatform());
     } else if (step === 6) {
-      setDiagSlot('revenue', t);
+      setDiagSlot('productCategory', t);
       setUiWizard('diagnosis', 7, getUiPlatform());
+    } else if (step === 7) {
+      setDiagSlot('revenue', t);
+      setUiWizard('diagnosis', 8, getUiPlatform());
     }
   };
 
@@ -1871,7 +1901,7 @@ function initAiChatbot() {
     // 澄清追问：只让用户打字，不展示快捷选项
     if (looksLikeDiagnosisClarificationAsk(botText)) {
       const clarifyStep = inferClarificationStepFromBotText(botText);
-      if (getUiMode() === 'diagnosis' && clarifyStep >= 1 && clarifyStep <= 6) {
+      if (getUiMode() === 'diagnosis' && clarifyStep >= 1 && clarifyStep <= 7) {
         setUiWizard('diagnosis', clarifyStep, getUiPlatform());
       }
       clearQuickReplies();
@@ -1886,15 +1916,16 @@ function initAiChatbot() {
       return;
     }
 
-    // Double gate: wizard option chips only while Mode A is collecting steps 1–6
+    // Double gate: wizard option chips only while Mode A is collecting steps 1–7
     const isWizardChip =
       setKey === 'platform' ||
       setKey === 'entity' ||
       setKey === 'exportMode' ||
       setKey === 'invoice' ||
+      setKey === 'productCategory' ||
       setKey === 'revenue' ||
       /^shipping/.test(setKey);
-    if (isWizardChip && (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 6)) {
+    if (isWizardChip && (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 7)) {
       clearQuickReplies();
       return;
     }
@@ -2236,10 +2267,10 @@ function initAiChatbot() {
       return;
     }
 
-    // Fast path: after invoice → step-6 销售额
+    // Fast path: after invoice → step-6 产品类别
     if (prevMode === 'diagnosis' && prevStep === 5 && getUiStep() === 6) {
       const platform = getUiPlatform();
-      const localAsk = localDiagnosisRevenueAsk('好的，已记录发票情况。');
+      const localAsk = localDiagnosisProductCategoryAsk('好的，已记录发票情况。');
       appendBubble(localAsk, 'bot');
       showQuickReplies(localAsk);
 
@@ -2261,7 +2292,39 @@ function initAiChatbot() {
           if (result?.conversationId) persistConversationId(result.conversationId, true);
           return result;
         } catch (err) {
-          console.warn('[diagnosis] step6 revenue sync failed', err);
+          console.warn('[diagnosis] step6 productCategory sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: after product category → step-7 销售额
+    if (prevMode === 'diagnosis' && prevStep === 6 && getUiStep() === 7) {
+      const platform = getUiPlatform();
+      const localAsk = localDiagnosisRevenueAsk('好的，已记录产品类别。');
+      appendBubble(localAsk, 'bot');
+      showQuickReplies(localAsk);
+
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 7, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step7 revenue sync failed', err);
           return null;
         }
       })();
@@ -2276,9 +2339,9 @@ function initAiChatbot() {
     messages.appendChild(typing);
     scrollDiagChatToBottom();
 
-    // Q6 answered → immediately show plan-generating status + right-panel working scene
+    // Q7 answered → immediately show plan-generating status + right-panel working scene
     const shouldGeneratePlanNow =
-      prevMode === 'diagnosis' && prevStep === 6 && getUiStep() >= 7;
+      prevMode === 'diagnosis' && prevStep === 7 && getUiStep() >= 8;
     if (shouldGeneratePlanNow) {
       showResultWorking();
       typing.classList.add('is-plan-status');
@@ -2579,23 +2642,23 @@ function looksLikeDiagnosisPlanStreaming(text) {
   return false;
 }
 
-/** Wizard steps 1–6 are collecting answers — keep asks in chat, never in the plan panel. */
+/** Wizard steps 1–7 are collecting answers — keep asks in chat, never in the plan panel. */
 function isDiagnosisWizardCollecting() {
   try {
     const mode = localStorage.getItem('daoith_diagnosis_ui_mode') || '';
     const step = parseInt(localStorage.getItem('daoith_diagnosis_ui_step') || '0', 10);
-    return mode === 'diagnosis' && Number.isFinite(step) && step >= 1 && step <= 6;
+    return mode === 'diagnosis' && Number.isFinite(step) && step >= 1 && step <= 7;
   } catch {
     return false;
   }
 }
 
-/** Step questions / option lists during the 6-step diagnosis (not a final report). */
+/** Step questions / option lists during the 7-step diagnosis (not a final report). */
 function looksLikeDiagnosisWizardAsk(text) {
   const t = String(text || '').trim();
   if (!t || looksLikeFullDiagnosisPlan(t) || looksLikeDiagnosisPlanStreaming(t)) return false;
   if (
-    (/第\s*[一二三四五六1-6]\s*步/.test(t) || /(?:^|\n)\s*\d+\.\s+\S/.test(t)) &&
+    (/第\s*[一二三四五六七1-7]\s*步/.test(t) || /(?:^|\n)\s*\d+\.\s+\S/.test(t)) &&
     /[？?]/.test(t)
   ) {
     return true;
@@ -2603,8 +2666,8 @@ function looksLikeDiagnosisWizardAsk(text) {
   if (
     t.length < 900 &&
     /[？?]/.test(t) &&
-    /(请问您|请选择|是以下哪一种|是哪一种|还是)/.test(t) &&
-    /(发货方式|注册主体|出口方式|电商平台|发票|销售额|哪个平台|什么平台)/.test(t) &&
+    /(请问您|请选择|是以下哪一种|是哪一种|还是|属于以下)/.test(t) &&
+    /(发货方式|注册主体|出口方式|电商平台|发票|产品类别|销售额|哪个平台|什么平台)/.test(t) &&
     !/(【核心风险诊断】|【合规方案】|【行动建议】)/.test(t)
   ) {
     return true;
