@@ -1763,6 +1763,16 @@ function initAiChatbot() {
       return;
     }
 
+    // 预约专家 1v1：本地引导 + 展示服务卡片（不走 Dify）
+    if (wantsExpertBooking(text)) {
+      clearQuickReplies();
+      input.value = '';
+      appendBubble(text, 'user');
+      appendBubble(EXPERT_BOOKING_MSG, 'bot');
+      showExpertConsultServiceRecs();
+      return;
+    }
+
     const askCount = getAskCount();
     if (!loggedIn && askCount >= FREE_ASK_LIMIT) {
       appendBubble(
@@ -2234,7 +2244,35 @@ const QA_LONG_ANSWER_CHAT_TIP =
   '由于内容较多，道一合规诊断助手已将回复展示在右侧方案生成区，请查看。';
 const DIAG_PLAN_LIMIT = 5;
 const DIAG_PLAN_LIMIT_MSG =
-  '理解您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
+  '您诊断的次数较多，如果您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
+const EXPERT_BOOKING_MSG = '请提交询价并完成预约。';
+
+function wantsExpertBooking(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (/^需要，想预约专家\s*1\s*[vV]\s*1$/.test(t)) return true;
+  if (/想预约专家\s*1\s*[vV]\s*1|预约专家\s*1\s*[vV]\s*1/.test(t)) return true;
+  if (/需要.*(?:预约)?专家\s*1\s*[vV]\s*1/.test(t) && /预约|咨询|需要/.test(t)) return true;
+  return false;
+}
+
+function showExpertConsultServiceRecs() {
+  const serviceHost = document.getElementById('diagServiceRecs');
+  if (!serviceHost) return;
+  const html = buildDiagnosisServiceRecsHtml('', {
+    ids: ['consult-1v1'],
+    lead: '',
+  });
+  if (!html) {
+    serviceHost.innerHTML = '';
+    serviceHost.hidden = true;
+    return;
+  }
+  serviceHost.innerHTML = html;
+  serviceHost.hidden = false;
+  window.DAOITH_CART?.bindAddButtons?.(serviceHost);
+  serviceHost.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+}
 
 function diagnosisPlanCountStorageKey() {
   const openid = String(window.DAOITH_AUTH?.getUser?.()?.openid || '').trim();
@@ -2288,8 +2326,14 @@ function pickDiagnosisServiceIds(text) {
   return ids.slice(0, 4);
 }
 
-function buildDiagnosisServiceRecsHtml(markdown) {
-  const ids = pickDiagnosisServiceIds(markdown);
+function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
+  const ids = Array.isArray(options.ids) && options.ids.length
+    ? options.ids
+    : pickDiagnosisServiceIds(markdown);
+  const lead =
+    options.lead != null
+      ? options.lead
+      : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。';
   const cards = ids
     .map((id) => {
       const s = (window.DAOITH_SERVICES || []).find((x) => x.id === id);
@@ -2310,7 +2354,7 @@ function buildDiagnosisServiceRecsHtml(markdown) {
   if (!cards) return '';
   return (
     `<h3 class="diag-services-heading">您可能需要的服务</h3>` +
-    `<p class="diag-services-lead">根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。</p>` +
+    (lead ? `<p class="diag-services-lead">${escapeHtml(lead)}</p>` : '') +
     `<div class="diag-services-grid">${cards}</div>`
   );
 }
