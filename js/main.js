@@ -806,8 +806,62 @@ function enhanceChatMarkdown(text) {
   return t;
 }
 
+/**
+ * Bold only the active diagnosis step question (e.g.「第三步：请问您的发货方式是以下哪一种？」).
+ * Confirmation lines and option lists stay unbolded.
+ */
+function emphasizeDiagStepQuestion(text) {
+  const t = String(text || '').replace(/\r/g, '');
+  if (!t.trim() || looksLikeFullDiagnosisPlan(t)) return t;
+
+  const lines = t.split('\n');
+  let hit = false;
+  const mapped = lines.map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || /^[-*•]/.test(trimmed) || /^选项[：:]/.test(trimmed)) return line;
+    const indent = line.match(/^\s*/)[0];
+    // 「第三步：……？」整行加粗
+    const stepMatch = trimmed.match(/^(?:\*\*)?(第\s*[一二三四五六1-6]\s*步[：:].+?[？?])(?:\*\*)?$/);
+    if (stepMatch) {
+      hit = true;
+      return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**`;
+    }
+    // 「……？ 选项：A、B…」只加粗问句，选项保持普通
+    const withOpts = trimmed.match(/^(?:\*\*)?(.+?[？?])(?:\*\*)?\s*(选项[：:].+)$/);
+    if (
+      withOpts &&
+      ( /第\s*[一二三四五六1-6]\s*步/.test(withOpts[1]) ||
+        /(请问|发货方式|出口方式|注册主体|发票|销售额|平台)/.test(withOpts[1]) )
+    ) {
+      hit = true;
+      return `${indent}**${withOpts[1].replace(/\*\*/g, '').trim()}** ${withOpts[2]}`;
+    }
+    return line;
+  });
+  if (hit) return mapped.join('\n');
+
+  const q = extractDiagActiveQuestion(t);
+  const plainQ = String(q || '')
+    .replace(/\*\*/g, '')
+    .trim();
+  if (
+    plainQ &&
+    !plainQ.includes('\n') &&
+    plainQ.length >= 6 &&
+    plainQ.length <= 180 &&
+    /[？?]/.test(plainQ) &&
+    /(平台|主体|发货|出口|发票|销售额|请选择|哪一种)/.test(plainQ)
+  ) {
+    const idx = t.indexOf(plainQ);
+    if (idx >= 0) {
+      return `${t.slice(0, idx)}**${plainQ}**${t.slice(idx + plainQ.length)}`;
+    }
+  }
+  return t;
+}
+
 function renderChatBubbleHtml(text) {
-  const md = enhanceChatMarkdown(sanitizeAiAnswer(text));
+  const md = enhanceChatMarkdown(sanitizeAiAnswer(emphasizeDiagStepQuestion(text)));
   const html = renderAIPlanHtml(md);
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
 }
@@ -2214,10 +2268,40 @@ function looksLikeDiagnosisPlanStreaming(text) {
   return false;
 }
 
+/** Wizard steps 1–6 are collecting answers — keep asks in chat, never in the plan panel. */
+function isDiagnosisWizardCollecting() {
+  try {
+    const mode = localStorage.getItem('daoith_diagnosis_ui_mode') || '';
+    const step = parseInt(localStorage.getItem('daoith_diagnosis_ui_step') || '0', 10);
+    return mode === 'diagnosis' && Number.isFinite(step) && step >= 1 && step <= 6;
+  } catch {
+    return false;
+  }
+}
+
+/** Step questions / option lists during the 6-step diagnosis (not a final report). */
+function looksLikeDiagnosisWizardAsk(text) {
+  const t = String(text || '').trim();
+  if (!t || looksLikeFullDiagnosisPlan(t) || looksLikeDiagnosisPlanStreaming(t)) return false;
+  if (/第\s*[一二三四五六1-6]\s*步/.test(t) && /[？?]/.test(t)) return true;
+  if (
+    t.length < 900 &&
+    /[？?]/.test(t) &&
+    /(请问您|请选择|是以下哪一种|是哪一种|还是)/.test(t) &&
+    /(发货方式|注册主体|出口方式|电商平台|发票|销售额|哪个平台|什么平台)/.test(t) &&
+    !/(【核心风险诊断】|【合规方案】|【行动建议】)/.test(t)
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /** Route long formal plans to the right panel; keep short Q&A in chat. */
 function shouldRouteDiagnosisToPlanPanel(text) {
   const t = String(text || '').trim();
   if (!t) return false;
+  // Never park diagnostic process questions in the solution panel
+  if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
   if (looksLikeFullDiagnosisPlan(t) || looksLikeDiagnosisPlanStreaming(t)) return true;
 
   const activeQ = extractDiagActiveQuestion(t);
@@ -2238,7 +2322,11 @@ function shouldRouteDiagnosisToPlanPanel(text) {
 
 /** Mode B / general replies longer than 100 characters → right panel. */
 function shouldRouteLongAnswerToPlanPanel(text) {
-  return String(text || '').trim().length > 100;
+  const t = String(text || '').trim();
+  if (!t) return false;
+  // Diagnosis wizard Q&A must stay in the left chat
+  if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
+  return t.length > 100;
 }
 
 const DIAG_PLAN_STATUS_MSG = '道一合规诊断助手正在为您生成专属合规方案，请查看右侧方案生成区';
