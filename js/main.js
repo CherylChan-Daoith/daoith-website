@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFeedbackForm();
   initLoadMore();
   initTaxSystemsGrid();
+  bindResultPanelCopyGuard();
   updateExpertArticles();
   window.DAOITH_CART?.updateCartBadge();
   window.DAOITH_CART?.bindAddButtons();
@@ -2722,6 +2723,21 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
     (lead ? `<p class="diag-services-lead">${escapeHtml(lead)}</p>` : '') +
     `<div class="diag-services-grid">${cards}</div>`
   );
+}
+
+/** Soft copy guard for the right-hand compliance plan panel (deterrent only). */
+function bindResultPanelCopyGuard() {
+  const panel = document.getElementById('resultPanel');
+  if (!panel || panel.dataset.copyGuard === '1') return;
+  panel.dataset.copyGuard = '1';
+  const block = (e) => {
+    e.preventDefault();
+  };
+  panel.addEventListener('copy', block);
+  panel.addEventListener('cut', block);
+  panel.addEventListener('contextmenu', block);
+  panel.addEventListener('dragstart', block);
+  panel.addEventListener('selectstart', block);
 }
 
 function buildResultWorkingHtml() {
