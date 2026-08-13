@@ -3699,11 +3699,19 @@ function nestPlanNumberedHierarchy(text) {
     }
     const om = trimmed.match(/^(\d+)[.)、．]\s+(.*)$/);
     if (!om) {
-      if (lastTop >= 1 && /^[-*•]\s+/.test(trimmed)) {
-        out.push(`  ${trimmed}`);
-        continue;
+      // Section headers reset numbering context; never auto-indent plain bullets
+      // (that created empty ● parents wrapping ○ children).
+      if (
+        /^【/.test(trimmed) ||
+        /^#{1,4}\s/.test(trimmed) ||
+        /^[一二三四五六七八九十]+[、.．]/.test(trimmed) ||
+        /^(业务流程图|主要风险|核心风险|行动建议|注意事项|合规方案)/.test(trimmed)
+      ) {
+        lastTop = 0;
+        nestSeq = 0;
+      } else if (!/^[-*•]\s+/.test(trimmed)) {
+        nestSeq = 0;
       }
-      nestSeq = 0;
       out.push(raw);
       continue;
     }
@@ -3807,12 +3815,13 @@ function sanitizeDiagnosisPlanText(text) {
   return t;
 }
 
-/** Strip leading list index from item text (avoid ● + 1 / **1**). */
+/** Strip leading list index from item text (avoid ● + 1 / **1** / duplicate glyphs). */
 function stripLeadingListIndex(content) {
   return String(content || '')
     .replace(/^\*\*\s*\d+\s*[.、)）．]?\s*\*\*\s*/, '')
     .replace(/^\*\*\d+\*\*\s*[.、)）．]?\s*/, '')
     .replace(/^\d+\s*[.、)）．]\s*/, '')
+    .replace(/^[●○◆▪•·◦▪️◉]+\s*/, '')
     .trim();
 }
 
@@ -4109,8 +4118,11 @@ function renderAIPlanHtml(text) {
 
   /** Emit a ul item at indent depth (0=二级, 1=三级, 2=四级, 3=五级). */
   const appendUlItem = (depth, contentHtml, asKv = false) => {
-    const d = Math.max(0, Math.min(3, depth));
+    let d = Math.max(0, Math.min(3, depth | 0));
     if (listMode !== 'ul') openList('ul');
+
+    // No parent list item with content yet — never create an empty ● wrapper around ○
+    if (d > 0 && !liOpen) d = 0;
 
     if (d === 0) {
       closeUlNestsTo(0);
@@ -4208,7 +4220,8 @@ function renderAIPlanHtml(text) {
       if (flowMode) sectionKind = 'flow';
       else if (/风险/.test(title)) sectionKind = 'risk';
       else if (/行动建议/.test(title)) sectionKind = 'actions';
-      else if (/合规方案|注意事项|流程|资料/.test(title)) sectionKind = 'plan';
+      else if (/注意事项/.test(title)) sectionKind = 'notes';
+      else if (/合规方案|流程|资料/.test(title)) sectionKind = 'plan';
       html += `<h5 class="result-section-subtitle${flowMode ? ' result-flow-heading' : ''}">${escapeHtml(title)}</h5>`;
       continue;
     }
@@ -4221,7 +4234,8 @@ function renderAIPlanHtml(text) {
       if (flowMode) sectionKind = 'flow';
       else if (/风险/.test(title)) sectionKind = 'risk';
       else if (/行动建议/.test(title)) sectionKind = 'actions';
-      else if (/合规方案|注意事项/.test(title)) sectionKind = 'plan';
+      else if (/注意事项/.test(title)) sectionKind = 'notes';
+      else if (/合规方案/.test(title)) sectionKind = 'plan';
       const cls =
         level >= 3 ? 'result-section-subtitle' : 'result-section-title';
       const flowCls = flowMode ? ' result-flow-heading' : '';
@@ -4238,7 +4252,8 @@ function renderAIPlanHtml(text) {
       flowMode = false;
       if (/核心风险/.test(title)) sectionKind = 'risk';
       else if (/行动建议/.test(title)) sectionKind = 'actions';
-      else if (/合规方案|注意事项/.test(title)) sectionKind = 'plan';
+      else if (/注意事项/.test(title)) sectionKind = 'notes';
+      else if (/合规方案/.test(title)) sectionKind = 'plan';
       else sectionKind = 'default';
       html += `<h5 class="result-section-title">${escapeHtml(title)}</h5>`;
       continue;
@@ -4268,6 +4283,7 @@ function renderAIPlanHtml(text) {
       }
 
       // Under 行动建议 / numbered plan: promote `- **标题**：说明` to next numbered peer
+      // Never switch mid-section from bullets → numbers (avoids ○ then 1. mix).
       if (
         bulletMatch &&
         depth === 0 &&
@@ -4293,12 +4309,18 @@ function renderAIPlanHtml(text) {
         continue;
       }
 
-      // Risks → plain bullets; 合规方案/行动建议 → continuous ol (1…6)
+      // notes/risk: flat bullets only. plan/actions: ordered only if section not already in ul.
       const useOrdered =
         depth === 0 &&
+        listMode !== 'ul' &&
         content.length <= 220 &&
-        ((Boolean(orderedMatch) && (sectionKind === 'plan' || sectionKind === 'actions')) ||
-          (sectionKind === 'actions' && looksLikePeerActionItem(content)));
+        (sectionKind === 'plan' || sectionKind === 'actions') &&
+        (Boolean(orderedMatch) ||
+          (sectionKind === 'actions' && looksLikePeerActionItem(content) && listMode !== 'ul'));
+
+      // Flatten accidental indent under notes/risk (no empty parent wrappers)
+      const effectiveDepth =
+        sectionKind === 'notes' || sectionKind === 'risk' ? 0 : depth;
 
       if (useOrdered) {
         closeLi();
@@ -4309,7 +4331,7 @@ function renderAIPlanHtml(text) {
         if (listMode === 'ol' || listMode === 'flow') closeList();
         const kv = matchBoldKvContent(content);
         // kv cards only for 合规方案对照（非定制/定制等）
-        if (kv && sectionKind === 'plan' && depth === 0) {
+        if (kv && sectionKind === 'plan' && effectiveDepth === 0) {
           appendUlItem(
             0,
             `<span class="result-kv-key">${escapeHtml(kv[1])}</span>` +
@@ -4317,7 +4339,7 @@ function renderAIPlanHtml(text) {
             true
           );
         } else {
-          appendUlItem(depth, formatPlanListItem(content), false);
+          appendUlItem(effectiveDepth, formatPlanListItem(content), false);
         }
       }
       continue;

@@ -1871,6 +1871,18 @@ ul {
   margin-bottom: 8px;
 }
 
+/* Wrapper-only <li> (no text, only nested list) must not show its own bullet */
+#resultItems .result-list > li:has(> .result-list:only-child),
+#resultItems .result-list-ordered > li:has(> .result-list:only-child) {
+  list-style: none !important;
+  padding-left: 0;
+  margin-left: 0;
+}
+
+#resultItems .result-list > li:has(> .result-list:only-child) > .result-list {
+  margin-left: 0;
+}
+
 .result-em {
   color: var(--navy);
   font-weight: 700;
