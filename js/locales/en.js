@@ -319,7 +319,7 @@ window.DAOITH_I18N_EN = {
       html: true,
       text: 'Fill in business details on the left,<br>then click "Generate AI Plan" for your custom plan.',
     },
-    '#resultContent h4': { text: 'Your Compliance Plan' },
+    '#resultContent h4': { text: 'Your Compliance Diagnosis Report' },
     '.faq-panel h3': { text: 'FAQ' },
     '.tax-calc h3': { text: 'Compliance Tax Calculator' },
     '.tax-calc > p': {

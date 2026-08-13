@@ -3777,6 +3777,20 @@ function isBoldNestParentBullet(content) {
   return /^\*\*[^*]{1,40}\*\*\s*[:：]?\s*$/.test(String(content || '').trim());
 }
 
+/** Intro bullets that open a nested list, e.g. **…风险**：……存在以下问题： */
+function isNestIntroParentBullet(content) {
+  const t = String(content || '').trim();
+  if (!t) return false;
+  if (isBoldNestParentBullet(t)) return true;
+  if (!/[：:]\s*$/.test(t)) return false;
+  return /(存在以下(?:问题|风险|情形)|如下|包括以下|具体(?:包括|如下)|主要(?:包括|有))/.test(t);
+}
+
+/** New bold-titled peer while currently nested under an intro parent. */
+function isBoldTitledBullet(content) {
+  return /^\*\*[^*]{1,48}\*\*/.test(String(content || '').trim());
+}
+
 /**
  * If the model emits a flat list of bold step titles + detail bullets,
  * indent details under each bold title so the renderer can nest 二/三/四级.
@@ -3802,8 +3816,11 @@ function nestPlanBulletHierarchy(text) {
       continue;
     }
     const content = String(bm[1] || '').trim();
-    if (isBoldNestParentBullet(content)) {
+    if (isNestIntroParentBullet(content)) {
       underParent = true;
+      out.push(`- ${content}`);
+    } else if (underParent && isBoldTitledBullet(content)) {
+      underParent = isNestIntroParentBullet(content) || isBoldNestParentBullet(content);
       out.push(`- ${content}`);
     } else if (underParent) {
       out.push(`  - ${content}`);
@@ -4453,9 +4470,8 @@ function renderAIPlanHtml(text) {
         (Boolean(orderedMatch) ||
           (sectionKind === 'actions' && looksLikePeerActionItem(content) && listMode !== 'ul'));
 
-      // Flatten accidental indent under notes/risk (no empty parent wrappers)
-      const effectiveDepth =
-        sectionKind === 'notes' || sectionKind === 'risk' ? 0 : depth;
+      // notes: keep flat discs. risk/plan/actions: honor markdown indent nesting.
+      const effectiveDepth = sectionKind === 'notes' ? 0 : depth;
 
       if (useOrdered) {
         closeLi();
