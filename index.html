@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260811d">
+  <link rel="stylesheet" href="/css/styles.css?v=20260813b">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -151,20 +151,18 @@
         <div class="ai-left">
         <div class="form-panel diag-panel">
           <div class="diag-hs-block">
-            <div class="form-group">
-              <label>出口退税率查询</label>
-              <div class="hs-input-group">
-                <input type="text" id="hsCode" placeholder="请填写10位海关编码以获得准确退税率" inputmode="numeric" autocomplete="off" maxlength="14">
+            <div class="diag-hs-title">出口退税率查询</div>
+            <div class="diag-hs-row">
+              <div class="diag-hs-left">
+                <input type="text" id="hsCode" placeholder="输入10位海关编码（HS Code）" inputmode="numeric" autocomplete="off" maxlength="14" aria-label="海关编码">
+                <p class="hs-hint" id="hsHint">完整税号精确匹配；不足10位时按前8位尝试。</p>
               </div>
-              <div class="hs-actions">
-                <div class="hs-action-row">
-                  <button type="button" class="btn btn-outline btn-sm hs-query-btn" id="queryTax">查询出口退税率</button>
-                  <input type="text" class="hs-rate-box" id="refundRateBox" readonly placeholder="—" aria-label="出口退税率">
-                </div>
+              <div class="diag-hs-right">
+                <button type="button" class="btn btn-primary btn-sm hs-query-btn" id="queryTax">查询</button>
+                <input type="text" class="hs-rate-box" id="refundRateBox" readonly placeholder="退税率" aria-label="出口退税率">
               </div>
-              <p class="hs-hint" id="hsHint">请填写10位海关编码以获得准确退税率（知识库按完整税号精确匹配；不足10位时将尝试按前8位匹配）。</p>
-              <p class="hs-rate-source" id="hsRateSource" hidden></p>
             </div>
+            <p class="hs-rate-source" id="hsRateSource" hidden></p>
           </div>
 
           <div class="diag-chat" id="aiChatbot" data-state="open">
@@ -722,7 +720,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260811d"></script>
+  <script src="/js/locales/en.js?v=20260813b"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260813a"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -733,6 +731,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260813a"></script>
+  <script src="/js/main.js?v=20260813b"></script>
 </body>
 </html>

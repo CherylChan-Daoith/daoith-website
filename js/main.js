@@ -1610,14 +1610,18 @@ function initAiChatbot() {
   const renderQuickReplyButtons = (options) => {
     if (!quickEl || !options?.length) return;
     clearQuickReplies();
-    options.forEach((label) => {
+    const label = document.createElement('div');
+    label.className = 'diag-quick-replies-label';
+    label.textContent = '请选择下方选项继续';
+    quickEl.appendChild(label);
+    options.forEach((opt) => {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'diag-quick-reply-btn';
-      btn.textContent = label;
+      btn.textContent = opt;
       btn.addEventListener('click', () => {
         if (busy) return;
-        input.value = label;
+        input.value = opt;
         form.requestSubmit();
       });
       quickEl.appendChild(btn);
@@ -1703,18 +1707,17 @@ function initAiChatbot() {
     // Welcome always restarts mode choice — clear stale diagnosis step chips from prior sessions
     resetUiWizard();
 
-    const greeting =
-      '您好，欢迎使用道一合规诊断助手，为跨境电商企业提供合规解决方案，我将根据您的情况提供针对性的合规方案。';
-    const ask =
-      '请选择：**开启专属合规诊断**（需微信登录，按步骤生成诊断报告），或 **我有特定问题想直接提问**（基于知识库即时解答）。';
-
-    // Plain welcome bubble — avoid markdown pipeline rewriting/dropping the intro
+    // Rich welcome card — controlled HTML only
     const greetEl = document.createElement('div');
     greetEl.className = 'ai-chatbot-bubble is-bot is-welcome';
-    greetEl.textContent = greeting;
+    greetEl.innerHTML =
+      `<div class="welcome-kicker">道一合规诊断助手</div>` +
+      `<p class="welcome-lead">您好，欢迎使用道一合规诊断助手</p>` +
+      `<p class="welcome-ask">为跨境电商企业提供合规解决方案。请选择：` +
+      `<strong>开启专属合规诊断</strong>（需微信登录，按步骤生成诊断报告），或 ` +
+      `<strong>我有特定问题想直接提问</strong>（基于知识库即时解答）。</p>`;
     messages.appendChild(greetEl);
 
-    appendBubble(ask, 'bot');
     showQuickReplies('请选择：开启专属合规诊断，还是我有特定问题想直接提问？');
     scrollDiagChatToBottom();
   };
