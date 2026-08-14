@@ -1851,6 +1851,7 @@ function initAiChatbot() {
     const t = String(text || '').trim();
     if (/开启专属合规诊断/.test(t)) {
       clearDiagSlots();
+      resetResultPlanPanel();
       setUiWizard('diagnosis', 1, '');
       return;
     }
@@ -1860,6 +1861,7 @@ function initAiChatbot() {
     }
     if (/重新诊断|换个模式|我要逐步诊断/.test(t)) {
       clearDiagSlots();
+      resetResultPlanPanel();
       setUiWizard('diagnosis', 1, '');
       return;
     }
@@ -2079,6 +2081,7 @@ function initAiChatbot() {
     resetConversation();
     clearMessages();
     clearQuickReplies();
+    resetResultPlanPanel();
     showWelcome();
     input.value = '';
     input.focus();
@@ -2624,11 +2627,23 @@ function initAiChatbot() {
       if (!answer || answer.length < 8) {
         // Do NOT fall back to raw result.text (often still contains think / CoT)
         const retry = sanitizeAiAnswer(result.text);
-        answer = retry || buildLocalChatReply(text, ctx) || '';
+        // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
+        if (
+          streamingPlan ||
+          shouldGeneratePlanNow ||
+          (getUiMode() === 'diagnosis' && getUiStep() >= 8)
+        ) {
+          answer = retry || '';
+        } else {
+          answer = retry || buildLocalChatReply(text, ctx) || '';
+        }
       }
       answer = sanitizeAiAnswer(answer);
       answer = stripDiagnosisIntroBoilerplate(answer || '');
       answer = correctAluminumRefundHallucinations(answer);
+      if (looksLikeLocalGenericHelp(answer)) {
+        answer = '';
+      }
       if (!answer || answer.length < 4) {
         if (streamingPlan || (getUiMode() === 'diagnosis' && getUiStep() >= 6)) {
           beginPlanRouting();
@@ -2730,6 +2745,31 @@ function looksLikeFullDiagnosisPlan(text) {
   if (t.length >= 500 && /【核心风险诊断】|【合规方案】/.test(t)) return true;
   if (t.length >= 650 && /#{1,3}\s+/.test(t) && /(风险|方案|建议)/.test(t)) return true;
   return false;
+}
+
+function looksLikeLocalGenericHelp(text) {
+  const t = String(text || '');
+  return (
+    /我可以协助的实务方向/.test(t) ||
+    /请先在左侧填写业务信息并生成方案/.test(t)
+  );
+}
+
+/** Reset the right-hand plan panel back to the empty AI placeholder. */
+function resetResultPlanPanel() {
+  const placeholder = document.getElementById('resultPlaceholder');
+  const content = document.getElementById('resultContent');
+  const items = document.getElementById('resultItems');
+  const working = document.getElementById('resultWorking');
+  const serviceHost = document.getElementById('diagServiceRecs');
+  if (working) working.remove();
+  if (items) items.innerHTML = '';
+  if (content) content.classList.remove('active');
+  if (placeholder) placeholder.style.display = '';
+  if (serviceHost) {
+    serviceHost.innerHTML = '';
+    serviceHost.hidden = true;
+  }
 }
 
 /**
@@ -2837,6 +2877,7 @@ function shouldRouteDiagnosisToPlanPanel(text) {
 function shouldRouteLongAnswerToPlanPanel(text) {
   const t = String(text || '').trim();
   if (!t) return false;
+  if (looksLikeLocalGenericHelp(t) || looksLikeDiagnosisPlanScaffold(t)) return false;
   // Diagnosis wizard Q&A must stay in the left chat
   if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
   return t.length > 100;
@@ -3057,6 +3098,13 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
+  // Local generic help / English scaffolds are not diagnosis reports
+  if (kind === 'diagnosis' && (looksLikeLocalGenericHelp(clean) || looksLikeDiagnosisPlanScaffold(clean))) {
+    return;
+  }
+  if (kind === 'qa' && looksLikeLocalGenericHelp(clean)) {
+    return;
+  }
   const body = renderAIPlanHtml(clean) || `<p class="result-paragraph">${escapeHtml(clean)}</p>`;
   const fromChat =
     kind === 'qa'
