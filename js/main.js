@@ -1260,7 +1260,7 @@ const DIAG_QUICK_REPLY_SETS = {
     '普货，能正常报关出口和退税',
     '0退税率产品（如贵重金属、珠宝玉石、钢材、铝材、木材）',
     '产品涉及商检（如食品、化妆品、危险化学品、木制品）',
-    '产品涉及海关备案商标或者专利但暂未获得授权',
+    '产品涉及海关备案商标但暂未获得授权',
     '其他（不在以上分类）',
   ],
   revenue: [
@@ -1607,7 +1607,7 @@ function formatDiagArchiveConfirmParts() {
   if (/^普货/.test(product)) productLabel = '普货';
   else if (/^0退税率/.test(product)) productLabel = '0退税率产品';
   else if (/商检/.test(product)) productLabel = '涉及商检';
-  else if (/商标|专利/.test(product)) productLabel = '海关备案商标／专利未授权';
+  else if (/商标|专利/.test(product)) productLabel = '海关备案商标未授权';
   else if (/^其他/.test(product)) productLabel = '其他产品类别';
 
   const revenue = String(s.revenue || '').trim();
@@ -3366,7 +3366,7 @@ function buildResultWorkingHtml() {
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<img class="rw-figure" src="/images/diag-thinker-blue.png" alt="" width="480" height="480" decoding="async"/>` +
+    `<img class="rw-figure" src="/images/diag-thinker-blue.png?v=20260815cut1" alt="" width="360" height="483" decoding="async"/>` +
     `<div class="rw-thoughts">${chipHtml}</div>` +
     `</div>` +
     `<p class="result-working-title">` +

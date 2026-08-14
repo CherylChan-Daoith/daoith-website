@@ -1760,17 +1760,17 @@ ul {
 
 .result-working-scene {
   position: relative;
-  width: min(220px, 78%);
-  aspect-ratio: 1 / 1;
+  width: min(200px, 72%);
 }
 
 .result-working-scene .rw-figure {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 16px;
-  box-shadow: 0 8px 24px rgba(34, 81, 255, 0.12);
+  height: auto;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
   animation: rw-breathe 3.2s ease-in-out infinite;
 }
 
@@ -2093,8 +2093,8 @@ ul {
   list-style: none !important;
   display: block !important;
   margin: 0 0 12px;
-  /* Left padding aligns card copy with bulleted body text in sibling sections */
-  padding: 14px 16px 14px 1.45rem;
+  /* Blue bar stands in for the bullet; inner copy lines up with risk list text */
+  padding: 12px 14px 12px 12px;
   border: 1px solid rgba(34, 81, 255, 0.1);
   border-left: 4px solid #2251ff;
   border-radius: 14px;
@@ -2119,12 +2119,12 @@ ul {
   line-height: 1.65;
 }
 
-/* 合规方案卡片列表：去掉默认圆点，卡片自带左边线 */
+/* 合规方案卡片：与风险列表同一左缩进 */
 #resultItems .result-list:has(> .result-kv),
 .result-list:has(> .result-kv) {
   list-style: none !important;
-  margin: 0 0 14px;
-  padding: 0;
+  margin: 0 0 14px 1.1rem;
+  padding: 0 0 0 0.35rem;
 }
 
 #ai-solution .result-panel .result-list li {
