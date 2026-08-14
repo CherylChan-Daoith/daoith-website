@@ -850,6 +850,60 @@ function stripDiagMetaHeadings(text) {
     .trim();
 }
 
+const DIAG_PICK_HINT = '（可在下方点选）';
+
+/** Force diagnosis asks to tip chips below — never keep option lists in the question text. */
+function normalizeDiagAskHint(text) {
+  let t = String(text || '');
+  // Known verbose templates → short ask + tip
+  t = t.replace(
+    /(^\s*(?:\*\*)?1\.\s*)您在哪个电商平台上销售商品[？?][^\n]*/gm,
+    `$1您在哪个电商平台上销售商品？${DIAG_PICK_HINT}`
+  );
+  t = t.replace(
+    /(^\s*(?:\*\*)?2\.\s*)您平台店铺的注册主体是[^？?\n]*[？?][^\n]*/gm,
+    `$1您平台店铺的注册主体是哪一种？${DIAG_PICK_HINT}`
+  );
+  t = t.replace(
+    /(^\s*(?:\*\*)?3\.\s*)请问您的发货方式是以下哪一种[？?][^\n]*/gm,
+    `$1请问您的发货方式是以下哪一种？${DIAG_PICK_HINT}`
+  );
+  t = t.replace(
+    /(^\s*(?:\*\*)?4\.\s*)您目前货物的出口方式是怎么样的[？?][^\n]*/gm,
+    `$1您目前货物的出口方式是怎么样的？${DIAG_PICK_HINT}`
+  );
+  t = t.replace(
+    /(^\s*(?:\*\*)?5\.\s*)您目前供应商[^？?\n]*[？?][^\n]*/gm,
+    `$1您目前供应商发票情况如何？${DIAG_PICK_HINT}`
+  );
+  t = t.replace(
+    /(^\s*(?:\*\*)?6\.\s*)您的产品属于以下哪种类别[？?][^\n]*/gm,
+    `$1您的产品属于以下哪种类别？${DIAG_PICK_HINT}`
+  );
+  t = t.replace(
+    /(^\s*(?:\*\*)?7\.\s*)您目前年销售额约多少人民币[？?][^\n]*/gm,
+    `$1您目前年销售额约多少人民币？${DIAG_PICK_HINT}`
+  );
+  // Unnumbered platform ask (model sometimes omits「1.」)
+  t = t.replace(
+    /(^|\n)(\s*)(?:\*\*)?您在哪个电商平台上销售商品[？?]\s*[（(][^）\n]*[）)](?:\*\*)?/g,
+    `$1$2您在哪个电商平台上销售商品？${DIAG_PICK_HINT}`
+  );
+  // Any remaining「（例如：…）」after a question → tip
+  t = t.replace(/([？?])\s*[（(]例如[：:][^）\n]*[）)]/g, `$1${DIAG_PICK_HINT}`);
+  // Step 1–7 lines that still have a long parenthetical after ？
+  t = t.replace(
+    /(^\s*(?:\*\*)?[1-7]\.\s+[^\n？?]*[？?])(?:\*\*)?\s*[（(](?!可在下方点选)[^）\n]{2,}[）)]/gm,
+    `$1${DIAG_PICK_HINT}`
+  );
+  // Step 1–7 asks missing the tip
+  t = t.replace(
+    /(^\s*(?:\*\*)?([1-7])\.\s+(?:您|请问)[^\n？?]*[？?])(?!\s*（可在下方点选）)/gm,
+    `$1${DIAG_PICK_HINT}`
+  );
+  return t;
+}
+
 /** Options are shown as chips — remove「选项/可选」dumps and duplicate bullet lists from chat text. */
 function stripDiagChoiceDump(text) {
   let t = String(text || '');
@@ -894,8 +948,10 @@ function stripDiagChoiceDump(text) {
  * Confirmation lines and option lists stay unbolded.
  */
 function emphasizeDiagStepQuestion(text) {
-  let t = stripDiagChoiceDump(
-    stripDiagMetaHeadings(normalizeDiagStepLabels(String(text || '').replace(/\r/g, '')))
+  let t = normalizeDiagAskHint(
+    stripDiagChoiceDump(
+      stripDiagMetaHeadings(normalizeDiagStepLabels(String(text || '').replace(/\r/g, '')))
+    )
   );
   if (!t.trim() || looksLikeFullDiagnosisPlan(t)) return t;
 
@@ -942,16 +998,19 @@ function emphasizeDiagStepQuestion(text) {
     if (!trimmed || /^[-*•]/.test(trimmed) || /^选项[：:]/.test(trimmed)) return line;
     if (/^\d+\.\s*了解/.test(trimmed.replace(/^\*\*|\*\*$/g, ''))) return '';
     const indent = line.match(/^\s*/)[0];
-    // 「3. ……？」——只加粗问句；选项已在下方 chips，正文不再带出
+    // 「3. ……？」——只加粗问句；统一附「（可在下方点选）」，选项在下方 chips
     const stepMatch = trimmed.match(/^(?:\*\*)?(\d+\.\s+[^？?\n]*[？?])(?:\*\*)?(.*)$/);
     if (stepMatch && !/了解/.test(stepMatch[1])) {
       hit = true;
-      const tail = String(stepMatch[2] || '').trim();
-      // Keep short parenthetical hints like（例如：…）；drop 选项/可选 dumps
-      if (tail && !/^(?:选项|可选)[：:]/.test(tail) && /^[（(]/.test(tail) && tail.length <= 80) {
-        return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**${stepMatch[2]}`;
+      const q = stepMatch[1].replace(/\*\*/g, '');
+      if (/^[1-7]\./.test(q)) {
+        return `${indent}**${q}**${DIAG_PICK_HINT}`;
       }
-      return `${indent}**${stepMatch[1].replace(/\*\*/g, '')}**`;
+      const tail = String(stepMatch[2] || '').trim();
+      if (tail && !/^(?:选项|可选)[：:]/.test(tail) && /^[（(]/.test(tail) && tail.length <= 40) {
+        return `${indent}**${q}**${stepMatch[2]}`;
+      }
+      return `${indent}**${q}**`;
     }
     // 「……？ 选项：A、B…」只保留问句
     const withOpts = trimmed.match(/^(?:\*\*)?(.+?[？?])(?:\*\*)?\s*(?:选项|可选)[：:].+$/);
@@ -994,6 +1053,11 @@ function renderChatBubbleHtml(text) {
   md = md.replace(/(^|\n)(\*\*)?(\d+)\.(?=\s)/gm, '$1$2@@N$3@@');
   let html = renderAIPlanHtml(md);
   html = String(html || '').replace(/@@N(\d+)@@/g, '$1.');
+  // Tip under chips: smaller + lighter than the question
+  html = String(html || '').replace(
+    /（可在下方点选）/g,
+    '<span class="diag-ask-hint">（可在下方点选）</span>'
+  );
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
 }
 
@@ -1423,7 +1487,7 @@ function normalizeDiagnosisModeQuery(text) {
   if (/开启专属合规诊断/.test(t)) {
     return (
       '【模式选择】用户选择：开启专属合规诊断。' +
-      '请立即进入模式A专属合规诊断，执行第一步：只提问销售平台（可列举亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN、Shopee、Lazada、美客多等）。' +
+      '请立即进入模式A专属合规诊断，执行第一步：只提问「1. 您在哪个电商平台上销售商品？（可在下方点选）」；不要在正文罗列平台名称，官网底部会显示按钮。' +
       '禁止说“这不是自动命令”，禁止要求用户改提其他具体问题，禁止输出欢迎语。'
     );
   }
@@ -1439,43 +1503,42 @@ function normalizeDiagnosisModeQuery(text) {
 function localDiagnosisPlatformAsk() {
   return (
     '好的，已为您开启专属合规诊断。\n\n' +
-    '1. 您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN、Shopee、Lazada）'
+    '1. 您在哪个电商平台上销售商品？（可在下方点选）'
   );
 }
 
 function localDiagnosisEntityAsk(platformLabel) {
   const platform = String(platformLabel || '').trim();
-  const opts = entityOptionsForPlatform(platform);
   return (
     (platform ? `好的，已将「${platform}」记录为您的销售平台。\n\n` : '好的。\n\n') +
-    `2. 您平台店铺的注册主体是${opts.join('、')}？`
+    '2. 您平台店铺的注册主体是哪一种？（可在下方点选）'
   );
 }
 
 function localDiagnosisShippingAsk(platformLabel) {
-  return '3. 请问您的发货方式是以下哪一种？';
+  return '3. 请问您的发货方式是以下哪一种？（可在下方点选）';
 }
 
 function localDiagnosisExportAsk() {
-  return '4. 您目前货物的出口方式是怎么样的？';
+  return '4. 您目前货物的出口方式是怎么样的？（可在下方点选）';
 }
 
 function localDiagnosisInvoiceAsk(preface) {
   const head = String(preface || '').trim();
   return (
     (head ? `${head}\n\n` : '') +
-    '5. 您目前供应商是否能够配合提供增值税专用发票？还是只能提供增值税普通发票，或者无法提供发票？'
+    '5. 您目前供应商发票情况如何？（可在下方点选）'
   );
 }
 
 function localDiagnosisProductCategoryAsk(preface) {
   const head = String(preface || '').trim();
-  return (head ? `${head}\n\n` : '') + '6. 您的产品属于以下哪种类别？';
+  return (head ? `${head}\n\n` : '') + '6. 您的产品属于以下哪种类别？（可在下方点选）';
 }
 
 function localDiagnosisRevenueAsk(preface) {
   const head = String(preface || '').trim();
-  return (head ? `${head}\n\n` : '') + '7. 您目前年销售额约多少人民币？';
+  return (head ? `${head}\n\n` : '') + '7. 您目前年销售额约多少人民币？（可在下方点选）';
 }
 
 /** 平台国内仓类发货 → 出口通常由平台安排 */
@@ -1629,12 +1692,12 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
   const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
-    2: '请执行第二步：只提问店铺注册主体一句；官网会按平台显示按钮（含对应海外本土公司选项，如 Shopee/Lazada→东南亚本土公司，美客多→南美洲本土公司）。不要在正文罗列全部选项。',
-    3: '请执行第三步：只提问一句「3. 请问您的发货方式是以下哪一种？」不要在正文罗列选项；官网会按平台显示按钮。',
-    4: '请执行第四步：只提问出口方式一句「4. 您目前货物的出口方式是怎么样的？」不要在正文列出选项；官网会提供按钮：正式报关出口（0110/9710）/正式报关出口（9810）/小包快递出口（9610/1210）/小包快递出口（未报关）/市场采购出口（1039）/委托货代出口/由平台安排出口/其他。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
-    5: '请执行第五步：只询问供应商发票情况。',
-    6: '请执行第六步：只提问一句「6. 您的产品属于以下哪种类别？」不要在正文罗列选项；官网会提供按钮：普货，能正常报关出口和退税 / 0退税率产品… / 产品涉及商检… / 产品涉及海关备案商标或者专利但暂未获得授权 / 其他（不在以上分类）。',
-    7: '请执行第七步：只提问一句「7. 您目前年销售额约多少人民币？」不要在正文罗列选项；官网会提供按钮。',
+    2: '请执行第二步：只提问「2. 您平台店铺的注册主体是哪一种？（可在下方点选）」；不要在正文罗列主体选项，官网会显示按钮。',
+    3: '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；不要在正文罗列选项，官网会按平台显示按钮。',
+    4: '请执行第四步：只提问「4. 您目前货物的出口方式是怎么样的？（可在下方点选）」；不要在正文列出选项。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
+    5: '请执行第五步：只提问「5. 您目前供应商发票情况如何？（可在下方点选）」；不要在正文罗列专票/普票等选项。',
+    6: '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
+    7: '请执行第七步：只提问「7. 您目前年销售额约多少人民币？（可在下方点选）」；不要在正文罗列选项。',
     8: '第1-7步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
   };
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
