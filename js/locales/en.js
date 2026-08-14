@@ -15,7 +15,7 @@ window.DAOITH_I18N_ZH = {
     'tax.viewDetail': '查看税制详情',
     'tax.trade': '2025年贸易额',
     'article.readMore': '阅读原文',
-    'ai.loading': '道一 AI 正在生成专属合规方案…',
+    'ai.loading': 'Daoith Compliance Assistant is generating your plan…',
     'ai.generating': '生成中…',
     'ai.querying': '查询中…',
     'tax.calcLoading': '计算中…',

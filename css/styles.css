@@ -919,9 +919,11 @@ ul {
 
 .diag-chat .ai-chatbot-bubble.is-bot {
   background: #fff;
-  border: 1px solid rgba(34, 81, 255, 0.1);
+  border: 1.5px solid rgba(34, 81, 255, 0.32);
   color: #14213d;
-  box-shadow: 0 4px 14px rgba(34, 81, 255, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(34, 81, 255, 0.06),
+    0 6px 18px rgba(34, 81, 255, 0.12);
 }
 
 .diag-chat .ai-chatbot-bubble.is-user {
@@ -942,14 +944,14 @@ ul {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   flex-shrink: 0;
-  max-height: min(34%, 220px);
+  max-height: min(28%, 160px);
   overflow-y: auto;
-  padding: 10px 16px 12px;
+  padding: 6px 12px 8px;
   margin: 0;
   border-top: 1px solid rgba(34, 81, 255, 0.1);
-  background: linear-gradient(180deg, #ffffff, #f3f7ff);
+  background: #fff;
   box-shadow: none;
 }
 
@@ -959,26 +961,27 @@ ul {
 
 .diag-quick-replies-label {
   flex: 0 0 100%;
-  margin: 0 0 2px;
-  font-size: 0.68rem;
+  margin: 0;
+  font-size: 0.64rem;
   font-weight: 600;
   color: #3b6cff;
   letter-spacing: 0;
+  line-height: 1.2;
 }
 
 .diag-quick-reply-btn {
   appearance: none;
-  border: 1px solid rgba(34, 81, 255, 0.18);
+  border: 1px solid rgba(34, 81, 255, 0.22);
   background: #fff;
   color: #1a2b6b;
   border-radius: 980px;
-  padding: 8px 14px;
-  font-size: 0.78rem;
-  line-height: 1.3;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  line-height: 1.25;
   font-weight: 500;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(34, 81, 255, 0.06);
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .diag-quick-replies.is-stacked {
@@ -986,6 +989,7 @@ ul {
   flex-wrap: nowrap;
   align-items: stretch;
   overflow-x: auto;
+  gap: 4px;
 }
 
 .diag-quick-replies.is-stacked .diag-quick-replies-label {
@@ -998,21 +1002,21 @@ ul {
   width: max-content;
   min-width: 100%;
   box-sizing: border-box;
-  padding: 8px 14px;
-  font-size: 0.76rem;
-  line-height: 1.35;
+  padding: 5px 10px;
+  font-size: 0.7rem;
+  line-height: 1.3;
   text-align: left;
   white-space: nowrap;
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .diag-quick-reply-btn:hover,
 .diag-quick-reply-btn:focus-visible,
 .diag-quick-reply-btn:active {
-  background: linear-gradient(135deg, rgba(34, 81, 255, 0.1), rgba(34, 211, 238, 0.12));
+  background: rgba(34, 81, 255, 0.08);
   border-color: rgba(34, 81, 255, 0.4);
   color: #1a3cff;
-  box-shadow: 0 4px 12px rgba(34, 81, 255, 0.14);
+  box-shadow: none;
   outline: none;
 }
 
@@ -1095,13 +1099,15 @@ ul {
 .diag-chat .ai-chatbot-bubble.is-welcome {
   max-width: 100%;
   background: #fff;
-  border: none;
+  border: 1.5px solid rgba(34, 81, 255, 0.32);
   color: #1d1d1f;
   font-size: 0.84rem;
   font-weight: 500;
   line-height: 1.6;
   padding: 16px 16px;
-  box-shadow: 0 1px 3px rgba(15, 28, 63, 0.06);
+  box-shadow:
+    0 0 0 1px rgba(34, 81, 255, 0.06),
+    0 6px 18px rgba(34, 81, 255, 0.12);
   border-radius: 16px;
 }
 
@@ -1748,13 +1754,12 @@ ul {
   display: block;
 }
 
-.result-working-svg .rw-desk,
-.result-working-svg .rw-base {
-  fill: #c7d2fe;
+.result-working-svg .rw-desk {
+  fill: #bfdbfe;
 }
 
 .result-working-svg .rw-screen {
-  fill: #1e3a8a;
+  fill: #1e40af;
 }
 
 .result-working-svg .rw-screen-inner {
@@ -1771,34 +1776,116 @@ ul {
   animation: rw-cursor 0.9s steps(2, end) infinite;
 }
 
+.result-working-svg .rw-keyboard {
+  fill: #93c5fd;
+}
+
+.result-working-svg .rw-keys rect {
+  fill: #dbeafe;
+}
+
+.result-working-svg .rw-antenna {
+  stroke: #60a5fa;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.result-working-svg .rw-antenna-ball {
+  fill: #38bdf8;
+}
+
 .result-working-svg .rw-head {
   fill: #93c5fd;
 }
 
-.result-working-svg .rw-body {
+.result-working-svg .rw-cheek {
+  fill: #fda4af;
+  opacity: 0.85;
+}
+
+.result-working-svg .rw-eye {
+  fill: #1e3a8a;
+}
+
+.result-working-svg .rw-smile {
   fill: none;
-  stroke: #60a5fa;
-  stroke-width: 10;
+  stroke: #1e3a8a;
+  stroke-width: 2;
   stroke-linecap: round;
 }
 
-.result-working-svg .rw-arms path {
+.result-working-svg .rw-torso {
+  fill: #60a5fa;
+}
+
+.result-working-svg .rw-badge {
+  fill: #fff;
+}
+
+.result-working-svg .rw-limb {
   fill: none;
   stroke: #60a5fa;
-  stroke-width: 6;
+  stroke-width: 7;
   stroke-linecap: round;
+}
+
+.result-working-svg .rw-hand {
+  fill: #93c5fd;
+  stroke: #3b82f6;
+  stroke-width: 1.2;
+}
+
+.result-working-svg .rw-finger {
+  fill: #bfdbfe;
+  stroke: #3b82f6;
+  stroke-width: 0.8;
+}
+
+.result-working-svg .rw-arm-l {
+  transform-origin: 78px 118px;
+  animation: rw-type-l 0.55s ease-in-out infinite;
 }
 
 .result-working-svg .rw-arm-r {
-  transform-origin: 124px 88px;
-  animation: rw-type 0.55s ease-in-out infinite;
+  transform-origin: 142px 118px;
+  animation: rw-type-r 0.55s ease-in-out infinite;
 }
 
 .result-working-title {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   font-size: 0.92rem;
   font-weight: 700;
   color: #0f1c3f;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.35;
+}
+
+.result-working-brand {
+  color: #1230b0;
+  font-weight: 800;
+}
+
+.result-working-ai-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 980px;
+  background: linear-gradient(135deg, #2251ff, #22d3ee);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.result-working-title-rest {
+  color: #0f1c3f;
+  font-weight: 700;
 }
 
 .result-working-sub {
@@ -1812,13 +1899,23 @@ ul {
   animation: rw-dots 1.2s steps(4, end) infinite;
 }
 
-@keyframes rw-type {
+@keyframes rw-type-l {
   0%,
   100% {
-    transform: rotate(0deg) translateY(0);
+    transform: translateY(0) rotate(0deg);
   }
   50% {
-    transform: rotate(-6deg) translateY(2px);
+    transform: translateY(3px) rotate(-4deg);
+  }
+}
+
+@keyframes rw-type-r {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(3px) rotate(4deg);
   }
 }
 

@@ -3268,26 +3268,64 @@ function buildResultWorkingHtml() {
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<svg class="result-working-svg" viewBox="0 0 220 160" xmlns="http://www.w3.org/2000/svg">` +
-    `<rect class="rw-desk" x="28" y="118" width="164" height="10" rx="3"/>` +
-    `<rect class="rw-screen" x="58" y="48" width="104" height="68" rx="6"/>` +
-    `<rect class="rw-screen-inner" x="66" y="56" width="88" height="46" rx="3"/>` +
+    `<svg class="result-working-svg" viewBox="0 0 220 168" xmlns="http://www.w3.org/2000/svg">` +
+    /* desk */
+    `<rect class="rw-desk" x="24" y="128" width="172" height="12" rx="4"/>` +
+    /* monitor */
+    `<rect class="rw-screen" x="62" y="42" width="96" height="70" rx="10"/>` +
+    `<rect class="rw-screen-inner" x="70" y="50" width="80" height="48" rx="6"/>` +
     `<g class="rw-code-lines">` +
-    `<rect x="72" y="62" width="52" height="4" rx="2"/>` +
-    `<rect x="72" y="72" width="70" height="4" rx="2"/>` +
-    `<rect x="72" y="82" width="40" height="4" rx="2"/>` +
-    `<rect class="rw-cursor" x="72" y="92" width="18" height="4" rx="2"/>` +
+    `<rect x="78" y="58" width="42" height="5" rx="2.5"/>` +
+    `<rect x="78" y="68" width="58" height="5" rx="2.5"/>` +
+    `<rect x="78" y="78" width="34" height="5" rx="2.5"/>` +
+    `<rect class="rw-cursor" x="78" y="88" width="16" height="5" rx="2.5"/>` +
     `</g>` +
-    `<rect class="rw-base" x="78" y="116" width="64" height="6" rx="2"/>` +
-    `<circle class="rw-head" cx="110" cy="36" r="12"/>` +
-    `<path class="rw-body" d="M88 118c4-22 14-32 22-32s18 10 22 32"/>` +
-    `<g class="rw-arms">` +
-    `<path d="M96 88c6 8 12 14 18 16"/>` +
-    `<path class="rw-arm-r" d="M124 88c-6 8-12 14-18 16"/>` +
+    /* keyboard */
+    `<rect class="rw-keyboard" x="74" y="120" width="72" height="10" rx="3"/>` +
+    `<g class="rw-keys">` +
+    `<rect x="78" y="122.5" width="8" height="5" rx="1"/>` +
+    `<rect x="89" y="122.5" width="8" height="5" rx="1"/>` +
+    `<rect x="100" y="122.5" width="8" height="5" rx="1"/>` +
+    `<rect x="111" y="122.5" width="8" height="5" rx="1"/>` +
+    `<rect x="122" y="122.5" width="8" height="5" rx="1"/>` +
+    `<rect x="133" y="122.5" width="8" height="5" rx="1"/>` +
+    `</g>` +
+    /* cute robot head */
+    `<g class="rw-bot">` +
+    `<circle class="rw-antenna-ball" cx="110" cy="12" r="3.5"/>` +
+    `<line class="rw-antenna" x1="110" y1="16" x2="110" y2="24"/>` +
+    `<circle class="rw-head" cx="110" cy="36" r="16"/>` +
+    `<circle class="rw-cheek rw-cheek-l" cx="100" cy="40" r="3"/>` +
+    `<circle class="rw-cheek rw-cheek-r" cx="120" cy="40" r="3"/>` +
+    `<circle class="rw-eye" cx="104" cy="34" r="2.4"/>` +
+    `<circle class="rw-eye" cx="116" cy="34" r="2.4"/>` +
+    `<path class="rw-smile" d="M104 42c3 3.2 9 3.2 12 0"/>` +
+    /* body */
+    `<rect class="rw-torso" x="96" y="52" width="28" height="22" rx="10"/>` +
+    `<circle class="rw-badge" cx="110" cy="63" r="4.5"/>` +
+    /* arms + cute mitten hands on keyboard */
+    `<g class="rw-arm-l">` +
+    `<path class="rw-limb" d="M100 68c-12 10-18 28-20 46"/>` +
+    `<ellipse class="rw-hand" cx="78" cy="118" rx="10" ry="7.5"/>` +
+    `<ellipse class="rw-finger" cx="71" cy="114" rx="2.4" ry="3.2"/>` +
+    `<ellipse class="rw-finger" cx="77" cy="112.5" rx="2.4" ry="3.2"/>` +
+    `<ellipse class="rw-finger" cx="83" cy="113" rx="2.4" ry="3.2"/>` +
+    `</g>` +
+    `<g class="rw-arm-r">` +
+    `<path class="rw-limb" d="M120 68c12 10 18 28 20 46"/>` +
+    `<ellipse class="rw-hand" cx="142" cy="118" rx="10" ry="7.5"/>` +
+    `<ellipse class="rw-finger" cx="135" cy="113" rx="2.4" ry="3.2"/>` +
+    `<ellipse class="rw-finger" cx="141" cy="112.5" rx="2.4" ry="3.2"/>` +
+    `<ellipse class="rw-finger" cx="147" cy="114" rx="2.4" ry="3.2"/>` +
+    `</g>` +
     `</g>` +
     `</svg>` +
     `</div>` +
-    `<p class="result-working-title">道一 AI 正在生成专属合规方案</p>` +
+    `<p class="result-working-title">` +
+    `<span class="result-working-brand">道一合规助手</span>` +
+    `<span class="result-working-ai-tag">AI</span>` +
+    `<span class="result-working-title-rest">正在生成专属合规方案</span>` +
+    `</p>` +
     `<p class="result-working-sub">正在检索知识库并整理诊断报告<span class="result-working-dots" aria-hidden="true"></span></p>` +
     `</div>`
   );
