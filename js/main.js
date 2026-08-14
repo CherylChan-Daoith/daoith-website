@@ -4026,9 +4026,9 @@ function formatInline(text) {
     if (!esc || s.includes(`>${esc}<`)) continue;
     s = s.split(esc).join(`<strong class="result-em">${esc}</strong>`);
   }
-  // Highlight common customs / regime codes
+  // Highlight common customs / regime codes (allow fullwidth digits / nearby punctuation)
   s = s.replace(
-    /\b(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)\b/g,
+    /(?<![\d])(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)(?![\d])/gi,
     '<span class="result-code">$1</span>'
   );
   return s;
@@ -4050,6 +4050,39 @@ function formatRiskOrBulletContent(content) {
 
 function matchBoldKvContent(content) {
   return String(content || '').match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
+}
+
+/** Split a 合规方案 bullet into card title + body (for left-accent cards). */
+function splitPlanCardContent(content) {
+  const raw = String(content || '').trim();
+  if (!raw) return null;
+
+  const bold = raw.match(/^\*\*([^*]{1,40})\*\*\s*[:：]?\s*([\s\S]*)$/);
+  if (bold) {
+    const key = bold[1].replace(/\s+/g, ' ').trim();
+    const val = String(bold[2] || '')
+      .replace(/^\s*[:：]\s*/, '')
+      .trim();
+    if (key && val) return { key, val };
+  }
+
+  const plain = raw.match(/^([^：:\n＊*]{2,48})[:：]\s*([\s\S]{6,})$/);
+  if (plain && !/→|⟶|->/.test(plain[1])) {
+    return {
+      key: plain[1].replace(/\*\*/g, '').replace(/\s+/g, ' ').trim(),
+      val: plain[2].trim(),
+    };
+  }
+
+  const lead = raw.match(/^(.{4,36}?)([。．])([\s\S]{16,})$/);
+  if (lead && !/→|⟶|->/.test(lead[1]) && !/^\d+$/.test(lead[1])) {
+    return {
+      key: lead[1].replace(/\*\*/g, '').replace(/\s+/g, ' ').trim(),
+      val: `${lead[3]}`.trim(),
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -4934,15 +4967,16 @@ function renderAIPlanHtml(text) {
         continue;
       }
 
-      // Under 行动建议 / numbered plan: promote `- **标题**：说明` to next numbered peer
+      // Under 行动建议: promote `- **标题**：说明` to next numbered peer
       // Never switch mid-section from bullets → numbers (avoids ○ then 1. mix).
+      // 合规方案固定用卡片，不升成有序编号。
       if (
         bulletMatch &&
         depth === 0 &&
         listMode === 'ol' &&
         liOpen &&
         looksLikePeerActionItem(content) &&
-        (sectionKind === 'actions' || sectionKind === 'plan')
+        sectionKind === 'actions'
       ) {
         closeLi();
         openList('ol');
@@ -4961,16 +4995,40 @@ function renderAIPlanHtml(text) {
         continue;
       }
 
-      // notes/risk: flat bullets only. plan/actions: ordered only if section not already in ul.
+      // 【合规方案】：顶层要点一律渲染为左侧蓝条白底卡片（忽略 1. / - 差异）
+      if (sectionKind === 'plan' && (depth === 0 || !liOpen)) {
+        if (listMode === 'ol' || listMode === 'flow') closeList();
+        const card = splitPlanCardContent(content) || matchBoldKvContent(content);
+        if (card) {
+          const key = card.key || card[1];
+          const val = card.val || card[2];
+          appendUlItem(
+            0,
+            `<span class="result-kv-key">${escapeHtml(key)}</span>` +
+              `<span class="result-kv-val">${formatInline(val)}</span>`,
+            true
+          );
+        } else {
+          // 仍用卡片外壳，避免退化成普通圆点列表
+          appendUlItem(
+            0,
+            `<span class="result-kv-val">${formatPlanListItem(content)}</span>`,
+            true
+          );
+        }
+        continue;
+      }
+
+      // notes/risk: flat bullets only. actions: ordered. plan handled above.
       const useOrdered =
         depth === 0 &&
         listMode !== 'ul' &&
         content.length <= 220 &&
-        (sectionKind === 'plan' || sectionKind === 'actions') &&
+        sectionKind === 'actions' &&
         (Boolean(orderedMatch) ||
-          (sectionKind === 'actions' && looksLikePeerActionItem(content) && listMode !== 'ul'));
+          (looksLikePeerActionItem(content) && listMode !== 'ul'));
 
-      // notes: keep flat discs. risk/plan/actions: honor markdown indent nesting.
+      // notes: keep flat discs. risk/actions: honor markdown indent nesting.
       const effectiveDepth = sectionKind === 'notes' ? 0 : depth;
 
       if (useOrdered) {
@@ -4981,8 +5039,8 @@ function renderAIPlanHtml(text) {
       } else {
         if (listMode === 'ol' || listMode === 'flow') closeList();
         const kv = matchBoldKvContent(content);
-        // kv cards only for 合规方案对照（非定制/定制等）
-        if (kv && sectionKind === 'plan' && effectiveDepth === 0) {
+        // kv cards only for 合规方案对照（非定制/定制等）— plan depth>0 fallback
+        if (kv && sectionKind === 'plan') {
           appendUlItem(
             0,
             `<span class="result-kv-key">${escapeHtml(kv[1])}</span>` +
