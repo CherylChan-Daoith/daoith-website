@@ -2560,7 +2560,8 @@ ul {
 /* AI section — white canvas, aligned with other site sections */
 #ai-solution,
 #ai-solution.ai-solution-page {
-  padding: 40px 0 56px;
+  /* Clear fixed site header (~61px) so the badge is not covered */
+  padding: 96px 0 56px;
   background: #fff;
   min-height: 100vh;
   overflow-x: hidden;
@@ -2573,22 +2574,26 @@ ul {
 }
 
 #ai-solution .section-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: #2251ff !important;
-  -webkit-text-fill-color: #2251ff;
-  background: transparent !important;
+  -webkit-text-fill-color: #2251ff !important;
+  background: #eef3ff !important;
   background-image: none !important;
-  -webkit-background-clip: border-box;
-  background-clip: border-box;
-  border: 1px solid rgba(34, 81, 255, 0.32);
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+  border: 1px solid rgba(34, 81, 255, 0.35);
   border-radius: 980px;
-  padding: 5px 14px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   line-height: 1.2;
   text-transform: uppercase;
   margin-bottom: 14px;
+  position: relative;
+  z-index: 2;
 }
 
 #ai-solution .section-header h2 {
