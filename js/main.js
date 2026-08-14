@@ -3761,13 +3761,17 @@ function formatPlanListItem(content) {
 
 /** Parse leading indent + list marker. depth 0–3 → display levels 2–5 under section titles. */
 function parsePlanListMarker(rawLine) {
-  const m = String(rawLine || '').match(/^([ \t]*)([-*•]|\d+[.)、．])\s+(.*)$/);
+  const m = String(rawLine || '').match(/^([ \t]*)([-*•]|\d+[.)、．]|[a-zA-Z][.)、．])\s+(.*)$/);
   if (!m) return null;
   const spaces = m[1].replace(/\t/g, '  ').length;
-  const depth = Math.min(3, Math.floor(spaces / 2));
+  let depth = Math.min(3, Math.floor(spaces / 2));
+  const marker = m[2];
+  const isLetter = /^[a-zA-Z][.)、．]$/.test(marker);
+  // Letter sub-points (a./b.) are always nested under the current parent item
+  if (isLetter && depth < 1) depth = 1;
   return {
     depth,
-    ordered: /^\d+[.)、．]$/.test(m[2]),
+    ordered: /^\d+[.)、．]$/.test(marker),
     content: m[3],
   };
 }
@@ -3889,6 +3893,71 @@ function nestPlanNumberedHierarchy(text) {
     lastTop = n;
     nestSeq = 0;
     out.push(`${n}. ${content}`);
+  }
+  return out.join('\n');
+}
+
+/**
+ * Fix「a. 非定制…」后误升为「2. 定制类…」→ 缩进为同级子项（CSS lower-alpha 显示为 b.），
+ * 并顺延后续一级序号。
+ */
+function nestCustomAfterNonCustomPeers(text) {
+  const lines = String(text || '').split('\n');
+  const out = [];
+  let sawNonCustomSub = false;
+  let demoteAfter = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      out.push(raw);
+      continue;
+    }
+    if (
+      /^【/.test(trimmed) ||
+      /^#{1,4}\s/.test(trimmed) ||
+      /^(业务流程图|主要风险|核心风险|行动建议|注意事项|合规方案)/.test(trimmed)
+    ) {
+      sawNonCustomSub = false;
+      demoteAfter = 0;
+      out.push(raw);
+      continue;
+    }
+
+    if (
+      /^([aA][.、．)]|\(?[aA]\))\s*\*{0,2}非定制/.test(trimmed) ||
+      /^[-*•]\s*\*{0,2}(?:[aA][.、．)]\s*)?\*{0,2}非定制/.test(trimmed) ||
+      /^\d+[.)、．]\s*\*{0,2}非定制/.test(trimmed)
+    ) {
+      sawNonCustomSub = true;
+      out.push(raw);
+      continue;
+    }
+
+    const customNum = trimmed.match(/^(\d+)[.)、．]\s+(\*{0,2}定制类.*)$/);
+    if (sawNonCustomSub && customNum) {
+      demoteAfter = parseInt(customNum[1], 10);
+      // Indented bullet → nests under current ol item; CSS lower-alpha renders as b.
+      let content = customNum[2].replace(/^[bB][.、．)]\s*/, '');
+      out.push(`  - ${content}`);
+      sawNonCustomSub = false;
+      continue;
+    }
+
+    const om = trimmed.match(/^(\d+)[.)、．]\s+(.*)$/);
+    if (om && demoteAfter > 0) {
+      const n = parseInt(om[1], 10);
+      if (Number.isFinite(n) && n > demoteAfter) {
+        out.push(`${n - 1}. ${om[2]}`);
+        continue;
+      }
+    }
+
+    if (/^\d+[.)、．]\s+/.test(trimmed)) {
+      sawNonCustomSub = false;
+    }
+    out.push(raw);
   }
   return out.join('\n');
 }
@@ -4196,10 +4265,12 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const lines = nestPlanNumberedHierarchy(
-    nestPlanBulletHierarchy(
-      structureAnnotationPlainText(
-        convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+  const lines = nestCustomAfterNonCustomPeers(
+    nestPlanNumberedHierarchy(
+      nestPlanBulletHierarchy(
+        structureAnnotationPlainText(
+          convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
+        )
       )
     )
   ).split('\n');
