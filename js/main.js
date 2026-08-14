@@ -1512,6 +1512,87 @@ function formatDiagSlotsForApi() {
   return `【诊断档案·必须采信】\n${lines.join('\n')}\n${hard}`;
 }
 
+/** Short labels for the fixed「诊断档案确认」line in the plan panel. */
+function formatDiagArchiveConfirmParts() {
+  const s = getDiagSlots();
+  const exportMode =
+    s.exportMode ||
+    (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '');
+  const product = String(s.productCategory || '').trim();
+  let productLabel = product;
+  if (/^普货/.test(product)) productLabel = '普货';
+  else if (/^0退税率/.test(product)) productLabel = '0退税率产品';
+  else if (/商检/.test(product)) productLabel = '涉及商检';
+  else if (/商标|专利/.test(product)) productLabel = '海关备案商标／专利未授权';
+  else if (/^其他/.test(product)) productLabel = '其他产品类别';
+
+  const revenue = String(s.revenue || '').trim();
+  const revenueLabel = revenue
+    ? /^年销售额/.test(revenue)
+      ? revenue
+      : `年销售额${revenue}`
+    : '';
+
+  return [
+    s.platform,
+    s.entity,
+    s.shipping,
+    exportMode,
+    s.invoice,
+    productLabel,
+    revenueLabel,
+  ]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean);
+}
+
+function buildDiagnosisArchiveConfirmHtml() {
+  const parts = formatDiagArchiveConfirmParts();
+  if (!parts.length) return '';
+  return (
+    `<p class="result-paragraph result-archive-confirm">` +
+    `<strong>诊断档案确认：</strong>` +
+    `<span class="result-archive-confirm-values">${escapeHtml(parts.join(' / '))}</span>` +
+    `</p>`
+  );
+}
+
+/** Drop model-written archive/confirm preambles — frontend owns this block. */
+function stripDiagnosisArchivePreamble(text) {
+  const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let skipping = true;
+  for (const raw of lines) {
+    const plain = raw
+      .replace(/\*/g, '')
+      .replace(/^[-*•]\s+/, '')
+      .trim();
+    if (skipping) {
+      if (!plain) continue;
+      if (
+        /^(诊断档案确认|业务档案确认|诊断信息确认|档案确认)[:：]/.test(plain) ||
+        /^以下方案由左侧/.test(plain) ||
+        /^您好[，,]?\s*我是您的道一合规小助手/.test(plain)
+      ) {
+        continue;
+      }
+      // Skip a compact archive dump line that lists options with /
+      if (
+        /(阿里|亚马逊|Temu|Shopee|速卖通|美客多|TikTok)/.test(plain) &&
+        /年销售额|专票|无票|普货|报关|发货/.test(plain) &&
+        (plain.match(/\//g) || []).length >= 3 &&
+        plain.length < 220 &&
+        !/^【/.test(plain)
+      ) {
+        continue;
+      }
+      skipping = false;
+    }
+    out.push(raw);
+  }
+  return out.join('\n').replace(/^\n+/, '');
+}
+
 function looksLikeModeSelectReply(text) {
   const t = String(text || '');
   return (
@@ -2921,7 +3002,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
 
-  const clean = sanitizeAiAnswer(markdown);
+  const clean = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
@@ -2930,10 +3011,12 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     kind === 'qa'
       ? `以下回复由左侧<strong>道一合规诊断助手</strong>生成：`
       : `以下方案由左侧<strong>道一合规诊断助手</strong>生成：`;
+  const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   items.innerHTML =
     `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
+    archiveHtml +
     body +
     `</div>`;
 
