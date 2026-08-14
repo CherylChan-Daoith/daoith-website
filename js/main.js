@@ -3328,59 +3328,75 @@ function bindResultPanelCopyGuard() {
 }
 
 function buildResultWorkingHtml() {
+  const chips = [
+    { cls: 'rw-chip-1', x: 18, y: 28, w: 52, label: '亚马逊' },
+    { cls: 'rw-chip-2', x: 168, y: 22, w: 56, label: '大陆公司' },
+    { cls: 'rw-chip-3', x: 8, y: 62, w: 58, label: 'FBA发货' },
+    { cls: 'rw-chip-4', x: 174, y: 58, w: 58, label: '正式报关' },
+    { cls: 'rw-chip-5', x: 28, y: 96, w: 44, label: '专票' },
+    { cls: 'rw-chip-6', x: 168, y: 94, w: 60, label: '普货可退' },
+    { cls: 'rw-chip-7', x: 86, y: 8, w: 68, label: '年销500万+' },
+  ];
+  const chipSvg = chips
+    .map(
+      (c) =>
+        `<g transform="translate(${c.x} ${c.y})">` +
+        `<g class="rw-chip ${c.cls}">` +
+        `<rect class="rw-chip-bg" x="0" y="0" width="${c.w}" height="22" rx="11"/>` +
+        `<text class="rw-chip-text" x="${c.w / 2}" y="15" text-anchor="middle">${c.label}</text>` +
+        `</g>` +
+        `</g>`
+    )
+    .join('');
+
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<svg class="result-working-svg" viewBox="0 0 220 168" xmlns="http://www.w3.org/2000/svg">` +
-    /* desk */
-    `<rect class="rw-desk" x="24" y="128" width="172" height="12" rx="4"/>` +
-    /* monitor */
-    `<rect class="rw-screen" x="62" y="42" width="96" height="70" rx="10"/>` +
-    `<rect class="rw-screen-inner" x="70" y="50" width="80" height="48" rx="6"/>` +
-    `<g class="rw-code-lines">` +
-    `<rect x="78" y="58" width="42" height="5" rx="2.5"/>` +
-    `<rect x="78" y="68" width="58" height="5" rx="2.5"/>` +
-    `<rect x="78" y="78" width="34" height="5" rx="2.5"/>` +
-    `<rect class="rw-cursor" x="78" y="88" width="16" height="5" rx="2.5"/>` +
-    `</g>` +
-    /* keyboard */
-    `<rect class="rw-keyboard" x="74" y="120" width="72" height="10" rx="3"/>` +
-    `<g class="rw-keys">` +
-    `<rect x="78" y="122.5" width="8" height="5" rx="1"/>` +
-    `<rect x="89" y="122.5" width="8" height="5" rx="1"/>` +
-    `<rect x="100" y="122.5" width="8" height="5" rx="1"/>` +
-    `<rect x="111" y="122.5" width="8" height="5" rx="1"/>` +
-    `<rect x="122" y="122.5" width="8" height="5" rx="1"/>` +
-    `<rect x="133" y="122.5" width="8" height="5" rx="1"/>` +
-    `</g>` +
-    /* cute robot head */
-    `<g class="rw-bot">` +
-    `<circle class="rw-antenna-ball" cx="110" cy="12" r="3.5"/>` +
-    `<line class="rw-antenna" x1="110" y1="16" x2="110" y2="24"/>` +
-    `<circle class="rw-head" cx="110" cy="36" r="16"/>` +
-    `<circle class="rw-cheek rw-cheek-l" cx="100" cy="40" r="3"/>` +
-    `<circle class="rw-cheek rw-cheek-r" cx="120" cy="40" r="3"/>` +
-    `<circle class="rw-eye" cx="104" cy="34" r="2.4"/>` +
-    `<circle class="rw-eye" cx="116" cy="34" r="2.4"/>` +
-    `<path class="rw-smile" d="M104 42c3 3.2 9 3.2 12 0"/>` +
-    /* body */
-    `<rect class="rw-torso" x="96" y="52" width="28" height="22" rx="10"/>` +
-    `<circle class="rw-badge" cx="110" cy="63" r="4.5"/>` +
-    /* arms + cute mitten hands on keyboard */
-    `<g class="rw-arm-l">` +
-    `<path class="rw-limb" d="M100 68c-12 10-18 28-20 46"/>` +
-    `<ellipse class="rw-hand" cx="78" cy="118" rx="10" ry="7.5"/>` +
-    `<ellipse class="rw-finger" cx="71" cy="114" rx="2.4" ry="3.2"/>` +
-    `<ellipse class="rw-finger" cx="77" cy="112.5" rx="2.4" ry="3.2"/>` +
-    `<ellipse class="rw-finger" cx="83" cy="113" rx="2.4" ry="3.2"/>` +
-    `</g>` +
-    `<g class="rw-arm-r">` +
-    `<path class="rw-limb" d="M120 68c12 10 18 28 20 46"/>` +
-    `<ellipse class="rw-hand" cx="142" cy="118" rx="10" ry="7.5"/>` +
-    `<ellipse class="rw-finger" cx="135" cy="113" rx="2.4" ry="3.2"/>` +
-    `<ellipse class="rw-finger" cx="141" cy="112.5" rx="2.4" ry="3.2"/>` +
-    `<ellipse class="rw-finger" cx="147" cy="114" rx="2.4" ry="3.2"/>` +
-    `</g>` +
+    `<svg class="result-working-svg" viewBox="0 0 240 178" xmlns="http://www.w3.org/2000/svg">` +
+    `<defs>` +
+    `<linearGradient id="rwRobeGrad" x1="0%" y1="0%" x2="100%" y2="100%">` +
+    `<stop offset="0%" stop-color="#e0f2fe"/>` +
+    `<stop offset="45%" stop-color="#93c5fd"/>` +
+    `<stop offset="100%" stop-color="#60a5fa"/>` +
+    `</linearGradient>` +
+    `<linearGradient id="rwSleeveGrad" x1="0%" y1="0%" x2="0%" y2="100%">` +
+    `<stop offset="0%" stop-color="#dbeafe"/>` +
+    `<stop offset="100%" stop-color="#7dd3fc"/>` +
+    `</linearGradient>` +
+    `<radialGradient id="rwHaloGrad" cx="50%" cy="50%" r="50%">` +
+    `<stop offset="0%" stop-color="rgba(147,197,253,0.45)"/>` +
+    `<stop offset="100%" stop-color="rgba(147,197,253,0)"/>` +
+    `</radialGradient>` +
+    `</defs>` +
+    /* soft floor shadow */
+    `<ellipse class="rw-shadow" cx="120" cy="162" rx="48" ry="7"/>` +
+    /* thought chips flashing around the head */
+    `<g class="rw-thoughts">${chipSvg}</g>` +
+    /* meditating figure — light blue robe, thinking (no computer) */
+    `<g class="rw-monk">` +
+    `<circle class="rw-halo" cx="120" cy="70" r="46" fill="url(#rwHaloGrad)"/>` +
+    /* crossed legs / robe base */
+    `<path class="rw-robe-base" fill="url(#rwRobeGrad)" d="M72 148c8-18 22-28 48-28s40 10 48 28c-14 8-32 12-48 12s-34-4-48-12z"/>` +
+    /* torso */
+    `<path class="rw-robe" fill="url(#rwRobeGrad)" d="M94 88c4-16 14-26 26-26s22 10 26 26c2 18-6 42-26 48-20-6-28-30-26-48z"/>` +
+    `<path class="rw-belt" d="M98 118h44" />` +
+    /* sleeves + prayer hands */
+    `<path class="rw-sleeve" fill="url(#rwSleeveGrad)" d="M96 96c-10 6-16 18-14 28 8-4 16-8 22-14 2-8-2-14-8-14z"/>` +
+    `<path class="rw-sleeve" fill="url(#rwSleeveGrad)" d="M144 96c10 6 16 18 14 28-8-4-16-8-22-14-2-8 2-14 8-14z"/>` +
+    `<ellipse class="rw-hand" cx="114" cy="118" rx="7" ry="6"/>` +
+    `<ellipse class="rw-hand" cx="126" cy="118" rx="7" ry="6"/>` +
+    /* bald head + ears */
+    `<ellipse class="rw-ear" cx="96" cy="68" rx="7" ry="9"/>` +
+    `<ellipse class="rw-ear" cx="144" cy="68" rx="7" ry="9"/>` +
+    `<circle class="rw-head" cx="120" cy="64" r="24"/>` +
+    `<circle class="rw-cheek" cx="106" cy="70" r="4.5"/>` +
+    `<circle class="rw-cheek" cx="134" cy="70" r="4.5"/>` +
+    /* closed eyes + calm smile */
+    `<path class="rw-eye-closed" d="M109 62c2.2-2.4 6.2-2.4 8.4 0"/>` +
+    `<path class="rw-eye-closed" d="M123 62c2.2-2.4 6.2-2.4 8.4 0"/>` +
+    `<path class="rw-smile" d="M112 74c3.5 3.8 12.5 3.8 16 0"/>` +
+    /* soft head highlight */
+    `<ellipse class="rw-head-shine" cx="112" cy="52" rx="7" ry="4"/>` +
     `</g>` +
     `</svg>` +
     `</div>` +
@@ -3389,7 +3405,7 @@ function buildResultWorkingHtml() {
     `<span class="result-working-ai-tag">AI</span>` +
     `<span class="result-working-title-rest">正在生成专属合规方案</span>` +
     `</p>` +
-    `<p class="result-working-sub">正在检索知识库并整理诊断报告<span class="result-working-dots" aria-hidden="true"></span></p>` +
+    `<p class="result-working-sub">正在梳理诊断要点并整理方案<span class="result-working-dots" aria-hidden="true"></span></p>` +
     `</div>`
   );
 }

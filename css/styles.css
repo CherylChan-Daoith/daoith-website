@@ -1594,8 +1594,10 @@ ul {
   z-index: 3;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 8px;
   padding: 12px 18px 8px;
   background: transparent;
   border-bottom: none;
@@ -1607,12 +1609,14 @@ ul {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #3b6cff;
+  white-space: nowrap;
 }
 
 .result-panel-head strong {
   font-size: 0.92rem;
   font-weight: 700;
   color: #2251ff;
+  white-space: nowrap;
   letter-spacing: -0.01em;
 }
 
@@ -1755,110 +1759,97 @@ ul {
 }
 
 .result-working-scene {
-  width: min(220px, 72%);
+  width: min(240px, 78%);
 }
 
 .result-working-svg {
   width: 100%;
   height: auto;
   display: block;
+  overflow: visible;
 }
 
-.result-working-svg .rw-desk {
-  fill: #bfdbfe;
+.result-working-svg .rw-shadow {
+  fill: rgba(34, 81, 255, 0.12);
 }
 
-.result-working-svg .rw-screen {
-  fill: #1e40af;
-}
-
-.result-working-svg .rw-screen-inner {
-  fill: #eff6ff;
-}
-
-.result-working-svg .rw-code-lines rect {
-  fill: #93c5fd;
-}
-
-.result-working-svg .rw-cursor {
-  fill: #2251ff;
-  transform-origin: left center;
-  animation: rw-cursor 0.9s steps(2, end) infinite;
-}
-
-.result-working-svg .rw-keyboard {
-  fill: #93c5fd;
-}
-
-.result-working-svg .rw-keys rect {
-  fill: #dbeafe;
-}
-
-.result-working-svg .rw-antenna {
-  stroke: #60a5fa;
-  stroke-width: 2.5;
-  stroke-linecap: round;
-}
-
-.result-working-svg .rw-antenna-ball {
-  fill: #38bdf8;
+.result-working-svg .rw-monk {
+  transform-origin: 120px 150px;
+  animation: rw-breathe 3.2s ease-in-out infinite;
 }
 
 .result-working-svg .rw-head {
-  fill: #93c5fd;
+  fill: #f3c9a8;
+}
+
+.result-working-svg .rw-head-shine {
+  fill: rgba(255, 255, 255, 0.45);
+}
+
+.result-working-svg .rw-ear {
+  fill: #e8b892;
 }
 
 .result-working-svg .rw-cheek {
   fill: #fda4af;
-  opacity: 0.85;
+  opacity: 0.75;
 }
 
-.result-working-svg .rw-eye {
-  fill: #1e3a8a;
+.result-working-svg .rw-eye-closed {
+  fill: none;
+  stroke: #5b4636;
+  stroke-width: 2.2;
+  stroke-linecap: round;
 }
 
 .result-working-svg .rw-smile {
   fill: none;
-  stroke: #1e3a8a;
+  stroke: #8b5a4a;
   stroke-width: 2;
   stroke-linecap: round;
 }
 
-.result-working-svg .rw-torso {
-  fill: #60a5fa;
-}
-
-.result-working-svg .rw-badge {
-  fill: #fff;
-}
-
-.result-working-svg .rw-limb {
+.result-working-svg .rw-belt {
   fill: none;
-  stroke: #60a5fa;
-  stroke-width: 7;
+  stroke: #1e40af;
+  stroke-width: 3.5;
   stroke-linecap: round;
+  opacity: 0.55;
 }
 
 .result-working-svg .rw-hand {
-  fill: #93c5fd;
-  stroke: #3b82f6;
-  stroke-width: 1.2;
-}
-
-.result-working-svg .rw-finger {
-  fill: #bfdbfe;
-  stroke: #3b82f6;
+  fill: #f3c9a8;
+  stroke: #e0a87a;
   stroke-width: 0.8;
 }
 
-.result-working-svg .rw-arm-l {
-  transform-origin: 78px 118px;
-  animation: rw-type-l 0.55s ease-in-out infinite;
+.result-working-svg .rw-chip {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rw-chip-flash 5.6s ease-in-out infinite;
 }
 
-.result-working-svg .rw-arm-r {
-  transform-origin: 142px 118px;
-  animation: rw-type-r 0.55s ease-in-out infinite;
+.result-working-svg .rw-chip-1 { animation-delay: 0s; }
+.result-working-svg .rw-chip-2 { animation-delay: 0.8s; }
+.result-working-svg .rw-chip-3 { animation-delay: 1.6s; }
+.result-working-svg .rw-chip-4 { animation-delay: 2.4s; }
+.result-working-svg .rw-chip-5 { animation-delay: 3.2s; }
+.result-working-svg .rw-chip-6 { animation-delay: 4s; }
+.result-working-svg .rw-chip-7 { animation-delay: 4.8s; }
+
+.result-working-svg .rw-chip-bg {
+  fill: #fff;
+  stroke: rgba(34, 81, 255, 0.28);
+  stroke-width: 1.2;
+  filter: drop-shadow(0 2px 4px rgba(34, 81, 255, 0.12));
+}
+
+.result-working-svg .rw-chip-text {
+  fill: #2251ff;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
 .result-working-title {
@@ -1909,34 +1900,31 @@ ul {
   animation: rw-dots 1.2s steps(4, end) infinite;
 }
 
-@keyframes rw-type-l {
+@keyframes rw-breathe {
   0%,
   100% {
-    transform: translateY(0) rotate(0deg);
+    transform: translateY(0);
   }
   50% {
-    transform: translateY(3px) rotate(-4deg);
+    transform: translateY(-2px);
   }
 }
 
-@keyframes rw-type-r {
+@keyframes rw-chip-flash {
   0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
+  8% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.88);
   }
-  50% {
-    transform: translateY(3px) rotate(4deg);
-  }
-}
-
-@keyframes rw-cursor {
-  0%,
-  49% {
+  18%,
+  32% {
     opacity: 1;
+    transform: translateY(0) scale(1);
   }
-  50%,
+  42%,
   100% {
-    opacity: 0.15;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.92);
   }
 }
 
