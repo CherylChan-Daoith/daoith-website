@@ -662,7 +662,7 @@ function sanitizeAiAnswer(text) {
       .trim();
 
   const looksLikeCot = (s) =>
-    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:|让我回顾一下|用户已经完成了第|缺少第二步|我需要汇总信息|让我检索知识库|让我再尝试|知识库返回为空|需要检索的知识库|属于路径[ABC]|路径A·|路径B·|路径C·/.test(
+    /我们被要求|我回想|根据我训练数据|需要准确查询|所以可直接回答|按照回答要求|必须严格按|假设知识库|思考过程|逐步分析|我先思考|正在检索知识库|调用工具|Action:|Observation:|让我回顾一下|用户已经完成了第|缺少第二步|我需要汇总信息|让我检索知识库|让我再尝试|知识库返回为空|需要检索的知识库/.test(
       s || ''
     );
 
@@ -700,6 +700,11 @@ function sanitizeAiAnswer(text) {
     .replace(/(?:^|\n)知识库返回为空[^\n]*/g, '\n')
     .replace(/(?:^|\n)让我再尝试[^\n]*/g, '\n')
     .replace(/(?:^|\n)根据发货方式[^\n]{0,40}属于路径[ABC][^\n]*/g, '\n')
+    // Internal path labels leaked into answer → keep Chinese body as 合规方案
+    .replace(
+      /(?:^|\n)\s*\*{0,2}【?\s*路径[ABC][·.．][^】\n]*】?\*{0,2}\s*/g,
+      '\n【合规方案】\n'
+    )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 
@@ -715,6 +720,12 @@ function sanitizeAiAnswer(text) {
   // Drop English writing outlines that reuse Chinese report headers
   if (t && looksLikeDiagnosisPlanScaffold(t)) {
     t = '';
+  }
+
+  // Last resort: salvage formal Chinese report sections from the raw model text
+  if (!t || looksLikeDiagnosisPlanScaffold(t)) {
+    const salvaged = salvageDiagnosisPlanFromRaw(raw);
+    if (salvaged) t = salvaged;
   }
 
   // If the whole bubble is still CoT-like or still contains think tags, drop it
@@ -2549,6 +2560,14 @@ function initAiChatbot() {
         }
         // Ignore English writing outlines that reuse report headers
         if (looksLikeDiagnosisPlanScaffold(clean)) {
+          const salvaged = salvageDiagnosisPlanFromRaw(partial);
+          if (salvaged) {
+            beginPlanRouting();
+            if (salvaged.length >= 120) {
+              publishDiagnosisPlanToResultPanel(salvaged, { kind: 'diagnosis' });
+            }
+            return;
+          }
           if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
           return;
         }
@@ -2627,15 +2646,16 @@ function initAiChatbot() {
       if (!answer || answer.length < 8) {
         // Do NOT fall back to raw result.text (often still contains think / CoT)
         const retry = sanitizeAiAnswer(result.text);
+        const salvaged = salvageDiagnosisPlanFromRaw(result.text);
         // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
         if (
           streamingPlan ||
           shouldGeneratePlanNow ||
           (getUiMode() === 'diagnosis' && getUiStep() >= 8)
         ) {
-          answer = retry || '';
+          answer = retry || salvaged || '';
         } else {
-          answer = retry || buildLocalChatReply(text, ctx) || '';
+          answer = retry || salvaged || buildLocalChatReply(text, ctx) || '';
         }
       }
       answer = sanitizeAiAnswer(answer);
@@ -2644,12 +2664,15 @@ function initAiChatbot() {
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
+      if ((!answer || answer.length < 4) && result?.text) {
+        answer = salvageDiagnosisPlanFromRaw(result.text) || '';
+      }
       if (!answer || answer.length < 4) {
         if (streamingPlan || (getUiMode() === 'diagnosis' && getUiStep() >= 6)) {
           beginPlanRouting();
           typing.classList.add('is-plan-status');
           typing.textContent =
-            '方案仍在生成中；若右侧暂无内容，请稍后重试或点击「新建对话」。思考过程不会显示在对话框中。';
+            '方案生成未得到可用正文（可能被模型思考过程占用）。请点击「新建对话」后重试；若多次失败请检查 Dify 诊断助手是否已发布最新提示词。';
           clearQuickReplies();
           return;
         }
@@ -2779,8 +2802,13 @@ function resetResultPlanPanel() {
 function looksLikeDiagnosisPlanScaffold(text) {
   const t = String(text || '').trim();
   if (!t) return false;
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+  // Substantial Chinese body → treat as real content, not an English outline
+  if (cjk >= 80 && cjk >= latin) return false;
+
   if (
-    /opening sentence|business profile|bullet risks|only the matched path|Let me write|write (?:the )?(?:report|plan|it)|placeholder|lorem ipsum|TODO[:：]|path\s*[ABC]\s*(?:要点|points?)/i.test(
+    /opening sentence|business profile|bullet risks|only the matched path|Let me write|write (?:the )?(?:report|plan|it)|placeholder|lorem ipsum|TODO[:：]/i.test(
       t
     )
   ) {
@@ -2789,17 +2817,45 @@ function looksLikeDiagnosisPlanScaffold(text) {
   // Bare English stubs under Chinese section titles
   if (
     /【核心风险诊断】|【合规方案】|【行动建议】|【注意事项】/.test(t) &&
-    /(?:^|\n)\s*[-*•]?\s*\*{0,2}\s*line\s*\*{0,2}\s*(?:\n|$)/im.test(t)
+    /(?:^|\n)\s*[-*•]?\s*\*{0,2}\s*line\s*\*{0,2}\s*(?:\n|$)/im.test(t) &&
+    cjk < 40
   ) {
     return true;
   }
   // Section headers present but body is Latin-heavy / Chinese-thin
   if (/【核心风险诊断】|【合规方案】/.test(t)) {
-    const latin = (t.match(/[A-Za-z]/g) || []).length;
-    const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
     if (latin >= 36 && cjk < Math.max(24, Math.floor(latin * 0.7))) return true;
   }
   return false;
+}
+
+/** Pull a usable Chinese diagnosis body out of mixed CoT / path-template output. */
+function salvageDiagnosisPlanFromRaw(raw) {
+  const s = String(raw || '');
+  if (!s.trim()) return '';
+
+  const cjkCount = (x) => (String(x).match(/[\u4e00-\u9fff]/g) || []).length;
+
+  const formal = s.match(/【核心风险诊断】[\s\S]*/);
+  if (formal && cjkCount(formal[0]) >= 60 && !looksLikeDiagnosisPlanScaffold(formal[0])) {
+    return formal[0].trim();
+  }
+
+  const planOnly = s.match(/【合规方案】[\s\S]*/);
+  if (planOnly && cjkCount(planOnly[0]) >= 80 && !looksLikeDiagnosisPlanScaffold(planOnly[0])) {
+    return `【核心风险诊断】\n主要风险：\n- 详见下方合规方案结合业务画像评估\n\n${planOnly[0].trim()}`;
+  }
+
+  const path = s.match(/\*{0,2}【?\s*路径[ABC][·.．][^】\n]*】?\*{0,2}[\s\S]*/);
+  if (path && cjkCount(path[0]) >= 80) {
+    const body = path[0]
+      .replace(/\*{0,2}【?\s*路径[ABC][·.．][^】\n]*】?\*{0,2}/g, '【合规方案】')
+      .replace(/属于路径[ABC]/g, '当前业务路径')
+      .trim();
+    if (body && !looksLikeDiagnosisPlanScaffold(body)) return body;
+  }
+
+  return '';
 }
 
 /** Earlier mid-stream hint that the Agent started a formal plan (before all sections arrive). */
