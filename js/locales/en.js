@@ -342,11 +342,15 @@ window.DAOITH_I18N_EN = {
     '.tax-form-grid .form-group:has(#taxShippingRate) label': { text: 'Logistics ratio (%)' },
     '.tax-form-grid .form-group:has(#taxStaffRate) label': { text: 'Staff cost ratio (%)' },
     '.tax-form-grid .form-group:has(#taxOtherRate) label': { text: 'Other expense ratio (%)' },
+    '.tax-form-grid .form-group:has(#taxSupplierInvoicePoint) label': {
+      text: 'Supplier invoice VAT point (%)',
+    },
     '.tax-form-note': {
-      text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue. If eligible for rebate/exemption, export rebate is used; otherwise domestic VAT is used.',
+      text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue. If eligible for rebate/exemption, export rebate is used; otherwise domestic VAT is used. Supplier invoice VAT point is the VAT rate on purchase invoices (e.g. 1%, 3%, 13%).',
     },
     '#calcTax': { text: 'Calculate tax burden' },
     '.tax-result-label': { text: 'Estimated annual compliance tax' },
+    '#taxRebateBenefitWrap .tax-result-label': { text: 'Export rebate net benefit' },
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {

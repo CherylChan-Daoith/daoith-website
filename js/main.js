@@ -3327,85 +3327,54 @@ function bindResultPanelCopyGuard() {
   panel.addEventListener('selectstart', block);
 }
 
+function collectDiagWorkingChipLabels() {
+  const s = getDiagSlots();
+  const exportMode =
+    s.exportMode ||
+    (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '');
+  return [s.platform, s.entity, s.shipping, exportMode, s.invoice, s.productCategory, s.revenue]
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .map((v) => (v.length > 16 ? `${v.slice(0, 15)}…` : v));
+}
+
 function buildResultWorkingHtml() {
-  const chips = [
-    { cls: 'rw-chip-1', x: 18, y: 28, w: 52, label: '亚马逊' },
-    { cls: 'rw-chip-2', x: 168, y: 22, w: 56, label: '大陆公司' },
-    { cls: 'rw-chip-3', x: 8, y: 62, w: 58, label: 'FBA发货' },
-    { cls: 'rw-chip-4', x: 174, y: 58, w: 58, label: '正式报关' },
-    { cls: 'rw-chip-5', x: 28, y: 96, w: 44, label: '专票' },
-    { cls: 'rw-chip-6', x: 168, y: 94, w: 60, label: '普货可退' },
-    { cls: 'rw-chip-7', x: 86, y: 8, w: 68, label: '年销500万+' },
+  const labels = collectDiagWorkingChipLabels();
+  // Position chips around the character's head (percent of scene)
+  const positions = [
+    { left: '2%', top: '8%' },
+    { left: '58%', top: '4%' },
+    { left: '0%', top: '28%' },
+    { left: '62%', top: '24%' },
+    { left: '6%', top: '48%' },
+    { left: '58%', top: '46%' },
+    { left: '28%', top: '2%' },
   ];
-  const chipSvg = chips
-    .map(
-      (c) =>
-        `<g transform="translate(${c.x} ${c.y})">` +
-        `<g class="rw-chip ${c.cls}">` +
-        `<rect class="rw-chip-bg" x="0" y="0" width="${c.w}" height="22" rx="11"/>` +
-        `<text class="rw-chip-text" x="${c.w / 2}" y="15" text-anchor="middle">${c.label}</text>` +
-        `</g>` +
-        `</g>`
-    )
-    .join('');
+  const chipHtml = labels.length
+    ? labels
+        .map((label, i) => {
+          const pos = positions[i % positions.length];
+          return (
+            `<span class="rw-chip rw-chip-${(i % 7) + 1}" style="left:${pos.left};top:${pos.top}">` +
+            `${escapeHtml(label)}` +
+            `</span>`
+          );
+        })
+        .join('')
+    : `<span class="rw-chip rw-chip-1" style="left:28%;top:6%">梳理诊断要点</span>`;
 
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<svg class="result-working-svg" viewBox="0 0 240 178" xmlns="http://www.w3.org/2000/svg">` +
-    `<defs>` +
-    `<linearGradient id="rwRobeGrad" x1="0%" y1="0%" x2="100%" y2="100%">` +
-    `<stop offset="0%" stop-color="#e0f2fe"/>` +
-    `<stop offset="45%" stop-color="#93c5fd"/>` +
-    `<stop offset="100%" stop-color="#60a5fa"/>` +
-    `</linearGradient>` +
-    `<linearGradient id="rwSleeveGrad" x1="0%" y1="0%" x2="0%" y2="100%">` +
-    `<stop offset="0%" stop-color="#dbeafe"/>` +
-    `<stop offset="100%" stop-color="#7dd3fc"/>` +
-    `</linearGradient>` +
-    `<radialGradient id="rwHaloGrad" cx="50%" cy="50%" r="50%">` +
-    `<stop offset="0%" stop-color="rgba(147,197,253,0.45)"/>` +
-    `<stop offset="100%" stop-color="rgba(147,197,253,0)"/>` +
-    `</radialGradient>` +
-    `</defs>` +
-    /* soft floor shadow */
-    `<ellipse class="rw-shadow" cx="120" cy="162" rx="48" ry="7"/>` +
-    /* thought chips flashing around the head */
-    `<g class="rw-thoughts">${chipSvg}</g>` +
-    /* meditating figure — light blue robe, thinking (no computer) */
-    `<g class="rw-monk">` +
-    `<circle class="rw-halo" cx="120" cy="70" r="46" fill="url(#rwHaloGrad)"/>` +
-    /* crossed legs / robe base */
-    `<path class="rw-robe-base" fill="url(#rwRobeGrad)" d="M72 148c8-18 22-28 48-28s40 10 48 28c-14 8-32 12-48 12s-34-4-48-12z"/>` +
-    /* torso */
-    `<path class="rw-robe" fill="url(#rwRobeGrad)" d="M94 88c4-16 14-26 26-26s22 10 26 26c2 18-6 42-26 48-20-6-28-30-26-48z"/>` +
-    `<path class="rw-belt" d="M98 118h44" />` +
-    /* sleeves + prayer hands */
-    `<path class="rw-sleeve" fill="url(#rwSleeveGrad)" d="M96 96c-10 6-16 18-14 28 8-4 16-8 22-14 2-8-2-14-8-14z"/>` +
-    `<path class="rw-sleeve" fill="url(#rwSleeveGrad)" d="M144 96c10 6 16 18 14 28-8-4-16-8-22-14-2-8 2-14 8-14z"/>` +
-    `<ellipse class="rw-hand" cx="114" cy="118" rx="7" ry="6"/>` +
-    `<ellipse class="rw-hand" cx="126" cy="118" rx="7" ry="6"/>` +
-    /* bald head + ears */
-    `<ellipse class="rw-ear" cx="96" cy="68" rx="7" ry="9"/>` +
-    `<ellipse class="rw-ear" cx="144" cy="68" rx="7" ry="9"/>` +
-    `<circle class="rw-head" cx="120" cy="64" r="24"/>` +
-    `<circle class="rw-cheek" cx="106" cy="70" r="4.5"/>` +
-    `<circle class="rw-cheek" cx="134" cy="70" r="4.5"/>` +
-    /* closed eyes + calm smile */
-    `<path class="rw-eye-closed" d="M109 62c2.2-2.4 6.2-2.4 8.4 0"/>` +
-    `<path class="rw-eye-closed" d="M123 62c2.2-2.4 6.2-2.4 8.4 0"/>` +
-    `<path class="rw-smile" d="M112 74c3.5 3.8 12.5 3.8 16 0"/>` +
-    /* soft head highlight */
-    `<ellipse class="rw-head-shine" cx="112" cy="52" rx="7" ry="4"/>` +
-    `</g>` +
-    `</svg>` +
+    `<img class="rw-figure" src="/images/diag-thinker-blue.png" alt="" width="480" height="480" decoding="async"/>` +
+    `<div class="rw-thoughts">${chipHtml}</div>` +
     `</div>` +
     `<p class="result-working-title">` +
     `<span class="result-working-brand">道一合规助手</span>` +
     `<span class="result-working-ai-tag">AI</span>` +
     `<span class="result-working-title-rest">正在生成专属合规方案</span>` +
     `</p>` +
-    `<p class="result-working-sub">正在梳理诊断要点并整理方案<span class="result-working-dots" aria-hidden="true"></span></p>` +
+    `<p class="result-working-sub">正在根据您的选项梳理方案<span class="result-working-dots" aria-hidden="true"></span></p>` +
     `</div>`
   );
 }
@@ -4148,6 +4117,9 @@ function formatInline(text) {
     /(?<![\d])(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)(?![\d])/gi,
     '<span class="result-code">$1</span>'
   );
+  // Keep CJK corner brackets from sitting flush against code pills
+  s = s.replace(/([「『])(<span class="result-code">)/g, '$1&#8201;$2');
+  s = s.replace(/(<\/span>)([」』])/g, '$1&#8201;$2');
   return s;
 }
 
@@ -5527,7 +5499,11 @@ function initTaxCalculator() {
     const staffRate = parseFloat(document.getElementById('taxStaffRate').value) || 0;
     const otherRate = parseFloat(document.getElementById('taxOtherRate').value) || 0;
     const incomeRate = parseFloat(document.getElementById('taxIncome').value) || 0;
+    const supplierPointPct =
+      parseFloat(document.getElementById('taxSupplierInvoicePoint')?.value) || 0;
     const vatLevyRate = 13; // 国内货物增值税征税率（简化）
+    const rebateBenefitEl = document.getElementById('taxRebateBenefit');
+    const rebateBenefitWrap = document.getElementById('taxRebateBenefitWrap');
 
     resultEl.textContent = window.DAOITH_t('tax.calcLoading');
     setButtonLoading(calcBtn, true, window.DAOITH_t('tax.calcLoading'));
@@ -5553,6 +5529,16 @@ function initTaxCalculator() {
       const domesticVat = revenue * (1 - productCostRate / 100) * (vatLevyRate / 100);
       const vatOrRebate = refundEligible ? exportRebate : domesticVat;
       const total = refundEligible ? incomeTax - exportRebate : incomeTax + domesticVat;
+
+      // 出口退税收益 =
+      // (年出口销售额×产品成本率)×(1+供应商取票税点)×13%/(1+13%)
+      // − (年出口销售额×产品成本率)×供应商取票税点
+      const costBase = revenue * (productCostRate / 100);
+      const supplierPoint = supplierPointPct / 100;
+      const rebateBenefit =
+        costBase * (1 + supplierPoint) * (vatLevyRate / 100) / (1 + vatLevyRate / 100) -
+        costBase * supplierPoint;
+
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const copy = locale === 'en'
         ? {
@@ -5562,6 +5548,9 @@ function initTaxCalculator() {
             vatYesFormula: 'Export sales × product cost ratio × export rebate rate',
             vatNo: '2) Domestic sales VAT',
             vatNoFormula: 'Sales × (1 − product cost ratio) × 13%',
+            rebateBenefit: '3) Export rebate net benefit',
+            rebateBenefitFormula:
+              '(Sales × product cost) × (1 + supplier invoice VAT point) × 13% / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
             total: 'Net domestic tax burden',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
@@ -5572,6 +5561,9 @@ function initTaxCalculator() {
             vatYesFormula: '出口销售额 × 产品成本率 × 出口退税率',
             vatNo: '2）内销增值税',
             vatNoFormula: '销售额 × (1 − 产品成本率) × 13%',
+            rebateBenefit: '3）出口退税收益',
+            rebateBenefitFormula:
+              '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 13% /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
             total: '国内税负合计（净额）',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
@@ -5579,6 +5571,8 @@ function initTaxCalculator() {
       const vatFormula = refundEligible ? copy.vatYesFormula : copy.vatNoFormula;
 
       resultEl.textContent = formatWan(total);
+      if (rebateBenefitEl) rebateBenefitEl.textContent = formatWan(rebateBenefit);
+      if (rebateBenefitWrap) rebateBenefitWrap.hidden = false;
       note.innerHTML = `
         <div class="tax-breakdown">
           <div class="tax-breakdown-section">
@@ -5588,6 +5582,10 @@ function initTaxCalculator() {
           <div class="tax-breakdown-section">
             <div><strong>${vatLabel}</strong>：${formatWan(vatOrRebate)}</div>
             <div class="tax-breakdown-formula">${vatFormula}</div>
+          </div>
+          <div class="tax-breakdown-section">
+            <div><strong>${copy.rebateBenefit}</strong>：${formatWan(rebateBenefit)}</div>
+            <div class="tax-breakdown-formula">${copy.rebateBenefitFormula}</div>
           </div>
           <div class="tax-breakdown-summary">
             <strong>${copy.total}：${formatWan(total)}</strong>
