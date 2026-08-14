@@ -816,7 +816,7 @@ ul {
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: linear-gradient(180deg, #f5f8ff 0%, #ffffff 56px);
+  background: #fff;
   border: 1.5px solid #9eb6ff;
   border-radius: 10px;
   padding: 0;

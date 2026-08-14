@@ -722,10 +722,15 @@ function sanitizeAiAnswer(text) {
     t = '';
   }
 
+  // Normalize section titles + strip English prompt-meta before salvage
+  if (t) {
+    t = prepareDiagnosisPlanMarkdown(t);
+  }
+
   // Last resort: salvage formal Chinese report sections from the raw model text
-  if (!t || looksLikeDiagnosisPlanScaffold(t)) {
-    const salvaged = salvageDiagnosisPlanFromRaw(raw);
-    if (salvaged) t = salvaged;
+  if (!t || looksLikeDiagnosisPlanScaffold(t) || !isDiagnosisPlanReadyToShow(t)) {
+    const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(raw) || '');
+    if (salvaged && isDiagnosisPlanReadyToShow(salvaged)) t = salvaged;
   }
 
   // If the whole bubble is still CoT-like or still contains think tags, drop it
@@ -2509,6 +2514,7 @@ function initAiChatbot() {
       let streamingLongQa = false;
       let loginPromptedForPlan = shouldGeneratePlanNow && !loggedIn;
       let planCountedThisTurn = false;
+      let lastStreamPlanLen = 0;
       const beginPlanRouting = () => {
         if (streamingPlan) {
           typing.classList.add('is-plan-status');
@@ -2553,17 +2559,18 @@ function initAiChatbot() {
           }
           return;
         }
-        const clean = stripDiagnosisIntroBoilerplate(cleaned);
+        const clean = prepareDiagnosisPlanMarkdown(stripDiagnosisIntroBoilerplate(cleaned));
         if (!clean) {
           if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
           return;
         }
-        // Ignore English writing outlines that reuse report headers
-        if (looksLikeDiagnosisPlanScaffold(clean)) {
-          const salvaged = salvageDiagnosisPlanFromRaw(partial);
-          if (salvaged) {
+        // Ignore English writing outlines / prompt-meta; try salvage only if ready
+        if (looksLikeDiagnosisPlanScaffold(clean) || looksLikeEnglishPromptMeta(clean)) {
+          const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(partial) || '');
+          if (salvaged && isDiagnosisPlanReadyToShow(salvaged)) {
             beginPlanRouting();
-            if (salvaged.length >= 120) {
+            if (salvaged.length >= lastStreamPlanLen + 120) {
+              lastStreamPlanLen = salvaged.length;
               publishDiagnosisPlanToResultPanel(salvaged, { kind: 'diagnosis' });
             }
             return;
@@ -2571,17 +2578,14 @@ function initAiChatbot() {
           if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
           return;
         }
-        // Full diagnosis → right-hand plan panel
+        // Full diagnosis → right-hand plan panel (only when body is ready; avoid header flashes)
         if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
           beginPlanRouting();
-          // Keep typing animation until enough plan content arrives
-          if (
-            looksLikeDiagnosisPlanStreaming(clean) ||
-            looksLikeFullDiagnosisPlan(clean) ||
-            clean.length >= 280
-          ) {
-            publishDiagnosisPlanToResultPanel(clean, { kind: 'diagnosis' });
-          }
+          if (!isDiagnosisPlanReadyToShow(clean)) return;
+          // Debounce: don't repaint every token; wait for meaningful growth
+          if (lastStreamPlanLen > 0 && clean.length < lastStreamPlanLen + 160) return;
+          lastStreamPlanLen = clean.length;
+          publishDiagnosisPlanToResultPanel(clean, { kind: 'diagnosis' });
           return;
         }
         // Mid-report CoT that slipped past sanitize: still never show in chat
@@ -2698,11 +2702,15 @@ function initAiChatbot() {
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
-        if (looksLikeDiagnosisPlanScaffold(answer)) {
-          // English outline / meta draft — never paint into the plan panel
+        answer = prepareDiagnosisPlanMarkdown(answer);
+        if (looksLikeDiagnosisPlanScaffold(answer) || looksLikeEnglishPromptMeta(answer)) {
+          const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(result.text) || '');
+          if (salvaged && isDiagnosisPlanReadyToShow(salvaged)) answer = salvaged;
+        }
+        if (!isDiagnosisPlanReadyToShow(answer)) {
           typing.classList.add('is-plan-status');
           typing.textContent =
-            '方案生成异常（模型输出了提纲草稿）。请点击「新建对话」后重试，或稍后再试。';
+            '方案正文不完整或含无效草稿。请点击「新建对话」后重试；并确认 Dify 已发布最新诊断提示词。';
           clearQuickReplies();
           return;
         }
@@ -2793,6 +2801,86 @@ function resetResultPlanPanel() {
     serviceHost.innerHTML = '';
     serviceHost.hidden = true;
   }
+}
+
+function countDiagnosisCjk(text) {
+  return (String(text || '').match(/[\u4e00-\u9fff]/g) || []).length;
+}
+
+/** Model meta-commentary about prompt numbering / structure (must never show). */
+function looksLikeEnglishPromptMeta(text) {
+  return /Note there'?s a jump|re-reading more carefully|intended structure|internal inconsistency|So the prompt uses|Actually re-reading|in the prompt[, ]|missing 第三|jump from 第|I think this is likely|which labels to use/i.test(
+    String(text || '')
+  );
+}
+
+function stripEnglishPromptMeta(text) {
+  let t = String(text || '');
+  // Drop English paragraphs that discuss the prompt itself
+  t = t.replace(
+    /(?:^|\n)[^\nA-Za-z【]*[A-Za-z][^\n]*(?:prompt|re-reading|intended structure|internal inconsistency|jump from|Note there|So the prompt|Actually re-reading|missing 第三|labels to use)[^\n]*(?:\n(?![【\-#*•]|业务流程|主要风险)[^\n]*)*/gi,
+    '\n'
+  );
+  // Drop long Latin-only runs (likely CoT leftovers)
+  t = t.replace(/(?:^|\n)[ \t]*[A-Za-z][A-Za-z0-9 ,.'"()\/:;_\-]{40,}[ \t]*(?=\n|$)/g, '\n');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Map model variants like「第一部分：核心风险提示」to fixed report titles. */
+function normalizeDiagnosisSectionTitles(text) {
+  let t = String(text || '');
+  t = t.replace(/【\s*第一部分[^】]*】/g, (m) =>
+    /风险/.test(m) ? '【核心风险诊断】' : /方案|合规/.test(m) ? '【合规方案】' : m
+  );
+  t = t.replace(/【\s*第二部分[^】]*】/g, (m) =>
+    /方案|合规/.test(m) ? '【合规方案】' : /风险/.test(m) ? '【核心风险诊断】' : /行动/.test(m) ? '【行动建议】' : m
+  );
+  t = t.replace(/【\s*第三部分[^】]*】/g, (m) =>
+    /行动/.test(m) ? '【行动建议】' : /方案|合规/.test(m) ? '【合规方案】' : /注意/.test(m) ? '【注意事项】' : '【行动建议】'
+  );
+  t = t.replace(/【\s*第四部分[^】]*】/g, (m) =>
+    /注意/.test(m) ? '【注意事项】' : /行动/.test(m) ? '【行动建议】' : '【行动建议】'
+  );
+  t = t.replace(/【\s*第五部分[^】]*】/g, '【注意事项】');
+  t = t.replace(/【\s*核心风险提示\s*】/g, '【核心风险诊断】');
+  t = t.replace(/【\s*合规方案建议\s*】/g, '【合规方案】');
+  return t;
+}
+
+/**
+ * Only paint the right panel when the plan has real Chinese body under sections.
+ * Avoids flashing empty headers / English meta during streaming.
+ */
+function isDiagnosisPlanReadyToShow(text) {
+  const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
+  if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return false;
+  if (looksLikeEnglishPromptMeta(t) && countDiagnosisCjk(t) < 280) return false;
+
+  const markers = [
+    /【核心风险诊断】/,
+    /【合规方案】/,
+    /【行动建议】/,
+    /【注意事项】/,
+  ];
+  const hit = markers.filter((re) => re.test(t)).length;
+  if (hit < 2) return false;
+  if (countDiagnosisCjk(t) < 160) return false;
+
+  // Body between titles must not be empty (headers-only drafts)
+  const bodyOnly = t
+    .replace(/【[^】]+】/g, '\n')
+    .replace(/^\s*(?:业务流程|主要风险)\s*[:：]?\s*$/gm, '')
+    .replace(/诊断档案确认[：:][^\n]*/g, '');
+  if (countDiagnosisCjk(bodyOnly) < 100) return false;
+  return true;
+}
+
+function prepareDiagnosisPlanMarkdown(text) {
+  let t = String(text || '');
+  t = stripEnglishPromptMeta(t);
+  t = normalizeDiagnosisSectionTitles(t);
+  t = stripDiagnosisArchivePreamble(t);
+  return t.trim();
 }
 
 /**
@@ -3150,12 +3238,20 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
 
-  const clean = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
+  const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
+  const clean =
+    options.kind === 'qa' ? cleanRaw : prepareDiagnosisPlanMarkdown(cleanRaw);
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
-  // Local generic help / English scaffolds are not diagnosis reports
-  if (kind === 'diagnosis' && (looksLikeLocalGenericHelp(clean) || looksLikeDiagnosisPlanScaffold(clean))) {
+  // Local generic help / English scaffolds / prompt-meta are not diagnosis reports
+  if (
+    kind === 'diagnosis' &&
+    (looksLikeLocalGenericHelp(clean) ||
+      looksLikeDiagnosisPlanScaffold(clean) ||
+      looksLikeEnglishPromptMeta(clean) ||
+      !isDiagnosisPlanReadyToShow(clean))
+  ) {
     return;
   }
   if (kind === 'qa' && looksLikeLocalGenericHelp(clean)) {
