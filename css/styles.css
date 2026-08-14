@@ -941,7 +941,7 @@ ul {
   margin: 0 0 1px;
   font-size: 0.62rem;
   font-weight: 600;
-  color: #4d7cff;
+  color: var(--accent);
   letter-spacing: 0.02em;
 }
 
@@ -989,8 +989,8 @@ ul {
 .diag-quick-reply-btn:focus-visible,
 .diag-quick-reply-btn:active {
   background: #eef3ff;
-  border-color: #4d7cff;
-  color: #3b6cff;
+  border-color: var(--accent);
+  color: var(--accent);
   box-shadow: none;
   outline: none;
 }
@@ -1093,7 +1093,7 @@ ul {
 }
 
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask strong {
-  color: #4d7cff;
+  color: var(--accent);
   font-weight: 500;
 }
 

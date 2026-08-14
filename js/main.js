@@ -712,6 +712,11 @@ function sanitizeAiAnswer(text) {
     t = '';
   }
 
+  // Drop English writing outlines that reuse Chinese report headers
+  if (t && looksLikeDiagnosisPlanScaffold(t)) {
+    t = '';
+  }
+
   // If the whole bubble is still CoT-like or still contains think tags, drop it
   if (
     !t ||
@@ -2539,6 +2544,11 @@ function initAiChatbot() {
           if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
           return;
         }
+        // Ignore English writing outlines that reuse report headers
+        if (looksLikeDiagnosisPlanScaffold(clean)) {
+          if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
+          return;
+        }
         // Full diagnosis → right-hand plan panel
         if (streamingPlan || shouldRouteDiagnosisToPlanPanel(clean)) {
           beginPlanRouting();
@@ -2650,6 +2660,14 @@ function initAiChatbot() {
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
+        if (looksLikeDiagnosisPlanScaffold(answer)) {
+          // English outline / meta draft — never paint into the plan panel
+          typing.classList.add('is-plan-status');
+          typing.textContent =
+            '方案生成异常（模型输出了提纲草稿）。请点击「新建对话」后重试，或稍后再试。';
+          clearQuickReplies();
+          return;
+        }
         publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis' });
         if (!planCountedThisTurn) {
           planCountedThisTurn = true;
@@ -2699,6 +2717,7 @@ function initAiChatbot() {
 function looksLikeFullDiagnosisPlan(text) {
   const t = String(text || '');
   if (t.length < 160) return false;
+  if (looksLikeDiagnosisPlanScaffold(t)) return false;
   const markers = [
     /核心风险诊断|风险诊断|合规风险/,
     /合规方案|解决方案|行动建议/,
@@ -2713,10 +2732,41 @@ function looksLikeFullDiagnosisPlan(text) {
   return false;
 }
 
+/**
+ * English / meta writing outlines that reuse report headers but are not a real plan.
+ * e.g. "line", "bullet risks (3-5)", "opening sentence describing business profile"
+ */
+function looksLikeDiagnosisPlanScaffold(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (
+    /opening sentence|business profile|bullet risks|only the matched path|Let me write|write (?:the )?(?:report|plan|it)|placeholder|lorem ipsum|TODO[:：]|path\s*[ABC]\s*(?:要点|points?)/i.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  // Bare English stubs under Chinese section titles
+  if (
+    /【核心风险诊断】|【合规方案】|【行动建议】|【注意事项】/.test(t) &&
+    /(?:^|\n)\s*[-*•]?\s*\*{0,2}\s*line\s*\*{0,2}\s*(?:\n|$)/im.test(t)
+  ) {
+    return true;
+  }
+  // Section headers present but body is Latin-heavy / Chinese-thin
+  if (/【核心风险诊断】|【合规方案】/.test(t)) {
+    const latin = (t.match(/[A-Za-z]/g) || []).length;
+    const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+    if (latin >= 36 && cjk < Math.max(24, Math.floor(latin * 0.7))) return true;
+  }
+  return false;
+}
+
 /** Earlier mid-stream hint that the Agent started a formal plan (before all sections arrive). */
 function looksLikeDiagnosisPlanStreaming(text) {
   const t = String(text || '');
   if (t.length < 80) return false;
+  if (looksLikeDiagnosisPlanScaffold(t)) return false;
   if (/【核心风险诊断】|【合规方案】/.test(t)) return true;
   if (/#{1,3}\s*1[）).、]/.test(t) && /(问题理解|业务画像|风险诊断|解决方案)/.test(t)) return true;
   if (t.length >= 220 && /#{1,3}\s+/.test(t) && /(业务画像|风险诊断|解决方案|行动建议|核心风险)/.test(t)) {
@@ -2762,6 +2812,7 @@ function looksLikeDiagnosisWizardAsk(text) {
 function shouldRouteDiagnosisToPlanPanel(text) {
   const t = String(text || '').trim();
   if (!t) return false;
+  if (looksLikeDiagnosisPlanScaffold(t)) return false;
   // Never park diagnostic process questions in the solution panel
   if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
   if (looksLikeFullDiagnosisPlan(t) || looksLikeDiagnosisPlanStreaming(t)) return true;
