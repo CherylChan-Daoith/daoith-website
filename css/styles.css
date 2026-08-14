@@ -2148,12 +2148,12 @@ ul {
   line-height: 1.65;
 }
 
-/* 合规方案卡片：左缘与上方风险列表黑点对齐 */
+/* 合规方案卡片：左缘与上方风险列表黑点对齐（略左移一字宽） */
 #resultItems .result-list:has(> .result-kv),
 #resultItems ul.result-list:has(> li.result-kv),
 .result-list:has(> .result-kv) {
   list-style: none !important;
-  margin: 0 0 14px 1.1rem !important;
+  margin: 0 0 14px calc(1.1rem - 1em) !important;
   padding: 0 !important;
 }
 
