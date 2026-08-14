@@ -1053,9 +1053,9 @@ function renderChatBubbleHtml(text) {
   md = md.replace(/(^|\n)(\*\*)?(\d+)\.(?=\s)/gm, '$1$2@@N$3@@');
   let html = renderAIPlanHtml(md);
   html = String(html || '').replace(/@@N(\d+)@@/g, '$1.');
-  // Tip under chips: smaller + lighter than the question
+  // Tip on its own line under the question (chips are below the bubble)
   html = String(html || '').replace(
-    /（可在下方点选）/g,
+    /\s*（可在下方点选）/g,
     '<span class="diag-ask-hint">（可在下方点选）</span>'
   );
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;

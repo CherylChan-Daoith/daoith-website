@@ -941,12 +941,13 @@ ul {
 }
 
 .diag-chat .ai-chatbot-bubble .diag-ask-hint {
-  display: inline;
-  margin-left: 0.1em;
+  display: block;
+  margin: 0.35em 0 0;
   font-size: 0.78em;
   font-weight: 400;
   color: #94a3b8;
   letter-spacing: 0.01em;
+  line-height: 1.4;
 }
 
 .diag-quick-replies {
