@@ -708,9 +708,9 @@ ul {
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--accent) !important;
-  background: #fff !important;
+  background: #e6ecf8 !important;
   background-image: none !important;
-  border-bottom: 1px solid #e8eefc;
+  border-bottom: 1px solid #d5def0;
 }
 
 .diag-hs-body {
@@ -832,10 +832,10 @@ ul {
   gap: 8px;
   flex-shrink: 0;
   padding: 10px 12px;
-  background: #fff !important;
+  background: #e6ecf8 !important;
   background-image: none !important;
   color: var(--accent);
-  border-bottom: 1px solid #e8eefc;
+  border-bottom: 1px solid #d5def0;
 }
 
 .diag-chat-title {

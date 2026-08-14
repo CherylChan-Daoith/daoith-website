@@ -3108,31 +3108,111 @@ function extractDiagnosisActionAdvice(markdown) {
 function pickDiagnosisServiceIds(text) {
   const full = String(text || '');
   const action = extractDiagnosisActionAdvice(full);
-  const t = `${action}\n${full}`;
+  const slots = getDiagSlots();
+  const shipping = String(slots.shipping || '');
+  const exportMode =
+    String(slots.exportMode || '').trim() ||
+    (isPlatformDomesticWarehouseShipping(shipping) ? '由平台安排出口' : '');
+  const invoice = String(slots.invoice || '');
+  const product = String(slots.productCategory || '');
+  const platform = String(slots.platform || '');
+  const entity = String(slots.entity || '');
+  // Slots first — plans often say「免税／清单」而不写「退税」，纯正文匹配会落到只剩专家1v1
+  const t = [action, full, platform, entity, shipping, exportMode, invoice, product]
+    .filter(Boolean)
+    .join('\n');
+
   const ids = [];
   const add = (id) => {
     if (id && !ids.includes(id)) ids.push(id);
   };
-  // Prefer path-specific compliance packages first
-  if (/0110/.test(t) && /香港/.test(t)) add('domestic-arch-0110-hk');
-  if (/1039/.test(t) && /香港/.test(t)) add('domestic-arch-1039-hk');
-  if (/9810/.test(t) && /退税|免抵退|出口退|海外仓|陪跑/.test(t)) add('domestic-rebate-9810');
-  if (/1210|9610/.test(t) && /退税|免抵退|出口退|陪跑|分送集报|保税/.test(t)) {
+
+  // 合规诊断完成后：专家1v1 固定第一位，其后才是路径套餐
+  add('consult-1v1');
+
+  const isDomesticWh =
+    isPlatformDomesticWarehouseShipping(shipping) || /由平台安排出口/.test(exportMode);
+  // Prefer slot shipping; only fall back to explicit overseas cues when shipping empty
+  const isOverseasWh = shipping
+    ? /亚马逊\s*FBA|FBA|FBL|Shopee海外仓|海外仓发货|半托管（海外仓）|POP（海外仓|自发货（海外仓|发货到平台海外仓|供货\s*SHEIN（保税仓）/.test(
+        shipping
+      )
+    : !isDomesticWh &&
+      /亚马逊\s*FBA|FBA|FBL|Shopee海外仓|海外仓发货|半托管（海外仓）|POP（海外仓|自发货（海外仓|发货到平台海外仓/.test(
+        t
+      );
+  const isParcelExport =
+    /小包快递出口|9610|1210|未报关/.test(exportMode) ||
+    (/国内直发|POP（国内直发）|自发货（国内直发）/.test(shipping) &&
+      /9610|1210|小包|未报关|保税|一日游/.test(t + exportMode));
+  const noInvoice = /无法提供|无票|不能提供/.test(invoice) || /无法提供发票|无票出口/.test(t);
+  const hasSpecialInvoice = /专用发票|专票/.test(invoice) || /专用发票|专票/.test(t);
+  const mentions0110Hk = /0110/.test(t) && /香港/.test(t);
+  const mentions1039Hk = /1039/.test(t) && /香港/.test(t);
+  const wantsRebateHelp = /退税|免抵退|出口退|退免税|免税|征退差|报关退税|报关清单|报关单/.test(t);
+
+  // ——— 路径套餐（第 2～4 位）———
+  // 平台国内仓与海外仓互斥：国内仓不走 0110/9810 海外仓套餐
+  if (
+    !isDomesticWh &&
+    (isOverseasWh || /正式报关出口（0110|正式报关出口（9810|9810|0110/.test(exportMode + t))
+  ) {
+    if (noInvoice || /1039|市场采购/.test(exportMode + t)) {
+      add('domestic-arch-1039-hk');
+      add('domestic-1039-sole');
+    } else if (/9810/.test(exportMode) || (/9810/.test(t) && /退税|海外仓|陪跑|不确定/.test(t))) {
+      add('domestic-rebate-9810');
+      if (mentions0110Hk || /香港公司|0110出口\s*\+?\s*香港/.test(t)) add('domestic-arch-0110-hk');
+    } else {
+      add('domestic-arch-0110-hk');
+    }
+  }
+
+  if (isParcelExport || /1210|9610|保税|一日游|分送集报/.test(t)) {
     add('domestic-rebate-1210-9610');
   }
-  if (/1039|市场采购/.test(t) && /个体户|核定/.test(t) && !ids.includes('domestic-arch-1039-hk')) {
-    add('domestic-1039-sole');
+
+  if (isDomesticWh) {
+    // 平台国内仓：阿里系常涉及 9610 清单；普遍需要合规代账
+    if (
+      /速卖通|AliExpress|阿里|SHEIN|菜鸟|全托管|半托管/.test(platform + shipping + t) ||
+      /9610|报关清单|退免税|免税/.test(t)
+    ) {
+      add('domestic-rebate-1210-9610');
+    }
+    add('domestic-compliance-bookkeeping');
   }
-  if (/退税|免抵退|出口退|征退差|报关退税/.test(t)) add('domestic-rebate');
+
+  if (mentions0110Hk) add('domestic-arch-0110-hk');
+  if (mentions1039Hk) add('domestic-arch-1039-hk');
+  if (/1039|市场采购/.test(exportMode + t) && (noInvoice || /个体户|核定/.test(t + entity))) {
+    add('domestic-1039-sole');
+    add('domestic-arch-1039-hk');
+  }
+
+  // ——— 通用配套 ———
+  if (wantsRebateHelp) add('domestic-rebate');
   if (/VAT|Oss|IOSS|增值税注册|远程销售|欧盟.*税/.test(t)) add('overseas-vat');
   if (/销售税|Sales\s*Tax|Wayfair|经济关联/.test(t)) add('overseas-us-sales-tax');
   if (/ODI|境外投资|境外直接/.test(t)) add('overseas-odi');
-  if (/香港公司|香港主体|香港审计|双层架构/.test(t)) add('hk-company');
+  if (/香港公司|香港主体|香港审计|双层架构|0110出口\s*\+?\s*香港|1039出口\s*\+?\s*香港/.test(t)) {
+    add('hk-company');
+  }
   if (/记账|账务|做账|汇算清缴|账册/.test(t)) add('domestic-bookkeeping');
   if (/合规体检|全面诊断|架构诊断|风险排查/.test(t)) add('domestic-diagnosis');
   if (/全年陪跑|持续跟进|常年顾问|财税合规陪跑/.test(t)) add('consult-annual');
-  // Always include expert consult; keep action matches first
-  if (!ids.includes('consult-1v1')) ids.push('consult-1v1');
+
+  // 若除专家外仍无套餐：按出口方式兜底
+  if (ids.length <= 1) {
+    if (/9810/.test(exportMode)) add('domestic-rebate-9810');
+    else if (/9610|1210|小包/.test(exportMode)) add('domestic-rebate-1210-9610');
+    else if (/1039|市场采购/.test(exportMode)) add('domestic-arch-1039-hk');
+    else if (/0110|9710|正式报关/.test(exportMode) || isOverseasWh) add('domestic-arch-0110-hk');
+    else if (isDomesticWh) add('domestic-compliance-bookkeeping');
+    else if (hasSpecialInvoice || wantsRebateHelp) add('domestic-rebate');
+    else add('domestic-diagnosis');
+  }
+
   return ids.slice(0, 4);
 }
 

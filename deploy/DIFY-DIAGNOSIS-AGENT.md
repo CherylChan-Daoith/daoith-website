@@ -24,6 +24,19 @@
 
 ## 2. 粘贴提示词
 
+**务必用纯文本粘贴，不要从 Markdown 预览 / 网页渲染态复制**（否则标题、列表、加粗会被 Dify 富文本改乱）。
+
+推荐做法：
+1. 在 Cursor 打开 `deploy/dify-prompts/diagnosis-agent-system.md`（**源码视图**，关掉 Markdown Preview）
+2. `⌘A` 全选 → `⌘C` 复制  
+   或终端执行：`pbcopy < deploy/dify-prompts/diagnosis-agent-system.md`
+3. 打开 Dify → 该 Agent → **指令 / Instruction**
+4. **先全选清空**旧内容，再粘贴
+5. 若出现「粘贴为富文本」，改选 **粘贴为纯文本**（Mac：`⇧⌘V`）
+6. 保存并 **发布**
+
+开头那行 `> 粘贴到 Dify…` 是给人看的说明，可删掉再贴，不影响模型。
+
 1. 打开 `deploy/dify-prompts/diagnosis-agent-system.md`  
    → 全文复制到 Agent **指令（Instruction）**
 2. 打开 `deploy/dify-prompts/diagnosis-agent-opening.md`  
