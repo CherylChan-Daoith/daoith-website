@@ -699,27 +699,24 @@ ul {
   flex: 0 0 auto;
   padding: 0;
   margin: 0;
-  border: 1px solid rgba(34, 81, 255, 0.14);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, #ffffff 100%);
+  border: 1.5px solid rgba(34, 81, 255, 0.28);
+  border-radius: 16px;
+  background: #fff;
   overflow: hidden;
-  box-shadow:
-    0 10px 28px rgba(34, 81, 255, 0.1),
-    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  box-shadow: 0 4px 18px rgba(34, 81, 255, 0.06);
 }
 
 .diag-hs-title,
 #ai-solution .diag-hs-title {
   margin: 0;
-  padding: 14px 18px 8px;
+  padding: 12px 16px 6px;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #1a3cff !important;
-  background: linear-gradient(90deg, rgba(34, 81, 255, 0.1), rgba(56, 189, 248, 0.08)) !important;
-  background-image: linear-gradient(90deg, rgba(34, 81, 255, 0.1), rgba(56, 189, 248, 0.08)) !important;
-  border-bottom: 1px solid rgba(34, 81, 255, 0.08);
+  color: #2251ff !important;
+  background: transparent !important;
+  background-image: none !important;
+  border-bottom: none;
 }
 
 .diag-hs-body {
@@ -828,13 +825,11 @@ ul {
   flex-direction: column;
   gap: 0;
   background: #fff;
-  border: 1px solid rgba(34, 81, 255, 0.14);
-  border-radius: 18px;
+  border: 1.5px solid rgba(34, 81, 255, 0.28);
+  border-radius: 16px;
   padding: 0;
   overflow: hidden;
-  box-shadow:
-    0 12px 32px rgba(34, 81, 255, 0.12),
-    0 1px 0 rgba(255, 255, 255, 0.85) inset;
+  box-shadow: 0 4px 18px rgba(34, 81, 255, 0.06);
 }
 
 .diag-chat-header,
@@ -844,11 +839,11 @@ ul {
   justify-content: space-between;
   gap: 8px;
   flex-shrink: 0;
-  padding: 14px 16px 12px;
-  background: linear-gradient(90deg, rgba(34, 81, 255, 0.12), rgba(56, 189, 248, 0.1)) !important;
-  background-image: linear-gradient(90deg, rgba(34, 81, 255, 0.12), rgba(56, 189, 248, 0.1)) !important;
-  color: #1230b0;
-  border-bottom: 1px solid rgba(34, 81, 255, 0.1);
+  padding: 12px 16px 8px;
+  background: transparent !important;
+  background-image: none !important;
+  color: #2251ff;
+  border-bottom: none;
 }
 
 .diag-chat-title {
@@ -863,7 +858,7 @@ ul {
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  color: #1230b0 !important;
+  color: #2251ff !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -906,11 +901,9 @@ ul {
   overscroll-behavior: contain;
   overflow-anchor: none;
   max-height: none;
-  padding: 16px;
+  padding: 14px 16px 16px;
   gap: 10px;
-  background:
-    radial-gradient(ellipse at top right, rgba(56, 189, 248, 0.12), transparent 42%),
-    linear-gradient(180deg, #f3f7ff 0%, #f8fbff 100%);
+  background: #fff;
   border: none;
   border-radius: 0;
   margin: 0;
@@ -1565,12 +1558,10 @@ ul {
 }
 
 .result-panel {
-  background:
-    radial-gradient(ellipse at top right, rgba(56, 189, 248, 0.14), transparent 40%),
-    linear-gradient(165deg, #ffffff 0%, #f4f8ff 100%);
-  border-radius: 18px;
+  background: #fff;
+  border-radius: 16px;
   padding: 0;
-  border: 1px solid rgba(34, 81, 255, 0.14);
+  border: 1.5px solid rgba(34, 81, 255, 0.28);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -1579,9 +1570,7 @@ ul {
   min-height: 560px;
   color: var(--text);
   overflow: hidden;
-  box-shadow:
-    0 14px 36px rgba(34, 81, 255, 0.12),
-    0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  box-shadow: 0 4px 18px rgba(34, 81, 255, 0.06);
 }
 
 .result-panel-head {
@@ -1591,9 +1580,9 @@ ul {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 14px 20px 12px;
-  background: linear-gradient(90deg, rgba(34, 81, 255, 0.14), rgba(34, 211, 238, 0.12));
-  border-bottom: 1px solid rgba(34, 81, 255, 0.1);
+  padding: 12px 18px 8px;
+  background: transparent;
+  border-bottom: none;
 }
 
 .result-panel-eyebrow {
@@ -1607,7 +1596,7 @@ ul {
 .result-panel-head strong {
   font-size: 0.92rem;
   font-weight: 700;
-  color: #1230b0;
+  color: #2251ff;
   letter-spacing: -0.01em;
 }
 
@@ -2471,14 +2460,11 @@ ul {
   max-height: 240px;
 }
 
-/* AI section — blue-forward canvas */
+/* AI section — white canvas, aligned with other site sections */
 #ai-solution,
 #ai-solution.ai-solution-page {
   padding: 40px 0 56px;
-  background:
-    radial-gradient(ellipse 70% 45% at 12% 0%, rgba(56, 189, 248, 0.28), transparent 55%),
-    radial-gradient(ellipse 55% 40% at 92% 8%, rgba(34, 81, 255, 0.22), transparent 50%),
-    linear-gradient(165deg, #dce8ff 0%, #eef4ff 42%, #f7faff 78%, #e8f5ff 100%);
+  background: #fff;
   min-height: 100vh;
   overflow-x: hidden;
   overflow-y: auto;
@@ -2490,25 +2476,36 @@ ul {
 }
 
 #ai-solution .section-badge {
-  color: #2251ff;
-  background: rgba(34, 81, 255, 0.1);
-  border: 1px solid rgba(34, 81, 255, 0.18);
+  display: inline-block;
+  color: #2251ff !important;
+  -webkit-text-fill-color: #2251ff;
+  background: transparent !important;
+  background-image: none !important;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  border: 1px solid rgba(34, 81, 255, 0.32);
   border-radius: 980px;
-  padding: 4px 12px;
+  padding: 5px 14px;
+  font-size: 0.72rem;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  margin-bottom: 14px;
 }
 
 #ai-solution .section-header h2 {
   margin-bottom: 10px;
   letter-spacing: -0.02em;
-  background: linear-gradient(120deg, #0f1c3f 10%, #2251ff 55%, #0891b2 120%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ink);
 }
 
 #ai-solution .section-header p {
-  color: #4a5d8a;
+  color: var(--text-secondary);
 }
 
 #ai-solution .tax-calc {
