@@ -1020,6 +1020,154 @@ window.DAOITH_I18N_EN = {
       ],
     },
     {
+      id: 'domestic-rebate-1210-9610',
+      title: '1210/9610 first-claim rebate coaching',
+      desc: 'Hands-on coaching for the first 1210 bonded / 9610 retail-export rebate claim: eligibility, documents, filing, and tax-bureau follow-up.',
+      unit: '/ case',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Guide sellers through the first 1210 or 9610 export rebate (or exemption) cycle—from customs/list documents and input VAT invoices to filing and bureau responses.',
+        bullets: [
+          'Eligibility and customs-model fit (1210 / 9610)',
+          'First-claim document pack coaching',
+          'Filing submission support',
+          'Tax-bureau supplement / interview support',
+          'Post-claim playbook for later batches',
+        ],
+        pricing: 'Fixed ¥5,000 per first-claim coaching engagement. Rebate amounts, customs brokerage, logistics, and government fees are excluded.',
+        process: [
+          'Discovery and path confirmation',
+          'Document checklist and gap closing',
+          'First-claim filing',
+          'Bureau response and close-out review',
+        ],
+        timeline: 'Kick-off usually within 3–5 business days after payment; filing often 5–10 business days after documents are complete.',
+        faqs: [
+          {
+            q: '1210 vs 9610—which should I choose?',
+            a: 'Stockable, non-custom SKUs often fit 1210 bonded fulfillment; order-driven or custom goods more often use 9610 / same-day bonded routes. Final choice depends on clearance capacity and local tax practice.',
+          },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-rebate-9810',
+      title: '9810 first-claim rebate coaching',
+      desc: 'Hands-on coaching for the first 9810 overseas-warehouse rebate claim, including sales/FX evidence and bureau liaison.',
+      unit: '/ case',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Help 9810 overseas-warehouse exporters align customs title, warehouse movements, overseas sales evidence, and FX proof for a first successful rebate filing.',
+        bullets: [
+          '9810 feasibility assessment',
+          'Title, warehouse, and sales-flow mapping',
+          'Sales / FX evidence coaching',
+          'First-claim filing and bureau follow-up',
+        ],
+        pricing: 'Fixed ¥5,000 per first-claim coaching engagement. Third-party warehouse, freight, and government fees are excluded.',
+        process: [
+          'Model and local-practice discovery',
+          'Evidence pack completion',
+          'First-claim filing',
+          'Supplements and close-out review',
+        ],
+        timeline: 'Kick-off usually within 3–5 business days; filing often 5–15 business days after documents are complete.',
+        faqs: [
+          {
+            q: 'Is a 9810 rebate guaranteed?',
+            a: 'No. Local evidence expectations vary. We prepare materials carefully but outcomes follow the tax authority. Where uncertainty is high, we may recommend a more stable 0110 + Hong Kong structure.',
+          },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-1039-sole',
+      title: '1039 market-procurement sole-proprietor package',
+      desc: 'One-stop 1039 sole-proprietor setup: registration, assessed-collection application, bookkeeping, and tax filing.',
+      unit: ' from',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'For sellers using 1039 market procurement via a sole proprietorship: formation, assessed-collection filing, and first-year basic bookkeeping/tax returns.',
+        bullets: [
+          '1039 suitability check',
+          'Sole-proprietor formation (typical market hubs)',
+          'Assessed-collection application support',
+          'First-year basic bookkeeping and filings',
+        ],
+        pricing: '¥5,000 package including formation, assessed-collection application, and first-year basic books/filings. Government fees, banking, rush services, and Hong Kong architecture are extra.',
+        process: [
+          'Suitability and location advice',
+          'Sole-proprietor registration',
+          'Assessed-collection application',
+          'Books and periodic filings',
+        ],
+        timeline: 'Formation often 5–15 business days after documents are ready; assessed collection follows local timelines.',
+        faqs: [
+          {
+            q: 'Does this include customs brokerage?',
+            a: 'No. This package focuses on the entity, assessed collection, and books/tax. Customs and freight can be arranged separately.',
+          },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-arch-0110-hk',
+      title: '0110 export + Hong Kong fully managed architecture',
+      desc: 'Fully managed 0110 general-trade + Hong Kong hub: design, PRC/HK incorporation, books, filings, and tax-inspection support.',
+      unit: '/ year from',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Implement supplier → PRC exporter → Hong Kong company → store entity → overseas buyers under 0110, with incorporation, books/filings, and inspection readiness in one managed package.',
+        bullets: [
+          'Architecture design and four-flow alignment',
+          'PRC and Hong Kong company formation',
+          'Books, filings, and rebate coordination (as scoped)',
+          'Documentation readiness and inspection support',
+        ],
+        pricing: '¥15,000–¥38,000 per year by sales band. Government fees, HK audit/secretary fees, and banking charges are separate.',
+        process: [
+          'Discovery and architecture plan',
+          'PRC / Hong Kong formation',
+          'Books and tax initialization',
+          'Ongoing managed compliance',
+          'Inspection support as needed',
+        ],
+        timeline: 'Architecture plan in 1–2 weeks after payment; formation often 2–6 weeks depending on location.',
+        faqs: [
+          {
+            q: 'Why route through Hong Kong?',
+            a: 'Exporting under 0110 to an overseas buyer (HKCo) helps align customs title with rebate eligibility before overseas resale. Transfer-pricing reasonableness still matters.',
+          },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-arch-1039-hk',
+      title: '1039 export + Hong Kong fully managed architecture',
+      desc: 'Fully managed 1039 market procurement + Hong Kong hub: design, sole-proprietor & HK formation, books, filings, and inspection support.',
+      unit: '/ year from',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'Implement supplier → sole proprietor → Hong Kong company → store entity under 1039, with formation, assessed collection, books/filings, and inspection support.',
+        bullets: [
+          '1039 suitability and quota planning',
+          'Sole-proprietor and Hong Kong formation',
+          'Books and filings under assessed collection',
+          'Inspection documentation support',
+        ],
+        pricing: '¥15,000–¥38,000 per year by sales band. Government fees, HK statutory fees, and extra sole proprietors are separate.',
+        process: [
+          'Suitability and architecture plan',
+          'Sole-proprietor + Hong Kong formation',
+          'Assessed collection and books setup',
+          'Ongoing managed compliance',
+          'Inspection support as needed',
+        ],
+        timeline: 'Plan in 1–2 weeks after payment; formation often 2–6 weeks.',
+        faqs: [
+          {
+            q: '0110+HK vs 1039+HK—how to choose?',
+            a: 'Prefer 1039+HK when special VAT invoices are hard to obtain and goods/quotas fit market procurement; prefer 0110+HK when invoices support formal rebate. Final choice depends on SKU, volume, and local practice.',
+          },
+        ],
+      }),
+    },
+    {
       id: 'domestic-rebate',
       title: 'Export rebate agency',
       desc: 'Full 9810/9610 rebate filing including documentation and authority liaison.',

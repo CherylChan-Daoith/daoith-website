@@ -2796,6 +2796,16 @@ function pickDiagnosisServiceIds(text) {
   const add = (id) => {
     if (id && !ids.includes(id)) ids.push(id);
   };
+  // Prefer path-specific compliance packages first
+  if (/0110/.test(t) && /香港/.test(t)) add('domestic-arch-0110-hk');
+  if (/1039/.test(t) && /香港/.test(t)) add('domestic-arch-1039-hk');
+  if (/9810/.test(t) && /退税|免抵退|出口退|海外仓|陪跑/.test(t)) add('domestic-rebate-9810');
+  if (/1210|9610/.test(t) && /退税|免抵退|出口退|陪跑|分送集报|保税/.test(t)) {
+    add('domestic-rebate-1210-9610');
+  }
+  if (/1039|市场采购/.test(t) && /个体户|核定/.test(t) && !ids.includes('domestic-arch-1039-hk')) {
+    add('domestic-1039-sole');
+  }
   if (/退税|免抵退|出口退|征退差|报关退税/.test(t)) add('domestic-rebate');
   if (/VAT|Oss|IOSS|增值税注册|远程销售|欧盟.*税/.test(t)) add('overseas-vat');
   if (/销售税|Sales\s*Tax|Wayfair|经济关联/.test(t)) add('overseas-us-sales-tax');
@@ -2803,7 +2813,7 @@ function pickDiagnosisServiceIds(text) {
   if (/香港公司|香港主体|香港审计|双层架构/.test(t)) add('hk-company');
   if (/记账|账务|做账|汇算清缴|账册/.test(t)) add('domestic-bookkeeping');
   if (/合规体检|全面诊断|架构诊断|风险排查/.test(t)) add('domestic-diagnosis');
-  if (/全年|陪跑|持续跟进|常年顾问/.test(t)) add('consult-annual');
+  if (/全年陪跑|持续跟进|常年顾问|财税合规陪跑/.test(t)) add('consult-annual');
   // Always include expert consult; keep action matches first
   if (!ids.includes('consult-1v1')) ids.push('consult-1v1');
   return ids.slice(0, 4);
@@ -4408,24 +4418,29 @@ function renderAIPlanHtml(text) {
     if (/请您提供|请提供以下信息|请提供具体信息/.test(line)) continue;
     if (/通用框架|在您提供信息前|由于您尚未提供/.test(line)) continue;
 
-    // Sub-labels like「主要风险：」「业务流程现状：」
-    const subLabel = line.replace(/\*/g, '').match(/^(业务流程图|业务流程现状|主要风险|核心风险)[:：]\s*$/);
-    if (subLabel) {
+    // Sub-labels「业务流程／主要风险」never render as bullets (even if model wrote `- **…**`)
+    const subLabelPlain = line
+      .replace(/\*/g, '')
+      .replace(/^[-*•]\s+/, '')
+      .replace(/^\d+[.)、．]\s+/, '')
+      .trim();
+    const subLabelMatch = subLabelPlain.match(
+      /^(业务流程图|业务流程现状|业务流程|主要风险|核心风险)[:：]\s*(.*)$/
+    );
+    if (subLabelMatch) {
       closeList();
-      const label = subLabel[1];
-      flowMode = isFlowchartTitle(label);
-      sectionKind = flowMode ? 'flow' : /风险/.test(label) ? 'risk' : sectionKind;
+      const label = subLabelMatch[1] === '业务流程' ? '业务流程' : subLabelMatch[1];
+      const rest = String(subLabelMatch[2] || '').trim();
+      const isRiskLabel = /风险/.test(label);
+      flowMode = isFlowchartTitle(label) || label === '业务流程';
+      sectionKind = isRiskLabel ? 'risk' : flowMode ? 'flow' : sectionKind;
       html += `<h5 class="result-section-subtitle${flowMode ? ' result-flow-heading' : ''}">${escapeHtml(label)}：</h5>`;
-      continue;
-    }
-    if (/^主要风险[:：]/.test(line.replace(/\*/g, ''))) {
-      closeList();
-      flowMode = false;
-      sectionKind = 'risk';
-      html += `<h5 class="result-section-subtitle">主要风险：</h5>`;
-      const rest = line.replace(/\*/g, '').replace(/^主要风险[:：]\s*/, '').trim();
       if (rest) {
-        html += `<ul class="result-list result-list-l2"><li>${formatRiskOrBulletContent(rest)}</li></ul>`;
+        if (flowMode) {
+          html += `<p class="result-paragraph">${formatInline(rest)}</p>`;
+        } else {
+          html += `<ul class="result-list result-list-l2"><li>${formatRiskOrBulletContent(rest)}</li></ul>`;
+        }
       }
       continue;
     }
