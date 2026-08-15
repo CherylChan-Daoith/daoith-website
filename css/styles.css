@@ -1655,9 +1655,9 @@ ul {
   z-index: 2;
   pointer-events: none;
   border-radius: inherit;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160' viewBox='0 0 240 160'%3E%3Ctext x='120' y='88' text-anchor='middle' fill='rgba(15%2C28%2C63%2C0.055)' font-size='15' font-weight='600' font-family='Noto Sans SC%2C PingFang SC%2C Microsoft YaHei%2C sans-serif' transform='rotate(-28 120 80)'%3E%E9%81%93%E4%B8%80%E8%B7%A8%E5%A2%83%E5%92%A8%E8%AF%A2%3C/text%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='180' viewBox='0 0 260 180'%3E%3Cg transform='rotate(-28 130 90)' fill='rgba(15%2C28%2C63%2C0.055)' text-anchor='middle' font-family='Noto Sans SC%2C PingFang SC%2C Microsoft YaHei%2C sans-serif'%3E%3Ctext x='130' y='86' font-size='15' font-weight='600'%3E%E9%81%93%E4%B8%80%E8%B7%A8%E5%A2%83%E5%92%A8%E8%AF%A2%3C/text%3E%3Ctext x='130' y='104' font-size='9.5' font-weight='600' letter-spacing='0.04em'%3EDAOITH Consulting%3C/text%3E%3C/g%3E%3C/svg%3E");
   background-repeat: repeat;
-  background-size: 240px 160px;
+  background-size: 260px 180px;
 }
 
 /* Discourage copying plan content (front-end deterrent only) */
