@@ -272,7 +272,7 @@
             <input type="number" id="taxSupplierInvoicePoint" value="10" min="0" max="100" step="0.01">
           </div>
         </div>
-        <p class="tax-form-note">以上费率指一年的成本费用占销售收入的比例。满足退免税条件时按出口退税测算；不满足时按内销增值税测算。供应商取票税点为采购开票增值税税率（如 1%、3%、13%）。</p>
+        <p class="tax-form-note">以上费率指一年的成本费用占销售收入的比例。满足退免税条件时按出口退税测算；不满足时按内销增值税测算。供应商取票税点为供应商开票需要在不含税采购价基础上加成的点数（如不开票采购价是100元，开票含税采购价110元，即加成10%）。</p>
         <button class="btn btn-primary" id="calcTax">计算合规税负</button>
         <div class="tax-result" id="taxResultPanel">
           <div class="tax-result-metrics">
