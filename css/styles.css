@@ -978,11 +978,6 @@ ul {
   line-height: 1.4;
 }
 
-.diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask .diag-ask-hint {
-  display: inline;
-  margin: 0;
-}
-
 .diag-quick-replies {
   display: flex;
   flex-wrap: wrap;
@@ -1175,9 +1170,23 @@ ul {
   line-height: 1.55;
 }
 
+.diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask .welcome-option {
+  white-space: nowrap;
+}
+
+.diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask .diag-ask-hint {
+  display: inline !important;
+  margin: 0 !important;
+  font-size: 0.78em;
+  font-weight: 400;
+  color: #94a3b8;
+  letter-spacing: 0.01em;
+  line-height: inherit;
+}
+
 .diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask strong {
-  color: var(--accent);
-  font-weight: 500;
+  color: #515154;
+  font-weight: 700;
 }
 
 /* Chat: emphasize with bold only (no blue); keep codes plain. Plan panel keeps chips. */

@@ -2148,8 +2148,10 @@ function initAiChatbot() {
     greetEl.innerHTML =
       `<p class="welcome-lead">您好，欢迎使用道一合规诊断助手！</p>` +
       `<p class="welcome-ask">请选择：` +
-      `<strong>开启专属合规诊断</strong><span class="diag-ask-hint">（需微信登录，按步骤生成诊断报告）</span>，或 ` +
-      `<strong>我有特定问题想直接提问</strong><span class="diag-ask-hint">（基于知识库即时解答）</span>。</p>`;
+      `<span class="welcome-option"><strong>开启专属合规诊断</strong><span class="diag-ask-hint">（需微信登录，按步骤生成诊断报告）</span></span>` +
+      `，或 ` +
+      `<span class="welcome-option"><strong>我有特定问题想直接提问</strong><span class="diag-ask-hint">（基于知识库即时解答）</span></span>` +
+      `。</p>`;
     messages.appendChild(greetEl);
 
     showQuickReplies('请选择：开启专属合规诊断，还是我有特定问题想直接提问？');
@@ -5526,9 +5528,12 @@ function initTaxCalculator() {
         - (staffRate / 100)
         - (otherRate / 100);
       const incomeTax = Math.max(0, revenue * profitRate * (incomeRate / 100));
-      // 满足退免税：出口退税 = 销售额 × 产品成本率 × 出口退税率
+      const costBase = revenue * (productCostRate / 100);
+      const supplierPoint = supplierPointPct / 100;
+      // 满足退免税：出口退税 = (年出口销售额×产品成本率)×(1+供应商取票税点)×出口退税率/(1+13%)
       // 不满足：按内销增值税 = 销售额 × (1 − 产品成本率) × 13%
-      const exportRebate = revenue * (productCostRate / 100) * (refundRate / 100);
+      const exportRebate =
+        costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100);
       const domesticVat = revenue * (1 - productCostRate / 100) * (vatLevyRate / 100);
       const vatOrRebate = refundEligible ? exportRebate : domesticVat;
       const total = refundEligible ? incomeTax - exportRebate : incomeTax + domesticVat;
@@ -5536,8 +5541,6 @@ function initTaxCalculator() {
       // 出口退税收益 =
       // (年出口销售额×产品成本率)×(1+供应商取票税点)×13%/(1+13%)
       // − (年出口销售额×产品成本率)×供应商取票税点
-      const costBase = revenue * (productCostRate / 100);
-      const supplierPoint = supplierPointPct / 100;
       const rebateBenefit =
         costBase * (1 + supplierPoint) * (vatLevyRate / 100) / (1 + vatLevyRate / 100) -
         costBase * supplierPoint;
@@ -5550,7 +5553,8 @@ function initTaxCalculator() {
             income: '1) Corporate income tax',
             incomeFormula: 'Sales × (1 − product − marketing − shipping − staff − other) × CIT rate',
             vatYes: '2) Export rebate',
-            vatYesFormula: 'Export sales × product cost ratio × export rebate rate',
+            vatYesFormula:
+              '(Sales × product cost) × (1 + supplier invoice VAT point) × export rebate rate / (1 + 13%)',
             vatNo: '2) Domestic sales VAT',
             vatNoFormula: 'Sales × (1 − product cost ratio) × 13%',
             rebateBenefit: '3) Export rebate net benefit',
@@ -5565,7 +5569,8 @@ function initTaxCalculator() {
             income: '1）企业所得税',
             incomeFormula: '销售额 × (1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率) × 适用所得税税率',
             vatYes: '2）出口退税',
-            vatYesFormula: '出口销售额 × 产品成本率 × 出口退税率',
+            vatYesFormula:
+              '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 出口退税率 /（1 + 13%）',
             vatNo: '2）内销增值税',
             vatNoFormula: '销售额 × (1 − 产品成本率) × 13%',
             rebateBenefit: '3）出口退税收益',
