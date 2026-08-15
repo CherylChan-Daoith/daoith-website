@@ -3366,7 +3366,7 @@ function buildResultWorkingHtml() {
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<img class="rw-figure" src="/images/diag-thinker-blue.png?v=20260815cut1" alt="" width="360" height="483" decoding="async"/>` +
+    `<img class="rw-figure" src="/images/diag-thinker-blue.png?v=20260815cool1" alt="" width="280" height="376" decoding="async"/>` +
     `<div class="rw-thoughts">${chipHtml}</div>` +
     `</div>` +
     `<p class="result-working-title">` +

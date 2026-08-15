@@ -1788,7 +1788,7 @@ ul {
 
 .result-working-scene {
   position: relative;
-  width: min(200px, 72%);
+  width: min(148px, 58%);
 }
 
 .result-working-scene .rw-figure {
@@ -1799,6 +1799,8 @@ ul {
   background: transparent;
   border-radius: 0;
   box-shadow: none;
+  /* Slight cool cast to match site blues */
+  filter: saturate(0.92) hue-rotate(12deg) brightness(1.02);
   animation: rw-breathe 3.2s ease-in-out infinite;
 }
 
@@ -2633,6 +2635,14 @@ ul {
 #ai-solution .tax-result-value {
   font-size: 1.35rem;
   color: #1230b0;
+}
+
+#ai-solution .result-placeholder .result-placeholder-logo {
+  display: block;
+  width: 72px;
+  height: auto;
+  margin: 0 auto 12px;
+  object-fit: contain;
 }
 
 #ai-solution .result-placeholder .icon {
