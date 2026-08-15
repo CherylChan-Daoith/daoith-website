@@ -5558,16 +5558,18 @@ function initTaxCalculator() {
         total = incomeTax + domesticVat;
       }
 
-      // 出口退税收益 =
+      // 出口退税收益（销售额低于 500 万时不计算）
       // (年出口销售额×产品成本率)×(1+供应商取票税点)×出口退税率/(1+13%)
       // − (年出口销售额×产品成本率)×供应商取票税点
-      const rebateBenefit =
-        costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100) -
-        costBase * supplierPoint;
+      const rebateBenefit = smallScale
+        ? null
+        : costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100) -
+          costBase * supplierPoint;
       // 税负率 = 企业所得税 / 销售额（退税率为 0 时销售额已折算）
       const burdenRatePct = salesForCit > 0 ? (incomeTax / salesForCit) * 100 : null;
 
       const locale = window.DAOITH_getLocale?.() || 'zh';
+      const burdenNum = smallScale ? '3' : '4';
       const copy = locale === 'en'
         ? {
             income: '1) Corporate income tax',
@@ -5588,7 +5590,7 @@ function initTaxCalculator() {
             rebateBenefit: '3) Export rebate net benefit',
             rebateBenefitFormula:
               '(Sales × product cost) × (1 + supplier invoice VAT point) × export rebate rate / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
-            burdenRate: '4) Tax burden rate',
+            burdenRate: `${burdenNum}) Tax burden rate`,
             burdenRateFormula: zeroRebate
               ? smallScale
                 ? 'Corporate income tax ÷ (export sales ÷ (1 + 1%))'
@@ -5616,7 +5618,7 @@ function initTaxCalculator() {
             rebateBenefit: '3）出口退税收益',
             rebateBenefitFormula:
               '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 出口退税率 /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
-            burdenRate: '4）税负率',
+            burdenRate: `${burdenNum}）税负率`,
             burdenRateFormula: zeroRebate
               ? smallScale
                 ? '企业所得税 ÷（出口销售额 /（1 + 1%））'
@@ -5641,7 +5643,19 @@ function initTaxCalculator() {
         burdenRateEl.textContent =
           burdenRatePct == null ? '—' : `${burdenRatePct.toFixed(2)}%`;
       }
-      if (rebateBenefitEl) rebateBenefitEl.textContent = formatWan(rebateBenefit);
+      const rebateBenefitMetric = rebateBenefitEl?.closest('.tax-result-metric');
+      if (rebateBenefitMetric) rebateBenefitMetric.hidden = !!smallScale;
+      if (rebateBenefitEl) {
+        rebateBenefitEl.textContent =
+          rebateBenefit == null ? '—' : formatWan(rebateBenefit);
+      }
+      const rebateBenefitSection = smallScale
+        ? ''
+        : `
+          <div class="tax-breakdown-section">
+            <div><strong>${copy.rebateBenefit}</strong>：${formatWan(rebateBenefit)}</div>
+            <div class="tax-breakdown-formula">${copy.rebateBenefitFormula}</div>
+          </div>`;
       note.innerHTML = `
         <div class="tax-breakdown">
           <div class="tax-breakdown-section">
@@ -5652,10 +5666,7 @@ function initTaxCalculator() {
             <div><strong>${vatLabel}</strong>：${formatWan(vatOrRebate)}</div>
             <div class="tax-breakdown-formula">${vatFormula}</div>
           </div>
-          <div class="tax-breakdown-section">
-            <div><strong>${copy.rebateBenefit}</strong>：${formatWan(rebateBenefit)}</div>
-            <div class="tax-breakdown-formula">${copy.rebateBenefitFormula}</div>
-          </div>
+          ${rebateBenefitSection}
           <div class="tax-breakdown-section">
             <div><strong>${copy.burdenRate}</strong>：${
               burdenRatePct == null ? '—' : `${burdenRatePct.toFixed(2)}%`
