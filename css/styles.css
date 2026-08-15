@@ -2679,23 +2679,34 @@ ul {
 }
 
 .tax-form-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 14px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 10px;
   margin-bottom: 12px;
   align-items: start;
 }
 
+@media (max-width: 1100px) {
+  .tax-form-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px 8px;
+  }
+}
+
 @media (max-width: 900px) {
   .tax-form-grid {
-    gap: 10px 12px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px 10px;
   }
 }
 
 @media (max-width: 520px) {
+  .tax-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tax-calc .form-group {
-    flex: 1 1 100%;
-    width: 100%;
+    width: auto;
     max-width: none;
   }
 }
@@ -2728,26 +2739,23 @@ ul {
 
 .tax-calc .form-group {
   margin-bottom: 0;
-  /* Width matches longest label：营销费率（%）（含所有平台收费） */
-  flex: 0 0 auto;
-  width: 12.75rem;
-  max-width: 100%;
+  width: auto;
   min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
 }
 
 .tax-calc .form-group label {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 500;
-  margin-bottom: 6px;
-  line-height: 1.25;
-  white-space: nowrap;
-  height: 1.25em;
+  margin-bottom: 5px;
+  line-height: 1.3;
+  white-space: normal;
+  min-height: 2.6em;
+  height: auto;
   color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .tax-calc .form-group select,
@@ -2755,9 +2763,9 @@ ul {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
-  height: 36px;
-  padding: 0 10px;
-  font-size: 0.8rem;
+  height: 34px;
+  padding: 0 8px;
+  font-size: 0.78rem;
   line-height: 1.2;
   border-radius: 6px;
   border: 1px solid var(--border);
