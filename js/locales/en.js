@@ -1225,6 +1225,83 @@ window.DAOITH_I18N_EN = {
       }),
     },
     {
+      id: 'domestic-offshore-vat-exemption',
+      title: 'Offshore service VAT exemption filing',
+      desc: 'Contract review, commerce-department contract filing, and tax-bureau VAT exemption filing for offshore outsourcing.',
+      unit: '/ case',
+      details: window.DAOITH_enServiceBlocks({
+        content:
+          'For firms providing ITO/BPO/KPO offshore outsourcing to overseas clients: contract compliance review, commerce-authority contract registration, and tax-bureau cross-border VAT exemption filing so eligible offshore service revenue can be reported as VAT-exempt.',
+        bullets: [
+          'Eligibility and contract-fit assessment',
+          'Contract review and clause hardening',
+          'Commerce outsourcing-system registration and confirmation materials',
+          'Tax-bureau VAT exemption filing pack and submission coaching',
+          'Post-filing reporting notes (separate accounting; no special VAT invoices on exempt items)',
+        ],
+        pricing:
+          '¥2,500 per case (typically one contract batch through commerce + tax filing). Extra contracts, translation/notarization, or rush handling scoped separately. Outcomes depend on authorities.',
+        process: [
+          'Collect contracts and overseas-buyer materials; assess eligibility',
+          'Review / strengthen contract elements into a filing-ready pack',
+          'Complete commerce-system contract registration and obtain confirmation',
+          'Prepare exemption forms and file with the competent tax bureau',
+          'Hand over acknowledgements and ongoing filing notes',
+        ],
+        timeline:
+          'Often 1–3 weeks on the advisory side after documents are ready; commerce review and tax acceptance vary by locality.',
+        faqs: [
+          {
+            q: 'Is commerce filing required before tax exemption?',
+            a: 'For offshore outsourcing, practice usually requires commerce-system registration (e.g. contract information sheet) before tax-bureau exemption filing. Local checklists may differ.',
+          },
+          {
+            q: 'Does filing alone make revenue VAT-exempt?',
+            a: 'Filing is a prerequisite. You must still separately account for exempt sales, report correctly, and avoid issuing special VAT invoices on exempt items. Material contract changes usually need re-registration / notice.',
+          },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-atsi',
+      title: 'Advanced technology service enterprise application',
+      desc: 'End-to-end ATSI qualification coaching: eligibility, dossier, filing follow-up, and CIT preference handover.',
+      unit: '/ case',
+      details: window.DAOITH_enServiceBlocks({
+        content:
+          'Coach applications for Advanced Technology Service Enterprise (ATSI) status. Qualified firms may enjoy 15% CIT and enhanced staff-training deduction rules. Covers eligibility gaps, MOFCOM outsourcing data filing, science/tech platform submission, multi-agency review support, and post-approval tax-bureau preference handover.',
+        bullets: [
+          'Eligibility gap analysis (scope, staff mix, ATSI revenue share, offshore share)',
+          'Revenue / headcount evidence checklist',
+          'MOFCOM service-outsourcing system information and data filing support',
+          'National ATSI platform registration and dossier assembly',
+          'Support for provincial science/commerce/finance/tax/NDRC review supplements',
+          'Post-approval CIT preference handover with the tax bureau',
+        ],
+        pricing:
+          '¥50,000 per case. Special audits, translation/notarization, or rush/re-application scoped separately. Approval is by provincial authorities; not guaranteed.',
+        process: [
+          'Eligibility pre-check against national ATSI rules',
+          'Coach MOFCOM outsourcing-system enterprise data filing',
+          'Register and submit on the ATSI / local government platform',
+          'Track form review, expert review, publicity, and national filing',
+          'After approval, coach tax-bureau CIT preference procedures',
+        ],
+        timeline:
+          'Advisory work often 1–3 months; official collection and review windows follow provincial annual notices and may span quarters.',
+        faqs: [
+          {
+            q: 'What are the core ATSI conditions?',
+            a: 'Typically: in-scope advanced technology services; ≥50% staff with college+ education; ≥50% revenue from ATSI services; ≥35% revenue from offshore outsourcing. Follow local annual rules.',
+          },
+          {
+            q: 'Who decides? What does the tax bureau do?',
+            a: 'Provincial science authorities jointly review with commerce, finance, tax, and NDRC. The tax bureau mainly administers CIT preferences after recognition and supervises ongoing eligibility.',
+          },
+        ],
+      }),
+    },
+    {
       id: 'overseas-odi',
       title: 'ODI filing agency',
       desc: 'End-to-end outbound investment filing (NDRC, commerce, SAFE).',
