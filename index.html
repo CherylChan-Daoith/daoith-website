@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260815cool1">
+  <link rel="stylesheet" href="/css/styles.css?v=20260815tax3">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -274,12 +274,20 @@
         </div>
         <p class="tax-form-note">以上费率指一年的成本费用占销售收入的比例。满足退免税条件时按出口退税测算；不满足时按内销增值税测算。供应商取票税点为采购开票增值税税率（如 1%、3%、13%）。</p>
         <button class="btn btn-primary" id="calcTax">计算合规税负</button>
-        <div class="tax-result">
-          <div class="tax-result-label">年度合规税负预估</div>
-          <div class="tax-result-value" id="taxResult">—</div>
-          <div class="tax-result-rebate" id="taxRebateBenefitWrap" hidden>
-            <div class="tax-result-label">出口退税收益</div>
-            <div class="tax-result-value tax-result-value--sub" id="taxRebateBenefit">—</div>
+        <div class="tax-result" id="taxResultPanel">
+          <div class="tax-result-metrics">
+            <div class="tax-result-metric">
+              <div class="tax-result-label">年度合规税负预估</div>
+              <div class="tax-result-value" id="taxResult">—</div>
+            </div>
+            <div class="tax-result-metric">
+              <div class="tax-result-label">税负率</div>
+              <div class="tax-result-value" id="taxBurdenRate">—</div>
+            </div>
+            <div class="tax-result-metric">
+              <div class="tax-result-label">出口退税收益</div>
+              <div class="tax-result-value" id="taxRebateBenefit">—</div>
+            </div>
           </div>
         </div>
         <div class="tax-actions">
@@ -733,7 +741,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260815hero1"></script>
+  <script src="/js/locales/en.js?v=20260815tax3"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260813a"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -744,6 +752,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260815cool1"></script>
+  <script src="/js/main.js?v=20260815tax3"></script>
 </body>
 </html>

@@ -5503,9 +5503,12 @@ function initTaxCalculator() {
       parseFloat(document.getElementById('taxSupplierInvoicePoint')?.value) || 0;
     const vatLevyRate = 13; // 国内货物增值税征税率（简化）
     const rebateBenefitEl = document.getElementById('taxRebateBenefit');
-    const rebateBenefitWrap = document.getElementById('taxRebateBenefitWrap');
+    const burdenRateEl = document.getElementById('taxBurdenRate');
+    const resultPanel = document.getElementById('taxResultPanel') || resultEl.parentElement;
 
     resultEl.textContent = window.DAOITH_t('tax.calcLoading');
+    if (burdenRateEl) burdenRateEl.textContent = '—';
+    if (rebateBenefitEl) rebateBenefitEl.textContent = '—';
     setButtonLoading(calcBtn, true, window.DAOITH_t('tax.calcLoading'));
 
     try {
@@ -5514,7 +5517,7 @@ function initTaxCalculator() {
         note = document.createElement('div');
         note.id = 'taxResultNote';
         note.className = 'tax-result-note';
-        resultEl.parentElement.appendChild(note);
+        resultPanel.appendChild(note);
       }
       const profitRate = 1
         - (productCostRate / 100)
@@ -5538,6 +5541,8 @@ function initTaxCalculator() {
       const rebateBenefit =
         costBase * (1 + supplierPoint) * (vatLevyRate / 100) / (1 + vatLevyRate / 100) -
         costBase * supplierPoint;
+      // 税负率 = 企业所得税 / 销售额
+      const burdenRatePct = revenue > 0 ? (incomeTax / revenue) * 100 : null;
 
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const copy = locale === 'en'
@@ -5551,6 +5556,8 @@ function initTaxCalculator() {
             rebateBenefit: '3) Export rebate net benefit',
             rebateBenefitFormula:
               '(Sales × product cost) × (1 + supplier invoice VAT point) × 13% / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
+            burdenRate: '4) Tax burden rate',
+            burdenRateFormula: 'Corporate income tax ÷ sales',
             total: 'Net domestic tax burden',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
@@ -5564,6 +5571,8 @@ function initTaxCalculator() {
             rebateBenefit: '3）出口退税收益',
             rebateBenefitFormula:
               '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 13% /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
+            burdenRate: '4）税负率',
+            burdenRateFormula: '企业所得税 ÷ 销售额',
             total: '国内税负合计（净额）',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
@@ -5571,8 +5580,11 @@ function initTaxCalculator() {
       const vatFormula = refundEligible ? copy.vatYesFormula : copy.vatNoFormula;
 
       resultEl.textContent = formatWan(total);
+      if (burdenRateEl) {
+        burdenRateEl.textContent =
+          burdenRatePct == null ? '—' : `${burdenRatePct.toFixed(2)}%`;
+      }
       if (rebateBenefitEl) rebateBenefitEl.textContent = formatWan(rebateBenefit);
-      if (rebateBenefitWrap) rebateBenefitWrap.hidden = false;
       note.innerHTML = `
         <div class="tax-breakdown">
           <div class="tax-breakdown-section">
@@ -5586,6 +5598,12 @@ function initTaxCalculator() {
           <div class="tax-breakdown-section">
             <div><strong>${copy.rebateBenefit}</strong>：${formatWan(rebateBenefit)}</div>
             <div class="tax-breakdown-formula">${copy.rebateBenefitFormula}</div>
+          </div>
+          <div class="tax-breakdown-section">
+            <div><strong>${copy.burdenRate}</strong>：${
+              burdenRatePct == null ? '—' : `${burdenRatePct.toFixed(2)}%`
+            }</div>
+            <div class="tax-breakdown-formula">${copy.burdenRateFormula}</div>
           </div>
           <div class="tax-breakdown-summary">
             <strong>${copy.total}：${formatWan(total)}</strong>

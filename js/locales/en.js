@@ -351,8 +351,13 @@ window.DAOITH_I18N_EN = {
       text: 'All ratios above refer to the share of annual costs/expenses in annual sales revenue. If eligible for rebate/exemption, export rebate is used; otherwise domestic VAT is used. Supplier invoice VAT point is the VAT rate on purchase invoices (e.g. 1%, 3%, 13%).',
     },
     '#calcTax': { text: 'Calculate tax burden' },
-    '.tax-result-label': { text: 'Estimated annual compliance tax' },
-    '#taxRebateBenefitWrap .tax-result-label': { text: 'Export rebate net benefit' },
+    '.tax-result-metric:nth-child(1) .tax-result-label': {
+      text: 'Estimated annual compliance tax',
+    },
+    '.tax-result-metric:nth-child(2) .tax-result-label': { text: 'Tax burden rate' },
+    '.tax-result-metric:nth-child(3) .tax-result-label': {
+      text: 'Export rebate net benefit',
+    },
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {
