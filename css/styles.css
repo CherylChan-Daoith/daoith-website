@@ -978,6 +978,11 @@ ul {
   line-height: 1.4;
 }
 
+.diag-chat .ai-chatbot-bubble.is-welcome .welcome-ask .diag-ask-hint {
+  display: inline;
+  margin: 0;
+}
+
 .diag-quick-replies {
   display: flex;
   flex-wrap: wrap;
