@@ -5565,8 +5565,12 @@ function initTaxCalculator() {
         ? null
         : costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100) -
           costBase * supplierPoint;
-      // 税负率 = 企业所得税 / 销售额（退税率为 0 时销售额已折算）
-      const burdenRatePct = salesForCit > 0 ? (incomeTax / salesForCit) * 100 : null;
+      // 税负率：退税率为 0 时 =（企业所得税 + 视同内销增值税）/（出口销售额/(1+13%)）
+      // 其余 = 企业所得税 / 销售额
+      const burdenSalesBase = zeroRebate ? revenue / (1 + vatLevyRate / 100) : salesForCit;
+      const burdenNumerator = zeroRebate ? incomeTax + deemedDomesticVat : incomeTax;
+      const burdenRatePct =
+        burdenSalesBase > 0 ? (burdenNumerator / burdenSalesBase) * 100 : null;
 
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const burdenNum = smallScale ? '3' : '4';
@@ -5592,9 +5596,7 @@ function initTaxCalculator() {
               '(Sales × product cost) × (1 + supplier invoice VAT point) × export rebate rate / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
             burdenRate: `${burdenNum}) Tax burden rate`,
             burdenRateFormula: zeroRebate
-              ? smallScale
-                ? 'Corporate income tax ÷ (export sales ÷ (1 + 1%))'
-                : 'Corporate income tax ÷ (export sales ÷ (1 + 13%))'
+              ? '(Corporate income tax + deemed domestic-sales VAT) ÷ (export sales ÷ (1 + 13%))'
               : 'Corporate income tax ÷ sales',
             total: 'Net domestic tax burden',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
@@ -5620,9 +5622,7 @@ function initTaxCalculator() {
               '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 出口退税率 /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
             burdenRate: `${burdenNum}）税负率`,
             burdenRateFormula: zeroRebate
-              ? smallScale
-                ? '企业所得税 ÷（出口销售额 /（1 + 1%））'
-                : '企业所得税 ÷（出口销售额 /（1 + 13%））'
+              ? '（企业所得税 + 视同内销增值税）÷（出口销售额 /（1 + 13%））'
               : '企业所得税 ÷ 销售额',
             total: '国内税负合计（净额）',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
