@@ -5527,62 +5527,104 @@ function initTaxCalculator() {
         - (shippingRate / 100)
         - (staffRate / 100)
         - (otherRate / 100);
-      const incomeTax = Math.max(0, revenue * profitRate * (incomeRate / 100));
+      const zeroRebate = refundRate === 0;
+      // 退税率为 0：企业所得税/税负率用销售额 = 出口销售额/(1+13%)
+      const salesForCit = zeroRebate ? revenue / (1 + vatLevyRate / 100) : revenue;
+      const incomeTax = Math.max(0, salesForCit * profitRate * (incomeRate / 100));
       const costBase = revenue * (productCostRate / 100);
       const supplierPoint = supplierPointPct / 100;
       // 满足退免税：出口退税 = (年出口销售额×产品成本率)×(1+供应商取票税点)×出口退税率/(1+13%)
+      // 退税率为 0：视同内销增值税（销售额<500万按 1%，否则按 13%）
       // 不满足：按内销增值税 = 销售额 × (1 − 产品成本率) × 13%
       const exportRebate =
         costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100);
+      const smallScale = revenue > 0 && revenue < 500;
+      const deemedDomesticVat = smallScale
+        ? (revenue / (1 + 0.01)) * 0.01
+        : (revenue / (1 + vatLevyRate / 100)) * (vatLevyRate / 100);
       const domesticVat = revenue * (1 - productCostRate / 100) * (vatLevyRate / 100);
-      const vatOrRebate = refundEligible ? exportRebate : domesticVat;
-      const total = refundEligible ? incomeTax - exportRebate : incomeTax + domesticVat;
+      let vatOrRebate;
+      let total;
+      if (zeroRebate) {
+        vatOrRebate = deemedDomesticVat;
+        total = incomeTax + deemedDomesticVat;
+      } else if (refundEligible) {
+        vatOrRebate = exportRebate;
+        total = incomeTax - exportRebate;
+      } else {
+        vatOrRebate = domesticVat;
+        total = incomeTax + domesticVat;
+      }
 
       // 出口退税收益 =
-      // (年出口销售额×产品成本率)×(1+供应商取票税点)×13%/(1+13%)
+      // (年出口销售额×产品成本率)×(1+供应商取票税点)×出口退税率/(1+13%)
       // − (年出口销售额×产品成本率)×供应商取票税点
       const rebateBenefit =
-        costBase * (1 + supplierPoint) * (vatLevyRate / 100) / (1 + vatLevyRate / 100) -
+        costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100) -
         costBase * supplierPoint;
-      // 税负率 = 企业所得税 / 销售额
-      const burdenRatePct = revenue > 0 ? (incomeTax / revenue) * 100 : null;
+      // 税负率 = 企业所得税 / 销售额（退税率为 0 时销售额已折算）
+      const burdenRatePct = salesForCit > 0 ? (incomeTax / salesForCit) * 100 : null;
 
       const locale = window.DAOITH_getLocale?.() || 'zh';
       const copy = locale === 'en'
         ? {
             income: '1) Corporate income tax',
-            incomeFormula: 'Sales × (1 − product − marketing − shipping − staff − other) × CIT rate',
+            incomeFormula: zeroRebate
+              ? '(Export sales ÷ (1 + 13%)) × (1 − product − marketing − shipping − staff − other) × CIT rate'
+              : 'Sales × (1 − product − marketing − shipping − staff − other) × CIT rate',
             vatYes: '2) Export rebate',
             vatYesFormula:
               '(Sales × product cost) × (1 + supplier invoice VAT point) × export rebate rate / (1 + 13%)',
+            vatZero: '2) Deemed domestic-sales VAT',
+            vatZeroFormula: smallScale
+              ? 'Export sales ÷ (1 + 1%) × 1% (annual sales under RMB 5m)'
+              : 'Export sales ÷ (1 + 13%) × 13%',
             vatNo: '2) Domestic sales VAT',
             vatNoFormula: 'Sales × (1 − product cost ratio) × 13%',
             rebateBenefit: '3) Export rebate net benefit',
             rebateBenefitFormula:
-              '(Sales × product cost) × (1 + supplier invoice VAT point) × 13% / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
+              '(Sales × product cost) × (1 + supplier invoice VAT point) × export rebate rate / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
             burdenRate: '4) Tax burden rate',
-            burdenRateFormula: 'Corporate income tax ÷ sales',
+            burdenRateFormula: zeroRebate
+              ? 'Corporate income tax ÷ (export sales ÷ (1 + 13%))'
+              : 'Corporate income tax ÷ sales',
             total: 'Net domestic tax burden',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
         : {
             income: '1）企业所得税',
-            incomeFormula: '销售额 × (1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率) × 适用所得税税率',
+            incomeFormula: zeroRebate
+              ? '（出口销售额 /（1 + 13%））×（1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率）× 适用所得税税率'
+              : '销售额 × (1 − 产品成本率 − 营销费率 − 运输费率 − 员工成本率 − 其他费用率) × 适用所得税税率',
             vatYes: '2）出口退税',
             vatYesFormula:
               '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 出口退税率 /（1 + 13%）',
+            vatZero: '2）视同内销增值税',
+            vatZeroFormula: smallScale
+              ? '出口销售额 /（1 + 1%）× 1%（年销售额低于 500 万）'
+              : '出口销售额 /（1 + 13%）× 13%',
             vatNo: '2）内销增值税',
             vatNoFormula: '销售额 × (1 − 产品成本率) × 13%',
             rebateBenefit: '3）出口退税收益',
             rebateBenefitFormula:
-              '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 13% /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
+              '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 出口退税率 /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
             burdenRate: '4）税负率',
-            burdenRateFormula: '企业所得税 ÷ 销售额',
+            burdenRateFormula: zeroRebate
+              ? '企业所得税 ÷（出口销售额 /（1 + 13%））'
+              : '企业所得税 ÷ 销售额',
             total: '国内税负合计（净额）',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
-      const vatLabel = refundEligible ? copy.vatYes : copy.vatNo;
-      const vatFormula = refundEligible ? copy.vatYesFormula : copy.vatNoFormula;
+      const vatLabel = zeroRebate
+        ? copy.vatZero
+        : refundEligible
+          ? copy.vatYes
+          : copy.vatNo;
+      const vatFormula = zeroRebate
+        ? copy.vatZeroFormula
+        : refundEligible
+          ? copy.vatYesFormula
+          : copy.vatNoFormula;
 
       resultEl.textContent = formatWan(total);
       if (burdenRateEl) {
