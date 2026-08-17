@@ -272,6 +272,20 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/diagnosis/reports":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_diagnosis_report_create(
+                self.headers.get("Authorization", ""),
+                body,
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
         self.send_error(404)
 
     def handle_deepseek(self):

@@ -1764,6 +1764,24 @@ def sync_inquiry_to_pm(inquiry: dict, env_loader=None):
         return json.loads(resp.read().decode("utf-8"))
 
 
+def sync_diagnosis_to_pm(report: dict, env_loader=None):
+    """Push finished diagnosis plan to pm.daoith.com website-diagnosis inbox."""
+    set_env_loader(env_loader)
+    base = (load_env_value("PM_SYNC_URL", env_loader) or "https://pm.daoith.com").rstrip("/")
+    headers = _pm_headers(env_loader)
+    if not headers:
+        return {"ok": False, "skipped": True, "reason": "missing PM_SYNC_SECRET"}
+    url = f"{base}/api/website/diagnosis/sync"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(report, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    with _NO_PROXY_OPENER.open(req, timeout=20) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
 def fetch_service_progress_from_pm(openid: str, env_loader=None):
     """Pull PM service-flow projects/tasks for website hub (right panel)."""
     set_env_loader(env_loader)
@@ -2001,6 +2019,103 @@ def handle_service_progress(auth_header: str, env_loader):
     if data.get("skipped"):
         return 200, {"ok": True, "services": [], "skipped": data.get("reason")}
     return 200, {"ok": True, "services": data.get("services") or []}
+
+
+def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader):
+    """Logged-in user: accept diagnosis markdown and sync to PM inbox."""
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+
+    body = body or {}
+    report_markdown = str(body.get("reportMarkdown") or body.get("markdown") or "").strip()
+    if len(report_markdown) < 80:
+        return 400, {"error": "报告内容过短，未保存"}
+
+    slots_raw = body.get("slots") if isinstance(body.get("slots"), dict) else {}
+    slot_keys = (
+        "platform",
+        "entity",
+        "shipping",
+        "exportMode",
+        "invoice",
+        "productCategory",
+        "revenue",
+    )
+    slots = {}
+    for key in slot_keys:
+        val = slots_raw.get(key)
+        if val is not None and str(val).strip():
+            slots[key] = str(val).strip()
+
+    labels = [
+        ("platform", "销售平台"),
+        ("entity", "注册主体"),
+        ("shipping", "发货方式"),
+        ("exportMode", "出口方式"),
+        ("invoice", "供应商发票"),
+        ("productCategory", "产品类别"),
+        ("revenue", "年销售额"),
+    ]
+    summary = "\n".join(
+        f"{label}：{slots[k]}" for k, label in labels if slots.get(k)
+    ) or str(body.get("businessSummary") or "").strip()
+
+    report_id = str(body.get("reportId") or "").strip() or (
+        f"diag_{int(time.time())}_{secrets.token_hex(4)}"
+    )
+    openid = resolved["websiteOpenid"]
+    payload = resolved.get("payload") or {}
+    nickname = (
+        body.get("nickname")
+        or payload.get("nickname")
+        or None
+    )
+    try:
+        user = get_user_by_openid(openid)
+        if user and user.get("nickname"):
+            nickname = nickname or user.get("nickname")
+        external_user_id = str(user.get("id")) if user and user.get("id") is not None else str(
+            payload.get("sub") or openid
+        )
+    except Exception:
+        external_user_id = str(payload.get("sub") or openid)
+
+    rec_ids = body.get("recommendedServiceIds")
+    if not isinstance(rec_ids, list):
+        rec_ids = []
+
+    report = {
+        "reportId": report_id,
+        "websiteOpenid": openid,
+        "externalUserId": external_user_id,
+        "nickname": nickname,
+        "slots": slots,
+        "businessSummary": summary,
+        "reportMarkdown": report_markdown,
+        "conversationId": (
+            str(body.get("conversationId")) if body.get("conversationId") else None
+        ),
+        "kind": "qa" if body.get("kind") == "qa" else "diagnosis",
+        "recommendedServiceIds": [str(x) for x in rec_ids],
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+    pm = {"ok": False}
+    try:
+        pm = sync_diagnosis_to_pm(report, env_loader)
+        if pm.get("ok") or pm.get("report"):
+            pm["ok"] = True
+    except Exception as e:
+        pm = {"ok": False, "error": str(e)}
+
+    status = 200 if pm.get("ok") or pm.get("skipped") else 502
+    return status, {
+        "ok": bool(pm.get("ok") or pm.get("skipped")),
+        "reportId": report_id,
+        "pm": pm,
+    }
 
 
 def handle_inquiry_create(auth_header: str, body: dict, env_loader):

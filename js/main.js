@@ -3492,7 +3492,12 @@ function persistDiagnosisReport(markdown) {
         ? crypto.randomUUID()
         : `diag_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
     const user = auth.getUser?.() || {};
-    const base = (window.DAOITH_CONFIG?.authApiBase || '').replace(/\/$/, '');
+    // Prefer Aliyun notify API (has PM_SYNC_SECRET); fall back to same-origin Vercel
+    const base = (
+      window.DAOITH_CONFIG?.notifyApiBase ||
+      window.DAOITH_CONFIG?.authApiBase ||
+      'https://api.daoith.com'
+    ).replace(/\/$/, '');
     const recIds =
       typeof pickDiagnosisServiceIds === 'function' ? pickDiagnosisServiceIds(clean) : [];
 
@@ -3512,9 +3517,16 @@ function persistDiagnosisReport(markdown) {
         kind: 'diagnosis',
       }),
       keepalive: true,
-    }).catch(() => {
-      /* ignore network errors */
-    });
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          console.warn('[diagnosis-report]', res.status, data.error || data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[diagnosis-report]', err?.message || err);
+      });
   } catch {
     /* never block diagnosis UX */
   }
