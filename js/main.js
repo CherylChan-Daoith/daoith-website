@@ -3162,11 +3162,31 @@ function stripEnglishPromptMeta(text) {
   let t = String(text || '');
   // Drop English paragraphs that discuss the prompt itself
   t = t.replace(
-    /(?:^|\n)[^\nA-Za-z【]*[A-Za-z][^\n]*(?:prompt|re-reading|intended structure|internal inconsistency|jump from|Note there|So the prompt|Actually re-reading|missing 第三|labels to use)[^\n]*(?:\n(?![【\-#*•]|业务流程|主要风险)[^\n]*)*/gi,
+    /(?:^|\n)[^\nA-Za-z【]*[A-Za-z][^\n]*(?:prompt|re-reading|intended structure|internal inconsistency|jump from|Note there|So the prompt|Actually re-reading|missing 第三|labels to use|Let me write|write carefully)[^\n]*(?:\n(?![【\-#*•]|业务流程|主要风险)[^\n]*)*/gi,
     '\n'
   );
   // Drop long Latin-only runs (likely CoT leftovers)
   t = t.replace(/(?:^|\n)[ \t]*[A-Za-z][A-Za-z0-9 ,.'"()\/:;_\-]{40,}[ \t]*(?=\n|$)/g, '\n');
+  // Drop Chinese scaffolding / self-talk lines leaked from prompts
+  t = t
+    .split('\n')
+    .filter((ln) => {
+      const s = ln.trim();
+      if (!s) return true;
+      if (
+        /^(?:业务流程一行|主要风险一行|3\s*[-–—~～]?\s*5\s*条风险|3\s*[-–—~～]?\s*6\s*条对症卡片|一段画像|对症卡片|方案卡片|风险条目|合规方案画像)\b/.test(
+          s
+        )
+      ) {
+        return false;
+      }
+      if (/^实际上我应该注意|^让我先(?:写|检索|通读)|^根据提示词/.test(s)) return false;
+      if (/^Let me\b/i.test(s)) return false;
+      return true;
+    })
+    .join('\n');
+  // Normalize bogus section labels into nothing or nearest real title context
+  t = t.replace(/(?:^|\n)\s*\*{0,2}(?:风险条目|方案卡片|合规方案画像)\*{0,2}\s*(?=\n|$)/g, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -3234,28 +3254,53 @@ function prepareDiagnosisPlanMarkdown(text) {
 function looksLikeDiagnosisPlanScaffold(text) {
   const t = String(text || '').trim();
   if (!t) return false;
-  const latin = (t.match(/[A-Za-z]/g) || []).length;
-  const cjk = (t.match(/[\u4e00-\u9fff]/g) || []).length;
+
+  const cleaned = stripEnglishPromptMeta(t);
+  const cleanedCjk = countDiagnosisCjk(cleaned);
+  const hasFormal =
+    /【核心风险诊断】/.test(cleaned) &&
+    /【合规方案】/.test(cleaned) &&
+    cleanedCjk >= 160;
+
+  // Chinese fill-in-the-blank skeletons — only treat as scaffold if no real formal body remains
+  if (
+    !hasFormal &&
+    /业务流程一行|主要风险一行|3\s*[-–—~～]?\s*5\s*条风险|3\s*[-–—~～]?\s*6\s*条对症|一段画像[（(]|对症卡片|合规方案画像/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (
+    !hasFormal &&
+    /实际上我应该注意|让我先(?:写|检索|通读)|根据提示词|输出骨架/.test(t) &&
+    cleanedCjk < 160
+  ) {
+    return true;
+  }
+
+  const latin = (cleaned.match(/[A-Za-z]/g) || []).length;
+  const cjk = (cleaned.match(/[\u4e00-\u9fff]/g) || []).length;
   // Substantial Chinese body → treat as real content, not an English outline
   if (cjk >= 80 && cjk >= latin) return false;
 
   if (
-    /opening sentence|business profile|bullet risks|only the matched path|Let me write|write (?:the )?(?:report|plan|it)|placeholder|lorem ipsum|TODO[:：]/i.test(
-      t
+    /opening sentence|business profile|bullet risks|only the matched path|Let me write|write (?:the )?(?:report|plan|it)|placeholder|lorem ipsum|TODO[:：]|write carefully/i.test(
+      cleaned
     )
   ) {
     return true;
   }
   // Bare English stubs under Chinese section titles
   if (
-    /【核心风险诊断】|【合规方案】|【行动建议】|【注意事项】/.test(t) &&
-    /(?:^|\n)\s*[-*•]?\s*\*{0,2}\s*line\s*\*{0,2}\s*(?:\n|$)/im.test(t) &&
+    /【核心风险诊断】|【合规方案】|【行动建议】|【注意事项】/.test(cleaned) &&
+    /(?:^|\n)\s*[-*•]?\s*\*{0,2}\s*line\s*\*{0,2}\s*(?:\n|$)/im.test(cleaned) &&
     cjk < 40
   ) {
     return true;
   }
   // Section headers present but body is Latin-heavy / Chinese-thin
-  if (/【核心风险诊断】|【合规方案】/.test(t)) {
+  if (/【核心风险诊断】|【合规方案】/.test(cleaned)) {
     if (latin >= 36 && cjk < Math.max(24, Math.floor(latin * 0.7))) return true;
   }
   return false;
