@@ -6,6 +6,21 @@ function hasDatabase() {
   return Boolean(process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim());
 }
 
+function publicUser(user) {
+  return {
+    id: user.id,
+    openid: user.openid || null,
+    nickname: user.nickname || null,
+    avatarUrl: user.avatarUrl || null,
+    phone: user.phone || null,
+    country: user.country || null,
+    province: user.province || null,
+    city: user.city || null,
+    lastLoginAt: user.lastLoginAt || null,
+    loginCount: user.loginCount || 0,
+  };
+}
+
 export default async function handler(req, res) {
   applyCors(req, res, 'GET, OPTIONS');
 
@@ -33,44 +48,23 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: '登录已过期，请重新登录' });
   }
 
-  // Prefer JWT profile claims (works without database)
-  if (payload.openid || payload.nickname || payload.avatarUrl) {
-    return res.status(200).json({
-      user: {
-        id: payload.sub,
-        openid: payload.openid || null,
-        nickname: payload.nickname || null,
-        avatarUrl: payload.avatarUrl || null,
-      },
-    });
-  }
-
-  if (!hasDatabase()) {
-    return res.status(200).json({
-      user: {
-        id: payload.sub,
-        openid: payload.openid || null,
-        nickname: null,
-        avatarUrl: null,
-      },
-    });
-  }
-
-  try {
-    const user = await getUserById(Number(payload.sub));
-    if (!user) {
-      return res.status(401).json({ error: '用户不存在' });
+  if (hasDatabase() && /^\d+$/.test(String(payload.sub))) {
+    try {
+      const user = await getUserById(Number(payload.sub));
+      if (user) {
+        return res.status(200).json({ user: publicUser(user) });
+      }
+    } catch (err) {
+      return res.status(500).json({ error: err.message || '获取用户信息失败' });
     }
-
-    return res.status(200).json({
-      user: {
-        id: user.id,
-        openid: user.openid,
-        nickname: user.nickname,
-        avatarUrl: user.avatarUrl,
-      },
-    });
-  } catch (err) {
-    return res.status(500).json({ error: err.message || '获取用户信息失败' });
   }
+
+  return res.status(200).json({
+    user: publicUser({
+      id: payload.sub,
+      openid: payload.openid || null,
+      nickname: payload.nickname || null,
+      avatarUrl: payload.avatarUrl || null,
+    }),
+  });
 }

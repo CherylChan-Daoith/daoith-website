@@ -45,7 +45,7 @@ grep -E 'DB_PASSWORD|POSTGRES_PASSWORD' .env
 docker exec -it <db-container> psql -U postgres -c "CREATE DATABASE daoith_users;"
 ```
 
-表结构会在首次登录时由后端自动创建，也可手动执行：
+表结构会在首次登录时由后端自动创建／迁移，也可手动执行：
 
 ```sql
 CREATE TABLE IF NOT EXISTS users (
@@ -54,12 +54,25 @@ CREATE TABLE IF NOT EXISTS users (
   unionid TEXT,
   nickname TEXT,
   avatar_url TEXT,
+  country TEXT,
+  province TEXT,
+  city TEXT,
+  phone TEXT,
+  last_login_at TIMESTAMPTZ,
+  login_count INTEGER NOT NULL DEFAULT 0,
+  last_login_ip TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid);
 ```
 
+额外环境变量（推送到 `pm.daoith.com` 网站用户分析）：
+
+| 变量 | 说明 |
+|------|------|
+| `PM_SYNC_URL` | 可选，默认 `https://pm.daoith.com` |
+| `PM_SYNC_SECRET` | 与 PM 的 `WEBSITE_SYNC_SECRET` 相同 |
 ### 3. 配置 `DATABASE_URL`
 
 在网站服务端 `.env` / Vercel 环境变量中设置：

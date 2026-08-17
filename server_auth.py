@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -14,6 +15,7 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent
 DB_PATH = ROOT / "data" / "daoith-auth.db"
@@ -127,12 +129,31 @@ def ensure_db():
                       unionid TEXT,
                       nickname TEXT,
                       avatar_url TEXT,
+                      country TEXT,
+                      province TEXT,
+                      city TEXT,
+                      phone TEXT,
+                      last_login_at TIMESTAMPTZ,
+                      login_count INTEGER NOT NULL DEFAULT 0,
+                      last_login_ip TEXT,
                       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                     )
                     """
                 )
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)")
+                for col, ddl in (
+                    ("country", "TEXT"),
+                    ("province", "TEXT"),
+                    ("city", "TEXT"),
+                    ("phone", "TEXT"),
+                    ("last_login_at", "TIMESTAMPTZ"),
+                    ("login_count", "INTEGER NOT NULL DEFAULT 0"),
+                    ("last_login_ip", "TEXT"),
+                ):
+                    cur.execute(
+                        f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {ddl}"
+                    )
             conn.commit()
         return
 
@@ -146,11 +167,33 @@ def ensure_db():
               unionid TEXT,
               nickname TEXT,
               avatar_url TEXT,
+              country TEXT,
+              province TEXT,
+              city TEXT,
+              phone TEXT,
+              last_login_at TEXT,
+              login_count INTEGER NOT NULL DEFAULT 0,
+              last_login_ip TEXT,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL
             )
             """
         )
+        cols = {
+            row[1]
+            for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+        for col, ddl in (
+            ("country", "TEXT"),
+            ("province", "TEXT"),
+            ("city", "TEXT"),
+            ("phone", "TEXT"),
+            ("last_login_at", "TEXT"),
+            ("login_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("last_login_ip", "TEXT"),
+        ):
+            if col not in cols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)")
         conn.commit()
 
@@ -165,6 +208,13 @@ def _row_to_user(row):
             "unionid": row.get("unionid"),
             "nickname": row.get("nickname"),
             "avatarUrl": row.get("avatar_url"),
+            "country": row.get("country"),
+            "province": row.get("province"),
+            "city": row.get("city"),
+            "phone": row.get("phone"),
+            "lastLoginAt": row.get("last_login_at"),
+            "loginCount": int(row.get("login_count") or 0),
+            "lastLoginIp": row.get("last_login_ip"),
             "createdAt": row.get("created_at"),
             "updatedAt": row.get("updated_at"),
         }
@@ -174,12 +224,36 @@ def _row_to_user(row):
         "unionid": row[2],
         "nickname": row[3],
         "avatarUrl": row[4],
-        "createdAt": row[5],
-        "updatedAt": row[6],
+        "country": row[5] if len(row) > 5 else None,
+        "province": row[6] if len(row) > 6 else None,
+        "city": row[7] if len(row) > 7 else None,
+        "phone": row[8] if len(row) > 8 else None,
+        "lastLoginAt": row[9] if len(row) > 9 else None,
+        "loginCount": int(row[10] or 0) if len(row) > 10 else 0,
+        "lastLoginIp": row[11] if len(row) > 11 else None,
+        "createdAt": row[12] if len(row) > 12 else None,
+        "updatedAt": row[13] if len(row) > 13 else None,
     }
 
 
-def upsert_wechat_user(openid, unionid=None, nickname=None, avatar_url=None):
+_USER_SELECT = (
+    "id, openid, unionid, nickname, avatar_url, country, province, city, phone, "
+    "last_login_at, login_count, last_login_ip, created_at, updated_at"
+)
+
+
+def upsert_wechat_user(
+    openid,
+    unionid=None,
+    nickname=None,
+    avatar_url=None,
+    country=None,
+    province=None,
+    city=None,
+    phone=None,
+    login_ip=None,
+    record_login=True,
+):
     ensure_db()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -188,17 +262,151 @@ def upsert_wechat_user(openid, unionid=None, nickname=None, avatar_url=None):
         with _pg_connect() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    """
-                    INSERT INTO users (openid, unionid, nickname, avatar_url, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    f"""
+                    INSERT INTO users (
+                      openid, unionid, nickname, avatar_url,
+                      country, province, city, phone,
+                      last_login_at, login_count, last_login_ip,
+                      created_at, updated_at
+                    )
+                    VALUES (
+                      %s, %s, %s, %s,
+                      %s, %s, %s, %s,
+                      %s, %s, %s,
+                      %s, %s
+                    )
                     ON CONFLICT (openid) DO UPDATE SET
-                      unionid = EXCLUDED.unionid,
-                      nickname = EXCLUDED.nickname,
-                      avatar_url = EXCLUDED.avatar_url,
+                      unionid = COALESCE(EXCLUDED.unionid, users.unionid),
+                      nickname = COALESCE(EXCLUDED.nickname, users.nickname),
+                      avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+                      country = COALESCE(EXCLUDED.country, users.country),
+                      province = COALESCE(EXCLUDED.province, users.province),
+                      city = COALESCE(EXCLUDED.city, users.city),
+                      phone = COALESCE(EXCLUDED.phone, users.phone),
+                      last_login_at = CASE
+                        WHEN %s THEN EXCLUDED.last_login_at
+                        ELSE COALESCE(users.last_login_at, EXCLUDED.last_login_at)
+                      END,
+                      login_count = CASE
+                        WHEN %s THEN users.login_count + 1
+                        ELSE users.login_count
+                      END,
+                      last_login_ip = COALESCE(EXCLUDED.last_login_ip, users.last_login_ip),
                       updated_at = EXCLUDED.updated_at
-                    RETURNING id, openid, unionid, nickname, avatar_url, created_at, updated_at
+                    RETURNING {_USER_SELECT}
                     """,
-                    (openid, unionid, nickname, avatar_url, now, now),
+                    (
+                        openid,
+                        unionid,
+                        nickname,
+                        avatar_url,
+                        country,
+                        province,
+                        city,
+                        phone,
+                        now,
+                        1 if record_login else 0,
+                        login_ip,
+                        now,
+                        now,
+                        record_login,
+                        record_login,
+                    ),
+                )
+                row = cur.fetchone()
+            conn.commit()
+        return _row_to_user(row)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        existing = conn.execute(
+            "SELECT login_count FROM users WHERE openid = ?", (openid,)
+        ).fetchone()
+        if existing:
+            next_count = int(existing[0] or 0) + (1 if record_login else 0)
+            conn.execute(
+                """
+                UPDATE users SET
+                  unionid = COALESCE(?, unionid),
+                  nickname = COALESCE(?, nickname),
+                  avatar_url = COALESCE(?, avatar_url),
+                  country = COALESCE(?, country),
+                  province = COALESCE(?, province),
+                  city = COALESCE(?, city),
+                  phone = COALESCE(?, phone),
+                  last_login_at = CASE WHEN ? THEN ? ELSE COALESCE(last_login_at, ?) END,
+                  login_count = ?,
+                  last_login_ip = COALESCE(?, last_login_ip),
+                  updated_at = ?
+                WHERE openid = ?
+                """,
+                (
+                    unionid,
+                    nickname,
+                    avatar_url,
+                    country,
+                    province,
+                    city,
+                    phone,
+                    1 if record_login else 0,
+                    now,
+                    now,
+                    next_count if record_login else int(existing[0] or 0),
+                    login_ip,
+                    now,
+                    openid,
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO users (
+                  openid, unionid, nickname, avatar_url,
+                  country, province, city, phone,
+                  last_login_at, login_count, last_login_ip,
+                  created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    openid,
+                    unionid,
+                    nickname,
+                    avatar_url,
+                    country,
+                    province,
+                    city,
+                    phone,
+                    now,
+                    1 if record_login else 0,
+                    login_ip,
+                    now,
+                    now,
+                ),
+            )
+        row = conn.execute(
+            f"SELECT {_USER_SELECT} FROM users WHERE openid = ?",
+            (openid,),
+        ).fetchone()
+        conn.commit()
+    return _row_to_user(row)
+
+
+def update_user_phone_by_openid(openid: str, phone: str):
+    if not openid or not phone:
+        return None
+    ensure_db()
+    now = datetime.now(timezone.utc).isoformat()
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    f"""
+                    UPDATE users
+                    SET phone = %s, updated_at = %s
+                    WHERE openid = %s
+                    RETURNING {_USER_SELECT}
+                    """,
+                    (phone, now, openid),
                 )
                 row = cur.fetchone()
             conn.commit()
@@ -206,19 +414,11 @@ def upsert_wechat_user(openid, unionid=None, nickname=None, avatar_url=None):
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            """
-            INSERT INTO users (openid, unionid, nickname, avatar_url, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            ON CONFLICT(openid) DO UPDATE SET
-              unionid = excluded.unionid,
-              nickname = excluded.nickname,
-              avatar_url = excluded.avatar_url,
-              updated_at = excluded.updated_at
-            """,
-            (openid, unionid, nickname, avatar_url, now, now),
+            "UPDATE users SET phone = ?, updated_at = ? WHERE openid = ?",
+            (phone, now, openid),
         )
         row = conn.execute(
-            "SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at FROM users WHERE openid = ?",
+            f"SELECT {_USER_SELECT} FROM users WHERE openid = ?",
             (openid,),
         ).fetchone()
         conn.commit()
@@ -233,8 +433,8 @@ def get_user_by_id(user_id: int):
         with _pg_connect() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
-                    """
-                    SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at
+                    f"""
+                    SELECT {_USER_SELECT}
                     FROM users
                     WHERE id = %s
                     """,
@@ -245,14 +445,135 @@ def get_user_by_id(user_id: int):
 
     with sqlite3.connect(DB_PATH) as conn:
         row = conn.execute(
-            "SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at FROM users WHERE id = ?",
+            f"SELECT {_USER_SELECT} FROM users WHERE id = ?",
             (user_id,),
+        ).fetchone()
+    return _row_to_user(row)
+
+
+def get_user_by_openid(openid: str):
+    ensure_db()
+    if get_database_url():
+        _, RealDictCursor = _import_psycopg()
+        with _pg_connect() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(
+                    f"SELECT {_USER_SELECT} FROM users WHERE openid = %s",
+                    (openid,),
+                )
+                row = cur.fetchone()
+        return _row_to_user(row)
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            f"SELECT {_USER_SELECT} FROM users WHERE openid = ?",
+            (openid,),
         ).fetchone()
     return _row_to_user(row)
 
 
 # Bypass system HTTP proxy (common on Chinese cloud hosts; breaks WeChat API)
 _NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+_PRIVATE_IP_RE = re.compile(
+    r"^(?:127\.|10\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|::1|fc|fd|fe80)",
+    re.I,
+)
+
+
+def extract_client_ip(headers, client_address=None):
+    candidates = []
+    if headers:
+        for key in (
+            "X-Forwarded-For",
+            "x-forwarded-for",
+            "X-Real-IP",
+            "x-real-ip",
+            "CF-Connecting-IP",
+            "cf-connecting-ip",
+        ):
+            raw = headers.get(key) if hasattr(headers, "get") else None
+            if raw:
+                candidates.extend([p.strip() for p in str(raw).split(",") if p.strip()])
+                break
+    if client_address:
+        host = client_address[0] if isinstance(client_address, (list, tuple)) else client_address
+        if host:
+            candidates.append(str(host))
+    for raw in candidates:
+        ip = str(raw or "").replace("::ffff:", "").strip()
+        if ip and not _PRIVATE_IP_RE.match(ip) and ip.lower() != "unknown":
+            return ip
+    return None
+
+
+def _normalize_province(raw):
+    if not raw:
+        return None
+    p = str(raw).strip().replace(" ", "")
+    if not p or p in ("XX", "内网IP"):
+        return None
+    mapping = {
+        "北京": "北京市",
+        "上海": "上海市",
+        "天津": "天津市",
+        "重庆": "重庆市",
+        "广东": "广东省",
+        "广西": "广西壮族自治区",
+        "内蒙古": "内蒙古自治区",
+        "西藏": "西藏自治区",
+        "宁夏": "宁夏回族自治区",
+        "新疆": "新疆维吾尔自治区",
+        "香港": "香港特别行政区",
+        "澳门": "澳门特别行政区",
+    }
+    for short, full in mapping.items():
+        if p == short or p.startswith(short):
+            return full
+    if re.search(r"(省|市|自治区|特别行政区)$", p):
+        return p
+    if re.match(r"^[\x00-\x7F]+$", p):
+        return None
+    return f"{p}省"
+
+
+def _normalize_city(raw):
+    if not raw:
+        return None
+    c = str(raw).strip().replace(" ", "")
+    if not c or c == "XX":
+        return None
+    if re.search(r"(市|州|盟|地区|县|区)$", c):
+        return c
+    if re.match(r"^[\x00-\x7F]+$", c):
+        return None
+    return f"{c}市"
+
+
+def lookup_ip_region(ip: str):
+    """Best-effort IP → province/city. Never raises."""
+    if not ip:
+        return None
+    try:
+        url = (
+            f"http://ip-api.com/json/{urllib.parse.quote(ip)}"
+            "?lang=zh-CN&fields=status,country,regionName,city"
+        )
+        req = urllib.request.Request(url, method="GET", headers={"User-Agent": "daoith-auth/1.0"})
+        with _NO_PROXY_OPENER.open(req, timeout=3) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data.get("status") != "success":
+            return None
+        country = data.get("country")
+        if country in ("China", "CN"):
+            country = "中国"
+        return {
+            "country": country,
+            "province": _normalize_province(data.get("regionName")),
+            "city": _normalize_city(data.get("city")),
+            "ip": ip,
+        }
+    except Exception:
+        return None
 
 
 def _fetch_json(url: str, timeout: int = 8):
@@ -421,7 +742,7 @@ def fetch_wechat_userinfo(access_token: str, openid: str):
     return _fetch_json(f"{WECHAT_USERINFO_URL}?{params}")
 
 
-def handle_wechat_login(body: dict, env_loader):
+def handle_wechat_login(body: dict, env_loader, client_ip: Optional[str] = None):
     set_env_loader(env_loader)
     code = (body.get("code") or "").strip()
     if not code:
@@ -442,13 +763,43 @@ def handle_wechat_login(body: dict, env_loader):
     try:
         token_data = exchange_wechat_code(code, app_id, app_secret)
         user_info = fetch_wechat_userinfo(token_data["access_token"], token_data["openid"])
+        region = {
+            "country": user_info.get("country") or None,
+            "province": user_info.get("province") or None,
+            "city": user_info.get("city") or None,
+        }
+        if not region["province"] and not region["city"]:
+            geo = lookup_ip_region(client_ip)
+            if geo:
+                region = {
+                    "country": geo.get("country") or region["country"],
+                    "province": geo.get("province"),
+                    "city": geo.get("city"),
+                }
         user = upsert_wechat_user(
             openid=user_info["openid"],
             unionid=user_info.get("unionid") or token_data.get("unionid"),
             nickname=user_info.get("nickname"),
             avatar_url=user_info.get("headimgurl"),
+            country=region.get("country"),
+            province=region.get("province"),
+            city=region.get("city"),
+            login_ip=client_ip,
+            record_login=True,
         )
-        jwt_token = sign_jwt({"sub": str(user["id"]), "openid": user["openid"]}, jwt_secret)
+        try:
+            sync_user_to_pm(user, env_loader, record_login=True)
+        except Exception:
+            pass
+        jwt_token = sign_jwt(
+            {
+                "sub": str(user["id"]),
+                "openid": user["openid"],
+                "nickname": user.get("nickname"),
+                "avatarUrl": user.get("avatarUrl"),
+            },
+            jwt_secret,
+        )
         return 200, {
             "token": jwt_token,
             "user": {
@@ -456,6 +807,12 @@ def handle_wechat_login(body: dict, env_loader):
                 "openid": user["openid"],
                 "nickname": user["nickname"],
                 "avatarUrl": user["avatarUrl"],
+                "phone": user.get("phone"),
+                "country": user.get("country"),
+                "province": user.get("province"),
+                "city": user.get("city"),
+                "lastLoginAt": user.get("lastLoginAt"),
+                "loginCount": user.get("loginCount") or 0,
             },
         }
     except urllib.error.HTTPError as e:
@@ -493,6 +850,12 @@ def handle_wechat_me(auth_header: str, env_loader):
             "openid": user["openid"],
             "nickname": user["nickname"],
             "avatarUrl": user["avatarUrl"],
+            "phone": user.get("phone"),
+            "country": user.get("country"),
+            "province": user.get("province"),
+            "city": user.get("city"),
+            "lastLoginAt": user.get("lastLoginAt"),
+            "loginCount": user.get("loginCount") or 0,
         }
     }
 
@@ -1360,11 +1723,16 @@ def sync_user_to_pm(user: dict, env_loader=None, *, record_login=False):
                 "unionid": user.get("unionid"),
                 "nickname": user.get("nickname"),
                 "avatarUrl": user.get("avatarUrl") or user.get("avatar_url"),
+                "phone": user.get("phone"),
                 "country": user.get("country"),
                 "province": user.get("province"),
                 "city": user.get("city"),
-                "registeredAt": user.get("registeredAt") or now,
-                "lastSeenAt": now,
+                "registeredAt": user.get("registeredAt")
+                or user.get("createdAt")
+                or now,
+                "lastSeenAt": user.get("lastLoginAt")
+                or user.get("lastSeenAt")
+                or now,
             }
         ],
     }
@@ -1624,18 +1992,23 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
         return err
     website_openid = resolved["websiteOpenid"]
     nickname = (resolved.get("payload") or {}).get("nickname")
-    # Keep PM website-user analytics fresh when logged-in users inquire
+    # Persist phone onto website user profile for analytics, then sync to PM
+    user_for_pm = None
     try:
-        sync_user_to_pm(
-            {
+        user_for_pm = update_user_phone_by_openid(website_openid, phone)
+        if not user_for_pm:
+            user_for_pm = get_user_by_openid(website_openid)
+        if not user_for_pm:
+            user_for_pm = {
                 "id": (resolved.get("payload") or {}).get("sub") or website_openid,
                 "openid": website_openid,
                 "nickname": nickname,
                 "avatarUrl": (resolved.get("payload") or {}).get("avatarUrl"),
-            },
-            env_loader,
-            record_login=False,
-        )
+                "phone": phone,
+            }
+        else:
+            user_for_pm["phone"] = user_for_pm.get("phone") or phone
+        sync_user_to_pm(user_for_pm, env_loader, record_login=False)
     except Exception:
         pass
 

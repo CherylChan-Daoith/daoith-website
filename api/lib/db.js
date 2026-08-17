@@ -42,11 +42,28 @@ async function ensureSchema() {
       unionid TEXT,
       nickname TEXT,
       avatar_url TEXT,
+      country TEXT,
+      province TEXT,
+      city TEXT,
+      phone TEXT,
+      last_login_at TIMESTAMPTZ,
+      login_count INTEGER NOT NULL DEFAULT 0,
+      last_login_ip TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
   await db.query('CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)');
+  // Migrate older installs that only had the base columns
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS country TEXT`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS province TEXT`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS city TEXT`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT`);
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ`);
+  await db.query(
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS login_count INTEGER NOT NULL DEFAULT 0`,
+  );
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_ip TEXT`);
 }
 
 export async function initDb() {
@@ -64,30 +81,109 @@ function mapUser(row) {
     unionid: row.unionid,
     nickname: row.nickname,
     avatarUrl: row.avatar_url,
+    country: row.country || null,
+    province: row.province || null,
+    city: row.city || null,
+    phone: row.phone || null,
+    lastLoginAt: row.last_login_at || null,
+    loginCount: Number(row.login_count || 0),
+    lastLoginIp: row.last_login_ip || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
 
-export async function upsertWeChatUser({ openid, unionid, nickname, avatarUrl }) {
+const USER_COLUMNS = `
+  id, openid, unionid, nickname, avatar_url,
+  country, province, city, phone,
+  last_login_at, login_count, last_login_ip,
+  created_at, updated_at
+`;
+
+export async function upsertWeChatUser({
+  openid,
+  unionid,
+  nickname,
+  avatarUrl,
+  country,
+  province,
+  city,
+  phone,
+  loginIp,
+  recordLogin = true,
+}) {
   await initDb();
   const db = getPool();
   const now = new Date().toISOString();
 
   const result = await db.query(
     `
-      INSERT INTO users (openid, unionid, nickname, avatar_url, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO users (
+        openid, unionid, nickname, avatar_url,
+        country, province, city, phone,
+        last_login_at, login_count, last_login_ip,
+        created_at, updated_at
+      )
+      VALUES (
+        $1, $2, $3, $4,
+        $5, $6, $7, $8,
+        $9, $10, $11,
+        $12, $13
+      )
       ON CONFLICT (openid) DO UPDATE SET
-        unionid = EXCLUDED.unionid,
-        nickname = EXCLUDED.nickname,
-        avatar_url = EXCLUDED.avatar_url,
+        unionid = COALESCE(EXCLUDED.unionid, users.unionid),
+        nickname = COALESCE(EXCLUDED.nickname, users.nickname),
+        avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url),
+        country = COALESCE(EXCLUDED.country, users.country),
+        province = COALESCE(EXCLUDED.province, users.province),
+        city = COALESCE(EXCLUDED.city, users.city),
+        phone = COALESCE(EXCLUDED.phone, users.phone),
+        last_login_at = CASE
+          WHEN $14 THEN EXCLUDED.last_login_at
+          ELSE COALESCE(users.last_login_at, EXCLUDED.last_login_at)
+        END,
+        login_count = CASE
+          WHEN $14 THEN users.login_count + 1
+          ELSE users.login_count
+        END,
+        last_login_ip = COALESCE(EXCLUDED.last_login_ip, users.last_login_ip),
         updated_at = EXCLUDED.updated_at
-      RETURNING id, openid, unionid, nickname, avatar_url, created_at, updated_at
+      RETURNING ${USER_COLUMNS}
     `,
-    [openid, unionid || null, nickname || null, avatarUrl || null, now, now],
+    [
+      openid,
+      unionid || null,
+      nickname || null,
+      avatarUrl || null,
+      country || null,
+      province || null,
+      city || null,
+      phone || null,
+      now,
+      recordLogin ? 1 : 0,
+      loginIp || null,
+      now,
+      now,
+      recordLogin,
+    ],
   );
 
+  return mapUser(result.rows[0]);
+}
+
+export async function updateUserPhoneByOpenid(openid, phone) {
+  if (!openid || !phone) return null;
+  await initDb();
+  const db = getPool();
+  const result = await db.query(
+    `
+      UPDATE users
+      SET phone = $2, updated_at = NOW()
+      WHERE openid = $1
+      RETURNING ${USER_COLUMNS}
+    `,
+    [openid, phone],
+  );
   return mapUser(result.rows[0]);
 }
 
@@ -96,7 +192,7 @@ export async function getUserById(userId) {
   const db = getPool();
   const result = await db.query(
     `
-      SELECT id, openid, unionid, nickname, avatar_url, created_at, updated_at
+      SELECT ${USER_COLUMNS}
       FROM users
       WHERE id = $1
     `,
@@ -104,4 +200,33 @@ export async function getUserById(userId) {
   );
 
   return mapUser(result.rows[0]);
+}
+
+export async function getUserByOpenid(openid) {
+  await initDb();
+  const db = getPool();
+  const result = await db.query(
+    `
+      SELECT ${USER_COLUMNS}
+      FROM users
+      WHERE openid = $1
+    `,
+    [openid],
+  );
+  return mapUser(result.rows[0]);
+}
+
+export async function listUsersForPmSync({ limit = 500, offset = 0 } = {}) {
+  await initDb();
+  const db = getPool();
+  const result = await db.query(
+    `
+      SELECT ${USER_COLUMNS}
+      FROM users
+      ORDER BY id ASC
+      LIMIT $1 OFFSET $2
+    `,
+    [limit, offset],
+  );
+  return result.rows.map(mapUser);
 }

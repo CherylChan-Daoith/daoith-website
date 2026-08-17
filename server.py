@@ -207,7 +207,11 @@ class Handler(SimpleHTTPRequestHandler):
             except json.JSONDecodeError:
                 self.send_json(400, {"error": "请求体必须是 JSON"})
                 return
-            status, data = server_auth.handle_wechat_login(body, load_env_value)
+            status, data = server_auth.handle_wechat_login(
+                body,
+                load_env_value,
+                client_ip=server_auth.extract_client_ip(self.headers, self.client_address),
+            )
             self.send_json(status, data)
             return
         if path in (

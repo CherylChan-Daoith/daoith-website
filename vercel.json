@@ -5,7 +5,8 @@
     { "source": "/api/deepseek", "destination": "/api/deepseek" },
     { "source": "/api/health", "destination": "/api/health" },
     { "source": "/api/auth/wechat/login", "destination": "/api/auth/wechat/login" },
-    { "source": "/api/auth/wechat/me", "destination": "/api/auth/wechat/me" }
+    { "source": "/api/auth/wechat/me", "destination": "/api/auth/wechat/me" },
+    { "source": "/api/admin/sync-users-to-pm", "destination": "/api/admin/sync-users-to-pm" }
   ],
   "headers": [
     {
