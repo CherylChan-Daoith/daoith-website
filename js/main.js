@@ -2383,7 +2383,11 @@ function initAiChatbot() {
     const greetEl = document.createElement('div');
     greetEl.className = 'ai-chatbot-bubble is-bot is-welcome';
     greetEl.innerHTML =
-      `<p class="welcome-ask">请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 我有特定问题想直接提问（基于知识库即时解答）。</p>`;
+      `<p class="welcome-ask">请在下方选择：` +
+      `<span class="welcome-option"><strong>开启专属合规诊断</strong><span class="diag-ask-hint">（需微信登录，按步骤生成诊断报告）</span></span>` +
+      `，或 ` +
+      `<span class="welcome-option"><strong>我有特定问题想直接提问</strong><span class="diag-ask-hint">（基于知识库即时解答）</span></span>` +
+      `。</p>`;
     messages.appendChild(greetEl);
 
     showQuickReplies('请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 我有特定问题想直接提问（基于知识库即时解答）。');
