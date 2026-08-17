@@ -2822,12 +2822,14 @@ function initAiChatbot() {
           setAskCount(askCount + 1);
           setBotBubble(typing, reply);
           showQuickReplies(reply);
+          maybeShowServiceRecsAfterAnswer(reply);
           return;
         }
         setAskCount(askCount + 1);
         const miss = `未查到海关编码 ${hsForRefund} 的出口退税率，请核对编码后重试，或以国家税务总局出口退税率文库为准。`;
         setBotBubble(typing, miss);
         showQuickReplies(miss);
+        maybeShowServiceRecsAfterAnswer(miss);
         return;
       }
 
@@ -2842,6 +2844,7 @@ function initAiChatbot() {
         } else {
           setBotBubble(typing, aluminumReply);
           showQuickReplies(aluminumReply);
+          maybeShowServiceRecsAfterAnswer(aluminumReply);
         }
         return;
       }
@@ -3073,6 +3076,7 @@ function initAiChatbot() {
       } else {
         setBotBubble(typing, answer);
         showQuickReplies(answer);
+        maybeShowServiceRecsAfterAnswer(answer);
       }
     } catch (err) {
       const msg = String(err?.message || '');
@@ -3398,12 +3402,16 @@ function wantsExpertBooking(text) {
 }
 
 function showExpertConsultServiceRecs() {
-  const serviceHost = document.getElementById('diagServiceRecs');
-  if (!serviceHost) return;
-  const html = buildDiagnosisServiceRecsHtml('', {
+  showDiagnosisServiceRecs('', {
     ids: ['consult-1v1'],
     lead: '',
   });
+}
+
+function showDiagnosisServiceRecs(markdown, options = {}) {
+  const serviceHost = document.getElementById('diagServiceRecs');
+  if (!serviceHost) return;
+  const html = buildDiagnosisServiceRecsHtml(markdown, options);
   if (!html) {
     serviceHost.innerHTML = '';
     serviceHost.hidden = true;
@@ -3412,7 +3420,15 @@ function showExpertConsultServiceRecs() {
   serviceHost.innerHTML = html;
   serviceHost.hidden = false;
   window.DAOITH_CART?.bindAddButtons?.(serviceHost);
-  serviceHost.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+}
+
+/** After a substantive bot reply (not wizard slot prompts), always show service cards. */
+function maybeShowServiceRecsAfterAnswer(answer) {
+  const t = String(answer || '').trim();
+  if (!t) return;
+  if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return;
+  if (looksLikeLocalGenericHelp(t)) return;
+  showDiagnosisServiceRecs(t);
 }
 
 function diagnosisPlanCountStorageKey() {
@@ -3637,7 +3653,11 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
   const lead =
     options.lead != null
       ? options.lead
-      : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。';
+      : '根据回复内容为您匹配，可加入询价单由顾问继续落地。';
+  const tip =
+    options.tip != null
+      ? options.tip
+      : '道一合规小助手已为您匹配最相关的服务供您选择。';
   const cards = ids
     .map((id) => {
       const s = (window.DAOITH_SERVICES || []).find((x) => x.id === id);
@@ -3657,9 +3677,10 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
     .join('');
   if (!cards) return '';
   return (
-    `<h3 class="diag-services-heading">您可能需要的服务</h3>` +
+    `<h3 class="diag-services-heading">服务推荐</h3>` +
     (lead ? `<p class="diag-services-lead">${escapeHtml(lead)}</p>` : '') +
-    `<div class="diag-services-grid">${cards}</div>`
+    `<div class="diag-services-grid">${cards}</div>` +
+    (tip ? `<p class="diag-services-match-tip">${escapeHtml(tip)}</p>` : '')
   );
 }
 
@@ -3792,21 +3813,13 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     `</div>`;
 
   if (serviceHost) {
-    // Service cards mainly for full diagnosis plans
-    if (kind === 'diagnosis') {
-      const html = buildDiagnosisServiceRecsHtml(clean);
-      if (html) {
-        serviceHost.innerHTML = html;
-        serviceHost.hidden = false;
-        window.DAOITH_CART?.bindAddButtons?.(serviceHost);
-      } else {
-        serviceHost.innerHTML = '';
-        serviceHost.hidden = true;
-      }
-    } else {
-      serviceHost.innerHTML = '';
-      serviceHost.hidden = true;
-    }
+    // Full diagnosis plans and Mode B / long Q&A answers both get recommendations
+    showDiagnosisServiceRecs(clean, {
+      lead:
+        kind === 'qa'
+          ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
+          : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
+    });
   }
 
   try {
