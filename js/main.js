@@ -6434,6 +6434,18 @@ async function loadServiceProgressForHub() {
   }
 }
 
+/** Remember which service cards are expanded across hub refreshes. */
+const serviceProgressExpandedIds = new Set();
+
+function serviceProgressCurrentStep(tasks) {
+  const list = Array.isArray(tasks) ? tasks : [];
+  const active = list.find((t) => t.status === 'IN_PROGRESS' || t.status === 'OVERDUE')
+    || list.find((t) => !isTaskDoneHub(t.status));
+  if (active) return active.title || '进行中';
+  if (list.length && list.every((t) => isTaskDoneHub(t.status))) return '全部完成';
+  return '待启动';
+}
+
 function renderServiceProgress(services) {
   const wrap = document.getElementById('quoteProgressWrap');
   if (!wrap) return;
@@ -6456,41 +6468,77 @@ function renderServiceProgress(services) {
     return;
   }
 
+  // Single service: expand by default; multiple: collapse unless user opened before
+  if (projects.length === 1 && projects[0].id) {
+    serviceProgressExpandedIds.add(String(projects[0].id));
+  }
+
   wrap.innerHTML = projects.map((p) => {
     const tasks = Array.isArray(p.tasks) ? p.tasks : [];
     const progress = Number(p.progress) || 0;
+    const id = String(p.id || `${p.inquiryId}:${p.serviceType}`);
+    const open = serviceProgressExpandedIds.has(id);
+    const currentStep = serviceProgressCurrentStep(tasks);
+    const toggleLabel = open ? '收起流程' : '查看详细进度';
     return `
-      <div class="service-progress-card">
-        <div class="service-progress-head">
-          <div>
-            <strong>${escapeHtmlHub(p.serviceType || p.name || '服务')}</strong>
-            <div class="service-progress-sub">${escapeHtmlHub(p.inquiryId || '')}${p.company ? ` · ${escapeHtmlHub(p.company)}` : ''}</div>
+      <div class="service-progress-card${open ? ' is-open' : ''}" data-service-id="${escapeHtmlHub(id)}">
+        <button type="button" class="service-progress-toggle" aria-expanded="${open ? 'true' : 'false'}">
+          <div class="service-progress-head">
+            <div class="service-progress-title">
+              <strong>${escapeHtmlHub(p.serviceType || p.name || '服务')}</strong>
+              <div class="service-progress-sub">${escapeHtmlHub(p.inquiryId || '')}${p.company ? ` · ${escapeHtmlHub(p.company)}` : ''}</div>
+              <div class="service-progress-summary">${escapeHtmlHub(currentStep)} · ${tasks.length} 个节点</div>
+            </div>
+            <div class="service-progress-aside">
+              <span class="service-progress-pct">${progress}%</span>
+              <span class="service-progress-action">${toggleLabel}</span>
+            </div>
           </div>
-          <span class="service-progress-pct">${progress}%</span>
-        </div>
-        <div class="quote-progress">
-          ${tasks.map((t) => {
-            const done = isTaskDoneHub(t.status);
-            const current = t.status === 'IN_PROGRESS' || t.status === 'OVERDUE';
-            const cls = [done ? 'done' : '', current ? 'current' : ''].filter(Boolean).join(' ');
-            let sub = taskStatusLabelHub(t.status);
-            if (done && t.actualCompletedAt) {
-              sub = formatDate(t.actualCompletedAt);
-            } else if (!done && t.plannedDueDate) {
-              sub = `计划 ${formatDate(t.plannedDueDate)}`;
-            }
-            return `
-              <div class="quote-progress-step ${cls}">
-                <div class="step-dot"></div>
-                <div class="step-body">
-                  <strong>${escapeHtmlHub(t.title || '节点')}</strong>
-                  <span>${escapeHtmlHub(sub)}</span>
-                </div>
-              </div>`;
-          }).join('')}
+        </button>
+        <div class="service-progress-detail" ${open ? '' : 'hidden'}>
+          <div class="quote-progress">
+            ${tasks.map((t) => {
+              const done = isTaskDoneHub(t.status);
+              const current = t.status === 'IN_PROGRESS' || t.status === 'OVERDUE';
+              const cls = [done ? 'done' : '', current ? 'current' : ''].filter(Boolean).join(' ');
+              let sub = taskStatusLabelHub(t.status);
+              if (done && t.actualCompletedAt) {
+                sub = formatDate(t.actualCompletedAt);
+              } else if (!done && t.plannedDueDate) {
+                sub = `计划 ${formatDate(t.plannedDueDate)}`;
+              }
+              return `
+                <div class="quote-progress-step ${cls}">
+                  <div class="step-dot"></div>
+                  <div class="step-body">
+                    <strong>${escapeHtmlHub(t.title || '节点')}</strong>
+                    <span>${escapeHtmlHub(sub)}</span>
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
         </div>
       </div>`;
   }).join('');
+
+  wrap.querySelectorAll('.service-progress-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const card = btn.closest('.service-progress-card');
+      if (!card) return;
+      const id = card.getAttribute('data-service-id') || '';
+      const detail = card.querySelector('.service-progress-detail');
+      const action = card.querySelector('.service-progress-action');
+      const willOpen = !card.classList.contains('is-open');
+      card.classList.toggle('is-open', willOpen);
+      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      if (detail) detail.hidden = !willOpen;
+      if (action) action.textContent = willOpen ? '收起流程' : '查看详细进度';
+      if (id) {
+        if (willOpen) serviceProgressExpandedIds.add(id);
+        else serviceProgressExpandedIds.delete(id);
+      }
+    });
+  });
 }
 
 function escapeHtmlHub(value) {
