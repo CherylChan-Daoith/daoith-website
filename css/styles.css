@@ -2133,6 +2133,27 @@ ul {
   font-weight: 400;
 }
 
+.result-change-points {
+  color: #515154;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  margin: 0 0 0.85em;
+  padding: 12px 14px;
+  background: #f4f8ff;
+  border: 1px solid #d7e3f4;
+  border-radius: 12px;
+}
+
+.result-change-points strong {
+  color: #1d1d1f;
+  font-weight: 600;
+}
+
+.result-change-points-values {
+  color: #3a3a3c;
+  font-weight: 400;
+}
+
 .result-kv {
   list-style: none !important;
   display: block !important;
