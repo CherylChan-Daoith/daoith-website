@@ -6183,6 +6183,8 @@ function initHubTabs() {
     const quotes = await loadQuotesForHub();
     renderQuotesList(quotes);
     renderHubProgress(quotes);
+    const services = await loadServiceProgressForHub();
+    renderServiceProgress(services);
     return quotes;
   }
 
@@ -6337,7 +6339,7 @@ function renderQuotesList(quotes) {
 }
 
 function renderHubProgress(quotes) {
-  const wrap = document.getElementById('hubProgressWrap') || document.getElementById('quoteProgressWrap');
+  const wrap = document.getElementById('hubProgressWrap');
   if (!wrap) return;
   const list = Array.isArray(quotes) ? quotes : getQuotes();
   if (!list.length) {
@@ -6400,6 +6402,103 @@ function renderHubProgress(quotes) {
     const tab = document.querySelector('.hub-tab[data-tab="quotes"]');
     tab?.click();
   });
+}
+
+function taskStatusLabelHub(status) {
+  const map = {
+    PENDING: '待开始',
+    IN_PROGRESS: '进行中',
+    COMPLETED: '已完成',
+    NOT_APPLICABLE: '不适用',
+    OVERDUE: '已超时',
+  };
+  return map[status] || status || '—';
+}
+
+function isTaskDoneHub(status) {
+  return status === 'COMPLETED' || status === 'NOT_APPLICABLE';
+}
+
+async function loadServiceProgressForHub() {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) return [];
+  try {
+    const res = await fetch(`${notifyApiBase()}/api/service-progress`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return [];
+    return Array.isArray(data.services) ? data.services : [];
+  } catch {
+    return [];
+  }
+}
+
+function renderServiceProgress(services) {
+  const wrap = document.getElementById('quoteProgressWrap');
+  if (!wrap) return;
+  const list = Array.isArray(services) ? services : [];
+  const projects = list.flatMap((s) =>
+    (s.projects || []).map((p) => ({
+      ...p,
+      inquiryId: s.inquiryId,
+      company: s.company,
+    }))
+  );
+
+  if (!projects.length) {
+    wrap.innerHTML = `
+      <div class="empty-state">
+        <div class="icon icon-muted">—</div>
+        <h4>暂无进行中的服务</h4>
+        <p>询价成交后，顾问会按服务流程在此更新进度</p>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = projects.map((p) => {
+    const tasks = Array.isArray(p.tasks) ? p.tasks : [];
+    const progress = Number(p.progress) || 0;
+    return `
+      <div class="service-progress-card">
+        <div class="service-progress-head">
+          <div>
+            <strong>${escapeHtmlHub(p.serviceType || p.name || '服务')}</strong>
+            <div class="service-progress-sub">${escapeHtmlHub(p.inquiryId || '')}${p.company ? ` · ${escapeHtmlHub(p.company)}` : ''}</div>
+          </div>
+          <span class="service-progress-pct">${progress}%</span>
+        </div>
+        <div class="quote-progress">
+          ${tasks.map((t) => {
+            const done = isTaskDoneHub(t.status);
+            const current = t.status === 'IN_PROGRESS' || t.status === 'OVERDUE';
+            const cls = [done ? 'done' : '', current ? 'current' : ''].filter(Boolean).join(' ');
+            let sub = taskStatusLabelHub(t.status);
+            if (done && t.actualCompletedAt) {
+              sub = formatDate(t.actualCompletedAt);
+            } else if (!done && t.plannedDueDate) {
+              sub = `计划 ${formatDate(t.plannedDueDate)}`;
+            }
+            return `
+              <div class="quote-progress-step ${cls}">
+                <div class="step-dot"></div>
+                <div class="step-body">
+                  <strong>${escapeHtmlHub(t.title || '节点')}</strong>
+                  <span>${escapeHtmlHub(sub)}</span>
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function escapeHtmlHub(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /* WeChat Toggle */

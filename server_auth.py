@@ -1764,6 +1764,27 @@ def sync_inquiry_to_pm(inquiry: dict, env_loader=None):
         return json.loads(resp.read().decode("utf-8"))
 
 
+def fetch_service_progress_from_pm(openid: str, env_loader=None):
+    """Pull PM service-flow projects/tasks for website hub (right panel)."""
+    set_env_loader(env_loader)
+    oid = (openid or "").strip()
+    if not oid:
+        return {"ok": False, "skipped": True, "reason": "missing openid", "services": []}
+    base = (load_env_value("PM_SYNC_URL", env_loader) or "https://pm.daoith.com").rstrip("/")
+    headers = _pm_headers(env_loader)
+    if not headers:
+        return {"ok": False, "skipped": True, "reason": "missing PM_SYNC_SECRET", "services": []}
+    url = f"{base}/api/website/service-progress?openid={urllib.parse.quote(oid)}"
+    req = urllib.request.Request(url, method="GET", headers=headers)
+    with _NO_PROXY_OPENER.open(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    services = data.get("services") if isinstance(data, dict) else None
+    return {
+        "ok": True,
+        "services": services if isinstance(services, list) else [],
+    }
+
+
 def update_inquiry_status(inquiry_id: str, status: str):
     ensure_inquiry_db()
     if status not in ALLOWED_INQUIRY_STATUS:
@@ -1965,6 +1986,21 @@ def handle_inquiry_list(auth_header: str, env_loader, limit: int = 50):
         return err
     items = list_inquiries_for_openid(resolved["websiteOpenid"], limit=limit)
     return 200, {"ok": True, "inquiries": items}
+
+
+def handle_service_progress(auth_header: str, env_loader):
+    """Logged-in user: proxy PM service-flow nodes for hub right panel."""
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    try:
+        data = fetch_service_progress_from_pm(resolved["websiteOpenid"], env_loader)
+    except Exception as e:
+        return 502, {"error": f"拉取服务进度失败：{e}", "services": []}
+    if data.get("skipped"):
+        return 200, {"ok": True, "services": [], "skipped": data.get("reason")}
+    return 200, {"ok": True, "services": data.get("services") or []}
 
 
 def handle_inquiry_create(auth_header: str, body: dict, env_loader):

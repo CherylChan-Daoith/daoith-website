@@ -4975,6 +4975,46 @@ body.modal-open {
   text-decoration: line-through;
 }
 
+.quote-progress-step.current .step-dot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.service-progress-card {
+  padding: 12px 0 4px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.service-progress-card:last-child {
+  border-bottom: none;
+}
+
+.service-progress-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.service-progress-head strong {
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+
+.service-progress-sub {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.service-progress-pct {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
 .quote-progress-meta {
   font-size: 0.78rem;
   color: var(--text-muted);

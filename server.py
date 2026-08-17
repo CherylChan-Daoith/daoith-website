@@ -116,6 +116,13 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/service-progress":
+            status, data = server_auth.handle_service_progress(
+                self.headers.get("Authorization", ""),
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/auth/wechat/notify/status":
             status, data = server_auth.handle_notify_status(
                 self.headers.get("Authorization", ""),
