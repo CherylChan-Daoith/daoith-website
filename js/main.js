@@ -1663,14 +1663,29 @@ function looksLikeVatRateNotRebate(text) {
   return /增值税/.test(t) && /13\s*%/.test(t) && !/(?:出口)?退税率?/.test(t);
 }
 
+/** Feasibility / clarification questions must not rewrite diagnosis slots. */
+function looksLikeDiagnosisFactQuestion(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (/[？?]/.test(t)) return true;
+  if (/(?:吗|么)\s*$/.test(t)) return true;
+  if (/^(?:能不能|可不可以|是否可以|是否能|能否|可以(?:走|用|做)|我能|我想问|请问)/.test(t)) {
+    return true;
+  }
+  if (/(?:能不能|可不可以|是否可以|是否能|能否).{0,12}(?:走|用|做|改|切换)/.test(t)) return true;
+  return false;
+}
+
 /**
  * Pull diagnosis-slot overrides from a free-text follow-up.
- * Conservative: only set a field when the wording is explicit.
+ * Conservative: only set a field when the wording is explicit (not a question).
  */
 function extractDiagnosisFactOverrides(text) {
   const t = String(text || '');
   const out = {};
   if (!t.trim()) return out;
+  // Asking "can I use 1039?" must not silently rewrite exportMode / slots
+  if (looksLikeDiagnosisFactQuestion(t)) return out;
 
   const platformRules = [
     [/亚马逊|Amazon/i, '亚马逊 Amazon'],
@@ -1794,18 +1809,20 @@ function looksLikeDiagnosisScenarioRestate(text) {
 
 function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
   const baseline = formatDiagSlotsSnapshot(baselineSlots);
+  const changeBlock = formatDiagChangeLines(changes);
   return (
-    '【诊断已完成·后续追问】禁止原样复用上一份诊断报告。\n' +
-    '【上一轮诊断档案·仅作对照基线，可被本轮用户新陈述覆盖】\n' +
+    '【诊断已完成·后续追问】\n' +
+    '【上一轮诊断档案】\n' +
     `${baseline}\n` +
-    '【本轮用户新问题】\n' +
+    '【本轮用户原话】\n' +
     `${String(userText || '').trim()}\n` +
-    '【本轮已识别的变化点】\n' +
-    `${formatDiagChangeLines(changes)}\n` +
-    '请先审视本轮问题与上一轮诊断的相关性，再作答：\n' +
-    '1. 若与上一轮同一业务、仅部分条件变化：必须先用项目符号列出【变化点】（旧值→新值），再分析该变化对合规路径、退税可行性、税负与风险的影响及注意事项，然后按【新事实】重新输出完整【核心风险诊断】【合规方案】【行动建议】【注意事项】。用户本轮明确给出的新事实优先于旧档案；禁止出现与新事实矛盾的旧结论（例如用户已说明13%退税率，禁止仍按0退税率撰写）。\n' +
-    '2. 若为全新问题（不同平台/不同业务/无关政策问答）：不要套用上一份诊断报告，按模式B针对新问题全新作答。若本轮已给出完整新业务画像，按新画像重新出报告，不要混入上一轮档案。\n' +
-    '3. 禁止再说“第1-7步已齐请直接出报告”而忽略用户新问题。'
+    '【前端识别的变化点·仅供参考】\n' +
+    `${changeBlock}\n` +
+    '【作答要求】\n' +
+    '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
+    '- 若用户在问可行性/政策点（如「我能走1039吗」）：先直接用中文回答该问题（结论+2～4点依据），再说明若要改出口方式对现有发货模式的影响；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
+    '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
+    '- 若为全新无关问题：按模式B作答，勿套用旧报告。'
   );
 }
 
@@ -2495,8 +2512,11 @@ function initAiChatbot() {
           });
         }
       }
-      applyDiagSlotOverrides(overrides);
-      if (overrides.platform) setUiWizard('diagnosis', 8, overrides.platform);
+      // Only rewrite slots on affirmative statements; questions like「我能走1039吗」keep old archive
+      if (!looksLikeDiagnosisFactQuestion(text) && Object.keys(overrides).length) {
+        applyDiagSlotOverrides(overrides);
+        if (overrides.platform) setUiWizard('diagnosis', 8, overrides.platform);
+      }
       setLastDiagFollowUpChanges(followUpChanges);
     } else if (!(prevMode === 'diagnosis' && prevStep === 7)) {
       setLastDiagFollowUpChanges([]);
@@ -2781,6 +2801,7 @@ function initAiChatbot() {
       prevMode === 'diagnosis' && prevStep === 7 && getUiStep() >= 8;
     const expectFollowUpPlan =
       isPostReportFollowUp &&
+      !looksLikeDiagnosisFactQuestion(text) &&
       (followUpChanges.length > 0 || looksLikeDiagnosisScenarioRestate(text));
     const forcePlanWhileThinking = shouldGeneratePlanNow || expectFollowUpPlan;
     const planBusyMsg = isPostReportFollowUp ? DIAG_PLAN_UPDATE_STATUS_MSG : DIAG_PLAN_STATUS_MSG;
@@ -3181,10 +3202,25 @@ function stripEnglishPromptMeta(text) {
         return false;
       }
       if (/^实际上我应该注意|^让我先(?:写|检索|通读)|^根据提示词/.test(s)) return false;
-      if (/^Let me\b/i.test(s)) return false;
+      if (/^Let me\b|^Actually\b|^But wait\b|^\*\s*First address|^\*\s*Then explain/i.test(s)) {
+        return false;
+      }
+      // Echoed follow-up instruction fragments
+      if (
+        /用户本轮明确给出的新事实优先于旧档案|禁止原样复用上一份诊断报告|请先审视本轮问题与上一轮|【诊断已完成[·.]后续追问】|【本轮已识别的变化点】|【作答要求】|【前端识别的变化点/.test(
+          s
+        )
+      ) {
+        return false;
+      }
       return true;
     })
     .join('\n');
+  // Drop English CoT paragraphs mixed into Chinese reports
+  t = t.replace(
+    /(?:^|\n)[ \t]*(?:Actually|But wait|First address|Then explain|The answer depends)[^\n]*(?:\n(?![【\-#*•]|业务流程|主要风险)[^\n]*)*/gi,
+    '\n'
+  );
   // Normalize bogus section labels into nothing or nearest real title context
   t = t.replace(/(?:^|\n)\s*\*{0,2}(?:风险条目|方案卡片|合规方案画像)\*{0,2}\s*(?=\n|$)/g, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
