@@ -1572,13 +1572,30 @@ function clearDiagSlots() {
   localStorage.removeItem(DIAG_SLOTS_KEY);
 }
 
-function formatDiagSlotsForApi() {
-  const s = getDiagSlots();
-  const exportMode =
+/** --- diag-followup-helpers start --- */
+const DIAG_SLOT_LABELS = {
+  platform: '销售平台',
+  entity: '注册主体',
+  shipping: '发货方式',
+  exportMode: '出口方式',
+  invoice: '供应商发票',
+  productCategory: '产品类别',
+  revenue: '年销售额',
+};
+
+function resolveDiagExportMode(slots) {
+  const s = slots && typeof slots === 'object' ? slots : {};
+  return (
     s.exportMode ||
     (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '') ||
-    '未填写';
-  const lines = [
+    ''
+  );
+}
+
+function formatDiagSlotsSnapshot(slots) {
+  const s = slots && typeof slots === 'object' ? slots : {};
+  const exportMode = resolveDiagExportMode(s) || '未填写';
+  return [
     `销售平台：${s.platform || '未填写'}`,
     `注册主体：${s.entity || '未填写'}`,
     `发货方式：${s.shipping || '未填写'}`,
@@ -1586,14 +1603,208 @@ function formatDiagSlotsForApi() {
     `供应商发票：${s.invoice || '未填写'}`,
     `产品类别：${s.productCategory || '未填写'}`,
     `年销售额：${s.revenue || '未填写'}`,
-  ];
+  ].join('\n');
+}
+
+function formatDiagSlotsForApi(slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const exportMode = resolveDiagExportMode(s) || '未填写';
   let hard = '';
   if (exportMode === '由平台安排出口') {
     hard =
       '【硬约束】出口方式已确定为「由平台安排出口」。禁止写“未提供出口信息/出口方式未知”；' +
       '【合规方案】只围绕平台统一安排出口撰写，禁止罗列其他出口方式分支情形。';
   }
-  return `【诊断档案·必须采信】\n${lines.join('\n')}\n${hard}`;
+  return `【诊断档案·必须采信】\n${formatDiagSlotsSnapshot(s)}\n${hard}`;
+}
+
+/** Last follow-up field diffs for the right-hand plan panel. */
+let lastDiagFollowUpChanges = [];
+
+function setLastDiagFollowUpChanges(changes) {
+  lastDiagFollowUpChanges = Array.isArray(changes) ? changes.slice() : [];
+}
+
+function getLastDiagFollowUpChanges() {
+  return lastDiagFollowUpChanges.slice();
+}
+
+function diffDiagSlots(before, after) {
+  const prev = before && typeof before === 'object' ? before : {};
+  const next = after && typeof after === 'object' ? after : {};
+  const mergedNext = {
+    ...next,
+    exportMode: resolveDiagExportMode(next) || next.exportMode || '',
+  };
+  const mergedPrev = {
+    ...prev,
+    exportMode: resolveDiagExportMode(prev) || prev.exportMode || '',
+  };
+  const changes = [];
+  Object.keys(DIAG_SLOT_LABELS).forEach((key) => {
+    const from = String(mergedPrev[key] || '').trim();
+    const to = String(mergedNext[key] || '').trim();
+    if (to && from !== to) {
+      changes.push({
+        key,
+        label: DIAG_SLOT_LABELS[key],
+        from: from || '未填写',
+        to,
+      });
+    }
+  });
+  return changes;
+}
+
+function looksLikeVatRateNotRebate(text) {
+  const t = String(text || '');
+  return /增值税/.test(t) && /13\s*%/.test(t) && !/(?:出口)?退税率?/.test(t);
+}
+
+/**
+ * Pull diagnosis-slot overrides from a free-text follow-up.
+ * Conservative: only set a field when the wording is explicit.
+ */
+function extractDiagnosisFactOverrides(text) {
+  const t = String(text || '');
+  const out = {};
+  if (!t.trim()) return out;
+
+  const platformRules = [
+    [/亚马逊|Amazon/i, '亚马逊 Amazon'],
+    [/\bTemu\b/i, 'Temu'],
+    [/TikTok(?:\s*Shop)?/i, 'TikTok Shop'],
+    [/速卖通|AliExpress/i, '速卖通'],
+    [/\bSHEIN\b/i, 'SHEIN'],
+    [/阿里国际站|国际站/, '阿里国际站'],
+    [/\bShopee\b/i, 'Shopee'],
+    [/\bLazada\b/i, 'Lazada'],
+    [/\beBay\b/i, 'eBay'],
+    [/Shopify|独立站/i, 'Shopify独立站'],
+    [/美客多|Mercado\s*Libre/i, '美客多'],
+  ];
+  for (const [re, label] of platformRules) {
+    if (re.test(t)) {
+      out.platform = label;
+      break;
+    }
+  }
+
+  if (/中国香港公司|香港公司/.test(t)) out.entity = '中国香港公司';
+  else if (/个体户/.test(t)) out.entity = '个体户';
+  else if (/中国个人|境内个人/.test(t)) out.entity = '中国个人';
+  else if (/外籍个人/.test(t)) out.entity = '外籍个人';
+  else if (/其他境外公司|海外公司/.test(t)) out.entity = '其他境外公司';
+  else if (/中国境内|中国大陆公司|国内公司|境内公司/.test(t)) out.entity = '中国大陆公司';
+
+  if (/亚马逊\s*FBA|\bFBA\b/i.test(t)) out.shipping = '亚马逊FBA';
+  else if (/全托管（国内仓）|全托管.*国内仓/.test(t)) out.shipping = '全托管（国内仓）';
+  else if (/半托管（海外仓）|半托管.*海外仓/.test(t)) out.shipping = '半托管（海外仓）';
+  else if (/半托管（国内仓）|半托管.*国内仓/.test(t)) out.shipping = '半托管（国内仓）';
+  else if (/海外仓/.test(t)) out.shipping = '自发货（海外仓发货）';
+  else if (/国内直发|自发货（国内直发）/.test(t)) out.shipping = '自发货（国内直发）';
+
+  if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
+  else if (/1039|市场采购/.test(t)) out.exportMode = '市场采购出口（1039）';
+  else if (/未报关/.test(t)) out.exportMode = '小包快递出口（未报关）';
+  else if (/9610|1210|小包快递/.test(t)) out.exportMode = '小包快递出口（9610/1210）';
+  else if (/由平台安排出口/.test(t)) out.exportMode = '由平台安排出口';
+  else if (/委托货代/.test(t)) out.exportMode = '委托货代出口';
+  else if (/正式报关/.test(t)) out.exportMode = '正式报关出口（0110/9710）';
+
+  if (/无法提供发票|不能.*发票|无票/.test(t)) out.invoice = '无法提供发票';
+  else if (/部分专票.{0,8}部分普票|专票.*普票/.test(t)) out.invoice = '部分专票+部分普票';
+  else if (/普通发票|普票/.test(t) && !/专用发票|专票/.test(t)) {
+    out.invoice = '只能提供增值税普通发票';
+  } else if (/专用发票|专票/.test(t)) {
+    out.invoice = '能提供增值税专用发票';
+  }
+
+  const rebateZero =
+    /(?:出口)?退税率?\s*(?:为|是|属于|:|：)?\s*0\s*%|[零0]退税率?产品|0\s*%\s*(?:出口)?退税/.test(t);
+  const rebatePositive = /(?:出口)?退税率?\s*(?:为|是|属于|:|：)?\s*(\d+(?:\.\d+)?)\s*%/.exec(t);
+  const rebatePositiveFlip = /(\d+(?:\.\d+)?)\s*%\s*(?:的)?\s*(?:出口)?退税率?/.exec(t);
+  const statedRate = rebatePositive
+    ? Number(rebatePositive[1])
+    : rebatePositiveFlip
+      ? Number(rebatePositiveFlip[1])
+      : NaN;
+  if (rebateZero && !(Number.isFinite(statedRate) && statedRate > 0)) {
+    out.productCategory = '0退税率产品（如贵重金属、珠宝玉石、钢材、铝材、木材）';
+  } else if (Number.isFinite(statedRate) && statedRate > 0 && !looksLikeVatRateNotRebate(t)) {
+    out.productCategory = '普货，能正常报关出口和退税';
+    out.productCategoryNote = `用户声明退税率${statedRate}%`;
+  } else if (/能正常报关出口和退税|普货/.test(t) && !rebateZero) {
+    out.productCategory = '普货，能正常报关出口和退税';
+  } else if (/商检/.test(t)) {
+    out.productCategory = '产品涉及商检（如食品、化妆品、危险化学品、木制品）';
+  } else if (/备案商标|未获得授权|未授权/.test(t)) {
+    out.productCategory = '产品涉及海关备案商标但暂未获得授权';
+  }
+
+  if (/10亿以上/.test(t)) out.revenue = '10亿以上';
+  else if (/4\s*[-~～到至]\s*10亿/.test(t)) out.revenue = '4-10亿';
+  else if (/1\s*[-~～到至]\s*4亿/.test(t)) out.revenue = '1-4亿';
+  else if (/5000万\s*[-~～到至]\s*1亿|5000万以上/.test(t)) out.revenue = '5000万-1亿';
+  else if (/年销售[额]?约?5000\s*万/.test(t)) out.revenue = '5000万-1亿';
+  else if (/2000\s*[-~～到至]\s*5000万/.test(t)) out.revenue = '2000-5000万';
+  else if (/500\s*[-~～到至]\s*2000万/.test(t)) out.revenue = '500-2000万';
+  else if (/500万以下|不到500万|不足500万/.test(t)) out.revenue = '500万以下';
+
+  return out;
+}
+
+function applyDiagSlotOverrides(overrides) {
+  const next = { ...getDiagSlots() };
+  if (!overrides || typeof overrides !== 'object') return next;
+  Object.keys(DIAG_SLOT_LABELS).forEach((key) => {
+    const value = String(overrides[key] || '').trim();
+    if (value) setDiagSlot(key, value);
+  });
+  return getDiagSlots();
+}
+
+function formatDiagChangeLines(changes) {
+  if (!Array.isArray(changes) || !changes.length) {
+    return '（前端未抽出明确字段变化；请以用户本轮原话为准自行对照，用户新陈述覆盖旧档案。）';
+  }
+  return changes
+    .map((c) => {
+      const note = c.note ? `（${c.note}）` : '';
+      return `- ${c.label}：${c.from} → ${c.to}${note}`;
+    })
+    .join('\n');
+}
+
+function looksLikeDiagnosisScenarioRestate(text) {
+  const t = String(text || '');
+  if (!t.trim()) return false;
+  let n = 0;
+  if (/亚马逊|Amazon|Temu|Shopee|Lazada|速卖通|SHEIN|TikTok|美客多|eBay|Shopify|阿里|平台/i.test(t)) n += 1;
+  if (/注册主体|大陆公司|境内公司|香港公司|个体户/.test(t)) n += 1;
+  if (/发货|直发|FBA|海外仓|全托管|半托管/.test(t)) n += 1;
+  if (/报关|出口|9610|0110|9810|1039|1210/.test(t)) n += 1;
+  if (/发票|专票|普票|无票/.test(t)) n += 1;
+  if (/退税|普货|商检|产品属于|产品类别/.test(t)) n += 1;
+  if (/年销售|销售额|\d+\s*万|\d+\s*亿/.test(t)) n += 1;
+  return n >= 3;
+}
+
+function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
+  const baseline = formatDiagSlotsSnapshot(baselineSlots);
+  return (
+    '【诊断已完成·后续追问】禁止原样复用上一份诊断报告。\n' +
+    '【上一轮诊断档案·仅作对照基线，可被本轮用户新陈述覆盖】\n' +
+    `${baseline}\n` +
+    '【本轮用户新问题】\n' +
+    `${String(userText || '').trim()}\n` +
+    '【本轮已识别的变化点】\n' +
+    `${formatDiagChangeLines(changes)}\n` +
+    '请先审视本轮问题与上一轮诊断的相关性，再作答：\n' +
+    '1. 若与上一轮同一业务、仅部分条件变化：必须先用项目符号列出【变化点】（旧值→新值），再分析该变化对合规路径、退税可行性、税负与风险的影响及注意事项，然后按【新事实】重新输出完整【核心风险诊断】【合规方案】【行动建议】【注意事项】。用户本轮明确给出的新事实优先于旧档案；禁止出现与新事实矛盾的旧结论（例如用户已说明13%退税率，禁止仍按0退税率撰写）。\n' +
+    '2. 若为全新问题（不同平台/不同业务/无关政策问答）：不要套用上一份诊断报告，按模式B针对新问题全新作答。若本轮已给出完整新业务画像，按新画像重新出报告，不要混入上一轮档案。\n' +
+    '3. 禁止再说“第1-7步已齐请直接出报告”而忽略用户新问题。'
+  );
 }
 
 /** Short labels for the fixed「诊断档案确认」line in the plan panel. */
@@ -1637,6 +1848,23 @@ function buildDiagnosisArchiveConfirmHtml() {
     `<p class="result-paragraph result-archive-confirm">` +
     `<strong>诊断档案确认：</strong>` +
     `<span class="result-archive-confirm-values">${escapeHtml(parts.join(' / '))}</span>` +
+    `</p>`
+  );
+}
+
+function buildDiagnosisChangePointsHtml(changes) {
+  const list = Array.isArray(changes) ? changes : [];
+  if (!list.length) return '';
+  const items = list
+    .map((c) => {
+      const note = c.note ? `（${c.note}）` : '';
+      return `${escapeHtml(c.label)}：${escapeHtml(c.from)} → ${escapeHtml(c.to)}${escapeHtml(note)}`;
+    })
+    .join('；');
+  return (
+    `<p class="result-paragraph result-change-points">` +
+    `<strong>相对上一轮的变化：</strong>` +
+    `<span class="result-change-points-values">${items}</span>` +
     `</p>`
   );
 }
@@ -1686,10 +1914,17 @@ function looksLikeModeSelectReply(text) {
 }
 
 /** Enrich diagnosis-step user replies so Dify never restarts mode selection. */
-function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
+function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {}) {
   const normalized = normalizeDiagnosisModeQuery(text);
   if (normalized !== String(text || '').trim()) return normalized;
   if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
+  if (options.isPostReportFollowUp) {
+    return buildDiagnosisFollowUpQuery(
+      text,
+      options.baselineSlots || getDiagSlots(),
+      options.changes || getLastDiagFollowUpChanges()
+    );
+  }
   const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
     2: '请执行第二步：只提问「2. 您平台店铺的注册主体是哪一种？（可在下方点选）」；不要在正文罗列主体选项，官网会显示按钮。',
@@ -1710,6 +1945,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel) {
     `\n${archive}`
   );
 }
+/** --- diag-followup-helpers end --- */
 
 function looksLikeRejectedDiagnosisStart(text) {
   const t = String(text || '');
@@ -1923,6 +2159,7 @@ function initAiChatbot() {
     localStorage.setItem(STEP_KEY, '0');
     localStorage.setItem(PLATFORM_KEY, '');
     clearDiagSlots();
+    setLastDiagFollowUpChanges([]);
   };
 
   /** Track mode/step so diagnosis keeps clickable answer chips each turn. */
@@ -2236,6 +2473,33 @@ function initAiChatbot() {
 
     const prevMode = getUiMode();
     const prevStep = getUiStep();
+    const isPostReportFollowUp = prevMode === 'diagnosis' && prevStep >= 8;
+    let followUpBaselineSlots = null;
+    let followUpChanges = [];
+    if (isPostReportFollowUp) {
+      followUpBaselineSlots = { ...getDiagSlots() };
+      const overrides = extractDiagnosisFactOverrides(text);
+      const merged = { ...followUpBaselineSlots, ...overrides };
+      followUpChanges = diffDiagSlots(followUpBaselineSlots, merged);
+      if (overrides.productCategoryNote) {
+        const hit = followUpChanges.find((c) => c.key === 'productCategory');
+        if (hit) hit.note = overrides.productCategoryNote;
+        else {
+          followUpChanges.push({
+            key: 'productCategory',
+            label: '产品类别',
+            from: followUpBaselineSlots.productCategory || '未填写',
+            to: overrides.productCategory || followUpBaselineSlots.productCategory || '普货',
+            note: overrides.productCategoryNote,
+          });
+        }
+      }
+      applyDiagSlotOverrides(overrides);
+      if (overrides.platform) setUiWizard('diagnosis', 8, overrides.platform);
+      setLastDiagFollowUpChanges(followUpChanges);
+    } else if (!(prevMode === 'diagnosis' && prevStep === 7)) {
+      setLastDiagFollowUpChanges([]);
+    }
     trackUserWizardAnswer(text);
 
     // Fast path: show step-1 locally immediately (don't block on Dify after login)
@@ -2514,13 +2778,19 @@ function initAiChatbot() {
     // Q7 answered → immediately show plan-generating status + right-panel working scene
     const shouldGeneratePlanNow =
       prevMode === 'diagnosis' && prevStep === 7 && getUiStep() >= 8;
-    if (shouldGeneratePlanNow) {
+    const expectFollowUpPlan =
+      isPostReportFollowUp &&
+      (followUpChanges.length > 0 || looksLikeDiagnosisScenarioRestate(text));
+    const forcePlanWhileThinking = shouldGeneratePlanNow || expectFollowUpPlan;
+    const planBusyMsg = isPostReportFollowUp ? DIAG_PLAN_UPDATE_STATUS_MSG : DIAG_PLAN_STATUS_MSG;
+    const planDoneMsg = isPostReportFollowUp ? DIAG_PLAN_UPDATE_DONE_MSG : DIAG_PLAN_DONE_MSG;
+    if (shouldGeneratePlanNow || expectFollowUpPlan) {
       showResultWorking();
       typing.classList.add('is-plan-status');
       const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
       typing.textContent = loggedInNow
-        ? DIAG_PLAN_STATUS_MSG
-        : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
+        ? planBusyMsg
+        : `${planBusyMsg}。请先微信登录以保存方案并继续`;
       if (!loggedInNow) {
         window.DAOITH_AUTH?.requireLogin?.(
           'ai_plan',
@@ -2538,7 +2808,11 @@ function initAiChatbot() {
 
       // Re-read after warm — do not use a stale id from before warm finished
       const sessionId = ensureConversationId();
-      const apiQuery = buildDiagnosisApiQuery(text, getUiMode(), getUiStep(), getUiPlatform());
+      const apiQuery = buildDiagnosisApiQuery(text, getUiMode(), getUiStep(), getUiPlatform(), {
+        isPostReportFollowUp,
+        baselineSlots: followUpBaselineSlots,
+        changes: followUpChanges,
+      });
 
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
@@ -2585,8 +2859,8 @@ function initAiChatbot() {
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
           typing.textContent = loggedInNow
-            ? DIAG_PLAN_STATUS_MSG
-            : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
+            ? planBusyMsg
+            : `${planBusyMsg}。请先微信登录以保存方案并继续`;
           if (!document.getElementById('resultWorking')) showResultWorking();
           return;
         }
@@ -2595,8 +2869,8 @@ function initAiChatbot() {
         typing.classList.add('is-plan-status');
         const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
         typing.textContent = loggedInNow
-          ? DIAG_PLAN_STATUS_MSG
-          : `${DIAG_PLAN_STATUS_MSG}。请先微信登录以保存方案并继续`;
+          ? planBusyMsg
+          : `${planBusyMsg}。请先微信登录以保存方案并继续`;
         if (!loginPromptedForPlan && !loggedInNow) {
           loginPromptedForPlan = true;
           window.DAOITH_AUTH?.requireLogin?.(
@@ -2605,7 +2879,7 @@ function initAiChatbot() {
           );
         }
       };
-      if (shouldGeneratePlanNow) beginPlanRouting();
+      if (forcePlanWhileThinking) beginPlanRouting();
 
       const beginLongQaRouting = () => {
         if (streamingLongQa) return;
@@ -2619,14 +2893,14 @@ function initAiChatbot() {
         const cleaned = sanitizeAiAnswer(partial);
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
-          if (getUiMode() === 'diagnosis' && getUiStep() >= 6) {
+          if (forcePlanWhileThinking) {
             beginPlanRouting();
           }
           return;
         }
         const clean = prepareDiagnosisPlanMarkdown(stripDiagnosisIntroBoilerplate(cleaned));
         if (!clean) {
-          if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
+          if (forcePlanWhileThinking) beginPlanRouting();
           return;
         }
         // Ignore English writing outlines / prompt-meta; try salvage only if ready
@@ -2640,7 +2914,7 @@ function initAiChatbot() {
             }
             return;
           }
-          if (getUiMode() === 'diagnosis' && getUiStep() >= 6) beginPlanRouting();
+          if (forcePlanWhileThinking) beginPlanRouting();
           return;
         }
         // Full diagnosis → right-hand plan panel (only when body is ready; avoid header flashes)
@@ -2655,8 +2929,7 @@ function initAiChatbot() {
         }
         // Mid-report CoT that slipped past sanitize: still never show in chat
         if (
-          getUiMode() === 'diagnosis' &&
-          getUiStep() >= 6 &&
+          forcePlanWhileThinking &&
           /(让我检索|知识库返回|属于路径[ABC]|需要检索的知识库|诊断档案)/.test(clean) &&
           !/(【核心风险诊断】|【合规方案】)/.test(clean)
         ) {
@@ -2737,7 +3010,7 @@ function initAiChatbot() {
         answer = salvageDiagnosisPlanFromRaw(result.text) || '';
       }
       if (!answer || answer.length < 4) {
-        if (streamingPlan || (getUiMode() === 'diagnosis' && getUiStep() >= 6)) {
+        if (streamingPlan || forcePlanWhileThinking) {
           beginPlanRouting();
           typing.classList.add('is-plan-status');
           typing.textContent =
@@ -2780,7 +3053,7 @@ function initAiChatbot() {
           return;
         }
         publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis' });
-        if (!planCountedThisTurn) {
+        if (!planCountedThisTurn && !isPostReportFollowUp) {
           planCountedThisTurn = true;
           bumpDiagnosisPlanCount();
         }
@@ -2788,8 +3061,8 @@ function initAiChatbot() {
         typing.classList.add('is-plan-status');
         const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
         typing.textContent = loggedInNow
-          ? DIAG_PLAN_DONE_MSG
-          : `${DIAG_PLAN_DONE_MSG}。请先微信登录以保存方案并继续`;
+          ? planDoneMsg
+          : `${planDoneMsg}。请先微信登录以保存方案并继续`;
         clearQuickReplies();
       } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
         beginLongQaRouting();
@@ -2990,6 +3263,16 @@ function salvageDiagnosisPlanFromRaw(raw) {
 
   const cjkCount = (x) => (String(x).match(/[\u4e00-\u9fff]/g) || []).length;
 
+  const withChanges = s.match(/【变化点】[\s\S]*/);
+  if (
+    withChanges &&
+    /【核心风险诊断】|【合规方案】/.test(withChanges[0]) &&
+    cjkCount(withChanges[0]) >= 60 &&
+    !looksLikeDiagnosisPlanScaffold(withChanges[0])
+  ) {
+    return withChanges[0].trim();
+  }
+
   const formal = s.match(/【核心风险诊断】[\s\S]*/);
   if (formal && cjkCount(formal[0]) >= 60 && !looksLikeDiagnosisPlanScaffold(formal[0])) {
     return formal[0].trim();
@@ -3095,6 +3378,9 @@ function shouldRouteLongAnswerToPlanPanel(text) {
 
 const DIAG_PLAN_STATUS_MSG = '道一合规诊断助手正在为您生成专属合规方案，请查看右侧方案生成区';
 const DIAG_PLAN_DONE_MSG = '道一合规诊断助手已为您生成专属合规方案，请查看右侧方案生成区';
+const DIAG_PLAN_UPDATE_STATUS_MSG =
+  '道一合规诊断助手正在对照上一轮诊断审视变化并更新方案，请查看右侧方案生成区';
+const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
 const QA_LONG_ANSWER_CHAT_TIP =
   '由于内容较多，道一合规诊断助手已将回复展示在右侧方案生成区，请查看。';
 const DIAG_PLAN_LIMIT = 5;
@@ -3494,11 +3780,14 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       ? `以下回复由左侧<strong>道一合规诊断助手</strong>生成：`
       : `以下方案由左侧<strong>道一合规诊断助手</strong>生成：`;
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
+  const changeHtml =
+    kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
   items.innerHTML =
     `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
     archiveHtml +
+    changeHtml +
     body +
     `</div>`;
 
