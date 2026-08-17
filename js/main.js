@@ -1611,13 +1611,44 @@ function formatDiagSlotsSnapshot(slots) {
 function formatDiagSlotsForApi(slots) {
   const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
   const exportMode = resolveDiagExportMode(s) || '未填写';
+  const shipping = String(s.shipping || '未填写').trim();
+  const revenue = String(s.revenue || '未填写').trim();
+  const platform = String(s.platform || '未填写').trim();
   let hard = '';
   if (exportMode === '由平台安排出口') {
-    hard =
-      '【硬约束】出口方式已确定为「由平台安排出口」。禁止写“未提供出口信息/出口方式未知”；' +
-      '【合规方案】只围绕平台统一安排出口撰写，禁止罗列其他出口方式分支情形。';
+    hard +=
+      '【硬约束·出口】出口方式已确定为「由平台安排出口」。禁止写“未提供出口信息/出口方式未知”；' +
+      '【合规方案】只围绕平台统一安排出口撰写，禁止罗列一般贸易/小包/海外仓等其它出口分支。\n';
   }
-  return `【诊断档案·必须采信】\n${formatDiagSlotsSnapshot(s)}\n${hard}`;
+  if (/国内仓/.test(shipping) && !/保税仓/.test(shipping)) {
+    hard +=
+      `【硬约束·发货】发货方式必须写「${shipping}」。禁止写成「保税仓」「供货SHEIN（保税仓）」或其它发货方式；业务流程与方案卡片须与此一致。\n`;
+  }
+  if (/保税仓/.test(shipping)) {
+    hard += `【硬约束·发货】发货方式必须写「${shipping}」，禁止改写成国内仓。\n`;
+  }
+  if (revenue && revenue !== '未填写') {
+    hard +=
+      `【硬约束·销售额】年销售额必须写「${revenue}」。禁止改用其它档位（例如档案是「500万以下」时禁止写「500-2000万」）。销售额分层建议仅在档案达到对应门槛时才写。\n`;
+  }
+  hard +=
+    `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
+    `本单业务画像必须以档案为准：${platform} / ${shipping} / ${exportMode} / ${revenue}。`;
+  return `【诊断档案·必须逐字采信】\n${formatDiagSlotsSnapshot(s)}\n${hard}`;
+}
+
+/** Dedicated query when generating the first full diagnosis report (step 7 → 8). */
+function buildDiagnosisPlanApiQuery(userText) {
+  const archive = formatDiagSlotsForApi();
+  const reply = String(userText || '').trim();
+  return (
+    '【专属合规诊断·生成报告】第1-7步已齐。请严格按下方【诊断档案】撰写完整四章报告，禁止再提问。\n' +
+    `${archive}\n` +
+    (reply ? `【用户本轮最后答复】${reply}\n` : '') +
+    '【写作铁律】业务流程、合规方案开篇画像、行动建议中出现的平台/发货/出口/发票/产品/销售额，必须与档案字段一致；' +
+    '不得把「国内仓」写成「保税仓」，不得改写销售额档位；不得照抄方案样本示例数据。' +
+    '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后参考对应样本结构生成报告。'
+  );
 }
 
 /** Last follow-up field diffs for the right-hand plan panel. */
@@ -2830,11 +2861,14 @@ function initAiChatbot() {
 
       // Re-read after warm — do not use a stale id from before warm finished
       const sessionId = ensureConversationId();
-      const apiQuery = buildDiagnosisApiQuery(text, getUiMode(), getUiStep(), getUiPlatform(), {
-        isPostReportFollowUp,
-        baselineSlots: followUpBaselineSlots,
-        changes: followUpChanges,
-      });
+      const apiQuery =
+        shouldGeneratePlanNow && !isPostReportFollowUp
+          ? buildDiagnosisPlanApiQuery(text)
+          : buildDiagnosisApiQuery(text, getUiMode(), getUiStep(), getUiPlatform(), {
+              isPostReportFollowUp,
+              baselineSlots: followUpBaselineSlots,
+              changes: followUpChanges,
+            });
 
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
