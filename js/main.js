@@ -3654,10 +3654,7 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
     options.lead != null
       ? options.lead
       : '根据回复内容为您匹配，可加入询价单由顾问继续落地。';
-  const tip =
-    options.tip != null
-      ? options.tip
-      : '道一合规小助手已为您匹配最相关的服务供您选择。';
+  // Tip lives at the bottom of the right-hand plan panel, not in this block
   const cards = ids
     .map((id) => {
       const s = (window.DAOITH_SERVICES || []).find((x) => x.id === id);
@@ -3677,11 +3674,17 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
     .join('');
   if (!cards) return '';
   return (
-    `<h3 class="diag-services-heading">服务推荐</h3>` +
+    `<h3 class="diag-services-heading">您可能需要的服务</h3>` +
     (lead ? `<p class="diag-services-lead">${escapeHtml(lead)}</p>` : '') +
-    `<div class="diag-services-grid">${cards}</div>` +
-    (tip ? `<p class="diag-services-match-tip">${escapeHtml(tip)}</p>` : '')
+    `<div class="diag-services-grid">${cards}</div>`
   );
+}
+
+const DIAG_SERVICE_MATCH_TIP =
+  '道一合规小助手已为您匹配最相关的服务，请在本页面下方进行选择。';
+
+function buildServiceMatchTipHtml() {
+  return `<p class="result-service-match-tip">${escapeHtml(DIAG_SERVICE_MATCH_TIP)}</p>`;
 }
 
 /** Soft copy guard for the right-hand compliance plan panel (deterrent only). */
@@ -3803,6 +3806,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
+  const tipHtml = buildServiceMatchTipHtml();
   items.innerHTML =
     `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
@@ -3810,6 +3814,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     archiveHtml +
     changeHtml +
     body +
+    tipHtml +
     `</div>`;
 
   if (serviceHost) {
