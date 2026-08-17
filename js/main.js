@@ -1359,11 +1359,13 @@ function detectDiagQuickReplySet(botText) {
   // Mode selection after welcome
   if (
     /(开启专属合规诊断|特定问题想直接提问|专属合规诊断|直接提问)/.test(zone) &&
-    /(请选择|还是|或者|两种|模式)/.test(zone)
+    /(请选择|请在下方选择|还是|或者|两种|模式)/.test(zone)
   ) {
     return 'modeSelect';
   }
-  if (/请选择/.test(zone) && /(合规诊断|直接提问|特定问题)/.test(zone)) return 'modeSelect';
+  if (/(请选择|请在下方选择)/.test(zone) && /(合规诊断|直接提问|特定问题)/.test(zone)) {
+    return 'modeSelect';
+  }
 
   // Platform question — only when actively asking; do not use zone (often echoes prior platform)
   if (isPlatformQuestionText(t)) return 'platform';
