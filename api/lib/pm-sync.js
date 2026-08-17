@@ -78,3 +78,41 @@ export function pushUsersToPmBackground(users, options = {}) {
     console.error('[pm-sync]', err.message || err);
   });
 }
+
+export async function pushDiagnosisReportToPm(report) {
+  const base = (process.env.PM_SYNC_URL || 'https://pm.daoith.com').replace(/\/$/, '');
+  const secret =
+    process.env.PM_SYNC_SECRET?.trim() ||
+    process.env.WEBSITE_SYNC_SECRET?.trim() ||
+    '';
+  if (!secret) {
+    console.warn('[pm-sync] PM_SYNC_SECRET not configured; skip diagnosis push');
+    return { skipped: true };
+  }
+  const url = `${base}/api/website/diagnosis/sync`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-website-sync-secret': secret,
+    },
+    body: JSON.stringify(report),
+  });
+  const text = await response.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { raw: text };
+  }
+  if (!response.ok) {
+    throw new Error(data?.error || `PM diagnosis sync failed (${response.status})`);
+  }
+  return data;
+}
+
+export function pushDiagnosisReportToPmBackground(report) {
+  pushDiagnosisReportToPm(report).catch((err) => {
+    console.error('[pm-sync:diagnosis]', err.message || err);
+  });
+}

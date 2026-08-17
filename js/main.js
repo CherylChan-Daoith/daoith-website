@@ -2784,6 +2784,7 @@ function initAiChatbot() {
           planCountedThisTurn = true;
           bumpDiagnosisPlanCount();
         }
+        persistDiagnosisReport(answer);
         typing.classList.add('is-plan-status');
         const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
         typing.textContent = loggedInNow
@@ -3153,6 +3154,68 @@ function bumpDiagnosisPlanCount() {
   const next = Math.min(DIAG_PLAN_LIMIT, getDiagnosisPlanCount() + 1);
   localStorage.setItem(diagnosisPlanCountStorageKey(), String(next));
   return next;
+}
+
+/** Persist finished diagnosis plan to PM analytics (best-effort). */
+function persistDiagnosisReport(markdown) {
+  try {
+    const auth = window.DAOITH_AUTH;
+    if (!auth?.isLoggedIn?.()) return;
+    const token = auth.getToken?.();
+    if (!token) return;
+    const clean = prepareDiagnosisPlanMarkdown(
+      stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
+    );
+    if (!clean || !isDiagnosisPlanReadyToShow(clean)) return;
+
+    const slots = typeof getDiagSlots === 'function' ? getDiagSlots() : {};
+    const slotKey = [
+      slots.platform,
+      slots.entity,
+      slots.shipping,
+      slots.exportMode,
+      slots.invoice,
+      slots.productCategory,
+      slots.revenue,
+    ]
+      .map((v) => String(v || '').trim())
+      .join('|');
+    const fingerprint = `${slotKey}::${clean.slice(0, 240)}`;
+    const dedupeKey = 'daoith_diag_report_fp';
+    if (sessionStorage.getItem(dedupeKey) === fingerprint) return;
+    sessionStorage.setItem(dedupeKey, fingerprint);
+
+    const reportId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `diag_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    const user = auth.getUser?.() || {};
+    const base = (window.DAOITH_CONFIG?.authApiBase || '').replace(/\/$/, '');
+    const recIds =
+      typeof pickDiagnosisServiceIds === 'function' ? pickDiagnosisServiceIds(clean) : [];
+
+    fetch(`${base}/api/diagnosis/reports`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        reportId,
+        slots,
+        reportMarkdown: clean,
+        nickname: user.nickname || null,
+        conversationId: localStorage.getItem('daoith_diagnosis_conversation_id') || null,
+        recommendedServiceIds: Array.isArray(recIds) ? recIds : [],
+        kind: 'diagnosis',
+      }),
+      keepalive: true,
+    }).catch(() => {
+      /* ignore network errors */
+    });
+  } catch {
+    /* never block diagnosis UX */
+  }
 }
 
 function isDiagnosisPlanLimitReached() {
