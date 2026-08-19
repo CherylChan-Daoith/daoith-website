@@ -982,11 +982,12 @@ ul {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px;
+  align-content: flex-start;
+  gap: 3px 4px;
   flex-shrink: 0;
-  max-height: min(28%, 160px);
+  max-height: min(34%, 188px);
   overflow-y: auto;
-  padding: 6px 12px 8px;
+  padding: 4px 10px 5px;
   margin: 0;
   border-top: 1px solid rgba(34, 81, 255, 0.1);
   background: #fff;
@@ -999,23 +1000,24 @@ ul {
 
 .diag-quick-replies-label {
   flex: 0 0 100%;
-  margin: 0;
-  font-size: 0.64rem;
+  margin: 0 0 1px;
+  font-size: 0.6rem;
   font-weight: 600;
   color: #3b6cff;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .diag-quick-reply-btn {
   appearance: none;
+  flex: 0 1 auto;
   border: 1px solid rgba(34, 81, 255, 0.22);
   background: #fff;
   color: #1a2b6b;
-  border-radius: 980px;
-  padding: 4px 10px;
-  font-size: 0.72rem;
-  line-height: 1.25;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  line-height: 1.2;
   font-weight: 500;
   cursor: pointer;
   box-shadow: none;
@@ -1027,7 +1029,7 @@ ul {
   flex-wrap: nowrap;
   align-items: stretch;
   overflow-x: auto;
-  gap: 4px;
+  gap: 3px;
 }
 
 .diag-quick-replies.is-stacked .diag-quick-replies-label {
@@ -1037,15 +1039,15 @@ ul {
 
 .diag-quick-replies.is-stacked .diag-quick-reply-btn {
   display: block;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: 0;
   box-sizing: border-box;
-  padding: 5px 10px;
-  font-size: 0.7rem;
-  line-height: 1.3;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  line-height: 1.25;
   text-align: left;
-  white-space: nowrap;
-  border-radius: 8px;
+  white-space: normal;
+  border-radius: 6px;
 }
 
 .diag-quick-reply-btn:hover,
