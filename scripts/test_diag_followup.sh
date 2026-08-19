@@ -98,6 +98,8 @@ const firstReport = buildDiagnosisApiQuery('5000万-1亿', 'diagnosis', 8, '亚�
 check('first-report-still-locked', /第1-7步已齐/.test(firstReport));
 check('first-report-must-read-kb', /出报告硬约束与路径要点/.test(firstReport) && /必须知道的知识点/.test(firstReport));
 check('first-report-no-format-dump', !/写作铁律/.test(firstReport) && !/完整四章报告/.test(firstReport));
+check('first-report-q17-in-must-read', /问题1–7各选项注意事项/.test(firstReport));
+check('first-report-no-standalone-qx', !/再按需检索问题X注意事项/.test(firstReport));
 
 check('question-13-rebate-not-silent-rewrite', extractDiagnosisFactOverrides('如果改成13%退税呢？').productCategory == null);
 check('unrelated-not-restate', looksLikeDiagnosisScenarioRestate('德国VAT怎么注册？') === false);
@@ -127,6 +129,14 @@ if grep -q '业务流程一行' "$PROMPT" || grep -q '3～6 条' "$PROMPT"; then
 fi
 if ! grep -q '出报告硬约束与路径要点' "$PROMPT" || ! grep -q '必须知道的知识点' "$PROMPT"; then
   echo "FAIL prompt must require the two must-read KB files" >&2
+  exit 1
+fi
+if ! grep -q '问题1–7各选项注意事项' "$PROMPT"; then
+  echo "FAIL prompt must treat Q1-7 notes as part of 必须知道的知识点" >&2
+  exit 1
+fi
+if grep -q '然后按需检索参考资料：用户各题对应的「问题X' "$PROMPT"; then
+  echo "FAIL prompt still retrieves standalone 问题X files" >&2
   exit 1
 fi
 echo "OK   prompt-split-must-read-kb"
