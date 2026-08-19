@@ -1,8 +1,9 @@
 # 在 Dify 搭建「道一财税诊断助手」Agent
 
 > 目标：多轮对话，**一次只问一个问题**，收集跨境财税关键信息后给出诊断与方案。  
-> 提示词文件：`deploy/dify-prompts/diagnosis-agent-*.md`  
-> **线上粘贴精简版** `diagnosis-agent-system.md`；完整归档见 `diagnosis-agent-system.full.md`（勿作 Instruction）。细则在知识库 `15-出报告硬约束与路径要点` 等。
+> 提示词文件：`deploy/dify-prompts/diagnosis-agent-*.md`（分层说明见 `deploy/dify-prompts/README.md`）  
+> **线上粘贴** `diagnosis-agent-system.md`：只含识别/分类、追问与解答逻辑。完整归档见 `diagnosis-agent-system.full.md`（勿作 Instruction）。  
+> 生成报告前必读知识库《出报告硬约束与路径要点》《必须知道的知识点》；其它为参考资料。
 
 ## 0. 和现有应用的关系
 
@@ -38,6 +39,8 @@
 
 开头那行 `> 粘贴到 Dify…` 是给人看的说明，可删掉再贴，不影响模型。
 
+同步把 `data/compliance-must-read-md/` 里的《出报告硬约束与路径要点》《必须知道的知识点》更新到知识库「合规解决方案必读文件」（报告格式与核心知识已从提示词迁出，不更新知识库则出报告会缺约束）。
+
 1. 打开 `deploy/dify-prompts/diagnosis-agent-system.md`  
    → 全文复制到 Agent **指令（Instruction）**
 2. 打开 `deploy/dify-prompts/diagnosis-agent-opening.md`  
@@ -59,7 +62,7 @@
 
 优先挂：
 
-- **`合规解决方案必读文件`**（出报告前强制检索：生成前必读 + 跨境电商实操知识 + 路径 A/B/C 方案样本）
+- **`合规解决方案必读文件`**（出报告前强制通读：《出报告硬约束与路径要点》《必须知道的知识点》；问题1–7注意事项与路径 A/B/C 方案样本作参考）
 - `DAOITH跨境电商知识库`（300问 / 平台税等）
 - `出口退税法规和实操`（如有）
 - `海关编码和出口退税率`（仅在用户问具体 HS 退税时依赖；回答时严守「退税率≠增值税」）
@@ -220,7 +223,9 @@ curl -s -X POST https://api.daoith.com/v1/diagnosis/chat-messages \
 
 ```
 deploy/DIFY-DIAGNOSIS-AGENT.md          ← 本文
+deploy/dify-prompts/README.md           ← 提示词 vs 知识库分层（以后调试按此增补）
 deploy/dify-prompts/diagnosis-agent-system.md
 deploy/dify-prompts/diagnosis-agent-opening.md
 deploy/dify-prompts/diagnosis-agent-kb-instruction.md
+data/compliance-must-read-md/           ← 必读《出报告硬约束与路径要点》《必须知道的知识点》+ 参考资料
 ```
