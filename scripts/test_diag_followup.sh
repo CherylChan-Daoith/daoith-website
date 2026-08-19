@@ -88,15 +88,20 @@ const follow = buildDiagnosisApiQuery(userQ, 'diagnosis', 8, '亚马逊 Amazon',
   changes,
 });
 check('followup-not-archive-lock', !/请基于【诊断档案】检索知识库并输出诊断报告/.test(follow));
-check('followup-has-compare', /诊断已完成·后续追问/.test(follow) && /本轮用户新问题/.test(follow));
+check('followup-has-compare', /诊断已完成·后续追问/.test(follow) && /本轮用户原话/.test(follow));
 check('followup-keeps-user-13', /13%退税率产品/.test(follow));
 check('followup-old-zero-as-baseline', /0退税率产品/.test(follow));
-check('followup-cover-rule', /用户本轮明确给出的新事实优先于旧档案/.test(follow));
+check('followup-cover-rule', /新事实覆盖旧档案/.test(follow));
+check('followup-must-read-kb', /出报告硬约束与路径要点/.test(follow) && /必须知道的知识点/.test(follow));
 
 const firstReport = buildDiagnosisApiQuery('5000万-1亿', 'diagnosis', 8, '亚马逊 Amazon');
 check('first-report-still-locked', /第1-7步已齐/.test(firstReport));
+check('first-report-must-read-kb', /出报告硬约束与路径要点/.test(firstReport) && /必须知道的知识点/.test(firstReport));
+check('first-report-no-format-dump', !/写作铁律/.test(firstReport) && !/完整四章报告/.test(firstReport));
+check('first-report-q17-in-must-read', /问题1–7各选项注意事项/.test(firstReport));
+check('first-report-no-standalone-qx', !/再按需检索问题X注意事项/.test(firstReport));
 
-check('short-13-rebate-followup', extractDiagnosisFactOverrides('如果改成13%退税呢？').productCategory === '普货，能正常报关出口和退税');
+check('question-13-rebate-not-silent-rewrite', extractDiagnosisFactOverrides('如果改成13%退税呢？').productCategory == null);
 check('unrelated-not-restate', looksLikeDiagnosisScenarioRestate('德国VAT怎么注册？') === false);
 
 let failed = 0;
@@ -116,3 +121,22 @@ else
   echo "Need node to run tests" >&2
   exit 1
 fi
+
+PROMPT="$ROOT/deploy/dify-prompts/diagnosis-agent-system.md"
+if grep -q '业务流程一行' "$PROMPT" || grep -q '3～6 条' "$PROMPT"; then
+  echo "FAIL prompt still contains report-format dump" >&2
+  exit 1
+fi
+if ! grep -q '出报告硬约束与路径要点' "$PROMPT" || ! grep -q '必须知道的知识点' "$PROMPT"; then
+  echo "FAIL prompt must require the two must-read KB files" >&2
+  exit 1
+fi
+if ! grep -q '问题1–7各选项注意事项' "$PROMPT"; then
+  echo "FAIL prompt must treat Q1-7 notes as part of 必须知道的知识点" >&2
+  exit 1
+fi
+if grep -q '然后按需检索参考资料：用户各题对应的「问题X' "$PROMPT"; then
+  echo "FAIL prompt still retrieves standalone 问题X files" >&2
+  exit 1
+fi
+echo "OK   prompt-split-must-read-kb"
