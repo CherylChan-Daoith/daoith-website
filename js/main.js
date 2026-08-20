@@ -3503,7 +3503,7 @@ const DIAG_PLAN_UPDATE_STATUS_MSG =
 const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
 const QA_LONG_ANSWER_CHAT_TIP =
   '由于内容较多，道一合规诊断助手已将回复展示在右侧方案生成区，请查看。';
-const DIAG_PLAN_LIMIT = 5;
+const DIAG_PLAN_LIMIT = 3;
 const DIAG_PLAN_LIMIT_MSG =
   '您诊断的次数较多，如果您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
 const EXPERT_BOOKING_MSG = '请提交询价并完成预约。';
@@ -4365,12 +4365,13 @@ function callDifyHsRate(hsCode) {
     },
     query: `你是中国出口退税政策助手。请优先依据已挂载的海关编码知识库查询海关编码 ${hsCode} 的现行出口退税率；知识库无精确匹配时再说明需核对官方文库。
 
-硬规则：只输出知识库中的「出口退税率」字段；严禁把「增值税税率」当作出口退税率。例如镶钻银饰71131110常见增值税13%、出口退税0%。
+硬规则：只输出知识库中的「出口退税率」字段；严禁把「增值税税率」当作出口退税率。例如镶钻银饰71131110常见增值税13%、出口退税0%。退税率为0时必须同时读取「特殊商品标识」（旧称特殊标志）：1=出口征税/视同内销（进项可抵）；2=出口免税（进项转出）。含黄金、铂金成分货物及钻石及其饰品一般为标识2，禁止写成视同内销。
 
 输出要求（中文，简洁）：
 1. 第一行：出口退税率：X%
-2. 第二行：数据来源：知识库 / 国家税务总局出口退税率文库（注明依据）
-3. 第三行：简要说明（不超过40字；可同时注明增值税税率但不得与退税率混用）
+2. 第二行：特殊商品标识：1 或 2（并注明征税/免税含义；知识库无该字段则写未收录）
+3. 第三行：数据来源：知识库 / 国家税务总局出口退税率文库（注明依据）
+4. 第四行：简要说明（不超过40字；可同时注明增值税税率但不得与退税率混用）
 不要编造无法核实的税率；不确定时明确写「需人工核对官方税则」。`,
   });
 }
@@ -4521,9 +4522,12 @@ async function resolveExportRefundRate(hsCode) {
 function formatStructuredRefundReply(kb, hsCode) {
   const matched = kb.hs_code || hsCode;
   const rate = kb.display || `${kb.rate}%`;
-  // Prefer 8-digit matched code in reply when input was 10-digit
-  const show = String(matched).replace(/\D/g, '').slice(0, 10) || hsCode;
-  return `${show} 的出口退税率为 ${rate}。`;
+  const digits = String(matched).replace(/\D/g, '').slice(0, 10) || hsCode;
+  const flagLabel = kb.special_goods_flag_label || '';
+  if (flagLabel) {
+    return `${digits} 的出口退税率为 ${rate}。特殊商品标识 ${flagLabel}。`;
+  }
+  return `${digits} 的出口退税率为 ${rate}。`;
 }
 
 function callDifyDutyRate(hsCode, countryLabel) {

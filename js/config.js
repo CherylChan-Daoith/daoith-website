@@ -24,6 +24,8 @@ window.DAOITH_CONFIG = {
   // 诊断方案次数免限（按微信 openid；控制台可执行：DAOITH_AUTH.getUser()?.openid）
   diagnosisPlanLimitBypassOpenids: [
     'oqURV2STObg-wXYNoeRrcA9-JJcg',
+    'oqURV2ZUYx-el4Mjq7bF4nrzacXg',
+    'oqURV2cJpXPQ_1RC9PG_BVJg41QM',
   ],
 
   // 公安备案 / 网站公示信息（须与营业执照及实际办公地一致；勿使用虚拟地址）
