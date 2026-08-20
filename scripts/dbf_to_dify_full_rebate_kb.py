@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Generate a FULL export-rebate Markdown KB from CMCODE2026B (all current HS codes).
 
-CMCODE NOTE only marks a minority of codes with explicit「退x」. To cover nearly all
-codes for Dify retrieval, resolve rates as:
+CMCODE NOTE only marks a minority of codes with explicit「退x」. The actual
+library rebate rate is field TSL (退税率). Resolve rates as:
 
-  1) NOTE has「退x」(incl. 退0) → use that (文库明确)
-  2) else HS chapter in known zero-rebate chapters → 0% (章目/政策口径)
+  1) TSL present (incl. 0) → use TSL (文库退税率)
+  2) else NOTE has「退x」→ use that
   3) else ZSSL_SET (VAT) present → same as VAT (征退一致推断)
   4) else chapter default from map if any
   5) else skip (未收录)
+
+Do not treat whole HS chapters as 0% — that wrongly zeroed 7113119090 (13%).
 
 Usage:
   .venv-dbf/bin/python scripts/dbf_to_dify_full_rebate_kb.py [/path/to/CMCODE2026B]
@@ -23,6 +25,11 @@ from pathlib import Path
 
 from dbfread import DBF
 
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from hs_special_goods_flag import special_goods_flag_keyword, special_goods_flag_line
+
 ROOT = Path(__file__).resolve().parents[1]
 CURRENT_END_YEAR = 2099
 RECORDS_PER_FILE = 80
@@ -36,42 +43,27 @@ DEFAULT_CANDIDATES = [
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b"),
 ]
 
-# Chapters where empty NOTE should NOT fall back to VAT (征退一致会错）
-ZERO_REBATE_CHAPTERS = {
-    "05",
-    "07",
-    "08",
-    "09",
-    "10",
-    "11",
-    "12",
-    "13",
-    "14",
-    "15",
-    "23",
-    "25",
-    "26",
-    "27",
-    "31",
-    "41",
-    "43",
-    "44",
-    "45",
-    "47",
-    "71",  # 贵金属首饰等多数 0%
-    "72",  # 钢铁等
-    "74",
-    "75",
-    "76",  # 铝材等，2024年第15号起取消退税
-    "78",
-    "79",
-    "80",
-    "81",
-    "93",
-    "97",
+# Silver finished goods whose library TSL is not 0%. Overlay: 2026 No.11
+# art.9(2)(4) — if silver (or other annex-9) raw-material cost ≥50% and
+# goods are not annex 8, apply the raw material's library policy.
+# Includes jewellery, silverware, clad silver, solder, ash/scrap, and
+# industrial/lab silver (crucibles, wire). Do not name-match「银」(false
+# positives: 银狐/银耳/银幕).
+SILVER_FINISHED_OVERLAY_CODES = {
+    "7113119090",
+    "7114110090",
+    "7115901010",
+    "71159010902",
+    "7113209090",
+    "71070000",
+    "71110000002",
+    "71142000902",
+    "71123010",
+    "71129910",
 }
+SILVER_RAW_CODES = {"71069110", "71069190", "71069210", "71069290"}
 
-# Fallback when NOTE empty、非零章、且无 ZSSL
+# Fallback when TSL missing、NOTE empty、且无 ZSSL
 CHAPTER_DEFAULT = {
     "01": "9%",
     "02": "9%",
@@ -214,25 +206,46 @@ def parse_zssl(zssl) -> str | None:
     return fmt_pct(first)
 
 
-def resolve_rebate(code: str, note: str, zssl) -> tuple[str, str] | None:
+def parse_tsl(tsl) -> str | None:
+    """CMCODE TSL is the library export rebate rate, including genuine 0%."""
+    if tsl is None or tsl == "":
+        return None
+    return fmt_pct(tsl)
+
+
+def resolve_rebate(code: str, note: str, zssl, tsl=None) -> tuple[str, str] | None:
     """Return (rate_display, source_label) or None if unknown."""
+    tsl_rate = parse_tsl(tsl)
+    if tsl_rate is not None:
+        return tsl_rate, "文库TSL退税率"
+
     note_rate = parse_note_rebate(note)
     if note_rate is not None:
         return note_rate, "文库NOTE明确"
 
-    chapter = code[:2]
-    if chapter in ZERO_REBATE_CHAPTERS:
-        return "0%", "章目/政策口径（NOTE无退x）"
-
     z = parse_zssl(zssl)
     if z is not None:
-        return z, "征退一致推断（NOTE无退x，按增值税税率）"
+        return z, "征退一致推断（无TSL、NOTE无退x，按增值税税率）"
 
-    ch = CHAPTER_DEFAULT.get(chapter)
+    ch = CHAPTER_DEFAULT.get(code[:2])
     if ch:
-        return ch, "章目默认（NOTE无退x且无ZSSL）"
+        return ch, "章目默认（无TSL、NOTE无退x且无ZSSL）"
 
     return None
+
+
+def overlay_policy_lines(code: str, rebate: str) -> list[str]:
+    if code in SILVER_FINISHED_OVERLAY_CODES:
+        return [
+            f"- **含银货物政策叠加（财政部 税务总局公告2026年第11号第九条第（二）款第4项）**：本税号文库退税率为{rebate}，不得据此把所有含银货物（含银饰、工业用银制品、银坩埚、银线、包银材料等）写成不能退税。",
+            "- **50%规则**：货物不属于附件8（含黄金、铂金成分货物及钻石及其饰品）时，若合计50%以上原材料成本由附件9原材料（天然钻石、银、金、铂、钯、铑及铱、锇、钌）构成，应改按成本占比最高的原材料在退税率文库中的增值税、消费税政策执行。银对应未锻造银71069190：退税率0%、特殊商品标识1（视同内销，进项可抵）。报关编码仍用本税号，不改为71069190。银材料成本未达50%则按本税号退税。工业用银制品与首饰适用同一规则。",
+            "- **不要混淆**：镶钻银饰71131110属于钻石及其饰品（附件8），文库本身退税率0%、特殊商品标识2（出口免税），不适用上述50%叠加。珍珠、宝石、工业用钻石、人造钻石已不再列入本规则（财税〔2014〕98号已废止）。",
+        ]
+    if code in SILVER_RAW_CODES:
+        return [
+            "- **政策用途**：银原材料在退税率文库中的政策（退税率0%、特殊商品标识1）。含银制成品（含银饰、工业用银制品等）不属于附件8时，若银材料成本≥50%，按本税号政策执行；报关商品编码仍用制成品税号，不改报为本税号。",
+        ]
+    return []
 
 
 def build_aliases(name: str) -> list[str]:
@@ -241,6 +254,8 @@ def build_aliases(name: str) -> list[str]:
         aliases.extend(["镶钻银饰", "钻石银饰", "镶嵌钻石银饰"])
     if "镶嵌钻石的黄金制首饰" in name or "镶嵌钻石的黄金" in name:
         aliases.extend(["镶钻金饰", "钻石金饰", "镶嵌钻石金饰"])
+    if "银首饰" in name and "镶嵌钻石" not in name:
+        aliases.extend(["银饰", "银饰品"])
     if "智能手机" in name:
         aliases.append("手机")
     seen: set[str] = set()
@@ -253,7 +268,7 @@ def build_aliases(name: str) -> list[str]:
 
 
 def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str | None:
-    resolved = resolve_rebate(code, cm.get("NOTE") or "", cm.get("ZSSL_SET"))
+    resolved = resolve_rebate(code, cm.get("NOTE") or "", cm.get("ZSSL_SET"), cm.get("TSL"))
     if resolved is None:
         return None
     rebate, source = resolved
@@ -277,10 +292,13 @@ def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str
         lines.append(f"- **计量单位**：{unit}")
     if dwcode:
         lines.append(f"- **单位代码**：{dwcode}")
+    flag_line = special_goods_flag_line(cm)
+    if flag_line:
+        lines.append(flag_line)
+    lines.extend(overlay_policy_lines(code, rebate))
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
-        ("TSFLAG", "特殊标志"),
         ("SPLB", "商品类别"),
         ("SZ", "税则标志"),
     ]:
@@ -296,9 +314,10 @@ def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str
     if note:
         lines.append(f"- **NOTE原文**：{note}")
 
+    kw_flag = special_goods_flag_keyword(cm)
     lines.append("")
     lines.append(
-        f"**关键词**：出口退税率{rebate} 海关编码{code} HS{code} {name} {' '.join(aliases)}".rstrip()
+        f"**关键词**：出口退税率{rebate} 海关编码{code} HS{code} {name} {' '.join(aliases)} {kw_flag}".rstrip()
     )
     lines.append("")
     lines.append("---")
@@ -319,7 +338,7 @@ def write_files(records: list[dict], std_map: dict[str, dict]) -> tuple[int, int
             "",
             f"- **编码范围**：{start_code} ~ {end_code}",
             f"- **本文件条数**：{len(chunk)}",
-            "- **说明**：含现行有效税号出口退税率；优先NOTE「退x」，否则按章目0%或征退一致推断。",
+            "- **说明**：含现行有效税号出口退税率；优先文库TSL字段，其次NOTE「退x」，禁止按整章一律填0%。",
             "",
             "---",
             "",
@@ -356,11 +375,12 @@ def write_files(records: list[dict], std_map: dict[str, dict]) -> tuple[int, int
 
 ## 税率判定规则（生成时）
 
-1. NOTE 含「退x」（含退0）→ 用该税率（文库明确）
-2. 否则若税号章属于常见零退税章（如 71/72/74/75/76 等）→ 0%
+1. CMCODE 字段 TSL（退税率，含 0%）→ 用该税率
+2. 否则 NOTE 含「退x」（含退0）→ 用该税率
 3. 否则若有增值税税率 ZSSL → 按征退一致采用该税率
 4. 否则用章目默认；仍无则不收录
 
+禁止把第 71 章等整章一律写成 0%。银饰 7113119090、工业用银 7115901010 等文库常为 13%；银材料成本≥50% 时政策改按 71069190，见条目内叠加提示。珍珠/翡翠/仿首饰不是一律 0%。
 推断条目请以税局申报系统终核为准。
 """
     batch_count = 0
@@ -408,10 +428,10 @@ def main() -> None:
     current.sort(key=lambda x: clean(x.get("CODE")))
 
     kept: list[dict] = []
-    src_counts = {"文库NOTE明确": 0, "章目/政策口径（NOTE无退x）": 0, "征退一致推断（NOTE无退x，按增值税税率）": 0, "章目默认（NOTE无退x且无ZSSL）": 0}
+    src_counts: dict[str, int] = {}
     for r in current:
         code = clean(r.get("CODE"))
-        resolved = resolve_rebate(code, r.get("NOTE") or "", r.get("ZSSL_SET"))
+        resolved = resolve_rebate(code, r.get("NOTE") or "", r.get("ZSSL_SET"), r.get("TSL"))
         if resolved is None:
             continue
         kept.append(r)
@@ -421,12 +441,15 @@ def main() -> None:
     for k, v in src_counts.items():
         print(f"  {k}: {v}")
 
-    for code in ("85171300", "76101000", "76081000", "71131110", "0210990090"):
+    for code in ("85171300", "76101000", "76081000", "71131110", "7113119090", "71069190", "0210990090"):
         sample = next((r for r in current if clean(r.get("CODE")) == code), None)
         if not sample:
             print(f"sample {code}: MISSING")
             continue
-        print(f"sample {code}: {resolve_rebate(code, sample.get('NOTE') or '', sample.get('ZSSL_SET'))}")
+        print(
+            f"sample {code}: "
+            f"{resolve_rebate(code, sample.get('NOTE') or '', sample.get('ZSSL_SET'), sample.get('TSL'))}"
+        )
 
     n, b = write_files(kept, std_map)
     print(f"Wrote {n} files / {b} batches")

@@ -32,6 +32,18 @@ RATE_PATTERNS = [
     re.compile(r"答：\s*([\d.]+)\s*%"),
 ]
 
+SPECIAL_FLAG_PATTERNS = [
+    re.compile(r"特殊商品标识\*?\*?\s*[:：]\s*([12])"),
+    re.compile(r"\*\*特殊商品标识\*\*\s*[:：]\s*([12])"),
+    re.compile(r"特殊标志\*?\*?\s*[:：]\s*([12])"),
+    re.compile(r"\*\*特殊标志\*\*\s*[:：]\s*([12])"),
+]
+
+SPECIAL_FLAG_MEANING = {
+    "1": "出口征税，视同内销计提销项，对应进项可以抵扣",
+    "2": "出口免税，只免销项不退税，对应进项转出",
+}
+
 
 def digits_only(hs: str) -> str:
     return re.sub(r"\D", "", str(hs or ""))
@@ -45,6 +57,22 @@ def extract_codes(content: str) -> list[str]:
             if code not in codes:
                 codes.append(code)
     return codes
+
+
+def extract_special_goods_flag(content: str) -> str | None:
+    text = content or ""
+    for pat in SPECIAL_FLAG_PATTERNS:
+        m = pat.search(text)
+        if m:
+            return m.group(1)
+    return None
+
+
+def special_goods_flag_label(flag: str | None) -> str | None:
+    if not flag:
+        return None
+    meaning = SPECIAL_FLAG_MEANING.get(flag)
+    return f"{flag}（{meaning}）" if meaning else flag
 
 
 def extract_refund_rate(content: str) -> float | None:
@@ -91,7 +119,7 @@ def segment_matches_hs(content: str, hs: str) -> bool:
 
 
 def pick_best_record(records: list[dict], hs: str) -> dict | None:
-    exact: list[tuple[float, dict, str, float]] = []
+    exact: list[tuple[float, dict, str, float, str | None]] = []
     for rec in records or []:
         seg = rec.get("segment") or {}
         content = seg.get("content") or ""
@@ -101,17 +129,20 @@ def pick_best_record(records: list[dict], hs: str) -> dict | None:
         if rate is None:
             continue
         score = float(rec.get("score") or 0)
-        exact.append((score, rec, content, rate))
+        flag = extract_special_goods_flag(content)
+        exact.append((score, rec, content, rate, flag))
     if not exact:
         return None
     exact.sort(key=lambda x: x[0], reverse=True)
-    _score, rec, content, rate = exact[0]
+    _score, rec, content, rate, flag = exact[0]
     doc = ((rec.get("segment") or {}).get("document") or {}).get("name") or ""
     return {
         "ok": True,
         "rate": rate,
         "display": f"{rate:g}%",
         "hs_code": hs,
+        "special_goods_flag": flag,
+        "special_goods_flag_label": special_goods_flag_label(flag),
         "message": f"按商品编码「{hs}」匹配知识库出口退税率",
         "source": "Dify 出口退税率知识库",
         "document": doc,

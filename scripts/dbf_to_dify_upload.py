@@ -21,6 +21,11 @@ from pathlib import Path
 
 from dbfread import DBF
 
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from hs_special_goods_flag import special_goods_flag_keyword, special_goods_flag_line
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT_ROOT = ROOT / "data" / "dify-hs-upload"
 DESKTOP = Path.home() / "Desktop" / "dify-hs-upload"
@@ -152,6 +157,9 @@ def record_txt(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
 
     lines.append(f"增值税税率：{vat}（进口/内销征税率参考，严禁当作出口退税）")
     lines.append(f"暂定税率：{tsl}")
+    flag_line = special_goods_flag_line(cm, markdown=False)
+    if flag_line:
+        lines.append(flag_line)
     if rebate is None:
         lines.append(
             "说明：本条 NOTE 无「退x」，出口退税率标记为未收录；"
@@ -161,11 +169,11 @@ def record_txt(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
         lines.append(
             "说明：回答「出口退税率」问题时，只能使用上面的出口退税率字段；"
             f"本题正确出口退税率为{rebate}，即使增值税为{vat}也不得改答{vat}。"
+            "退税率0时必须同时看「特殊商品标识」：1=视同内销征税，2=出口免税、进项转出。"
         )
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
-        ("TSFLAG", "特殊标志"),
         ("SPLB", "商品类别"),
         ("SZ", "税则标志"),
         ("NOTE", "备注原文"),
@@ -178,9 +186,10 @@ def record_txt(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     if st or en:
         lines.append(f"有效期：{st} ~ {en}")
 
+    kw_flag = special_goods_flag_keyword(cm)
     lines.append(
         f"关键词：出口退税率{rebate_display} 海关编码{code} HS{code} "
-        f"{name} {' '.join(aliases)} 增值税{vat}(非退税)"
+        f"{name} {' '.join(aliases)} 增值税{vat}(非退税) {kw_flag}".rstrip()
     )
     lines.append("")
     lines.append("---")

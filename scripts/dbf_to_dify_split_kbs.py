@@ -20,6 +20,11 @@ from pathlib import Path
 
 from dbfread import DBF
 
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from hs_special_goods_flag import special_goods_flag_keyword, special_goods_flag_line
+
 ROOT = Path(__file__).resolve().parents[1]
 CURRENT_END_YEAR = 2099
 RECORDS_PER_FILE = 80
@@ -178,10 +183,12 @@ def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str
         lines.append(f"- **计量单位**：{unit}")
     if dwcode:
         lines.append(f"- **单位代码**：{dwcode}")
+    flag_line = special_goods_flag_line(cm)
+    if flag_line:
+        lines.append(flag_line)
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
-        ("TSFLAG", "特殊标志"),
         ("SPLB", "商品类别"),
         ("SZ", "税则标志"),
     ]:
@@ -193,9 +200,10 @@ def rebate_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str
     if st or en:
         lines.append(f"- **有效期**：{st} ~ {en}")
 
+    kw_flag = special_goods_flag_keyword(cm)
     lines.append("")
     lines.append(
-        f"**关键词**：出口退税率{rebate} 海关编码{code} HS{code} {name} {' '.join(aliases)}".rstrip()
+        f"**关键词**：出口退税率{rebate} 海关编码{code} HS{code} {name} {' '.join(aliases)} {kw_flag}".rstrip()
     )
     lines.append("")
     lines.append("---")
@@ -226,10 +234,12 @@ def vat_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
         lines.append(f"- **计量单位**：{unit}")
     if dwcode:
         lines.append(f"- **单位代码**：{dwcode}")
+    flag_line = special_goods_flag_line(cm)
+    if flag_line:
+        lines.append(flag_line)
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
-        ("TSFLAG", "特殊标志"),
         ("SPLB", "商品类别"),
         ("SZ", "税则标志"),
     ]:
@@ -244,7 +254,7 @@ def vat_record(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     lines.append("")
     lines.append(
         f"**关键词**：进口增值税税率{vat} 暂定税率{tsl} 海关编码{code} HS{code} "
-        f"{name} {' '.join(aliases)}".rstrip()
+        f"{name} {' '.join(aliases)} {special_goods_flag_keyword(cm)}".rstrip()
     )
     lines.append("")
     lines.append("---")

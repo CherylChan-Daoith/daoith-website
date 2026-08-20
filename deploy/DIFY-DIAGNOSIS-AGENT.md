@@ -2,7 +2,7 @@
 
 > 目标：多轮对话，**一次只问一个问题**，收集跨境财税关键信息后给出诊断与方案。  
 > 提示词文件：`deploy/dify-prompts/diagnosis-agent-*.md`  
-> **线上粘贴精简版** `diagnosis-agent-system.md`；完整归档见 `diagnosis-agent-system.full.md`（勿作 Instruction）。细则在知识库 `15-出报告硬约束与路径要点` 等。
+> **线上粘贴** `diagnosis-agent-system.md`（0819 详细修订，含路径 A/B/C/D 细则）。历史稿见 `diagnosis-agent-system.full.md`。知识库补问题分篇、知识点与方案样本。
 
 ## 0. 和现有应用的关系
 
@@ -36,7 +36,7 @@
 5. 若出现「粘贴为富文本」，改选 **粘贴为纯文本**（Mac：`⇧⌘V`）
 6. 保存并 **发布**
 
-开头那行 `> 粘贴到 Dify…` 是给人看的说明，可删掉再贴，不影响模型。
+`diagnosis-agent-system.md` 即为 Instruction 全文，可整份覆盖粘贴。发布后才会生效。
 
 1. 打开 `deploy/dify-prompts/diagnosis-agent-system.md`  
    → 全文复制到 Agent **指令（Instruction）**
@@ -59,7 +59,7 @@
 
 优先挂：
 
-- **`合规解决方案必读文件`**（出报告前强制检索：生成前必读 + 跨境电商实操知识 + 路径 A/B/C 方案样本）
+- **`合规解决方案必读文件`**（出报告前强制检索：硬约束全文 + 知识点分块 + 跨境电商实操知识 + 路径 A/B/C/D 方案样本）
 - `DAOITH跨境电商知识库`（300问 / 平台税等）
 - `出口退税法规和实操`（如有）
 - `海关编码和出口退税率`（仅在用户问具体 HS 退税时依赖；回答时严守「退税率≠增值税」）

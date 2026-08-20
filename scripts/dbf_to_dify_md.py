@@ -18,6 +18,11 @@ from pathlib import Path
 
 from dbfread import DBF
 
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+from hs_special_goods_flag import special_goods_flag_keyword, special_goods_flag_line
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "data" / "dify-hs-codes"
 CURRENT_END_YEAR = 2099
@@ -127,6 +132,9 @@ def record_md(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     lines.append(f"- **增值税税率**：{vat}")
     lines.append(f"- **出口退税率**：{rebate_display}")
     lines.append(f"- **暂定税率**：{tsl}")
+    flag_line = special_goods_flag_line(cm)
+    if flag_line:
+        lines.append(flag_line)
     if rebate is None:
         lines.append(
             "- **说明**：NOTE 无「退x」，出口退税率未收录（禁止默认 0%）；"
@@ -135,6 +143,7 @@ def record_md(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     else:
         lines.append(
             "- **说明**：增值税税率与出口退税率不同；查询出口退税时只看「出口退税率」。"
+            "退税率0时必须同时看「特殊商品标识」：1=视同内销征税，2=出口免税、进项转出。"
         )
 
     clde = cm.get("CLDE")
@@ -146,7 +155,6 @@ def record_md(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
 
     for key, label in [
         ("BCFLAG", "监管条件标志"),
-        ("TSFLAG", "特殊标志"),
         ("SPLB", "商品类别"),
         ("SZ", "税则标志"),
         ("ZHCMCODE", "组合商品编码"),
@@ -161,9 +169,10 @@ def record_md(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     if st or en:
         lines.append(f"- **有效期**：{st} ~ {en}")
 
+    kw_flag = special_goods_flag_keyword(cm)
     lines.append("")
     lines.append(
-        f"关键词：海关编码 {code} HS {code} 出口退税率 {rebate_display} 增值税 {vat} {name}"
+        f"关键词：海关编码 {code} HS {code} 出口退税率 {rebate_display} 增值税 {vat} {name} {kw_flag}".rstrip()
     )
     lines.append("")
     return "\n".join(lines)
