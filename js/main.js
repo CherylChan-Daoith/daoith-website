@@ -3841,17 +3841,54 @@ function collectDiagWorkingChipLabels() {
     .map((v) => (v.length > 16 ? `${v.slice(0, 15)}…` : v));
 }
 
+function daoithLogoWaterSvg() {
+  // Inline SVG: glass orb + animated water, no extra image request.
+  return (
+    `<svg class="rw-figure" viewBox="0 0 120 120" width="176" height="176" focusable="false">` +
+    `<defs>` +
+    `<radialGradient id="rwOrb" cx="36%" cy="30%" r="70%">` +
+    `<stop offset="0%" stop-color="#f7fcff"/>` +
+    `<stop offset="46%" stop-color="#c8e6fb"/>` +
+    `<stop offset="100%" stop-color="#6ea0ce"/>` +
+    `</radialGradient>` +
+    `<linearGradient id="rwInk" x1="18%" y1="18%" x2="88%" y2="88%">` +
+    `<stop offset="0%" stop-color="#3a62d4"/>` +
+    `<stop offset="48%" stop-color="#15348f"/>` +
+    `<stop offset="100%" stop-color="#07133d"/>` +
+    `</linearGradient>` +
+    `<clipPath id="rwClip"><circle cx="60" cy="60" r="46"/></clipPath>` +
+    `</defs>` +
+    `<circle cx="60" cy="60" r="54" fill="#2251ff" opacity=".12"/>` +
+    `<circle cx="60" cy="60" r="46" fill="url(#rwOrb)"/>` +
+    `<g clip-path="url(#rwClip)">` +
+    `<g class="rw-water">` +
+    `<path class="rw-water-main" fill="url(#rwInk)" d="M18 72C22 46 46 36 61 51c13 13 28-6 42-26 6-8 16 4 8 16-12 20-30 44-54 38-18-4-35 12-39-7z"/>` +
+    `<path class="rw-water-wash" fill="#5b86dc" opacity=".42" d="M26 82c10-20 32-18 44-6 11 10 24 2 34-10 2 14-10 26-28 32-18 6-42 6-50-16z"/>` +
+    `<circle class="rw-drop rw-drop-1" cx="88" cy="28" r="3.1" fill="#1a3a9a"/>` +
+    `<circle class="rw-drop rw-drop-2" cx="98" cy="40" r="1.9" fill="#1a3a9a"/>` +
+    `<circle class="rw-drop rw-drop-3" cx="28" cy="46" r="2.3" fill="#2448b0" opacity=".85"/>` +
+    `</g>` +
+    `<g stroke="rgba(255,255,255,.32)" stroke-width=".35" fill="none">` +
+    `<path d="M72 14v92M80 16v88M88 22v76"/>` +
+    `</g>` +
+    `</g>` +
+    `<circle cx="60" cy="60" r="46" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.15"/>` +
+    `<path d="M78 21a46 46 0 0 1 25 36" fill="none" stroke="#fff" stroke-width="3.1" stroke-linecap="round" opacity=".72"/>` +
+    `</svg>`
+  );
+}
+
 function buildResultWorkingHtml() {
   const labels = collectDiagWorkingChipLabels();
-  // Position chips around the character's head (percent of scene)
+  // Position chips around the circular logo
   const positions = [
-    { left: '2%', top: '8%' },
-    { left: '58%', top: '4%' },
-    { left: '0%', top: '28%' },
-    { left: '62%', top: '24%' },
-    { left: '6%', top: '48%' },
-    { left: '58%', top: '46%' },
-    { left: '28%', top: '2%' },
+    { left: '-24%', top: '10%' },
+    { left: '72%', top: '4%' },
+    { left: '-28%', top: '40%' },
+    { left: '74%', top: '36%' },
+    { left: '-10%', top: '70%' },
+    { left: '64%', top: '68%' },
+    { left: '22%', top: '-10%' },
   ];
   const chipHtml = labels.length
     ? labels
@@ -3869,7 +3906,7 @@ function buildResultWorkingHtml() {
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<img class="rw-figure" src="/images/diag-thinker-blue.png?v=20260815cool1" alt="" width="280" height="376" decoding="async"/>` +
+    daoithLogoWaterSvg() +
     `<div class="rw-thoughts">${chipHtml}</div>` +
     `</div>` +
     `<p class="result-working-title">` +
