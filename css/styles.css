@@ -1814,50 +1814,17 @@ ul {
 
 .result-working-scene {
   position: relative;
-  width: min(176px, 68%);
+  width: min(96px, 42%);
   overflow: visible;
-}
-
-.result-working-scene .rw-figure,
-.result-placeholder .rw-figure {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
-  background: transparent;
 }
 
 .result-working-scene .rw-figure {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  background: transparent;
   animation: rw-breathe 3.2s ease-in-out infinite;
-}
-
-.rw-figure .rw-water {
-  transform-box: fill-box;
-  transform-origin: 52% 58%;
-  animation: rw-water-swirl 5s ease-in-out infinite;
-}
-
-.rw-figure .rw-water-wash {
-  transform-box: fill-box;
-  transform-origin: 48% 70%;
-  animation: rw-water-wash 6.2s ease-in-out infinite;
-}
-
-.rw-figure .rw-drop {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.rw-figure .rw-drop-1 {
-  animation: rw-drop 3.4s ease-in-out infinite;
-}
-
-.rw-figure .rw-drop-2 {
-  animation: rw-drop 4.1s ease-in-out infinite 0.35s;
-}
-
-.rw-figure .rw-drop-3 {
-  animation: rw-drop 3.8s ease-in-out infinite 0.7s;
 }
 
 .result-working-scene .rw-thoughts {
@@ -1952,45 +1919,8 @@ ul {
   }
 }
 
-@keyframes rw-water-swirl {
-  0%,
-  100% {
-    transform: rotate(-8deg) translate(0, 0) scale(1);
-  }
-  50% {
-    transform: rotate(10deg) translate(1px, 2px) scale(1.05);
-  }
-}
-
-@keyframes rw-water-wash {
-  0%,
-  100% {
-    transform: translate(-2px, 1px) scale(1);
-  }
-  50% {
-    transform: translate(3px, -2px) scale(1.07);
-  }
-}
-
-@keyframes rw-drop {
-  0%,
-  100% {
-    transform: translate(0, 0);
-    opacity: 0.95;
-  }
-  50% {
-    transform: translate(1px, 4px);
-    opacity: 0.45;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .result-working-scene .rw-figure,
-  .rw-figure .rw-water,
-  .rw-figure .rw-water-wash,
-  .rw-figure .rw-drop-1,
-  .rw-figure .rw-drop-2,
-  .rw-figure .rw-drop-3 {
+  .result-working-scene .rw-figure {
     animation: none;
   }
 }
@@ -2056,6 +1986,17 @@ ul {
   border-radius: 12px;
   margin-bottom: 14px;
   line-height: 1.55;
+}
+
+.result-writing {
+  margin: 18px 0 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #5b6b95;
+}
+
+.result-body.is-writing .result-writing .result-working-dots::after {
+  color: #2251ff;
 }
 
 .result-facts {
@@ -2759,10 +2700,9 @@ ul {
 
 #ai-solution .result-placeholder .result-placeholder-logo {
   display: block;
-  width: 88px;
+  width: 72px;
   height: auto;
   margin: 0 auto 12px;
-  overflow: visible;
 }
 
 #ai-solution .result-placeholder .icon {
