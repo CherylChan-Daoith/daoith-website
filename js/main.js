@@ -2981,14 +2981,11 @@ function initAiChatbot() {
           isDiagnosisPlanDraftReadyToShow(clean)
         ) {
           beginPlanRouting();
-          if (diagnosisHasLeakedEnglish(clean)) {
-            beginPlanRouting();
-            return;
-          }
-          if (!isDiagnosisPlanDraftReadyToShow(clean) && !isDiagnosisPlanReadyToShow(clean)) return;
-          if (lastStreamPlanLen > 0 && clean.length < lastStreamPlanLen + 8) return;
-          lastStreamPlanLen = clean.length;
-          publishDiagnosisPlanToResultPanel(clean, { kind: 'diagnosis', draft: true });
+          const closed = extractClosedDiagnosisSections(clean);
+          if (!closed) return;
+          if (lastStreamPlanLen > 0 && closed.length <= lastStreamPlanLen) return;
+          lastStreamPlanLen = closed.length;
+          publishDiagnosisPlanToResultPanel(closed, { kind: 'diagnosis', draft: true });
           return;
         }
         // Mid-report CoT that slipped past sanitize: still never show in chat
@@ -3391,19 +3388,9 @@ function isDiagnosisPlanReadyToShow(text) {
   return true;
 }
 
-/** Mid-stream: show the plan as soon as one real Chinese section has body. */
+/** Mid-stream: show only closed chapters so incomplete lists/headers do not render. */
 function isDiagnosisPlanDraftReadyToShow(text) {
-  const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
-  if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return false;
-  if (
-    !/【核心风险诊断】|【合规方案】|【行动建议】|【注意事项】|业务流程\s*[:：]/.test(t)
-  ) {
-    return false;
-  }
-  const bodyOnly = t.replace(/【[^】]+】/g, '\n');
-  if (countDiagnosisCjk(bodyOnly) < 20) return false;
-  if (diagnosisHasLeakedEnglish(t)) return false;
-  return true;
+  return Boolean(extractClosedDiagnosisSections(text));
 }
 
 function prepareDiagnosisPlanMarkdown(text) {
@@ -3411,7 +3398,34 @@ function prepareDiagnosisPlanMarkdown(text) {
   t = stripEnglishPromptMeta(t);
   t = normalizeDiagnosisSectionTitles(t);
   t = stripDiagnosisArchivePreamble(t);
-  return t.trim();
+  t = t.replace(/(?:^|\n)\s*Path\s*[A-D](?:\.\d+)?[^\n]*/gi, '\n');
+  t = t.replace(/(?:^|\n)\s*属于路径[A-D][^\n]*/g, '\n');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Only chapters that already have a following title — the last open chapter is still being typed. */
+function extractClosedDiagnosisSections(text) {
+  const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
+  if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return '';
+  const titles = [
+    '【变化点】',
+    '【影响与注意事项】',
+    '【核心风险诊断】',
+    '【合规方案】',
+    '【行动建议】',
+    '【注意事项】',
+  ];
+  const hits = [];
+  for (const title of titles) {
+    const idx = t.indexOf(title);
+    if (idx >= 0) hits.push({ idx });
+  }
+  hits.sort((a, b) => a.idx - b.idx);
+  if (hits.length < 2) return '';
+  const closed = t.slice(hits[0].idx, hits[hits.length - 1].idx).trim();
+  if (countDiagnosisCjk(closed.replace(/【[^】]+】/g, '\n')) < 36) return '';
+  if (diagnosisHasLeakedEnglish(closed)) return '';
+  return closed;
 }
 
 /**
@@ -4272,7 +4286,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   const emit = (force) => {
     if (typeof onChunk !== 'function' || !answer) return;
     const now = Date.now();
-    if (!force && now - lastPaint < 24) return;
+    if (!force && now - lastPaint < 40) return;
     lastPaint = now;
     onChunk(answer);
   };
@@ -5671,10 +5685,14 @@ function renderAIPlanHtml(text) {
       if (looksLikeFlowStep) {
         closeLi();
         openList('flow');
+        const step = content
+          .replace(/^[\s"'“”「『]+/, '')
+          .replace(/[\s"'“”」』]+$/, '')
+          .trim();
         html +=
           `<li class="result-flow-step">` +
           `<span class="result-flow-badge" aria-hidden="true"></span>` +
-          `<span class="result-flow-card">${formatInline(content)}</span>`;
+          `<span class="result-flow-card">${formatInline(step)}</span>`;
         liOpen = true;
         continue;
       }
@@ -5769,10 +5787,21 @@ function renderAIPlanHtml(text) {
     // Single-line arrow flow: 采购 → 报关 → 履约
     if ((flowMode || sectionKind === 'flow') && /→|⟶|->|➜|➔/.test(line) && !/^#{1,4}\s+/.test(line)) {
       const parts = line
+        .replace(/^[-*•]\s+/, '')
         .split(/\s*(?:→|⟶|->|➜|➔)\s*/)
-        .map((s) => s.replace(/^[\d]+[.)、．]\s*/, '').trim())
+        .map((s) =>
+          s
+            .replace(/^[\d]+[.)、．]\s*/, '')
+            .replace(/^[\s"'“”「『]+/, '')
+            .replace(/[\s"'“”」』]+$/, '')
+            .trim()
+        )
         .filter(Boolean);
-      if (parts.length >= 2) {
+      const isFieldTemplate =
+        parts.filter((p) =>
+          /^(供应商发票|店铺主体|出口方式|发货方式|平台|境外消费者)\b/.test(p)
+        ).length >= 4;
+      if (parts.length >= 2 && !isFieldTemplate) {
         closeList();
         const inline = parts.length <= 4;
         html += `<ol class="result-flow${inline ? ' result-flow-inline' : ''}">`;
