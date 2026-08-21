@@ -1414,7 +1414,7 @@ window.DAOITH_I18N_EN = {
       ],
     },
     {
-      title: 'Operations Director & Tax Expert, DAOITH',
+      title: 'Operations & Service Director, DAOITH',
       edu: 'Extensive cross-border tax and operations experience',
       bullets: [
         '15+ years in tax; former Alibaba.com tax expert and tax lead at a major cross-border e-commerce company. Hands-on experience in export rebates, tax-risk management, and building corporate finance systems.',
