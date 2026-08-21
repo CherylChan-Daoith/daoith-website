@@ -1804,27 +1804,26 @@ ul {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 28px 16px;
+  padding: 24px 20px;
   text-align: center;
-  background:
-    radial-gradient(ellipse at 50% 30%, rgba(34, 81, 255, 0.08), transparent 58%),
-    #f8faff;
+  background: transparent;
   border-radius: 10px;
 }
 
 .result-working-scene {
   position: relative;
-  width: min(96px, 42%);
+  width: 72px;
   overflow: visible;
 }
 
+.result-placeholder-logo,
 .result-working-scene .rw-figure {
   display: block;
-  width: 100%;
+  width: 72px;
   height: auto;
+  margin: 0 auto 12px;
   object-fit: contain;
   background: transparent;
-  animation: rw-breathe 3.2s ease-in-out infinite;
 }
 
 .result-working-scene .rw-thoughts {
@@ -2698,7 +2697,8 @@ ul {
   color: #1230b0;
 }
 
-#ai-solution .result-placeholder .result-placeholder-logo {
+#ai-solution .result-placeholder .result-placeholder-logo,
+#ai-solution .result-working-scene .result-placeholder-logo {
   display: block;
   width: 72px;
   height: auto;

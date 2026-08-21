@@ -744,7 +744,7 @@ function sanitizeAiAnswer(text) {
     // Prefer any trailing formal section after last think-ish paragraph
     if (/(【核心风险诊断】|【合规方案】)/.test(raw)) {
       const m = raw.match(/【核心风险诊断】[\s\S]*$/);
-      if (m) t = clean(m[0]);
+      if (m) t = prepareDiagnosisPlanMarkdown(clean(m[0]));
       else t = '';
     } else if (
       t &&
@@ -2981,6 +2981,10 @@ function initAiChatbot() {
           isDiagnosisPlanDraftReadyToShow(clean)
         ) {
           beginPlanRouting();
+          if (diagnosisHasLeakedEnglish(clean)) {
+            beginPlanRouting();
+            return;
+          }
           if (!isDiagnosisPlanDraftReadyToShow(clean) && !isDiagnosisPlanReadyToShow(clean)) return;
           if (lastStreamPlanLen > 0 && clean.length < lastStreamPlanLen + 8) return;
           lastStreamPlanLen = clean.length;
@@ -3207,9 +3211,31 @@ function countDiagnosisCjk(text) {
   return (String(text || '').match(/[\u4e00-\u9fff]/g) || []).length;
 }
 
+function countDiagnosisThinkingLatin(text) {
+  return (
+    String(text || '')
+      .replace(
+        /\b(?:Shopee|Lazada|Temu|SHEIN|Amazon|Walmart|FBA|FBL|POP|VAT|GST|HS|DAOITH|Daoith)\b/gi,
+        ''
+      )
+      .replace(/\b(?:0110|9610|9710|9810|1210|1039)\b/g, '')
+      .match(/[A-Za-z]/g) || []
+  ).length;
+}
+
+function diagnosisHasLeakedEnglish(text) {
+  const t = String(text || '');
+  if (!t) return false;
+  if (looksLikeEnglishPromptMeta(t)) return true;
+  const latin = countDiagnosisThinkingLatin(t);
+  const cjk = countDiagnosisCjk(t);
+  if (latin >= 24 && (cjk < 40 || latin * 4 > cjk)) return true;
+  return false;
+}
+
 /** Model meta-commentary about prompt numbering / structure (must never show). */
 function looksLikeEnglishPromptMeta(text) {
-  return /Note there'?s a jump|re-reading more carefully|intended structure|internal inconsistency|So the prompt uses|Actually re-reading|in the prompt[, ]|missing 第三|jump from 第|I think this is likely|which labels to use|Wait,\s*I need|Let me re-read|Hmm,?\s*actually|No Markdown tables|No URLs?\/?links|No naked|must be paired|same level|业务流程 written as/i.test(
+  return /Note there'?s a jump|re-reading more carefully|intended structure|internal inconsistency|So the prompt uses|Actually re-reading|in the prompt[, ]|missing 第三|jump from 第|I think this is likely|which labels to use|Wait,\s*I need|Let me re-read|Hmm,?\s*actually|No Markdown tables|No URLs?\/?links|No naked|must be paired|same level|业务流程 written as|standard architecture|need to be careful|Import\/Export Company|Overseas Consumer/i.test(
     String(text || '')
   );
 }
@@ -3248,13 +3274,17 @@ function isDiagnosisJunkLine(line) {
   if (/【合规方案】/.test(s) && /短标题/.test(s) && /only/i.test(s)) return true;
   if (/same level/i.test(s) && /行动建议|1\.\s*2\.\s*3/.test(s)) return true;
   if (
-    /^(Wait|Hmm+|Uh|Okay|Ok|So|Actually|But wait|Let me|I need to|I'll|I'm going to)\b/i.test(
+    /\b(Wait|Hmm+|Uh|Okay|Let me|I need to|I'll|I'm going to|need to be careful|re-read path|let me think|standard architecture)\b/i.test(
       s
     )
   ) {
     return true;
   }
-  if (/re-read path|need to be careful|let me think|standard architecture for/i.test(s)) {
+  if (
+    /^(Wait|Hmm+|Uh|Okay|Ok|So|Actually|But wait|Let me|I need to|I'll|I'm going to)\b/i.test(
+      s
+    )
+  ) {
     return true;
   }
   if (/Import\/Export Company|Overseas Consumer|overseas warehouse/i.test(s) && /→|->/.test(s)) {
@@ -3267,11 +3297,7 @@ function isDiagnosisJunkLine(line) {
   const cjk = (s.match(/[\u4e00-\u9fff]/g) || []).length;
   if (latin >= 20 && cjk <= 4) return true;
   if (latin >= 28 && cjk < latin * 0.35) return true;
-  if (
-    latin >= 16 &&
-    cjk < latin &&
-    /^(If|When|Then|But|The|This|That|In this|First|Now)\b/.test(s)
-  ) {
+  if (/^(If|When|Then|But|The|This|That|In this|First|Now)\b/.test(s) && latin >= 10) {
     return true;
   }
   return false;
@@ -3288,11 +3314,26 @@ function stripEnglishPromptMeta(text) {
   t = t.replace(/(?:^|\n)[ \t]*[A-Za-z][A-Za-z0-9 ,.'"()\/:;_\-]{40,}[ \t]*(?=\n|$)/g, '\n');
   t = t
     .split('\n')
+    .map((ln) => {
+      if (isDiagnosisJunkLine(ln)) return '';
+      const parts = String(ln).split(/(?<=[。！？.!?])\s+/);
+      if (parts.length <= 1) return ln;
+      return parts
+        .filter((p) => {
+          const latin = (p.match(/[A-Za-z]/g) || []).length;
+          const cjk = (p.match(/[\u4e00-\u9fff]/g) || []).length;
+          if (latin >= 12 && cjk < 8) return false;
+          if (latin >= 16 && cjk < latin) return false;
+          if (isDiagnosisJunkLine(p)) return false;
+          return true;
+        })
+        .join('');
+    })
     .filter((ln) => !isDiagnosisJunkLine(ln))
     .join('\n');
   // Drop English CoT paragraphs mixed into Chinese reports
   t = t.replace(
-    /(?:^|\n)[ \t]*(?:Actually|But wait|First address|Then explain|The answer depends|Wait,|Hmm,|Let me)[^\n]*(?:\n(?![【\-#*•]|业务流程|主要风险)[^\n]*)*/gi,
+    /(?:^|\n)[ \t]*(?:Actually|But wait|First address|Then explain|The answer depends|Wait,|Hmm,|Let me|If the shop|In this scenario)[^\n]*(?:\n(?![【\-#*•]|业务流程|主要风险)[^\n]*)*/gi,
     '\n'
   );
   // Normalize bogus section labels into nothing or nearest real title context
@@ -3329,6 +3370,7 @@ function isDiagnosisPlanReadyToShow(text) {
   const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
   if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return false;
   if (looksLikeEnglishPromptMeta(t) && countDiagnosisCjk(t) < 280) return false;
+  if (diagnosisHasLeakedEnglish(t)) return false;
 
   const markers = [
     /【核心风险诊断】/,
@@ -3359,7 +3401,9 @@ function isDiagnosisPlanDraftReadyToShow(text) {
     return false;
   }
   const bodyOnly = t.replace(/【[^】]+】/g, '\n');
-  return countDiagnosisCjk(bodyOnly) >= 20;
+  if (countDiagnosisCjk(bodyOnly) < 20) return false;
+  if (diagnosisHasLeakedEnglish(t)) return false;
+  return true;
 }
 
 function prepareDiagnosisPlanMarkdown(text) {
@@ -3894,6 +3938,13 @@ function collectDiagWorkingChipLabels() {
     .map((v) => (v.length > 16 ? `${v.slice(0, 15)}…` : v));
 }
 
+function diagBrandLogoHtml(extraClass) {
+  const cls = extraClass
+    ? `result-placeholder-logo ${extraClass}`
+    : 'result-placeholder-logo';
+  return `<img class="${cls}" src="/images/logo-mark.png" alt="DAOITH" width="72" height="78" decoding="async">`;
+}
+
 function buildResultWorkingHtml() {
   const labels = collectDiagWorkingChipLabels();
   const positions = [
@@ -3921,7 +3972,7 @@ function buildResultWorkingHtml() {
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
     `<div class="result-working-scene" aria-hidden="true">` +
-    `<img class="rw-figure" src="/images/logo-mark.png" alt="" width="96" height="104" decoding="async"/>` +
+    diagBrandLogoHtml('rw-figure') +
     `<div class="rw-thoughts">${chipHtml}</div>` +
     `</div>` +
     `<p class="result-working-title">` +
@@ -3976,7 +4027,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     kind === 'diagnosis' &&
     (looksLikeLocalGenericHelp(clean) ||
       looksLikeDiagnosisPlanScaffold(clean) ||
-      (looksLikeEnglishPromptMeta(clean) && countDiagnosisCjk(clean) < 80) ||
+      diagnosisHasLeakedEnglish(clean) ||
       (isDraft ? !isDiagnosisPlanDraftReadyToShow(clean) : !isDiagnosisPlanReadyToShow(clean)))
   ) {
     return;
