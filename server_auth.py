@@ -1733,6 +1733,7 @@ def sync_user_to_pm(user: dict, env_loader=None, *, record_login=False):
                 "lastSeenAt": user.get("lastLoginAt")
                 or user.get("lastSeenAt")
                 or now,
+                "lastLoginIp": user.get("lastLoginIp") or user.get("last_login_ip"),
             }
         ],
     }

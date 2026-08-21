@@ -2270,6 +2270,38 @@ ul {
   margin-bottom: 6px;
 }
 
+.result-process-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #d5dee9;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f7f9fc 0%, #eef3f9 100%);
+  box-sizing: border-box;
+}
+
+.result-process-chip {
+  display: inline-block;
+  padding: 5px 10px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  color: #1e293b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.result-process-arrow {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .result-flow {
   list-style: none !important;
   margin: 0 0 12px;

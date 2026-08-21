@@ -4775,10 +4775,41 @@ function formatInline(text) {
     /(?<![\d])(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)(?![\d])/gi,
     '<span class="result-code">$1</span>'
   );
+  s = s.replace(/([（(])\s*(<span class="result-code">)/g, '$1$2');
+  s = s.replace(/(<\/span>)\s*([）)])/g, '$1$2');
   // Keep CJK corner brackets from sitting flush against code pills
   s = s.replace(/([「『])(<span class="result-code">)/g, '$1&#8201;$2');
   s = s.replace(/(<\/span>)([」』])/g, '$1&#8201;$2');
   return s;
+}
+
+function splitArrowFlowParts(text) {
+  return String(text || '')
+    .replace(/^[-*•]\s+/, '')
+    .split(/\s*(?:→|⟶|->|➜|➔)\s*/)
+    .map((s) =>
+      s
+        .replace(/^[\d]+[.)、．]\s*/, '')
+        .replace(/^[\s"'“”「『]+/, '')
+        .replace(/[\s"'“”」』]+$/, '')
+        .trim()
+    )
+    .filter(Boolean);
+}
+
+function renderArrowFlowHtml(parts) {
+  if (!parts || parts.length < 2) return '';
+  return (
+    `<p class="result-process-line">` +
+    parts
+      .map((part, i) => {
+        const chip = `<span class="result-process-chip">${formatInline(part)}</span>`;
+        if (i === parts.length - 1) return chip;
+        return `${chip}<span class="result-process-arrow" aria-hidden="true">→</span>`;
+      })
+      .join('') +
+    `</p>`
+  );
 }
 
 /** Bold a short lead title before 。/： when the rest is a longer explanation. */
@@ -5485,6 +5516,7 @@ function renderAIPlanHtml(text) {
   let liOpen = false;
   let flowMode = false;
   let sectionKind = 'default'; // 'flow' | 'risk' | 'plan' | 'default'
+  let flowPartsBuf = [];
   /** Open nested <ul> depths under the current top-level ul (1 = first nest / 三级). */
   let ulNestDepth = 0;
   let ulLiOpenAt = []; // bool per nest depth whether <li> is open
@@ -5517,7 +5549,17 @@ function renderAIPlanHtml(text) {
     ulLiOpenAt = [];
   };
 
+  const flushFlowBuffer = () => {
+    if (flowPartsBuf.length >= 2) {
+      html += renderArrowFlowHtml(flowPartsBuf);
+    } else if (flowPartsBuf.length === 1) {
+      html += `<p class="result-paragraph">${formatInline(flowPartsBuf[0])}</p>`;
+    }
+    flowPartsBuf = [];
+  };
+
   const closeList = () => {
+    flushFlowBuffer();
     closeLi();
     if (listMode === 'flow' || listMode === 'ol') {
       html += '</ol>';
@@ -5633,7 +5675,11 @@ function renderAIPlanHtml(text) {
       html += `<h5 class="result-section-subtitle${flowMode ? ' result-flow-heading' : ''}">${escapeHtml(label)}：</h5>`;
       if (rest) {
         if (flowMode) {
-          html += `<p class="result-paragraph">${formatInline(rest)}</p>`;
+          const arrowParts = splitArrowFlowParts(rest);
+          html +=
+            arrowParts.length >= 2
+              ? renderArrowFlowHtml(arrowParts)
+              : `<p class="result-paragraph">${formatInline(rest)}</p>`;
         } else {
           html += `<ul class="result-list result-list-l2"><li>${formatRiskOrBulletContent(rest)}</li></ul>`;
         }
@@ -5706,17 +5752,11 @@ function renderAIPlanHtml(text) {
         !/[。；;]/.test(content);
 
       if (looksLikeFlowStep) {
-        closeLi();
-        openList('flow');
         const step = content
           .replace(/^[\s"'“”「『]+/, '')
           .replace(/[\s"'“”」』]+$/, '')
           .trim();
-        html +=
-          `<li class="result-flow-step">` +
-          `<span class="result-flow-badge" aria-hidden="true"></span>` +
-          `<span class="result-flow-card">${formatInline(step)}</span>`;
-        liOpen = true;
+        if (step) flowPartsBuf.push(step);
         continue;
       }
 
@@ -5826,16 +5866,7 @@ function renderAIPlanHtml(text) {
         ).length >= 4;
       if (parts.length >= 2 && !isFieldTemplate) {
         closeList();
-        const inline = parts.length <= 4;
-        html += `<ol class="result-flow${inline ? ' result-flow-inline' : ''}">`;
-        parts.forEach((part) => {
-          html +=
-            `<li class="result-flow-step">` +
-            `<span class="result-flow-badge" aria-hidden="true"></span>` +
-            `<span class="result-flow-card">${formatInline(part)}</span>` +
-            `</li>`;
-        });
-        html += `</ol>`;
+        html += renderArrowFlowHtml(parts);
         flowMode = false;
         continue;
       }

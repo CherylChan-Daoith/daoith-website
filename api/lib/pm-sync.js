@@ -34,6 +34,7 @@ export function toPmUserPayload(user) {
     city: user.city || null,
     registeredAt: toIso(user.createdAt),
     lastSeenAt: toIso(user.lastLoginAt || user.updatedAt || user.createdAt),
+    lastLoginIp: user.lastLoginIp || null,
   };
 }
 
