@@ -5933,9 +5933,7 @@ body.modal-open {
   margin-bottom: 48px;
 }
 
-.footer-brand p {
-  font-size: 0.9rem;
-  line-height: 1.7;
+.footer-brand .footer-wechat {
   margin-top: 16px;
 }
 

@@ -469,9 +469,6 @@ window.DAOITH_I18N_EN = {
     },
     '.cta-actions .btn-primary': { text: 'Get started free' },
     '.cta-actions .btn-outline': { text: 'Contact experts' },
-    '.footer-brand p': {
-      text: 'Cross-border e-commerce tax solutions combining AI technology and senior expert experience.',
-    },
     '.footer-grid > div:nth-child(2) h4': { text: 'Features' },
     '.footer-grid > div:nth-child(3) h4': { text: 'Company' },
     '.footer-grid > div:nth-child(4) h4': { text: 'Contact' },
