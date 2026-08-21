@@ -1403,28 +1403,21 @@ window.DAOITH_I18N_EN = {
       title: 'Senior Tax Expert, DAOITH',
       edu: 'BA Sun Yat-sen University, CPA (China)',
       bullets: [
-        '13 years in tax; former Deloitte Shanghai manager, Fosun Group tax director, and unicorn tax lead.',
-        'Customized tax solutions for cross-border e-commerce, multinationals, and listed companies.',
-        'Led high-tech and software enterprise qualification planning for major groups in Shanghai.',
+        '13+ years in tax; former Deloitte Shanghai Tax Manager, Fosun Group Head of Tax, and tax lead at a multinational internet unicorn. Experienced in tax planning and in-house tax management for cross-border e-commerce, large multinationals, and listed companies.',
       ],
     },
     {
       title: 'Founder, DAOITH Consulting',
       edu: 'BA Fudan University, CTA, CMA (US)',
       bullets: [
-        '15 years in tax; Deloitte China, listed cross-border group, Alibaba International tax lead.',
-        'Built Alibaba tax compliance products serving 1,000+ cross-border sellers.',
-        'Deloitte Shenzhen senior manager — transfer pricing, international tax, and structure optimization.',
-        'Tax lead at listed cross-border group — global structure, incentives, and overseas tax management.',
+        '15+ years in cross-border e-commerce and tax. Held roles at Deloitte China, a listed cross-border group, and Alibaba.com. Hands-on experience in customs, tax, and foreign-exchange administration in cross-border trade.',
       ],
     },
     {
       title: 'Operations Director & Tax Expert, DAOITH',
       edu: 'Extensive cross-border tax and operations experience',
       bullets: [
-        '15 years in tax; former Alibaba International tax expert serving hundreds of clients nationwide.',
-        'South China tax operations lead — export rebate management in Guangzhou, Foshan, and Zhongshan.',
-        'Former tax lead at major cross-border company — structure optimization and equity restructuring.',
+        '15+ years in tax; former Alibaba.com tax expert and tax lead at a major cross-border e-commerce company. Hands-on experience in export rebates, tax-risk management, and building corporate finance systems.',
       ],
     },
   ],
