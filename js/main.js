@@ -3906,8 +3906,7 @@ function collectDiagWorkingChipLabels() {
     (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '');
   return [s.platform, s.entity, s.shipping, exportMode, s.invoice, s.productCategory, s.revenue]
     .map((v) => String(v || '').trim())
-    .filter(Boolean)
-    .map((v) => (v.length > 16 ? `${v.slice(0, 15)}…` : v));
+    .filter(Boolean);
 }
 
 function diagBrandLogoHtml(extraClass) {
@@ -3920,26 +3919,34 @@ function diagBrandLogoHtml(extraClass) {
 function buildResultWorkingHtml() {
   const labels = collectDiagWorkingChipLabels();
   const positions = [
-    { left: '2%', top: '8%' },
-    { left: '58%', top: '4%' },
-    { left: '0%', top: '28%' },
-    { left: '62%', top: '24%' },
-    { left: '6%', top: '48%' },
-    { left: '58%', top: '46%' },
-    { left: '28%', top: '2%' },
+    { right: '112%', top: '2%' },
+    { left: '112%', top: '2%' },
+    { right: '118%', top: '38%' },
+    { left: '118%', top: '38%' },
+    { right: '108%', top: '74%' },
+    { left: '108%', top: '74%' },
+    { left: '50%', top: '-34%' },
   ];
   const chipHtml = labels.length
     ? labels
         .map((label, i) => {
           const pos = positions[i % positions.length];
+          const place = [
+            pos.left != null ? `left:${pos.left}` : '',
+            pos.right != null ? `right:${pos.right}` : '',
+            `top:${pos.top}`,
+            pos.left === '50%' ? 'transform:translateX(-50%)' : '',
+          ]
+            .filter(Boolean)
+            .join(';');
           return (
-            `<span class="rw-chip rw-chip-${(i % 7) + 1}" style="left:${pos.left};top:${pos.top}">` +
+            `<span class="rw-chip rw-chip-${(i % 7) + 1}" style="${place}">` +
             `${escapeHtml(label)}` +
             `</span>`
           );
         })
         .join('')
-    : `<span class="rw-chip rw-chip-1" style="left:28%;top:6%">梳理诊断要点</span>`;
+    : `<span class="rw-chip rw-chip-1" style="left:50%;top:-34%;transform:translateX(-50%)">梳理诊断要点</span>`;
 
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
