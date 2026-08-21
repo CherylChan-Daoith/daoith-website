@@ -2912,7 +2912,6 @@ function initAiChatbot() {
       let streamingLongQa = false;
       let loginPromptedForPlan = shouldGeneratePlanNow && !loggedIn;
       let planCountedThisTurn = false;
-      let lastStreamPlanLen = 0;
       const beginPlanRouting = () => {
         if (streamingPlan) {
           typing.classList.add('is-plan-status');
@@ -2956,36 +2955,19 @@ function initAiChatbot() {
           }
           return;
         }
-        let clean = prepareDiagnosisPlanMarkdown(stripDiagnosisIntroBoilerplate(cleaned));
+        const clean = prepareDiagnosisPlanMarkdown(stripDiagnosisIntroBoilerplate(cleaned));
         if (!clean) {
           if (forcePlanWhileThinking) beginPlanRouting();
           return;
         }
-        // English outlines / prompt-meta: keep cleaned Chinese if it already drafts; else salvage
-        if (
-          !isDiagnosisPlanDraftReadyToShow(clean) &&
-          (looksLikeDiagnosisPlanScaffold(clean) || looksLikeEnglishPromptMeta(clean))
-        ) {
-          const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(partial) || '');
-          if (salvaged && isDiagnosisPlanDraftReadyToShow(salvaged)) {
-            clean = salvaged;
-          } else {
-            if (forcePlanWhileThinking) beginPlanRouting();
-            return;
-          }
-        }
-        // Full diagnosis → right-hand plan panel (stream drafts as they arrive)
+        // Keep the working logo until the full report is ready — do not paint half-written plans
         if (
           streamingPlan ||
+          forcePlanWhileThinking ||
           shouldRouteDiagnosisToPlanPanel(clean) ||
-          isDiagnosisPlanDraftReadyToShow(clean)
+          /【核心风险诊断】|【合规方案】/.test(clean)
         ) {
           beginPlanRouting();
-          const closed = extractClosedDiagnosisSections(clean);
-          if (!closed) return;
-          if (lastStreamPlanLen > 0 && closed.length <= lastStreamPlanLen) return;
-          lastStreamPlanLen = closed.length;
-          publishDiagnosisPlanToResultPanel(closed, { kind: 'diagnosis', draft: true });
           return;
         }
         // Mid-report CoT that slipped past sanitize: still never show in chat
@@ -3232,7 +3214,7 @@ function diagnosisHasLeakedEnglish(text) {
 
 /** Model meta-commentary about prompt numbering / structure (must never show). */
 function looksLikeEnglishPromptMeta(text) {
-  return /Note there'?s a jump|re-reading more carefully|intended structure|internal inconsistency|So the prompt uses|Actually re-reading|in the prompt[, ]|missing 第三|jump from 第|I think this is likely|which labels to use|Wait,\s*I need|Let me re-read|Hmm,?\s*actually|No Markdown tables|No URLs?\/?links|No naked|must be paired|same level|业务流程 written as|standard architecture|need to be careful|Import\/Export Company|Overseas Consumer/i.test(
+  return /Note there'?s a jump|re-reading more carefully|intended structure|internal inconsistency|So the prompt uses|Actually re-reading|in the prompt[, ]|missing 第三|jump from 第|I think this is likely|which labels to use|Wait,\s*I need|Let me re-read|Hmm,?\s*actually|No Markdown tables|No URLs?\/?links|No naked|must be paired|same level|业务流程 written as|standard architecture|need to be careful|Import\/Export Company|Overseas Consumer|I have \d+ items|Titles only|no dash|no bullet|For the 业务流程/i.test(
     String(text || '')
   );
 }
@@ -3270,6 +3252,12 @@ function isDiagnosisJunkLine(line) {
   if (/业务流程 written as/i.test(s)) return true;
   if (/【合规方案】/.test(s) && /短标题/.test(s) && /only/i.test(s)) return true;
   if (/same level/i.test(s) && /行动建议|1\.\s*2\.\s*3/.test(s)) return true;
+  if (/[✓✔]/.test(s) && /only|Titles|no dash|no bullet|items|短标题|1\.2\.3|业务流程/i.test(s)) {
+    return true;
+  }
+  if (/I have \d+ items/i.test(s)) return true;
+  if (/^For (?:the )?业务流程\b/i.test(s) || /^For 合规方案\b/i.test(s)) return true;
+  if (/开篇一段普通正文/.test(s)) return true;
   if (
     /\b(Wait|Hmm+|Uh|Okay|Let me|I need to|I'll|I'm going to|need to be careful|re-read path|let me think|standard architecture)\b/i.test(
       s
@@ -3294,7 +3282,7 @@ function isDiagnosisJunkLine(line) {
   const cjk = (s.match(/[\u4e00-\u9fff]/g) || []).length;
   if (latin >= 20 && cjk <= 4) return true;
   if (latin >= 28 && cjk < latin * 0.35) return true;
-  if (/^(If|When|Then|But|The|This|That|In this|First|Now)\b/.test(s) && latin >= 10) {
+  if (/^(If|When|Then|But|The|This|That|In this|First|Now|For)\b/.test(s) && latin >= 10) {
     return true;
   }
   return false;
@@ -3367,7 +3355,7 @@ function isDiagnosisPlanReadyToShow(text) {
   const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
   if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return false;
   if (looksLikeEnglishPromptMeta(t) && countDiagnosisCjk(t) < 280) return false;
-  if (diagnosisHasLeakedEnglish(t)) return false;
+  if (diagnosisHasLeakedEnglish(t) && countDiagnosisCjk(t) < 280) return false;
 
   const markers = [
     /【核心风险诊断】/,
@@ -3388,11 +3376,6 @@ function isDiagnosisPlanReadyToShow(text) {
   return true;
 }
 
-/** Mid-stream: show only closed chapters so incomplete lists/headers do not render. */
-function isDiagnosisPlanDraftReadyToShow(text) {
-  return Boolean(extractClosedDiagnosisSections(text));
-}
-
 function prepareDiagnosisPlanMarkdown(text) {
   let t = String(text || '');
   t = stripEnglishPromptMeta(t);
@@ -3401,31 +3384,6 @@ function prepareDiagnosisPlanMarkdown(text) {
   t = t.replace(/(?:^|\n)\s*Path\s*[A-D](?:\.\d+)?[^\n]*/gi, '\n');
   t = t.replace(/(?:^|\n)\s*属于路径[A-D][^\n]*/g, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/** Only chapters that already have a following title — the last open chapter is still being typed. */
-function extractClosedDiagnosisSections(text) {
-  const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
-  if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return '';
-  const titles = [
-    '【变化点】',
-    '【影响与注意事项】',
-    '【核心风险诊断】',
-    '【合规方案】',
-    '【行动建议】',
-    '【注意事项】',
-  ];
-  const hits = [];
-  for (const title of titles) {
-    const idx = t.indexOf(title);
-    if (idx >= 0) hits.push({ idx });
-  }
-  hits.sort((a, b) => a.idx - b.idx);
-  if (hits.length < 2) return '';
-  const closed = t.slice(hits[0].idx, hits[hits.length - 1].idx).trim();
-  if (countDiagnosisCjk(closed.replace(/【[^】]+】/g, '\n')) < 36) return '';
-  if (diagnosisHasLeakedEnglish(closed)) return '';
-  return closed;
 }
 
 /**
@@ -4035,14 +3993,12 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
-  const isDraft = Boolean(options.draft) && kind === 'diagnosis';
   // Local generic help / English scaffolds / prompt-meta are not diagnosis reports
   if (
     kind === 'diagnosis' &&
     (looksLikeLocalGenericHelp(clean) ||
       looksLikeDiagnosisPlanScaffold(clean) ||
-      diagnosisHasLeakedEnglish(clean) ||
-      (isDraft ? !isDiagnosisPlanDraftReadyToShow(clean) : !isDiagnosisPlanReadyToShow(clean)))
+      !isDiagnosisPlanReadyToShow(clean))
   ) {
     return;
   }
@@ -4057,38 +4013,29 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
-  const tipHtml = isDraft ? '' : buildServiceMatchTipHtml();
-  const writingHtml = isDraft
-    ? `<p class="result-writing" aria-live="polite">正在撰写方案<span class="result-working-dots" aria-hidden="true"></span></p>`
-    : '';
+  const tipHtml = buildServiceMatchTipHtml();
   items.innerHTML =
-    `<div class="result-body result-body-scroll${isDraft ? ' is-writing' : ''}">` +
+    `<div class="result-body result-body-scroll">` +
     `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
     archiveHtml +
     changeHtml +
     body +
-    writingHtml +
     tipHtml +
     `</div>`;
 
   if (serviceHost) {
-    if (isDraft) {
-      serviceHost.innerHTML = '';
-      serviceHost.hidden = true;
-    } else {
-      // Full diagnosis plans and Mode B / long Q&A answers both get recommendations
-      showDiagnosisServiceRecs(clean, {
-        lead:
-          kind === 'qa'
-            ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
-            : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
-      });
-    }
+    // Full diagnosis plans and Mode B / long Q&A answers both get recommendations
+    showDiagnosisServiceRecs(clean, {
+      lead:
+        kind === 'qa'
+          ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
+          : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
+    });
   }
 
   try {
-    items.scrollTop = isDraft ? items.scrollHeight : 0;
+    items.scrollTop = 0;
   } catch {
     /* ignore */
   }
