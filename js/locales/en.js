@@ -482,6 +482,7 @@ window.DAOITH_I18N_EN = {
     '.footer-links a[href="#about"]': { text: 'About' },
     '.footer-links a[href="#team"]': { text: 'Team' },
     '.footer-links a[href="mailto:service@daoith.com"]': { text: 'service@daoith.com' },
+    '.footer-wechat-caption': { text: 'Follow our WeChat official account' },
     '.article-page .logo-text': { text: 'DAOITH Consulting' },
     '.article-page .nav a[href="/#hero"]': { text: 'Home' },
     '.article-page .nav a[href="/#policy-expert"]': { text: 'Insights' },

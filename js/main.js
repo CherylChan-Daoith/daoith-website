@@ -1645,7 +1645,8 @@ function buildDiagnosisPlanApiQuery(userText) {
     '【专属合规诊断·生成报告】第1-7步已齐。请严格按下方【诊断档案】撰写完整四章报告，禁止再提问。\n' +
     `${archive}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
-    '【写作铁律】业务流程、合规方案开篇画像、行动建议中出现的平台/发货/出口/发票/产品/销售额，必须与档案字段一致；' +
+    '【写作铁律】必须按顺序写完四章：【核心风险诊断】【合规方案】【行动建议】【注意事项】，写完注意事项后再写专家1v1结尾句；' +
+    '禁止在【合规方案】后提前结束。业务流程、合规方案开篇画像、行动建议中出现的平台/发货/出口/发票/产品/销售额，必须与档案字段一致；' +
     '不得把「国内仓」写成「保税仓」，不得改写销售额档位；不得照抄方案样本示例数据。' +
     '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后参考对应样本结构生成报告。'
   );
@@ -1983,7 +1984,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
     5: '请执行第五步：只提问「5. 您目前供应商发票情况如何？（可在下方点选）」；不要在正文罗列专票/普票等选项。',
     6: '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
     7: '请执行第七步：只提问「7. 您目前年销售额约多少人民币？（可在下方点选）」；不要在正文罗列选项。',
-    8: '第1-7步已齐，请基于【诊断档案】检索知识库并输出诊断报告，不要再提问，不要声称信息缺失。',
+    8: '第1-7步已齐，请基于【诊断档案】输出完整四章：【核心风险诊断】【合规方案】【行动建议】【注意事项】，写完注意事项后再写专家1v1结尾句；禁止在【合规方案】后提前结束，不要再提问，不要声称信息缺失。',
   };
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
   const archive = formatDiagSlotsForApi();
@@ -3347,6 +3348,73 @@ function normalizeDiagnosisSectionTitles(text) {
   return t;
 }
 
+function diagnosisHasChapter(text, name) {
+  const t = String(text || '');
+  const escaped = String(name || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (
+    new RegExp(`【\\s*${escaped}\\s*】`).test(t) ||
+    new RegExp(`^#{1,4}\\s*(?:[0-9]+[）).、]\\s*)?${escaped}\\s*$`, 'm').test(t) ||
+    new RegExp(`^\\*{0,2}${escaped}\\*{0,2}\\s*$`, 'm').test(t)
+  );
+}
+
+function stripDiagnosisExpertTip(text) {
+  return String(text || '')
+    .replace(
+      /(?:^|\n)\s*可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。[。．]?\s*/g,
+      '\n'
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function buildFallbackActionAdvice(slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const platform = s.platform || '当前平台';
+  const shipping = s.shipping || '当前发货方式';
+  const exportMode = resolveDiagExportMode(s) || s.exportMode || '当前出口方式';
+  const invoice = s.invoice || '供应商发票情况';
+  const product = s.productCategory || '所售产品';
+  const entity = s.entity || '店铺主体';
+  const items = [
+    `按【合规方案】落实报关与出口路径：以「${exportMode}」和「${shipping}」为准，优先把报关抬头与经营主体对齐。`,
+    `核对「${entity}」与「${platform}」店铺主体是否一致，并整理订单流、资金流、物流凭证，避免申报主体与平台报送脱节。`,
+    `对照「${invoice}」盘点开票缺口；能改专票的优先改，报关品名、单位与发票保持一致。`,
+    `就「${product}」在本页左侧「查询出口退税率」核实税号与退税率后再报关，不要把增值税税率当成出口退税率。`,
+    '需要落地搭建或与税局沟通时，选择页面下方「专家1v1财税咨询服务」。',
+  ];
+  return `【行动建议】\n${items.map((x, i) => `${i + 1}. ${x}`).join('\n')}`;
+}
+
+function buildFallbackNotes(slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const bullets = [
+    '公司注册、海关备案、退免税资格等事项均有办理周期，请预留时间，不要按即时生效估算。',
+    '出口申报不实、少缴税款可能面临税务稽查、滞纳金与罚款，请以真实交易和完整单证申报。',
+    '本报告为基于您所填信息的一般性合规参考，不构成法律意见或具体办税承诺。',
+    '本次诊断仅针对当前填写的一个销售平台；其他平台或另一套货盘需另行诊断。',
+  ];
+  if (/中国大陆公司|中国个人|个体户/.test(String(s.entity || ''))) {
+    bullets.push('各地税局审核要点有差异，搭建前可咨询专家。');
+  }
+  return `【注意事项】\n${bullets.map((x) => `- ${x}`).join('\n')}`;
+}
+
+/** Model often stops after 合规方案; keep 行动建议 / 注意事项 visible. */
+function ensureDiagnosisClosingChapters(text) {
+  let t = String(text || '').trim();
+  if (!t) return t;
+  if (!/【核心风险诊断】|【合规方案】/.test(t)) return t;
+  t = stripDiagnosisExpertTip(t);
+  if (!diagnosisHasChapter(t, '行动建议')) {
+    t = `${t}\n\n${buildFallbackActionAdvice()}`;
+  }
+  if (!diagnosisHasChapter(t, '注意事项')) {
+    t = `${t}\n\n${buildFallbackNotes()}`;
+  }
+  return t;
+}
+
 /**
  * Only paint the right panel when the plan has real Chinese body under sections.
  * Avoids flashing empty headers / English meta during streaming.
@@ -3383,6 +3451,7 @@ function prepareDiagnosisPlanMarkdown(text) {
   t = stripDiagnosisArchivePreamble(t);
   t = t.replace(/(?:^|\n)\s*Path\s*[A-D](?:\.\d+)?[^\n]*/gi, '\n');
   t = t.replace(/(?:^|\n)\s*属于路径[A-D][^\n]*/g, '\n');
+  t = ensureDiagnosisClosingChapters(t);
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 

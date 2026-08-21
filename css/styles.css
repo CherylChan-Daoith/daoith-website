@@ -5964,6 +5964,29 @@ body.modal-open {
   color: inherit;
 }
 
+.footer-wechat {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.footer-wechat img {
+  display: block;
+  width: 112px;
+  height: 112px;
+  padding: 4px;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.footer-wechat-caption {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .result-placeholder .icon-muted {
   font-family: var(--font-sans);
   font-size: 0.75rem;
