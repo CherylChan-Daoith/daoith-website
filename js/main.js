@@ -4799,17 +4799,7 @@ function splitArrowFlowParts(text) {
 
 function renderArrowFlowHtml(parts) {
   if (!parts || parts.length < 2) return '';
-  return (
-    `<p class="result-process-line">` +
-    parts
-      .map((part, i) => {
-        const chip = `<span class="result-process-chip">${formatInline(part)}</span>`;
-        if (i === parts.length - 1) return chip;
-        return `${chip}<span class="result-process-arrow" aria-hidden="true">→</span>`;
-      })
-      .join('') +
-    `</p>`
-  );
+  return `<p class="result-paragraph result-process-text">${formatInline(parts.join(' → '))}</p>`;
 }
 
 /** Bold a short lead title before 。/： when the rest is a longer explanation. */
