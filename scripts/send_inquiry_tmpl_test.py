@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED_STATUS = {"已提交", "已受理", "已报价", "已成交", "已关闭"}
+ALLOWED_STATUS = {"已提交", "处理中", "已报价", "已成交", "已关闭"}
 
 
 def load_env():

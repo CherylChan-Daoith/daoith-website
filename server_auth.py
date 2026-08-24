@@ -1367,8 +1367,8 @@ def handle_notify_disable(auth_header: str, env_loader):
 ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "已报价", "已成交", "已关闭"}
 _INQUIRY_STATUS_ORDER = ["已提交", "处理中", "已报价"]
 _INQUIRY_TERMINALS = {"已成交", "已关闭"}
-# WeChat template enum may not include 处理中; map for push only
-_TEMPLATE_STATUS_MAP = {"处理中": "已提交"}
+# WeChat template const12 enums currently approved in the OA console
+_WECHAT_TMPL_STATUSES = frozenset({"已提交", "处理中", "已报价", "已成交", "已关闭"})
 
 
 def _inquiry_status_path(status: str) -> list:
@@ -1659,16 +1659,46 @@ def update_inquiry_flags(inquiry_id: str, *, notify_sent=None, pm_synced=None):
         conn.commit()
 
 
-def send_inquiry_template(oa_openid: str, *, inquiry_id: str, status: str, env_loader=None):
+def _inquiry_template_status(status: str):
+    """WeChat const12 must match OA enum exactly; None means do not push."""
+    if status in _WECHAT_TMPL_STATUSES:
+        return status
+    return None
+
+
+def _format_wechat_time(value=None) -> str:
+    dt = None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str) and value.strip():
+        try:
+            dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            dt = None
+    if dt is None:
+        dt = datetime.now()
+    if dt.tzinfo:
+        dt = dt.astimezone()
+    return dt.strftime("%Y年%m月%d日 %H:%M")
+
+
+def send_inquiry_template(
+    oa_openid: str,
+    *,
+    inquiry_id: str,
+    status: str,
+    created_at=None,
+    env_loader=None,
+):
     set_env_loader(env_loader)
     template_id = load_env_value("WECHAT_TMPL_INQUIRY", env_loader)
     if not template_id:
         raise RuntimeError("未配置 WECHAT_TMPL_INQUIRY")
-    tmpl_status = _TEMPLATE_STATUS_MAP.get(status, status)
-    if tmpl_status not in {"已提交", "已受理", "已报价", "已成交", "已关闭"}:
-        tmpl_status = "已提交"
+    tmpl_status = _inquiry_template_status(status)
+    if not tmpl_status:
+        raise ValueError(f"微信模板未配置状态「{status}」")
     token = get_oa_access_token(env_loader)
-    now = datetime.now().strftime("%Y年%m月%d日 %H:%M")
+    ordered_at = _format_wechat_time(created_at)
     due = datetime.now().strftime("%Y年%m月%d日")
     body = {
         "touser": oa_openid,
@@ -1676,7 +1706,7 @@ def send_inquiry_template(oa_openid: str, *, inquiry_id: str, status: str, env_l
         "url": "https://www.daoith.com/#hub",
         "data": {
             "thing3": {"value": "官网询价"},
-            "time4": {"value": now},
+            "time4": {"value": ordered_at},
             "character_string5": {"value": str(inquiry_id)[:32]},
             "const12": {"value": tmpl_status},
             "time29": {"value": due},
@@ -1687,6 +1717,44 @@ def send_inquiry_template(oa_openid: str, *, inquiry_id: str, status: str, env_l
         body,
         timeout=15,
     )
+
+
+def notify_inquiry_if_subscribed(
+    website_openid: str,
+    *,
+    inquiry_id: str,
+    status: str,
+    created_at=None,
+    env_loader=None,
+):
+    """Push OA template when the user has bound and enabled WeChat notify."""
+    tmpl_status = _inquiry_template_status(status)
+    if not tmpl_status:
+        return {
+            "sent": False,
+            "skipped": True,
+            "reason": f"模板未配置状态「{status}」",
+        }
+    if not website_openid:
+        return {"sent": False, "skipped": True, "reason": "missing openid"}
+    prefs = get_notify_prefs(website_openid)
+    if not prefs or not prefs.get("enabled") or not prefs.get("oaOpenid"):
+        return {"sent": False, "skipped": True, "reason": "未订阅微信通知"}
+    try:
+        wx = send_inquiry_template(
+            prefs["oaOpenid"],
+            inquiry_id=inquiry_id,
+            status=tmpl_status,
+            created_at=created_at,
+            env_loader=env_loader,
+        )
+        return {
+            "sent": True,
+            "msgid": wx.get("msgid"),
+            "status": tmpl_status,
+        }
+    except Exception as e:
+        return {"sent": False, "error": str(e)}
 
 
 def _pm_headers(env_loader=None):
@@ -1814,20 +1882,25 @@ def update_inquiry_status(inquiry_id: str, status: str):
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT website_openid, status_history_json FROM website_inquiries WHERE id = %s",
+                    """
+                    SELECT website_openid, status, status_history_json, created_at
+                    FROM website_inquiries WHERE id = %s
+                    """,
                     (inquiry_id,),
                 )
                 row = cur.fetchone()
                 if not row:
                     return None
-                history = _merge_status_history(row[1], status, now)
+                prev_status = row[1] or "已提交"
+                created_at = row[3]
+                history = _merge_status_history(row[2], status, now)
                 history_json = json.dumps(history, ensure_ascii=False)
                 cur.execute(
                     """
                     UPDATE website_inquiries
                     SET status = %s, status_history_json = %s
                     WHERE id = %s
-                    RETURNING id, website_openid, status, status_history_json
+                    RETURNING id, website_openid, status, status_history_json, created_at
                     """,
                     (status, history_json, inquiry_id),
                 )
@@ -1837,17 +1910,23 @@ def update_inquiry_status(inquiry_id: str, status: str):
             "id": updated[0],
             "websiteOpenid": updated[1],
             "status": updated[2],
+            "previousStatus": prev_status,
             "statusHistory": _parse_status_history(updated[3]),
+            "createdAt": updated[4],
         }
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
         row = conn.execute(
-            "SELECT website_openid, status_history_json FROM website_inquiries WHERE id = ?",
+            """
+            SELECT website_openid, status, status_history_json, created_at
+            FROM website_inquiries WHERE id = ?
+            """,
             (inquiry_id,),
         ).fetchone()
         if not row:
             return None
+        prev_status = row["status"] or "已提交"
         history = _merge_status_history(row["status_history_json"], status, now)
         history_json = json.dumps(history, ensure_ascii=False)
         conn.execute(
@@ -1859,7 +1938,9 @@ def update_inquiry_status(inquiry_id: str, status: str):
         "id": inquiry_id,
         "websiteOpenid": row["website_openid"],
         "status": status,
+        "previousStatus": prev_status,
         "statusHistory": history,
+        "createdAt": row["created_at"],
     }
 
 
@@ -1973,21 +2054,22 @@ def handle_inquiry_status_update(headers, body: dict, env_loader):
     if not updated:
         return 404, {"error": "询价不存在"}
 
-    notify = {"sent": False}
-    openid = updated.get("websiteOpenid")
-    if openid:
-        prefs = get_notify_prefs(openid)
-        if prefs and prefs.get("enabled") and prefs.get("oaOpenid"):
+    prev = updated.get("previousStatus") or ""
+    if prev == status:
+        notify = {"sent": False, "skipped": True, "reason": "状态未变化"}
+    else:
+        notify = notify_inquiry_if_subscribed(
+            updated.get("websiteOpenid") or "",
+            inquiry_id=inquiry_id,
+            status=status,
+            created_at=updated.get("createdAt"),
+            env_loader=env_loader,
+        )
+        if notify.get("sent"):
             try:
-                wx = send_inquiry_template(
-                    prefs["oaOpenid"],
-                    inquiry_id=inquiry_id,
-                    status=status,
-                    env_loader=env_loader,
-                )
-                notify = {"sent": True, "msgid": wx.get("msgid")}
-            except Exception as e:
-                notify = {"sent": False, "error": str(e)}
+                update_inquiry_flags(inquiry_id, notify_sent=True)
+            except Exception:
+                pass
 
     return 200, {
         "ok": True,
@@ -2185,21 +2267,18 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
     }
     save_inquiry(record)
 
-    notify = {"sent": False}
-    if website_openid:
-        prefs = get_notify_prefs(website_openid)
-        if prefs and prefs.get("enabled") and prefs.get("oaOpenid"):
-            try:
-                wx = send_inquiry_template(
-                    prefs["oaOpenid"],
-                    inquiry_id=inquiry_id,
-                    status=status,
-                    env_loader=env_loader,
-                )
-                notify = {"sent": True, "msgid": wx.get("msgid")}
-                update_inquiry_flags(inquiry_id, notify_sent=True)
-            except Exception as e:
-                notify = {"sent": False, "error": str(e)}
+    notify = notify_inquiry_if_subscribed(
+        website_openid,
+        inquiry_id=inquiry_id,
+        status=status,
+        created_at=created_at,
+        env_loader=env_loader,
+    )
+    if notify.get("sent"):
+        try:
+            update_inquiry_flags(inquiry_id, notify_sent=True)
+        except Exception:
+            pass
 
     pm = {"ok": False}
     try:
