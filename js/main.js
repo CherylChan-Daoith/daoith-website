@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeroFeatures();
   initFAQ();
   initHsRebateQuery();
+  initAiSolutionGuide();
   initAiChatbot();
   initTaxCalculator();
   initServicesMarketplace();
@@ -2156,6 +2157,70 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
 
   if (!detected && stepKey) return stepKey;
   return detected;
+}
+
+function initAiSolutionGuide() {
+  const root = document.getElementById('aiFlowHints');
+  if (!root) return;
+  const hints = [...root.querySelectorAll('.ai-flow-hint')];
+  if (!hints.length) return;
+
+  let active = hints.findIndex((el) => el.classList.contains('is-open'));
+  if (active < 0) active = 0;
+  let timer = null;
+  let paused = false;
+
+  const setOpen = (index) => {
+    active = ((index % hints.length) + hints.length) % hints.length;
+    hints.forEach((el, i) => {
+      const on = i === active;
+      el.classList.toggle('is-open', on);
+      el.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+  };
+
+  const scrollToTarget = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === 'diagServiceRecs') el.hidden = false;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const startCycle = () => {
+    stopCycle();
+    timer = window.setInterval(() => {
+      if (paused) return;
+      setOpen(active + 1);
+    }, 3200);
+  };
+
+  const stopCycle = () => {
+    if (timer) {
+      window.clearInterval(timer);
+      timer = null;
+    }
+  };
+
+  hints.forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      setOpen(i);
+      scrollToTarget(btn.dataset.target || '');
+      paused = true;
+      window.setTimeout(() => {
+        paused = false;
+      }, 6000);
+    });
+  });
+
+  root.addEventListener('mouseenter', () => {
+    paused = true;
+  });
+  root.addEventListener('mouseleave', () => {
+    paused = false;
+  });
+
+  setOpen(active);
+  startCycle();
 }
 
 function initAiChatbot() {
@@ -6755,7 +6820,7 @@ function playHubJourney() {
   root.classList.add('is-playing');
   nodes.forEach((node, i) => {
     setTimeout(() => {
-      node.classList.add('is-active', 'is-on');
+      node.classList.add('is-on');
       if (i > 0) lines[i - 1]?.classList.add('is-on');
       if (i === nodes.length - 1) {
         setTimeout(() => root.classList.add('is-done'), 280);
@@ -6888,6 +6953,18 @@ function formatDateCompact(iso) {
   const d = new Date(iso);
   if (isNaN(d)) return iso || '—';
   return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatDateDay(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso || '—';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatDateMd(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return iso || '—';
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function hubDateCell(iso) {
@@ -7194,20 +7271,21 @@ function renderServiceProgress(services, quotes) {
     return;
   }
 
-  const plannedLabel = hubT('预', 'ETA');
-  const actualLabel = hubT('实', 'Done');
-
   const rows = projects.map((p) => {
     const tasks = Array.isArray(p.tasks) ? p.tasks : [];
     const progress = hubProgressPct(p);
     const currentStep = serviceProgressCurrentStep(tasks);
+    const compact = tasks.length >= 6 || /合规代账/.test(String(p.title || ''));
+    const plannedLabel = compact ? hubT('预', 'ETA') : hubT('预计完成', 'Est. complete');
+    const actualLabel = compact ? hubT('实', 'Done') : hubT('实际完成', 'Actual complete');
+    const fmtDate = compact ? formatDateMd : formatDateDay;
     const nodes = tasks.length
-      ? `<ol class="hub-nodes">${tasks.map((t) => {
+      ? `<ol class="hub-nodes${compact ? ' is-compact' : ''}">${tasks.map((t) => {
           const done = isTaskDoneHub(t.status);
           const current = t.status === 'IN_PROGRESS' || t.status === 'OVERDUE';
           const cls = [done ? 'is-done' : '', current ? 'is-current' : ''].filter(Boolean).join(' ');
-          const planned = t.plannedDueDate ? formatDateCompact(t.plannedDueDate) : '—';
-          const actual = t.actualCompletedAt ? formatDateCompact(t.actualCompletedAt) : '—';
+          const planned = t.plannedDueDate ? fmtDate(t.plannedDueDate) : '—';
+          const actual = t.actualCompletedAt ? fmtDate(t.actualCompletedAt) : '—';
           return `<li class="hub-node ${cls}">
             <span class="hub-node-title">${escapeHtmlHub(t.title || hubT('节点', 'Step'))}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.plannedDueDate ? formatDate(t.plannedDueDate) : '')}">${plannedLabel} ${escapeHtmlHub(planned)}</span>
@@ -7219,7 +7297,7 @@ function renderServiceProgress(services, quotes) {
     return `
       <tr data-service-id="${escapeHtmlHub(String(p.id))}">
         <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(p.subOrderNo || '—')}</span></td>
-        <td class="hub-cell-wrap"><strong class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</strong></td>
+        <td class="hub-cell-wrap"><span class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</span></td>
         <td class="hub-td-bar">
           <div class="hub-bar-wrap" title="${progress}%">
             <div class="hub-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>

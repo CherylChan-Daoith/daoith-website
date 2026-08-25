@@ -258,7 +258,42 @@ window.DAOITH_I18N_EN = {
     },
     '#ai-solution .section-header h2': { text: 'AI Compliance Plan Generator' },
     '#ai-solution .section-header p': {
-      text: 'Follow the compliance diagnosis assistant prompts to provide business details and get your tailored plan.',
+      text: 'Follow the flow into the Daoith AI assistant to generate your plan and matched services.',
+    },
+    '.ai-flow-node[data-step="01"] .ai-flow-title': { text: 'Enter Daoith AI Compliance Assistant' },
+    '.ai-flow-node[data-step="02"] .ai-flow-title': { text: 'Choose a path' },
+    '.ai-flow-node[data-step="02"] .ai-flow-sub': {
+      text: 'Start guided diagnosis, or ask a question directly',
+    },
+    '.ai-flow-path:nth-child(1) .ai-flow-edge': {
+      text: 'Answer 7 questions prompted by the AI assistant',
+    },
+    '.ai-flow-path:nth-child(1) .ai-flow-path-label': { text: 'Guided diagnosis' },
+    '.ai-flow-path:nth-child(2) .ai-flow-edge': { text: 'Describe your question' },
+    '.ai-flow-path:nth-child(2) .ai-flow-path-label': { text: 'Ask directly' },
+    '.ai-flow-node[data-step="04"] .ai-flow-title': {
+      text: 'Wait 1–2 minutes for your solution',
+    },
+    '.ai-flow-node[data-step="05"] .ai-flow-title': {
+      text: 'Review matched exclusive services',
+    },
+    '.ai-flow-hint[data-target="resultPanel"] .ai-flow-hint-label': {
+      text: 'Generate your free compliance plan',
+    },
+    '.ai-flow-hint[data-target="resultPanel"] .ai-flow-hint-body': {
+      text: 'Start diagnosis or ask directly in the chat; your plan appears on the right.',
+    },
+    '.ai-flow-hint[data-target="diagServiceRecs"] .ai-flow-hint-label': {
+      text: 'View AI-matched exclusive services',
+    },
+    '.ai-flow-hint[data-target="diagServiceRecs"] .ai-flow-hint-body': {
+      text: 'After the plan is ready, we recommend services matched to your path.',
+    },
+    '.ai-flow-hint[data-target="taxCalcBlock"] .ai-flow-hint-label': {
+      text: 'Auto-estimate compliance tax burden',
+    },
+    '.ai-flow-hint[data-target="taxCalcBlock"] .ai-flow-hint-body': {
+      text: 'Estimate CIT and VAT/export rebate from your parameters; adjust and recalculate anytime.',
     },
     '.diag-chat-title strong': { text: 'Daoith Compliance Diagnosis' },
     '#aiForm .form-required-hint': {
@@ -378,9 +413,9 @@ window.DAOITH_I18N_EN = {
     },
     '#hubJourney [data-step="1"] h4': { text: 'Inquiries' },
     '#hubJourney [data-step="1"] .tag': { text: 'Submit an inquiry and pay' },
-    '#hubJourney [data-step="2"] h4': { text: 'Service orders' },
+    '#hubJourney [data-step="2"] h4': { text: 'Service order management' },
     '#hubJourney [data-step="2"] .tag': { text: 'Look up orders after close-won' },
-    '#hubJourney [data-step="3"] h4': { text: 'Progress' },
+    '#hubJourney [data-step="3"] h4': { text: 'Service progress tracking' },
     '#hubJourney [data-step="3"] .tag': { text: 'Track delivery steps' },
     '#hub .hub-hero .stats > div:nth-child(1) .stat-label': { text: 'Clients served' },
     '#hub .hub-hero .stats > div:nth-child(2) .stat-label': { text: 'Satisfaction' },
