@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260825hub">
+  <link rel="stylesheet" href="/css/styles.css?v=20260825hub2">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -591,29 +591,38 @@
         <p>询价管理、服务订单与服务进度跟踪，支持微信通知订阅</p>
       </div>
       <div class="hub-stack">
-        <div class="wechat-notify">
-          <div>
-            <h4>微信通知订阅</h4>
-            <p style="font-size:0.85rem;color:var(--text-muted)">开启后，服务进展将自动推送到您的微信</p>
-          </div>
-          <button class="toggle-switch" id="wechatToggle" aria-label="微信通知" aria-pressed="false"></button>
-        </div>
-
         <div class="hub-panel" data-hub-section="inquiries">
-          <h4>询价管理</h4>
+          <div class="hub-panel-head">
+            <h4>询价管理</h4>
+            <div class="hub-notify-mini">
+              <span class="hub-notify-mini-label">微信通知</span>
+              <button type="button" class="toggle-switch toggle-switch-sm wechat-toggle" id="wechatToggle" aria-label="微信通知" aria-pressed="false"></button>
+            </div>
+          </div>
           <div id="quotesListWrap"></div>
         </div>
 
         <div class="hub-panel" data-hub-section="orders">
-          <h4>服务订单管理</h4>
+          <div class="hub-panel-head">
+            <h4>服务订单管理</h4>
+            <div class="hub-notify-mini">
+              <span class="hub-notify-mini-label">微信通知</span>
+              <button type="button" class="toggle-switch toggle-switch-sm wechat-toggle" aria-label="微信通知" aria-pressed="false"></button>
+            </div>
+          </div>
           <div id="hubOrdersWrap"></div>
         </div>
 
         <div class="hub-panel" data-hub-section="progress">
-          <h4>服务进度跟踪</h4>
+          <div class="hub-panel-head">
+            <h4>服务进度跟踪</h4>
+            <div class="hub-notify-mini">
+              <span class="hub-notify-mini-label">微信通知</span>
+              <button type="button" class="toggle-switch toggle-switch-sm wechat-toggle" aria-label="微信通知" aria-pressed="false"></button>
+            </div>
+          </div>
           <div id="quoteProgressWrap">
             <div class="empty-state">
-              <div class="icon icon-muted">—</div>
               <h4>暂无进行中的服务</h4>
               <p>询价成交后，顾问会按服务流程在此更新进度</p>
             </div>
@@ -630,7 +639,7 @@
               <button class="type-btn" data-type="inquiry">咨询</button>
             </div>
             <div class="form-group">
-              <textarea id="feedbackText" placeholder="请描述您的问题或建议..." rows="4"></textarea>
+              <textarea id="feedbackText" placeholder="请描述您的问题或建议..." rows="3"></textarea>
             </div>
             <button class="btn btn-primary btn-sm" id="submitFeedback">提交</button>
           </div>
@@ -757,7 +766,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260825hub"></script>
+  <script src="/js/locales/en.js?v=20260825hub2"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260820quota"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -768,6 +777,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260825hub"></script>
+  <script src="/js/main.js?v=20260825hub2"></script>
 </body>
 </html>

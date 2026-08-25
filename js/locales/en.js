@@ -376,8 +376,7 @@ window.DAOITH_I18N_EN = {
     '#hub .section-header p': {
       text: 'Manage inquiries, service orders, and delivery progress — with optional WeChat notifications.',
     },
-    '.wechat-notify h4': { text: 'WeChat notifications' },
-    '.wechat-notify p': { text: 'Service updates pushed to your WeChat when enabled.' },
+    '.hub-notify-mini-label': { text: 'WeChat' },
     '#wechatBindTitle': { text: 'Bind WeChat notifications' },
     '#wechatBindLead': {
       text: 'Follow the Official Account first, then scan the bind QR to receive inquiry & service updates.',
@@ -396,9 +395,9 @@ window.DAOITH_I18N_EN = {
     '#wechatBindCopy': { text: 'Copy link' },
     '#wechatBindDone': { text: 'Done' },
     '#wechatBindHint': { text: 'Waiting for WeChat bind…' },
-    '[data-hub-section="inquiries"] > h4': { text: 'Inquiry management' },
-    '[data-hub-section="orders"] > h4': { text: 'Service orders' },
-    '[data-hub-section="progress"] > h4': { text: 'Service progress' },
+    '[data-hub-section="inquiries"] .hub-panel-head h4': { text: 'Inquiry management' },
+    '[data-hub-section="orders"] .hub-panel-head h4': { text: 'Service orders' },
+    '[data-hub-section="progress"] .hub-panel-head h4': { text: 'Service progress' },
     '#hubSlipTitle': { text: 'Upload payment slip' },
     '#hubSlipLead': { text: 'Upload the bank transfer slip and enter the payment time shown on it.' },
     'label[for="hubSlipFile"]': { text: 'Payment slip' },
