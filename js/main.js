@@ -5935,18 +5935,14 @@ function renderAIPlanHtml(text) {
       closeList();
       if (stageFromHash?.kind === 'stage' && (sectionKind === 'plan' || sectionKind === 'risk')) {
         if (sectionKind === 'plan') {
+          // 细则阶段：忽略环节小标题，项目连续排列
           if (planPhase === 'detail' || planDetailOpen) {
             flushPlanOverview();
-            closePlanDetailList();
             planPhase = 'detail';
-          } else {
-            planPhase = 'overview';
+            continue;
           }
-          if (planPhase === 'overview') {
-            planOverviewStages.push({ num: stageFromHash.num, title: stageFromHash.title, items: [] });
-          } else {
-            html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
-          }
+          planPhase = 'overview';
+          planOverviewStages.push({ num: stageFromHash.num, title: stageFromHash.title, items: [] });
         } else {
           html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
         }
@@ -6018,13 +6014,14 @@ function renderAIPlanHtml(text) {
       }
       if (stageHit.kind === 'stage') {
         if (sectionKind === 'plan') {
+          // 细则阶段：不插入 01/02/03 小标题，菱形项目一条条往下排
           if (planPhase === 'detail' || planDetailOpen) {
             flushPlanOverview();
-            html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageHit.num)}</span>${escapeHtml(stageHit.title)}</h6>`;
-          } else {
-            planPhase = 'overview';
-            planOverviewStages.push({ num: stageHit.num, title: stageHit.title, items: [] });
+            planPhase = 'detail';
+            continue;
           }
+          planPhase = 'overview';
+          planOverviewStages.push({ num: stageHit.num, title: stageHit.title, items: [] });
         } else {
           html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageHit.num)}</span>${escapeHtml(stageHit.title)}</h6>`;
         }
