@@ -1658,7 +1658,8 @@ function buildDiagnosisPlanApiQuery(userText) {
     '【写作铁律】必须按顺序写完四章：【核心风险诊断】【合规方案】【行动建议】【注意事项】，写完注意事项后再写专家1v1结尾句；' +
     '禁止在【合规方案】后提前结束。业务流程、合规方案开篇画像、行动建议中出现的平台/发货/出口/发票/产品/销售额，必须与档案字段一致；' +
     '不得把「国内仓」写成「保税仓」，不得改写销售额档位；不得照抄方案样本示例数据。' +
-    '【三大环节】核心风险诊断、合规方案、行动建议均须按「01 供应商发票和产品环节 / 02 报关出口环节 / 03 境外销售环节」展开；' +
+    '【三大环节】核心风险诊断、合规方案须按「01 供应商发票和产品环节 / 02 报关出口环节 / 03 境外销售环节」展开；' +
+    '【行动建议】不要分三大环节，直接连续 `1. 2. 3. 4. …` 排列；' +
     '【合规方案】先写各环节短事项概览（每条一行短标题），再写对应细则 `- **短标题**：说明`，不要用卡片式长文代替概览。' +
     '禁止把版式说明、英文备忘、结尾句占位、概览→细则自检表、hard constraint / NOT write 等写作笔记输出给用户。' +
     '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后参考对应样本结构生成报告。'
@@ -5713,11 +5714,6 @@ function renderAIPlanHtml(text) {
   let planPhase = null;
   let planOverviewStages = [];
   let planDetailOpen = false;
-  /** 行动建议：当前环节大号（1/2/3）与小节（.1/.2…） */
-  let actionStageMajor = 0;
-  let actionStageMinor = 0;
-  /** Currently open staged actions <ol> major number (0 = plain decimal ol) */
-  let openActionListMajor = 0;
 
   const closeNestedUl = () => {
     if (nestedUl) {
@@ -5775,12 +5771,6 @@ function renderAIPlanHtml(text) {
     planPhase = null;
   };
 
-  const setActionStage = (numStr) => {
-    const n = parseInt(String(numStr || '').replace(/^0+/, '') || '0', 10);
-    actionStageMajor = Number.isFinite(n) && n > 0 ? n : 0;
-    actionStageMinor = 0;
-  };
-
   const closeList = () => {
     flushFlowBuffer();
     closeLi();
@@ -5791,30 +5781,18 @@ function renderAIPlanHtml(text) {
       html += '</ul>';
     }
     listMode = null;
-    openActionListMajor = 0;
     ulNestDepth = 0;
     ulLiOpenAt = [];
   };
 
   const openList = (mode) => {
-    const wantStaged = mode === 'ol' && sectionKind === 'actions' && actionStageMajor > 0;
-    if (listMode === mode) {
-      if (wantStaged && openActionListMajor === actionStageMajor) return;
-      if (!wantStaged && listMode === 'ol' && openActionListMajor === 0) return;
-      if (!wantStaged && mode !== 'ol') return;
-    }
+    if (listMode === mode) return;
     closeList();
     if (mode === 'flow') {
       html += `<ol class="result-flow">`;
       flowMode = true;
     } else if (mode === 'ol') {
-      if (wantStaged) {
-        html += `<ol class="result-list result-list-ordered result-list-actions-staged" data-stage="${actionStageMajor}">`;
-        openActionListMajor = actionStageMajor;
-      } else {
-        html += `<ol class="result-list result-list-ordered">`;
-        openActionListMajor = 0;
-      }
+      html += `<ol class="result-list result-list-ordered">`;
     } else {
       html += `<ul class="result-list result-list-l2">`;
     }
@@ -5824,13 +5802,7 @@ function renderAIPlanHtml(text) {
   const appendActionTopItem = (contentHtml) => {
     closeLi();
     openList('ol');
-    let prefix = '';
-    if (sectionKind === 'actions' && actionStageMajor > 0) {
-      actionStageMinor += 1;
-      const label = `${actionStageMajor}.${actionStageMinor}`;
-      prefix = `<span class="result-action-num" aria-hidden="true">${label}</span>`;
-    }
-    html += `<li>${prefix}${contentHtml}`;
+    html += `<li>${contentHtml}`;
     liOpen = true;
   };
   /** Emit a ul item at indent depth (0=二级, 1=三级, 2=四级, 3=五级). */
@@ -5955,11 +5927,13 @@ function renderAIPlanHtml(text) {
     }
 
     if (/^#{1,4}\s+/.test(line)) {
-      closeList();
       const level = (line.match(/^#+/) || ['##'])[0].length;
       const title = cleanSectionTitle(line.replace(/^#{1,4}\s+/, ''));
       const stageFromHash = matchPlanStageHeading(title);
-      if (stageFromHash?.kind === 'stage' && (sectionKind === 'plan' || sectionKind === 'risk' || sectionKind === 'actions')) {
+      // 行动建议：忽略三大环节小标题，保持连续 1/2/3…（先跳过，勿 closeList）
+      if (stageFromHash?.kind === 'stage' && sectionKind === 'actions') continue;
+      closeList();
+      if (stageFromHash?.kind === 'stage' && (sectionKind === 'plan' || sectionKind === 'risk')) {
         if (sectionKind === 'plan') {
           if (planPhase === 'detail' || planDetailOpen) {
             flushPlanOverview();
@@ -5974,7 +5948,6 @@ function renderAIPlanHtml(text) {
             html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
           }
         } else {
-          if (sectionKind === 'actions') setActionStage(stageFromHash.num);
           html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
         }
         continue;
@@ -6012,8 +5985,6 @@ function renderAIPlanHtml(text) {
       resetPlanLayout();
       const title = `【${bracketTitle[1]}】`;
       flowMode = false;
-      actionStageMajor = 0;
-      actionStageMinor = 0;
       if (/核心风险/.test(title)) sectionKind = 'risk';
       else if (/行动建议/.test(title)) sectionKind = 'actions';
       else if (/注意事项/.test(title)) sectionKind = 'notes';
@@ -6031,6 +6002,8 @@ function renderAIPlanHtml(text) {
       !/^[-*•]\s+/.test(line) &&
       !/^\d+[.)、．]\s+\S{20,}/.test(line)
     ) {
+      // 行动建议：跳过环节标题，列表连续编号
+      if (sectionKind === 'actions' && stageHit.kind === 'stage') continue;
       closeList();
       if (stageHit.kind === 'overviewLabel' && sectionKind === 'plan') {
         flushPlanOverview();
@@ -6053,7 +6026,6 @@ function renderAIPlanHtml(text) {
             planOverviewStages.push({ num: stageHit.num, title: stageHit.title, items: [] });
           }
         } else {
-          if (sectionKind === 'actions') setActionStage(stageHit.num);
           html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageHit.num)}</span>${escapeHtml(stageHit.title)}</h6>`;
         }
         continue;
