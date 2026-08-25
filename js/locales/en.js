@@ -276,16 +276,16 @@ window.DAOITH_I18N_EN = {
     '#aiSolutionJourney .process-branch-row:nth-child(2) .tag': {
       text: 'Instant answers from the knowledge base',
     },
-    '#aiSolutionJourney .process-card[data-step="4"] h4': {
+    '#aiSolutionJourney .process-card[data-step="3"] h4': {
       text: 'Generate your solution',
     },
-    '#aiSolutionJourney .process-card[data-step="4"] .tag': {
+    '#aiSolutionJourney .process-card[data-step="3"] .tag': {
       text: 'Ready in about 1–5 minutes',
     },
-    '#aiSolutionJourney .process-card[data-step="5"] h4': {
+    '#aiSolutionJourney .process-card[data-step="4"] h4': {
       text: 'Exclusive services',
     },
-    '#aiSolutionJourney .process-card[data-step="5"] .tag': {
+    '#aiSolutionJourney .process-card[data-step="4"] .tag': {
       text: 'View AI-matched exclusive services',
     },
     '.ai-solution-guide .hub-scroll-hint span': {

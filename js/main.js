@@ -7308,7 +7308,7 @@ function renderServiceProgress(services, quotes) {
         </td>
         <td class="hub-progress-step hub-td-step">${escapeHtmlHub(currentStep)}</td>
         <td>
-          <button type="button" class="hub-link-btn hub-detail-btn" data-hub-progress-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? hubT('收起', 'Hide') : hubT('查看详情', 'View details')}</button>
+          <button type="button" class="hub-link-btn hub-detail-btn" data-hub-progress-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? hubT('收起', 'Hide') : hubT('点击查看详情', 'Click to view details')}</button>
         </td>
       </tr>
       <tr class="hub-progress-detail-row" data-hub-progress-detail ${open ? '' : 'hidden'}>
@@ -7546,7 +7546,7 @@ function bindHubUi() {
       const willOpen = detail.hidden;
       detail.hidden = !willOpen;
       progressBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      progressBtn.textContent = willOpen ? hubT('收起', 'Hide') : hubT('查看详情', 'View details');
+      progressBtn.textContent = willOpen ? hubT('收起', 'Hide') : hubT('点击查看详情', 'Click to view details');
       if (id) {
         if (willOpen) serviceProgressExpandedIds.add(id);
         else serviceProgressExpandedIds.delete(id);
