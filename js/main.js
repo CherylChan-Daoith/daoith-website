@@ -1658,6 +1658,8 @@ function buildDiagnosisPlanApiQuery(userText) {
     '【写作铁律】必须按顺序写完四章：【核心风险诊断】【合规方案】【行动建议】【注意事项】，写完注意事项后再写专家1v1结尾句；' +
     '禁止在【合规方案】后提前结束。业务流程、合规方案开篇画像、行动建议中出现的平台/发货/出口/发票/产品/销售额，必须与档案字段一致；' +
     '不得把「国内仓」写成「保税仓」，不得改写销售额档位；不得照抄方案样本示例数据。' +
+    '【三大环节】核心风险诊断、合规方案、行动建议均须按「01 供应商发票和产品环节 / 02 报关出口环节 / 03 境外销售环节」展开；' +
+    '【合规方案】先写各环节短事项概览（每条一行短标题），再写对应细则 `- **短标题**：说明`，不要用卡片式长文代替概览。' +
     '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后参考对应样本结构生成报告。'
   );
 }
@@ -4895,7 +4897,7 @@ function matchBoldKvContent(content) {
   return String(content || '').match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
 }
 
-/** Split a 合规方案 bullet into card title + body (for left-accent cards). */
+/** Split a 合规方案 bullet into card title + body (legacy; plan now uses detail rows). */
 function splitPlanCardContent(content) {
   const raw = String(content || '').trim();
   if (!raw) return null;
@@ -4926,6 +4928,90 @@ function splitPlanCardContent(content) {
   }
 
   return null;
+}
+
+const PLAN_STAGE_TITLES = [
+  '供应商发票和产品环节',
+  '报关出口环节',
+  '境外销售环节',
+];
+
+/** Match「01 供应商发票和产品环节」stage headings used across report chapters. */
+function matchPlanStageHeading(line) {
+  const t = String(line || '')
+    .replace(/\*/g, '')
+    .replace(/^[-*•]\s+/, '')
+    .replace(/^\d+[.)、．]\s+/, '')
+    .replace(/^【\s*/, '')
+    .replace(/\s*】$/, '')
+    .trim();
+  if (!t) return null;
+  if (/环节概览|整改概览|概览事项/.test(t) && !/细则/.test(t)) {
+    return { kind: 'overviewLabel', num: '', title: t };
+  }
+  if (/环节细则|整改细则|细则说明/.test(t)) {
+    return { kind: 'detailLabel', num: '', title: t };
+  }
+  for (let i = 0; i < PLAN_STAGE_TITLES.length; i++) {
+    const title = PLAN_STAGE_TITLES[i];
+    const re = new RegExp(
+      `^(?:0?${i + 1}[.、．:\\s]*)?${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`
+    );
+    if (re.test(t)) {
+      return { kind: 'stage', num: String(i + 1).padStart(2, '0'), title };
+    }
+  }
+  return null;
+}
+
+function isPlanOverviewBullet(content) {
+  const raw = String(content || '').trim();
+  if (!raw) return false;
+  const card = splitPlanCardContent(raw);
+  if (card && String(card.val || '').length >= 28) return false;
+  const plain = raw.replace(/\*/g, '').trim();
+  if (plain.length <= 42 && !/[。；]/.test(plain)) return true;
+  if (card && String(card.val || '').length < 28) return true;
+  return plain.length <= 36;
+}
+
+function renderPlanOverviewHtml(stages) {
+  const list = (stages || []).filter((s) => s && (s.items?.length || s.title));
+  if (!list.length) return '';
+  const parts = list.map((stage, idx) => {
+    const items = (stage.items || [])
+      .map((it) => `<li>${escapeHtml(String(it).replace(/\*/g, '').trim())}</li>`)
+      .join('');
+    const arrow =
+      idx < list.length - 1
+        ? `<span class="result-plan-overview-arrow" aria-hidden="true"></span>`
+        : '';
+    return (
+      `<div class="result-plan-stage">` +
+      `<div class="result-plan-stage-head">` +
+      `<span class="result-plan-stage-num">${escapeHtml(stage.num || String(idx + 1).padStart(2, '0'))}</span>` +
+      `<span class="result-plan-stage-title">${escapeHtml(stage.title)}</span>` +
+      `</div>` +
+      (items ? `<ul class="result-plan-stage-items">${items}</ul>` : '') +
+      `</div>${arrow}`
+    );
+  });
+  return `<div class="result-plan-overview" role="list">${parts.join('')}</div>`;
+}
+
+function renderPlanDetailItemHtml(content) {
+  const card = splitPlanCardContent(content) || matchBoldKvContent(content);
+  if (card) {
+    const key = card.key || card[1];
+    const val = card.val || card[2];
+    return (
+      `<li class="result-plan-detail">` +
+      `<span class="result-plan-detail-title">${escapeHtml(key)}</span>` +
+      `<span class="result-plan-detail-body">${formatInline(val)}</span>` +
+      `</li>`
+    );
+  }
+  return `<li class="result-plan-detail"><span class="result-plan-detail-body">${formatPlanListItem(content)}</span></li>`;
 }
 
 /**
@@ -5585,6 +5671,10 @@ function renderAIPlanHtml(text) {
   /** Open nested <ul> depths under the current top-level ul (1 = first nest / 三级). */
   let ulNestDepth = 0;
   let ulLiOpenAt = []; // bool per nest depth whether <li> is open
+  /** planPhase: null | 'overview' | 'detail' — 合规方案概览行 + 细则 */
+  let planPhase = null;
+  let planOverviewStages = [];
+  let planDetailOpen = false;
 
   const closeNestedUl = () => {
     if (nestedUl) {
@@ -5621,6 +5711,25 @@ function renderAIPlanHtml(text) {
       html += `<p class="result-paragraph">${formatInline(flowPartsBuf[0])}</p>`;
     }
     flowPartsBuf = [];
+  };
+
+  const flushPlanOverview = () => {
+    if (!planOverviewStages.length) return;
+    html += renderPlanOverviewHtml(planOverviewStages);
+    planOverviewStages = [];
+  };
+
+  const closePlanDetailList = () => {
+    if (planDetailOpen) {
+      html += '</ul>';
+      planDetailOpen = false;
+    }
+  };
+
+  const resetPlanLayout = () => {
+    flushPlanOverview();
+    closePlanDetailList();
+    planPhase = null;
   };
 
   const closeList = () => {
@@ -5760,6 +5869,7 @@ function renderAIPlanHtml(text) {
       !/^\d+[.)、．]/.test(line)
     ) {
       closeList();
+      resetPlanLayout();
       const title = cleanSectionTitle(line);
       flowMode = isFlowchartTitle(title);
       if (flowMode) sectionKind = 'flow';
@@ -5775,6 +5885,38 @@ function renderAIPlanHtml(text) {
       closeList();
       const level = (line.match(/^#+/) || ['##'])[0].length;
       const title = cleanSectionTitle(line.replace(/^#{1,4}\s+/, ''));
+      const stageFromHash = matchPlanStageHeading(title);
+      if (stageFromHash?.kind === 'stage' && (sectionKind === 'plan' || sectionKind === 'risk' || sectionKind === 'actions')) {
+        if (sectionKind === 'plan') {
+          if (planPhase === 'detail' || planDetailOpen) {
+            flushPlanOverview();
+            closePlanDetailList();
+            planPhase = 'detail';
+          } else {
+            planPhase = 'overview';
+          }
+          if (planPhase === 'overview') {
+            planOverviewStages.push({ num: stageFromHash.num, title: stageFromHash.title, items: [] });
+          } else {
+            html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
+          }
+        } else {
+          html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
+        }
+        continue;
+      }
+      if (stageFromHash?.kind === 'overviewLabel' && sectionKind === 'plan') {
+        flushPlanOverview();
+        closePlanDetailList();
+        planPhase = 'overview';
+        continue;
+      }
+      if (stageFromHash?.kind === 'detailLabel' && sectionKind === 'plan') {
+        flushPlanOverview();
+        planPhase = 'detail';
+        continue;
+      }
+      resetPlanLayout();
       flowMode = isFlowchartTitle(title);
       if (flowMode) sectionKind = 'flow';
       else if (/风险/.test(title)) sectionKind = 'risk';
@@ -5793,6 +5935,7 @@ function renderAIPlanHtml(text) {
     const bracketTitle = cleanedBracketLine.match(/^【([^】]+)】\s*$/);
     if (bracketTitle) {
       closeList();
+      resetPlanLayout();
       const title = `【${bracketTitle[1]}】`;
       flowMode = false;
       if (/核心风险/.test(title)) sectionKind = 'risk';
@@ -5802,6 +5945,42 @@ function renderAIPlanHtml(text) {
       else sectionKind = 'default';
       html += `<h5 class="result-section-title">${escapeHtml(title)}</h5>`;
       continue;
+    }
+
+    // Stage headings inside risk / plan / actions (plain or bold lines)
+    const stageHit = matchPlanStageHeading(line);
+    if (
+      stageHit &&
+      (sectionKind === 'plan' || sectionKind === 'risk' || sectionKind === 'actions') &&
+      !/^[-*•]\s+/.test(line) &&
+      !/^\d+[.)、．]\s+\S{20,}/.test(line)
+    ) {
+      closeList();
+      if (stageHit.kind === 'overviewLabel' && sectionKind === 'plan') {
+        flushPlanOverview();
+        closePlanDetailList();
+        planPhase = 'overview';
+        continue;
+      }
+      if (stageHit.kind === 'detailLabel' && sectionKind === 'plan') {
+        flushPlanOverview();
+        planPhase = 'detail';
+        continue;
+      }
+      if (stageHit.kind === 'stage') {
+        if (sectionKind === 'plan') {
+          if (planPhase === 'detail' || planDetailOpen) {
+            flushPlanOverview();
+            html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageHit.num)}</span>${escapeHtml(stageHit.title)}</h6>`;
+          } else {
+            planPhase = 'overview';
+            planOverviewStages.push({ num: stageHit.num, title: stageHit.title, items: [] });
+          }
+        } else {
+          html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageHit.num)}</span>${escapeHtml(stageHit.title)}</h6>`;
+        }
+        continue;
+      }
     }
 
     const listInfo = parsePlanListMarker(rawLine);
@@ -5827,7 +6006,7 @@ function renderAIPlanHtml(text) {
 
       // Under 行动建议: promote `- **标题**：说明` to next numbered peer
       // Never switch mid-section from bullets → numbers (avoids ○ then 1. mix).
-      // 合规方案固定用卡片，不升成有序编号。
+      // 合规方案用概览+细则，不升成有序编号。
       if (
         bulletMatch &&
         depth === 0 &&
@@ -5853,27 +6032,43 @@ function renderAIPlanHtml(text) {
         continue;
       }
 
-      // 【合规方案】：顶层要点一律渲染为左侧蓝条白底卡片（忽略 1. / - 差异）
+      // 【合规方案】：概览短事项归入三列；细则用菱形列表（不再用卡片）
       if (sectionKind === 'plan' && (depth === 0 || !liOpen)) {
         if (listMode === 'ol' || listMode === 'flow') closeList();
-        const card = splitPlanCardContent(content) || matchBoldKvContent(content);
-        if (card) {
-          const key = card.key || card[1];
-          const val = card.val || card[2];
-          appendUlItem(
-            0,
-            `<span class="result-kv-key">${escapeHtml(key)}</span>` +
-              `<span class="result-kv-val">${formatInline(val)}</span>`,
-            true
-          );
-        } else {
-          // 仍用卡片外壳，避免退化成普通圆点列表
-          appendUlItem(
-            0,
-            `<span class="result-kv-val">${formatPlanListItem(content)}</span>`,
-            true
-          );
+        const plainItem = String(content || '')
+          .replace(/^\*\*([^*]+)\*\*\s*[:：]?\s*$/, '$1')
+          .replace(/\*/g, '')
+          .trim();
+        const inOverview =
+          planPhase !== 'detail' &&
+          (planPhase === 'overview' ||
+            planOverviewStages.length > 0 ||
+            isPlanOverviewBullet(content));
+        if (inOverview && isPlanOverviewBullet(content) && planPhase !== 'detail') {
+          planPhase = 'overview';
+          if (!planOverviewStages.length) {
+            planOverviewStages.push({
+              num: '01',
+              title: PLAN_STAGE_TITLES[0],
+              items: [],
+            });
+          }
+          const stage = planOverviewStages[planOverviewStages.length - 1];
+          const split = splitPlanCardContent(content) || matchBoldKvContent(content);
+          const label = split
+            ? String(split.key || split[1] || '').trim()
+            : plainItem;
+          if (label) stage.items.push(label);
+          continue;
         }
+        flushPlanOverview();
+        planPhase = 'detail';
+        if (listMode === 'ul') closeList();
+        if (!planDetailOpen) {
+          html += `<ul class="result-plan-details">`;
+          planDetailOpen = true;
+        }
+        html += renderPlanDetailItemHtml(content);
         continue;
       }
 
@@ -5897,14 +6092,16 @@ function renderAIPlanHtml(text) {
       } else {
         if (listMode === 'ol' || listMode === 'flow') closeList();
         const kv = matchBoldKvContent(content);
-        // kv cards only for 合规方案对照（非定制/定制等）— plan depth>0 fallback
+        // Nested plan lines also use detail style (no cards)
         if (kv && sectionKind === 'plan') {
-          appendUlItem(
-            0,
-            `<span class="result-kv-key">${escapeHtml(kv[1])}</span>` +
-              `<span class="result-kv-val">${formatInline(kv[2])}</span>`,
-            true
-          );
+          flushPlanOverview();
+          planPhase = 'detail';
+          if (listMode === 'ul') closeList();
+          if (!planDetailOpen) {
+            html += `<ul class="result-plan-details">`;
+            planDetailOpen = true;
+          }
+          html += renderPlanDetailItemHtml(content);
         } else {
           appendUlItem(effectiveDepth, formatPlanListItem(content), false);
         }
@@ -5938,10 +6135,12 @@ function renderAIPlanHtml(text) {
     }
 
     closeList();
+    if (sectionKind === 'plan') flushPlanOverview();
     html += `<p class="result-paragraph">${formatInline(line)}</p>`;
   }
 
   closeList();
+  resetPlanLayout();
   return html;
 }
 
