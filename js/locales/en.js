@@ -297,7 +297,7 @@ window.DAOITH_I18N_EN = {
     '.ai-workspace > .hub-scroll-hint[data-ai-scroll="taxCalcBlock"] span': {
       text: 'Click to try automated tax-burden calc',
     },
-    '.diag-chat-title strong': { text: 'Daoith Compliance Diagnosis' },
+    '.diag-chat-title strong': { text: 'Daoith Compliance Assistant' },
     '#aiForm .form-required-hint': {
       text: 'Only “E-commerce platform” and “Shipping model” are required; leave the rest blank for a general plan first.',
     },

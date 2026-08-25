@@ -770,7 +770,7 @@ function sanitizeAiAnswer(text) {
   // Opening welcome belongs in the first bubble only — strip if the model repeats it mid-chat
   t = t
     .replace(
-      /您好[，,]?\s*欢迎使用道一合规诊断助手[！!]?\s*(?:我们)?为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
+      /您好[，,]?\s*欢迎使用道一合规(?:诊断)?助手[！!]?\s*(?:我们)?为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
       ''
     )
     .replace(
@@ -787,11 +787,11 @@ function sanitizeAiAnswer(text) {
 function stripDiagnosisIntroBoilerplate(text) {
   return String(text || '')
     .replace(
-      /您好[，,]?\s*欢迎使用道一合规诊断助手[！!]?\s*(?:我们)?为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
+      /您好[，,]?\s*欢迎使用道一合规(?:诊断)?助手[！!]?\s*(?:我们)?为跨境电商企业提供合规解决方案[，,]?\s*我将根据您的情况提供针对性的合规方案[。.]?\s*/g,
       ''
     )
     .replace(
-      /您好[，,]?\s*我是\*{0,2}道一合规诊断助手\*{0,2}[。.]?\s*/g,
+      /您好[，,]?\s*我是\*{0,2}道一合规(?:诊断)?助手\*{0,2}[。.]?\s*/g,
       ''
     )
     .replace(
@@ -3688,13 +3688,13 @@ function shouldRouteLongAnswerToPlanPanel(text) {
   return t.length > 100;
 }
 
-const DIAG_PLAN_STATUS_MSG = '道一合规诊断助手正在为您生成专属合规方案，请查看右侧方案生成区';
-const DIAG_PLAN_DONE_MSG = '道一合规诊断助手已为您生成专属合规方案，请查看右侧方案生成区';
+const DIAG_PLAN_STATUS_MSG = '道一合规助手正在为您生成专属合规方案，请查看右侧方案生成区';
+const DIAG_PLAN_DONE_MSG = '道一合规助手已为您生成专属合规方案，请查看右侧方案生成区';
 const DIAG_PLAN_UPDATE_STATUS_MSG =
-  '道一合规诊断助手正在对照上一轮诊断审视变化并更新方案，请查看右侧方案生成区';
+  '道一合规助手正在对照上一轮诊断审视变化并更新方案，请查看右侧方案生成区';
 const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
 const QA_LONG_ANSWER_CHAT_TIP =
-  '由于内容较多，道一合规诊断助手已将回复展示在右侧方案生成区，请查看。';
+  '由于内容较多，道一合规助手已将回复展示在右侧方案生成区，请查看。';
 const DIAG_PLAN_LIMIT = 3;
 const DIAG_PLAN_LIMIT_MSG =
   '您诊断的次数较多，如果您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
@@ -4138,8 +4138,8 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const body = renderAIPlanHtml(clean) || `<p class="result-paragraph">${escapeHtml(clean)}</p>`;
   const fromChat =
     kind === 'qa'
-      ? `以下回复由左侧<strong>道一合规诊断助手</strong>生成：`
-      : `以下方案由左侧<strong>道一合规诊断助手</strong>生成：`;
+      ? `以下回复由左侧<strong>道一合规助手</strong>生成：`
+      : `以下方案由左侧<strong>道一合规助手</strong>生成：`;
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
