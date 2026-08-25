@@ -258,9 +258,12 @@ window.DAOITH_I18N_EN = {
       text: 'Follow the flow into the Daoith AI assistant to generate your plan and matched services.',
     },
     '#aiSolutionJourney .process-card[data-step="1"] h4': {
-      text: 'Enter Daoith AI Compliance Assistant',
+      text: 'Daoith AI Compliance Assistant',
     },
-    '#aiSolutionJourney .process-card[data-step="2"] h4': { text: 'Choose a path' },
+    '#aiSolutionJourney .process-card[data-step="1"] .tag': {
+      text: 'Limited-time free trial',
+    },
+    '#aiSolutionJourney .process-card[data-step="2"] h4': { text: 'Choose a service' },
     '#aiSolutionJourney .process-branch-row:nth-child(1) .process-branch-name': {
       text: 'Start guided diagnosis',
     },
@@ -268,25 +271,31 @@ window.DAOITH_I18N_EN = {
       text: 'Answer 7 questions prompted by the AI',
     },
     '#aiSolutionJourney .process-branch-row:nth-child(2) .process-branch-name': {
-      text: 'Ask directly',
+      text: 'Ask a specific question',
     },
     '#aiSolutionJourney .process-branch-row:nth-child(2) .tag': {
-      text: 'Describe your question',
-    },
-    '#aiSolutionJourney .process-card[data-step="3"] h4': {
-      text: 'Wait 1–2 minutes for your solution',
+      text: 'Instant answers from the knowledge base',
     },
     '#aiSolutionJourney .process-card[data-step="4"] h4': {
-      text: 'Review matched exclusive services',
+      text: 'Generate your solution',
+    },
+    '#aiSolutionJourney .process-card[data-step="4"] .tag': {
+      text: 'Ready in about 1–5 minutes',
+    },
+    '#aiSolutionJourney .process-card[data-step="5"] h4': {
+      text: 'Exclusive services',
+    },
+    '#aiSolutionJourney .process-card[data-step="5"] .tag': {
+      text: 'View AI-matched exclusive services',
     },
     '.ai-solution-guide .hub-scroll-hint span': {
-      text: 'Scroll to your compliance plan',
+      text: 'Click to try the AI solution',
     },
     '.ai-workspace > .hub-scroll-hint[data-ai-scroll="diagServiceRecs"] span': {
-      text: 'Scroll to matched services',
+      text: 'Click to view exclusive services',
     },
     '.ai-workspace > .hub-scroll-hint[data-ai-scroll="taxCalcBlock"] span': {
-      text: 'Scroll to tax burden calculator',
+      text: 'Click to try automated tax-burden calc',
     },
     '.diag-chat-title strong': { text: 'Daoith Compliance Diagnosis' },
     '#aiForm .form-required-hint': {
@@ -413,9 +422,9 @@ window.DAOITH_I18N_EN = {
     '#hub .hub-hero .stats > div:nth-child(1) .stat-label': { text: 'Clients served' },
     '#hub .hub-hero .stats > div:nth-child(2) .stat-label': { text: 'Satisfaction' },
     '#hub .hub-hero .stats > div:nth-child(3) .stat-label': { text: 'Cities covered' },
-    '.hub-scroll-hint[data-hub-scroll="hub-inquiries"] span': { text: 'Scroll to inquiries' },
-    '.hub-scroll-hint[data-hub-scroll="hub-orders"] span': { text: 'Scroll to service orders' },
-    '.hub-scroll-hint[data-hub-scroll="hub-progress"] span': { text: 'Scroll to service progress' },
+    '.hub-scroll-hint[data-hub-scroll="hub-inquiries"] span': { text: 'Click to view inquiries' },
+    '.hub-scroll-hint[data-hub-scroll="hub-orders"] span': { text: 'Click to view service orders' },
+    '.hub-scroll-hint[data-hub-scroll="hub-progress"] span': { text: 'Click to view service progress' },
     '.hub-notify-mini-label': { text: 'WeChat' },
     '#wechatBindTitle': { text: 'Bind WeChat notifications' },
     '#wechatBindLead': {

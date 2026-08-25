@@ -167,6 +167,9 @@ function initNavigation() {
     if (view === 'hub' && prevView !== 'hub') {
       requestAnimationFrame(() => window.DAOITH_playHubJourney?.());
     }
+    if (view === 'ai-solution' && prevView !== 'ai-solution') {
+      requestAnimationFrame(() => window.DAOITH_playAiSolutionJourney?.());
+    }
   }
 
   function onNavigateClick(e) {
@@ -2159,9 +2162,37 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
   return detected;
 }
 
+function playAiSolutionJourney() {
+  const root = document.getElementById('aiSolutionJourney');
+  if (!root) return;
+  const nodes = [...root.querySelectorAll('.process-card')];
+  const lines = [...root.querySelectorAll('.process-arrow')];
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  root.classList.remove('is-playing', 'is-done');
+  nodes.forEach((n) => n.classList.remove('is-active', 'is-on'));
+  lines.forEach((n) => n.classList.remove('is-on'));
+  if (reduce) {
+    root.classList.add('is-done');
+    return;
+  }
+  root.classList.add('is-playing');
+  nodes.forEach((node, i) => {
+    setTimeout(() => {
+      node.classList.add('is-on');
+      if (i > 0) lines[i - 1]?.classList.add('is-on');
+      if (i === nodes.length - 1) {
+        setTimeout(() => root.classList.add('is-done'), 280);
+      }
+    }, 180 + i * 520);
+  });
+}
+
 function initAiSolutionGuide() {
   const section = document.getElementById('ai-solution');
   if (!section) return;
+
+  window.DAOITH_playAiSolutionJourney = playAiSolutionJourney;
+  if (document.body.dataset.activeView === 'ai-solution') playAiSolutionJourney();
 
   section.addEventListener('click', (e) => {
     const hint = e.target.closest('[data-ai-scroll]');

@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260825node2">
+  <link rel="stylesheet" href="/css/styles.css?v=20260825flow2">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -139,36 +139,49 @@
         <div class="process-flow" id="aiSolutionJourney">
           <div class="process-card" data-step="1">
             <div class="process-step">01</div>
-            <h4>进入道一AI合规助手</h4>
+            <h4>道一AI合规助手</h4>
+            <div class="process-tags">
+              <span class="tag">限时免费体验</span>
+            </div>
           </div>
           <span class="process-arrow" aria-hidden="true"></span>
-          <div class="process-card process-card-branch" data-step="2">
+          <div class="process-card" data-step="2">
             <div class="process-step">02</div>
-            <h4>选择分叉</h4>
+            <h4>选择服务</h4>
+          </div>
+          <span class="process-arrow" aria-hidden="true"></span>
+          <div class="process-card process-card-branch" data-step="3">
+            <div class="process-step">03</div>
             <div class="process-branch-rows">
               <div class="process-branch-row">
                 <span class="process-branch-name">开启专属合规诊断</span>
                 <span class="tag">按AI助手提示回复7个问题</span>
               </div>
               <div class="process-branch-row">
-                <span class="process-branch-name">直接提问</span>
-                <span class="tag">描述您的问题</span>
+                <span class="process-branch-name">特定问题咨询</span>
+                <span class="tag">基于知识库即时解答</span>
               </div>
             </div>
           </div>
           <span class="process-arrow" aria-hidden="true"></span>
-          <div class="process-card" data-step="3">
+          <div class="process-card" data-step="4">
             <div class="process-step">04</div>
-            <h4>等待1–2分钟生成解决方案</h4>
+            <h4>生成解决方案</h4>
+            <div class="process-tags">
+              <span class="tag">等待1-5分钟即可生成</span>
+            </div>
           </div>
           <span class="process-arrow" aria-hidden="true"></span>
-          <div class="process-card" data-step="4">
+          <div class="process-card" data-step="5">
             <div class="process-step">05</div>
-            <h4>查看AI助手为您匹配的专属服务</h4>
+            <h4>专属服务</h4>
+            <div class="process-tags">
+              <span class="tag">查看AI匹配的专属服务</span>
+            </div>
           </div>
         </div>
         <button type="button" class="hub-scroll-hint" data-ai-scroll="aiWorkspace">
-          <span>下拉查看专属合规方案</span>
+          <span>点击体验AI解决方案</span>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
       </div>
@@ -241,7 +254,7 @@
       </div>
 
       <button type="button" class="hub-scroll-hint" data-ai-scroll="diagServiceRecs">
-        <span>下拉查看匹配的专属服务</span>
+        <span>点击查看专属服务</span>
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
       </button>
 
@@ -249,7 +262,7 @@
       <div class="diag-services-section" id="diagServiceRecs" hidden aria-live="polite"></div>
 
       <button type="button" class="hub-scroll-hint" data-ai-scroll="taxCalcBlock">
-        <span>下拉查看合规税负测算</span>
+        <span>点击体验自动化合规税负测算</span>
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
       </button>
 
@@ -664,7 +677,7 @@
           </div>
         </div>
         <button type="button" class="hub-scroll-hint" data-hub-scroll="hub-inquiries">
-          <span>下拉查看询价管理</span>
+          <span>点击查看询价管理</span>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
       </div>
@@ -683,7 +696,7 @@
         </div>
 
         <button type="button" class="hub-scroll-hint" data-hub-scroll="hub-orders">
-          <span>下拉查看服务订单管理</span>
+          <span>点击查看服务订单管理</span>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
 
@@ -699,7 +712,7 @@
         </div>
 
         <button type="button" class="hub-scroll-hint" data-hub-scroll="hub-progress">
-          <span>下拉查看服务进度跟踪</span>
+          <span>点击查看服务进度跟踪</span>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
 
@@ -856,7 +869,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20260825horiz1"></script>
+  <script src="/js/locales/en.js?v=20260825click1"></script>
   <script src="/js/i18n.js?v=20260729a"></script>
   <script src="/js/config.js?v=20260820quota"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -867,6 +880,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260825node2"></script>
+  <script src="/js/main.js?v=20260825flow2"></script>
 </body>
 </html>
