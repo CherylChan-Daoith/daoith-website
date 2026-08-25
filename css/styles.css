@@ -839,6 +839,10 @@ ul {
   color: #86868b;
 }
 
+.diag-hs-block .hs-hint.is-flag {
+  color: #1d1d1f;
+}
+
 .diag-hs-block .hs-rate-source {
   margin: 6px 0 0;
   font-size: 0.68rem;
@@ -1422,6 +1426,10 @@ ul {
   font-size: 0.7rem;
   line-height: 1.45;
   color: var(--text-muted);
+}
+
+.ai-grid .form-panel .hs-hint.is-flag {
+  color: var(--ink, #1d1d1f);
 }
 
 .ai-grid .form-panel .hs-rate-source {

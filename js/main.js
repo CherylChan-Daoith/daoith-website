@@ -4531,26 +4531,47 @@ function callDifyHsRate(hsCode) {
   });
 }
 
+function hsRefundApiCandidates() {
+  const cfg = getDifyConfig();
+  const path = cfg.hsRefundApiPath || '/api/hs-refund-rate';
+  const rel = path.startsWith('/') ? path : `/${path}`;
+  const remoteBase = (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(
+    /\/$/,
+    ''
+  );
+  const remote = `${remoteBase}${rel}`;
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  if (host === 'localhost' || host === '127.0.0.1') return [rel, remote];
+  return [remote];
+}
+
 /** Left-side HS refund lookup: Dataset Retrieve API (structured), not Chat LLM. */
 async function lookupRefundRateFromKnowledgeBase(hsCode) {
-  const cfg = getDifyConfig();
-  const base = (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
-  const path = cfg.hsRefundApiPath || '/api/hs-refund-rate';
-  const res = await fetch(`${base}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ hs_code: hsCode }),
-  });
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error(`退税率知识库返回异常（HTTP ${res.status}）`);
+  let lastError = null;
+  for (const url of hsRefundApiCandidates()) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hs_code: hsCode }),
+      });
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        lastError = new Error(`退税率知识库返回异常（HTTP ${res.status}）`);
+        continue;
+      }
+      if (!res.ok) {
+        lastError = new Error(data.message || data.error || `知识库查询失败（HTTP ${res.status}）`);
+        continue;
+      }
+      return data;
+    } catch (err) {
+      lastError = err;
+    }
   }
-  if (!res.ok) {
-    throw new Error(data.message || data.error || `知识库查询失败（HTTP ${res.status}）`);
-  }
-  return data;
+  throw lastError || new Error('知识库查询失败');
 }
 
 /** Extract HS digits from a refund-rate style chat question. */
@@ -6034,6 +6055,59 @@ function extractRatePercent(text) {
   return match ? `${match[1]}%` : '';
 }
 
+const HS_HINT_DEFAULT_ZH = '完整税号精确匹配；不足10位时按前8位尝试。';
+const HS_HINT_DEFAULT_EN = 'Exact match on full HS; if fewer than 10 digits, try first 8.';
+const SPECIAL_GOODS_FLAG_HINT = {
+  '1': {
+    zh: '特殊商品标识：1（视同内销征税，进项可抵）',
+    en: 'Special goods flag: 1 (taxed as deemed domestic sales; input VAT creditable)',
+  },
+  '2': {
+    zh: '特殊商品标识：2（出口免税，进项转出）',
+    en: 'Special goods flag: 2 (export VAT-exempt; input VAT transferred out)',
+  },
+};
+
+function isHsLocaleEn() {
+  return (window.DAOITH_getLocale?.() || 'zh') === 'en';
+}
+
+function defaultHsHintText() {
+  return isHsLocaleEn() ? HS_HINT_DEFAULT_EN : HS_HINT_DEFAULT_ZH;
+}
+
+function isZeroExportRefund(result) {
+  if (!result || result.rate == null) return false;
+  const n = Number(result.rate);
+  if (Number.isFinite(n)) return n === 0;
+  return /^0(?:\.0+)?%?$/.test(String(result.display || result.rate).trim());
+}
+
+function specialGoodsFlagHintText(result) {
+  const en = isHsLocaleEn();
+  const raw = String(result?.special_goods_flag || '').trim();
+  const mapped = SPECIAL_GOODS_FLAG_HINT[raw];
+  if (mapped) return en ? mapped.en : mapped.zh;
+  const label = String(result?.special_goods_flag_label || '').trim();
+  if (label) {
+    return en ? `Special goods flag: ${label}` : `特殊商品标识：${label}`;
+  }
+  return en
+    ? 'Special goods flag: not listed; please verify in the STA rebate schedule.'
+    : '特殊商品标识：未收录，请核对出口退税率文库';
+}
+
+function setHsHint(text, isFlag) {
+  const el = document.getElementById('hsHint');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('is-flag', Boolean(isFlag));
+}
+
+function resetHsHint() {
+  setHsHint(defaultHsHintText(), false);
+}
+
 function setHsRateSource(kind, result) {
   const el = document.getElementById('hsRateSource');
   if (!el) return;
@@ -6130,6 +6204,7 @@ function initHsRebateQuery() {
     const rateBox = document.getElementById('refundRateBox');
     if (rateBox) rateBox.value = '';
     setHsRateSource('refund', null);
+    resetHsHint();
 
     setButtonLoading(queryBtn, true, window.DAOITH_t('ai.querying'));
     try {
@@ -6158,14 +6233,19 @@ function initHsRebateQuery() {
       if (result.ok && result.rate != null) {
         const refundInput = document.getElementById('taxRefund');
         if (refundInput) refundInput.value = String(result.rate);
-      }
-
-      if (!result.ok) {
+        if (isZeroExportRefund(result)) {
+          setHsHint(specialGoodsFlagHintText(result), true);
+        } else {
+          resetHsHint();
+        }
+      } else {
+        resetHsHint();
         alert('未查到参考退税率，请核对海关编码后重试');
       }
     } catch (err) {
       if (rateBox) rateBox.value = '';
       setHsRateSource('refund', null);
+      resetHsHint();
       alert(err.message);
     } finally {
       setButtonLoading(queryBtn, false);
