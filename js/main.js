@@ -6602,17 +6602,22 @@ const HUB_BANK = {
   branch: '平安银行深圳梅龙支行',
   cnaps: '307584021509',
 };
-const HUB_DISCOUNT_ZH = '1 个服务项目按原价；2 个服务项目享 9.5 折；3 个及以上服务项目享 9 折。按询价单中的服务项目数量计算（同一服务的数量不叠加折扣档）。最终成交价以顾问确认为准。';
-const HUB_DISCOUNT_EN = '1 service: list price; 2 services: 5% off; 3 or more: 10% off. Counted by distinct services on the inquiry (quantity of the same service does not change the tier). Final amount is confirmed by the advisor.';
+const HUB_DISCOUNT_ZH = '1 个服务项目按原价\n2 个服务项目享 9.5 折\n3 个及以上服务项目享 9 折\n最终成交价以顾问确认为准。';
+const HUB_DISCOUNT_EN = '1 service: list price\n2 services: 5% off\n3 or more: 10% off\nFinal amount is confirmed by the advisor.';
 
 let hubQuotesCache = [];
 let hubServicesCache = [];
 let hubQuotesExpanded = false;
 let hubOrdersExpanded = false;
 let hubEventsBound = false;
+const serviceProgressExpandedIds = new Set();
 
 function hubT(zh, en) {
   return (window.DAOITH_getLocale?.() || 'zh') === 'en' ? en : zh;
+}
+
+function hubItemCount(items) {
+  return (items || []).reduce((n, it) => n + (Number(it.qty) || 1), 0);
 }
 
 function hubDiscountRate(itemCount) {
@@ -6629,21 +6634,56 @@ function hubQuoteTotals(q) {
     standard += (Number(it.priceValue) || 0) * (Number(it.qty) || 1);
   });
   if (standard <= 0) standard = Number(q?.total) || 0;
-  const rate = hubDiscountRate(items.length);
+  const rate = hubDiscountRate(hubItemCount(items));
   const quoted = q?.quotedTotal != null && q.quotedTotal !== ''
     ? Number(q.quotedTotal)
     : Math.round(standard * rate * 100) / 100;
   return { standard, quoted, rate, items };
 }
 
-function hubOrderNo(inquiryId) {
-  const id = String(inquiryId || '').trim();
-  if (!id) return '';
-  return /^INQ/i.test(id) ? `SO${id.slice(3)}` : `SO-${id}`;
+function hubYymmdd(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d)) return '000000';
+  return `${String(d.getFullYear()).slice(-2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function hubSubOrderNo(inquiryId, index) {
-  return `${hubOrderNo(inquiryId)}-${String(index + 1).padStart(2, '0')}`;
+function hubTwoCharFromSeed(seed) {
+  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let h = 2166136261;
+  const s = String(seed || '');
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  h >>>= 0;
+  return chars[h % 36] + chars[Math.floor(h / 36) % 36];
+}
+
+function hubParseInquiryCode(inquiryId, createdAt) {
+  const id = String(inquiryId || '').trim().toUpperCase();
+  if (/^INQ\d{6}[0-9A-Z]{2}$/.test(id) && id.length === 11) {
+    return { date: id.slice(3, 9), seq: id.slice(9, 11), inquiryNo: id };
+  }
+  const fromId = id.match(/^INQ(\d{6})(.*)$/);
+  const date = fromId ? fromId[1] : hubYymmdd(createdAt);
+  const tail = (fromId ? fromId[2] : '').replace(/[^0-9A-Z]/g, '');
+  const seq = tail.length >= 2 ? tail.slice(-2) : hubTwoCharFromSeed(id || date);
+  return { date, seq, inquiryNo: `INQ${date}${seq}` };
+}
+
+function hubDisplayInquiryNo(inquiryId, createdAt) {
+  return hubParseInquiryCode(inquiryId, createdAt).inquiryNo;
+}
+
+function hubOrderNo(inquiryId, createdAt) {
+  const { date, seq } = hubParseInquiryCode(inquiryId, createdAt);
+  return `SO${date}${seq}`;
+}
+
+function hubSubOrderNo(inquiryId, index, createdAt) {
+  const { date, seq } = hubParseInquiryCode(inquiryId, createdAt);
+  const letter = String.fromCharCode(65 + (Number(index) || 0) % 26);
+  return `SO${date}${seq[0]}${letter}`;
 }
 
 function initServiceHub() {
@@ -6858,7 +6898,7 @@ function renderHubInquiries(quotes) {
       : '';
     return `
       <tr data-inquiry-id="${escapeHtmlHub(q.inquiryId || '')}">
-        <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(q.inquiryId || '—')}</span></td>
+        <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(hubDisplayInquiryNo(q.inquiryId, q.createdAt))}</span></td>
         <td>${hubDateCell(q.createdAt)}</td>
         <td class="hub-cell-wrap">${hubServiceChipsHtml(totals.items)}</td>
         <td class="hub-price-old hub-num">${escapeHtmlHub(formatYuanHub(totals.standard))}</td>
@@ -6888,7 +6928,7 @@ function renderHubInquiries(quotes) {
             <th>
               ${hubT('优惠报价', 'Quote')}
               <span class="hub-help-wrap">
-                <button type="button" class="hub-help" data-hub-help aria-expanded="false" title="${escapeHtmlHub(discountTip)}" aria-label="${hubT('优惠报价说明', 'Quote discount rules')}">?</button>
+                <button type="button" class="hub-help" data-hub-help aria-expanded="false" aria-label="${hubT('优惠报价说明', 'Quote discount rules')}">?</button>
                 <span class="hub-help-tip" hidden>${escapeHtmlHub(discountTip)}</span>
               </span>
             </th>
@@ -6914,10 +6954,42 @@ function projectsByInquiry(services) {
   return map;
 }
 
+function hubLineQuoted(q, it) {
+  const totals = hubQuoteTotals(q);
+  const lineStd = (Number(it?.priceValue) || 0) * (Number(it?.qty) || 1);
+  if (totals.standard <= 0) return totals.quoted;
+  return Math.round((lineStd / totals.standard) * totals.quoted * 100) / 100;
+}
+
+function collectOrderRows(quotes, services) {
+  const svcMap = projectsByInquiry(services);
+  const rows = [];
+  (Array.isArray(quotes) ? quotes : []).filter((q) => q.status === '已成交').forEach((q) => {
+    const totals = hubQuoteTotals(q);
+    const svc = svcMap.get(q.inquiryId);
+    const projects = Array.isArray(svc?.projects) ? svc.projects : [];
+    const items = totals.items.length ? totals.items : [{ title: hubT('成交服务', 'Service') }];
+    items.forEach((it, i) => {
+      const p = projects[i] || projects.find((x) => x.serviceType === it.title) || null;
+      rows.push({
+        inquiryId: q.inquiryId,
+        createdAt: q.createdAt,
+        subNo: p?.subOrderNo || hubSubOrderNo(q.inquiryId, i, q.createdAt),
+        title: it.title || p?.serviceType || '—',
+        step: p ? serviceProgressCurrentStep(p.tasks) : hubT('待启动', 'Pending start'),
+        amount: hubLineQuoted(q, it),
+        startAt: p?.startDate || p?.createdAt || '',
+        owner: p?.ownerName || '',
+      });
+    });
+  });
+  return rows;
+}
+
 function renderHubOrders(quotes, services) {
   const wrap = document.getElementById('hubOrdersWrap');
   if (!wrap) return;
-  const list = (Array.isArray(quotes) ? quotes : []).filter((q) => q.status === '已成交');
+  const list = collectOrderRows(quotes, services);
   if (!list.length) {
     wrap.innerHTML = hubEmptyHtml(
       hubT('暂无服务订单', 'No service orders'),
@@ -6925,39 +6997,27 @@ function renderHubOrders(quotes, services) {
     );
     return;
   }
-  const svcMap = projectsByInquiry(services);
   const visible = hubOrdersExpanded ? list : list.slice(0, HUB_ORDER_LIMIT);
-  const rows = visible.map((q) => {
-    const totals = hubQuoteTotals(q);
-    const orderNo = hubOrderNo(q.inquiryId);
-    const svc = svcMap.get(q.inquiryId);
-    const projects = Array.isArray(svc?.projects) ? svc.projects : [];
-    const items = totals.items.length ? totals.items : [{ title: hubT('成交服务', 'Service') }];
-    const chips = items.map((it, i) => {
-      const p = projects[i] || projects.find((x) => x.serviceType === it.title) || null;
-      const subNo = p?.subOrderNo || hubSubOrderNo(q.inquiryId, i);
-      const step = p ? serviceProgressCurrentStep(p.tasks) : hubT('待启动', 'Pending start');
-      return `<span class="hub-chip hub-chip-order"><span class="hub-suborder-no">${escapeHtmlHub(subNo)}</span><span class="hub-suborder-title">${escapeHtmlHub(it.title || p?.serviceType || '—')}</span><span class="hub-suborder-step">${escapeHtmlHub(step)}</span></span>`;
-    }).join('');
-    return `
+  const rows = visible.map((row) => `
       <tr>
-        <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(orderNo)}</span></td>
-        <td class="hub-cell-wrap"><div class="hub-chips">${chips}</div></td>
-        <td class="hub-price-deal hub-num">${escapeHtmlHub(formatYuanHub(totals.quoted))}</td>
-        <td>${q.paidAt ? hubDateCell(q.paidAt) : '—'}</td>
-        <td>${escapeHtmlHub(q.contact || '—')}</td>
-      </tr>`;
-  }).join('');
+        <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(row.subNo)}</span></td>
+        <td class="hub-cell-wrap">${escapeHtmlHub(row.title)}</td>
+        <td>${escapeHtmlHub(row.step)}</td>
+        <td class="hub-price-deal hub-num">${escapeHtmlHub(formatYuanHub(row.amount))}</td>
+        <td>${row.startAt ? hubDateCell(row.startAt) : '—'}</td>
+        <td>${escapeHtmlHub(row.owner || hubT('待分配', 'Unassigned'))}</td>
+      </tr>`).join('');
   wrap.innerHTML = `
     <div class="hub-table-scroll">
       <table class="hub-table">
         <thead>
           <tr>
             <th>${hubT('订单号', 'Order no.')}</th>
-            <th>${hubT('服务项目 / 最新进度', 'Services / latest step')}</th>
+            <th>${hubT('服务项目', 'Service')}</th>
+            <th>${hubT('最新进度', 'Latest step')}</th>
             <th>${hubT('订单金额', 'Amount')}</th>
-            <th>${hubT('支付时间', 'Paid at')}</th>
-            <th>${hubT('联系人', 'Contact')}</th>
+            <th>${hubT('项目启动时间', 'Project start')}</th>
+            <th>${hubT('项目负责人', 'Owner')}</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -7008,8 +7068,8 @@ function collectProgressCards(services, quotes) {
         inquiryId: s.inquiryId,
         company: s.company || '',
         title: p.serviceType || p.name || hubT('服务', 'Service'),
-        orderNo: p.orderNo || hubOrderNo(s.inquiryId),
-        subOrderNo: p.subOrderNo || hubSubOrderNo(s.inquiryId, i),
+        orderNo: p.orderNo || hubOrderNo(s.inquiryId, s.createdAt),
+        subOrderNo: p.subOrderNo || hubSubOrderNo(s.inquiryId, i, s.createdAt),
         progress: Number(p.progress) || 0,
         tasks: Array.isArray(p.tasks) ? p.tasks : [],
       });
@@ -7023,8 +7083,8 @@ function collectProgressCards(services, quotes) {
         inquiryId: q.inquiryId,
         company: q.company || '',
         title: it.title || hubT('服务', 'Service'),
-        orderNo: hubOrderNo(q.inquiryId),
-        subOrderNo: hubSubOrderNo(q.inquiryId, i),
+        orderNo: hubOrderNo(q.inquiryId, q.createdAt),
+        subOrderNo: hubSubOrderNo(q.inquiryId, i, q.createdAt),
         progress: 0,
         tasks: [],
       });
@@ -7067,8 +7127,9 @@ function renderServiceProgress(services, quotes) {
           </li>`;
         }).join('')}</ol>`
       : `<p class="hub-nodes-empty">${hubT('服务流程尚未启动', 'Workflow not started yet')}</p>`;
+    const open = serviceProgressExpandedIds.has(String(p.id));
     return `
-      <div class="hub-progress-row" data-service-id="${escapeHtmlHub(String(p.id))}">
+      <div class="hub-progress-row${open ? ' is-open' : ''}" data-service-id="${escapeHtmlHub(String(p.id))}">
         <div class="hub-progress-info">
           <span class="hub-record-no">${escapeHtmlHub(p.subOrderNo || '—')}</span>
           <strong class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</strong>
@@ -7076,9 +7137,10 @@ function renderServiceProgress(services, quotes) {
             <div class="hub-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
             <span class="hub-bar-pct">${progress}%</span>
           </div>
-          <span class="hub-suborder-step">${escapeHtmlHub(currentStep)}</span>
+          <span class="hub-progress-step">${escapeHtmlHub(currentStep)}</span>
+          <button type="button" class="hub-link-btn hub-detail-btn" data-hub-progress-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? hubT('收起', 'Hide') : hubT('查看详情', 'View details')}</button>
         </div>
-        ${nodes}
+        <div class="hub-progress-detail" ${open ? '' : 'hidden'}>${nodes}</div>
       </div>`;
   }).join('');
 }
@@ -7276,6 +7338,23 @@ function bindHubUi() {
       renderHubInquiries(hubQuotesCache);
       renderHubOrders(hubQuotesCache, hubServicesCache);
       return;
+    }
+
+    const progressBtn = e.target.closest('[data-hub-progress-toggle]');
+    if (progressBtn) {
+      const row = progressBtn.closest('.hub-progress-row');
+      if (!row) return;
+      const id = row.getAttribute('data-service-id') || '';
+      const detail = row.querySelector('.hub-progress-detail');
+      const willOpen = !row.classList.contains('is-open');
+      row.classList.toggle('is-open', willOpen);
+      progressBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      progressBtn.textContent = willOpen ? hubT('收起', 'Hide') : hubT('查看详情', 'View details');
+      if (detail) detail.hidden = !willOpen;
+      if (id) {
+        if (willOpen) serviceProgressExpandedIds.add(id);
+        else serviceProgressExpandedIds.delete(id);
+      }
     }
   });
 

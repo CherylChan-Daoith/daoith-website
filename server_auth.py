@@ -1523,6 +1523,20 @@ SLIP_MIME_EXT = {
 }
 
 
+def inquiry_item_count(items) -> int:
+    total = 0
+    for it in items or []:
+        if not isinstance(it, dict):
+            total += 1
+            continue
+        try:
+            qty = int(float(it.get("qty") or 1))
+        except (TypeError, ValueError):
+            qty = 1
+        total += max(qty, 1)
+    return total
+
+
 def inquiry_discount_rate(item_count: int) -> float:
     n = int(item_count or 0)
     if n >= 3:
@@ -1551,7 +1565,7 @@ def compute_inquiry_totals(items, total=None):
             standard = float(total or 0)
         except (TypeError, ValueError):
             standard = 0.0
-    rate = inquiry_discount_rate(len(items or []))
+    rate = inquiry_discount_rate(inquiry_item_count(items))
     quoted = round(standard * rate, 2)
     return round(standard, 2), quoted, rate
 
@@ -1657,8 +1671,46 @@ def ensure_inquiry_db():
             pass
 
 
+_INQ_SEQ_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def _two_char_seq(n: int) -> str:
+    if n < 1:
+        n = 1
+    if n <= 99:
+        return f"{n:02d}"
+    rest = n - 100
+    first = min(rest // 36, 25)
+    second = rest % 36
+    return chr(ord("A") + first) + _INQ_SEQ_CHARS[second]
+
+
+def _inquiry_ids_starting(prefix: str) -> set:
+    ensure_inquiry_db()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM website_inquiries WHERE id LIKE %s", (prefix + "%",))
+                return {row[0] for row in cur.fetchall() if row and row[0]}
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT id FROM website_inquiries WHERE id LIKE ?",
+            (prefix + "%",),
+        ).fetchall()
+        return {row[0] for row in rows if row and row[0]}
+
+
 def _new_inquiry_id() -> str:
-    return "INQ" + datetime.now().strftime("%y%m%d%H%M%S") + secrets.token_hex(2).upper()
+    prefix = "INQ" + datetime.now().strftime("%y%m%d")
+    existing = _inquiry_ids_starting(prefix)
+    n = 1
+    while n < 1300:
+        cand = prefix + _two_char_seq(n)
+        if cand not in existing:
+            return cand
+        n += 1
+    return prefix + secrets.choice(_INQ_SEQ_CHARS) + secrets.choice(_INQ_SEQ_CHARS)
 
 
 def save_inquiry(record: dict):
