@@ -6714,10 +6714,8 @@ function hubParseInquiryCode(inquiryId, createdAt) {
   if (/^INQ\d{6}[0-9A-Z]{2}$/.test(id) && id.length === 11) {
     return { date: id.slice(3, 9), seq: id.slice(9, 11), inquiryNo: id };
   }
-  const fromId = id.match(/^INQ(\d{6})(.*)$/);
-  const date = fromId ? fromId[1] : hubYymmdd(createdAt);
-  const tail = (fromId ? fromId[2] : '').replace(/[^0-9A-Z]/g, '');
-  const seq = tail.length >= 2 ? tail.slice(-2) : hubTwoCharFromSeed(id || date);
+  const date = hubYymmdd(createdAt);
+  const seq = hubTwoCharFromSeed(id || date);
   return { date, seq, inquiryNo: `INQ${date}${seq}` };
 }
 
@@ -7011,6 +7009,21 @@ function hubLineQuoted(q, it) {
   return Math.round((lineStd / totals.standard) * totals.quoted * 100) / 100;
 }
 
+function hubStep01Time(tasks) {
+  const list = Array.isArray(tasks) ? tasks.slice() : [];
+  list.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+  const first = list[0];
+  if (!first) return '';
+  return first.plannedDueDate || first.actualCompletedAt || '';
+}
+
+function hubBarTone(pct) {
+  const n = Number(pct) || 0;
+  if (n <= 33) return 'is-low';
+  if (n <= 66) return 'is-mid';
+  return 'is-high';
+}
+
 function collectOrderRows(quotes, services) {
   const svcMap = projectsByInquiry(services);
   const rows = [];
@@ -7024,11 +7037,11 @@ function collectOrderRows(quotes, services) {
       rows.push({
         inquiryId: q.inquiryId,
         createdAt: q.createdAt,
-        subNo: p?.subOrderNo || hubSubOrderNo(q.inquiryId, i, q.createdAt),
+        subNo: hubSubOrderNo(q.inquiryId, i, q.createdAt),
         title: it.title || p?.serviceType || '—',
         step: p ? serviceProgressCurrentStep(p.tasks) : hubT('待启动', 'Pending start'),
         amount: hubLineQuoted(q, it),
-        startAt: p?.startDate || p?.createdAt || '',
+        startAt: hubStep01Time(p?.tasks) || '',
         owner: p?.ownerName || '',
       });
     });
@@ -7118,8 +7131,8 @@ function collectProgressCards(services, quotes) {
         inquiryId: s.inquiryId,
         company: s.company || '',
         title: p.serviceType || p.name || hubT('服务', 'Service'),
-        orderNo: p.orderNo || hubOrderNo(s.inquiryId, s.createdAt),
-        subOrderNo: p.subOrderNo || hubSubOrderNo(s.inquiryId, i, s.createdAt),
+        orderNo: hubOrderNo(s.inquiryId, s.createdAt),
+        subOrderNo: hubSubOrderNo(s.inquiryId, i, s.createdAt),
         progress: Number(p.progress) || 0,
         tasks: Array.isArray(p.tasks) ? p.tasks : [],
       });
@@ -7159,9 +7172,10 @@ function renderServiceProgress(services, quotes) {
   const plannedLabel = hubT('预', 'ETA');
   const actualLabel = hubT('实', 'Done');
 
-  wrap.innerHTML = projects.map((p) => {
+  const rows = projects.map((p) => {
     const tasks = Array.isArray(p.tasks) ? p.tasks : [];
     const progress = hubProgressPct(p);
+    const tone = hubBarTone(progress);
     const currentStep = serviceProgressCurrentStep(tasks);
     const nodes = tasks.length
       ? `<ol class="hub-nodes">${tasks.map((t) => {
@@ -7179,20 +7193,40 @@ function renderServiceProgress(services, quotes) {
       : `<p class="hub-nodes-empty">${hubT('服务流程尚未启动', 'Workflow not started yet')}</p>`;
     const open = serviceProgressExpandedIds.has(String(p.id));
     return `
-      <div class="hub-progress-row${open ? ' is-open' : ''}" data-service-id="${escapeHtmlHub(String(p.id))}">
-        <div class="hub-progress-info">
-          <span class="hub-record-no">${escapeHtmlHub(p.subOrderNo || '—')}</span>
-          <strong class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</strong>
+      <tr data-service-id="${escapeHtmlHub(String(p.id))}">
+        <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(p.subOrderNo || '—')}</span></td>
+        <td class="hub-cell-wrap"><strong class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</strong></td>
+        <td class="hub-td-bar">
           <div class="hub-bar-wrap" title="${progress}%">
-            <div class="hub-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
+            <div class="hub-bar ${tone}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
             <span class="hub-bar-pct">${progress}%</span>
           </div>
-          <span class="hub-progress-step">${escapeHtmlHub(currentStep)}</span>
+        </td>
+        <td class="hub-progress-step">${escapeHtmlHub(currentStep)}</td>
+        <td>
           <button type="button" class="hub-link-btn hub-detail-btn" data-hub-progress-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? hubT('收起', 'Hide') : hubT('查看详情', 'View details')}</button>
-        </div>
-        <div class="hub-progress-detail" ${open ? '' : 'hidden'}>${nodes}</div>
-      </div>`;
+        </td>
+      </tr>
+      <tr class="hub-progress-detail-row" data-hub-progress-detail ${open ? '' : 'hidden'}>
+        <td colspan="5">${nodes}</td>
+      </tr>`;
   }).join('');
+
+  wrap.innerHTML = `
+    <div class="hub-table-scroll">
+      <table class="hub-table hub-progress-table">
+        <thead>
+          <tr>
+            <th>${hubT('服务单号', 'Service no.')}</th>
+            <th>${hubT('服务项目', 'Service')}</th>
+            <th>${hubT('服务进度', 'Progress')}</th>
+            <th>${hubT('当前进展', 'Current step')}</th>
+            <th>${hubT('更多功能', 'More')}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function closeHubHelpTips(exceptWrap) {
@@ -7392,15 +7426,14 @@ function bindHubUi() {
 
     const progressBtn = e.target.closest('[data-hub-progress-toggle]');
     if (progressBtn) {
-      const row = progressBtn.closest('.hub-progress-row');
-      if (!row) return;
+      const row = progressBtn.closest('tr');
+      const detail = row?.nextElementSibling;
+      if (!row || !detail?.hasAttribute('data-hub-progress-detail')) return;
       const id = row.getAttribute('data-service-id') || '';
-      const detail = row.querySelector('.hub-progress-detail');
-      const willOpen = !row.classList.contains('is-open');
-      row.classList.toggle('is-open', willOpen);
+      const willOpen = detail.hidden;
+      detail.hidden = !willOpen;
       progressBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       progressBtn.textContent = willOpen ? hubT('收起', 'Hide') : hubT('查看详情', 'View details');
-      if (detail) detail.hidden = !willOpen;
       if (id) {
         if (willOpen) serviceProgressExpandedIds.add(id);
         else serviceProgressExpandedIds.delete(id);
