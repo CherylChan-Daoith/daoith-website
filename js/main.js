@@ -7246,15 +7246,18 @@ function renderServiceProgress(services, quotes) {
     const plannedLabel = compact ? hubT('预', 'ETA') : hubT('预计完成', 'Est. complete');
     const actualLabel = compact ? hubT('实', 'Done') : hubT('实际完成', 'Actual complete');
     const fmtDate = compact ? formatDateMd : formatDateDay;
-    const nodes = tasks.length
-      ? `<ol class="hub-nodes${compact ? ' is-compact' : ''}">${tasks.map((t) => {
+    const nodeTasks = tasks.slice().sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+    const nodes = nodeTasks.length
+      ? `<ol class="hub-nodes${compact ? ' is-compact' : ''}">${nodeTasks.map((t, i) => {
           const done = isTaskDoneHub(t.status);
           const current = t.status === 'IN_PROGRESS' || t.status === 'OVERDUE';
           const cls = [done ? 'is-done' : '', current ? 'is-current' : ''].filter(Boolean).join(' ');
           const planned = t.plannedDueDate ? fmtDate(t.plannedDueDate) : '—';
           const actual = t.actualCompletedAt ? fmtDate(t.actualCompletedAt) : '—';
+          const stepNo = `Step ${String(i + 1).padStart(2, '0')}`;
+          const title = `${stepNo} ${t.title || hubT('节点', 'Step')}`;
           return `<li class="hub-node ${cls}">
-            <span class="hub-node-title">${escapeHtmlHub(t.title || hubT('节点', 'Step'))}</span>
+            <span class="hub-node-title">${escapeHtmlHub(title)}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.plannedDueDate ? formatDate(t.plannedDueDate) : '')}">${plannedLabel} ${escapeHtmlHub(planned)}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.actualCompletedAt ? formatDate(t.actualCompletedAt) : '')}">${actualLabel} ${escapeHtmlHub(actual)}</span>
           </li>`;
