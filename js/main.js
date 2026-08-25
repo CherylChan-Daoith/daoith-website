@@ -7017,13 +7017,6 @@ function hubStep01Time(tasks) {
   return first.plannedDueDate || first.actualCompletedAt || '';
 }
 
-function hubBarTone(pct) {
-  const n = Number(pct) || 0;
-  if (n <= 33) return 'is-low';
-  if (n <= 66) return 'is-mid';
-  return 'is-high';
-}
-
 function collectOrderRows(quotes, services) {
   const svcMap = projectsByInquiry(services);
   const rows = [];
@@ -7175,7 +7168,6 @@ function renderServiceProgress(services, quotes) {
   const rows = projects.map((p) => {
     const tasks = Array.isArray(p.tasks) ? p.tasks : [];
     const progress = hubProgressPct(p);
-    const tone = hubBarTone(progress);
     const currentStep = serviceProgressCurrentStep(tasks);
     const nodes = tasks.length
       ? `<ol class="hub-nodes">${tasks.map((t) => {
@@ -7198,7 +7190,7 @@ function renderServiceProgress(services, quotes) {
         <td class="hub-cell-wrap"><strong class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</strong></td>
         <td class="hub-td-bar">
           <div class="hub-bar-wrap" title="${progress}%">
-            <div class="hub-bar ${tone}" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
+            <div class="hub-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
             <span class="hub-bar-pct">${progress}%</span>
           </div>
         </td>
