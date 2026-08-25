@@ -4809,123 +4809,69 @@ body.modal-open {
 }
 
 /* ===== SERVICE HUB ===== */
-.hub-journey {
-  position: relative;
-  margin-bottom: 28px;
-  padding: 22px 24px 20px;
-  overflow: hidden;
-  border: 1.5px solid rgba(34, 81, 255, 0.28);
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 4px 18px rgba(34, 81, 255, 0.06);
+#hub.section {
+  padding: 0 0 64px;
 }
 
-.hub-journey::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 28px;
-  pointer-events: none;
-  z-index: 1;
-  border-radius: 15px 15px 0 0;
-  background: linear-gradient(
-    180deg,
-    rgba(34, 81, 255, 0.18) 0%,
-    rgba(59, 130, 246, 0.08) 42%,
-    rgba(34, 81, 255, 0) 100%
-  );
-  box-shadow: inset 0 1px 0 rgba(34, 81, 255, 0.35);
-}
-
-.hub-journey-track {
-  position: relative;
-  z-index: 2;
+.hub-hero {
+  min-height: calc(100vh - 60px);
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.hub-journey-node {
-  flex: 0 1 180px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border-light);
+  padding: 88px 0 36px;
   text-align: center;
-  padding: 10px 12px;
-  border-radius: 12px;
-  opacity: 0.38;
-  transform: scale(0.96);
-  transition: opacity 0.35s ease, transform 0.35s ease, background 0.35s ease, box-shadow 0.35s ease;
 }
 
-.hub-journey-node.is-on,
-.hub-journey.is-done .hub-journey-node {
+.hub-hero h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(2.25rem, 5vw, 3.25rem);
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.25;
+  margin: 0 auto 24px;
+  max-width: 820px;
+}
+
+.hub-hero .hero-subtitle {
+  margin-bottom: 40px;
+}
+
+.hub-hero .process-flow {
+  margin-bottom: 40px;
+}
+
+.hub-hero .stats {
+  margin-bottom: 28px;
+}
+
+#hubJourney .process-card {
+  opacity: 0.42;
+  transition: opacity 0.35s ease, background 0.35s ease;
+}
+
+#hubJourney .process-card.is-active,
+#hubJourney.is-done .process-card {
   opacity: 1;
-  transform: scale(1);
-  background: linear-gradient(135deg, rgba(34, 81, 255, 0.08), rgba(34, 211, 238, 0.08));
-  box-shadow: 0 4px 14px rgba(34, 81, 255, 0.08);
 }
 
-.hub-journey-num {
-  display: block;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #3b6cff;
-  margin-bottom: 4px;
+#hubJourney .process-arrow {
+  opacity: 0.28;
+  transition: opacity 0.35s ease, color 0.35s ease;
 }
 
-.hub-journey-node strong {
-  display: block;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #2251ff;
-  margin-bottom: 2px;
+#hubJourney .process-arrow.is-on,
+#hubJourney.is-done .process-arrow {
+  opacity: 1;
+  color: var(--ink);
 }
 
-.hub-journey-desc {
-  display: block;
-  font-size: 0.72rem;
-  color: #5b6b95;
-  line-height: 1.4;
+.hub-hero .hub-scroll-hint {
+  margin-top: 8px;
 }
 
-.hub-journey-line {
-  flex: 1 1 40px;
-  max-width: 72px;
-  height: 2px;
-  position: relative;
-  background: rgba(34, 81, 255, 0.14);
-}
-
-.hub-journey-line::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, #1a3a7a, #1a5a88);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.45s ease;
-}
-
-.hub-journey-line.is-on::before,
-.hub-journey.is-done .hub-journey-line::before {
-  transform: scaleX(1);
-}
-
-.hub-journey-line::after {
-  content: '';
-  position: absolute;
-  right: -5px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: 5px solid transparent;
-  border-left-color: rgba(34, 81, 255, 0.28);
-}
-
-.hub-journey-line.is-on::after,
-.hub-journey.is-done .hub-journey-line::after {
-  border-left-color: #1a3a7a;
+.hub-body {
+  padding-top: 48px;
 }
 
 .hub-scroll-hint {
@@ -4970,49 +4916,9 @@ body.modal-open {
     animation: none;
   }
 
-  .hub-journey-node,
-  .hub-journey-line::before {
+  #hubJourney .process-card,
+  #hubJourney .process-arrow {
     transition: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .hub-journey-track {
-    flex-direction: column;
-  }
-
-  .hub-journey-line {
-    width: 2px;
-    height: 28px;
-    max-width: none;
-    flex: 0 0 28px;
-  }
-
-  .hub-journey-line::before {
-    transform-origin: top;
-    transform: scaleY(0);
-  }
-
-  .hub-journey-line.is-on::before,
-  .hub-journey.is-done .hub-journey-line::before {
-    transform: scaleY(1);
-  }
-
-  .hub-journey-line::after {
-    right: auto;
-    left: 50%;
-    top: auto;
-    bottom: -5px;
-    transform: translateX(-50%);
-    border: 5px solid transparent;
-    border-top-color: rgba(34, 81, 255, 0.28);
-    border-left-color: transparent;
-  }
-
-  .hub-journey-line.is-on::after,
-  .hub-journey.is-done .hub-journey-line::after {
-    border-top-color: #1a3a7a;
-    border-left-color: transparent;
   }
 }
 

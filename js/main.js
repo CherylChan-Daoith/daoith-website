@@ -257,7 +257,7 @@ function initNavDropdown() {
 /* Hero process cards reveal feature blocks */
 function initHeroFeatures() {
   const grid = document.getElementById('heroFeatures');
-  const cards = document.querySelectorAll('.process-card[data-step]');
+  const cards = document.querySelectorAll('#hero .process-card[data-step]');
   if (!grid || !cards.length) return;
 
   function revealStep(step) {
@@ -1941,7 +1941,7 @@ function stripDiagnosisArchivePreamble(text) {
       if (
         /^(诊断档案确认|业务档案确认|诊断信息确认|档案确认)[:：]/.test(plain) ||
         /^以下方案由左侧/.test(plain) ||
-        /^您好[，,]?\s*我是您的道一合规小助手/.test(plain)
+        /^您好[，,]?\s*我是您的(道一合规小助手|AI合规助手)/.test(plain)
       ) {
         continue;
       }
@@ -5353,7 +5353,7 @@ function convertMarkdownTablesToBullets(text) {
 }
 
 const SOLUTION_GREETING =
-  '您好，我是您的道一合规小助手，我将基于AI知识库给您提供合规方案，供您一般性参考，如您需要更准确和更有针对性的解决方案，可以咨询我们的财税合规专家！';
+  '您好，我是您的AI合规助手，我将基于财税知识库给您提供合规方案，供您一般性参考。由于AI和知识库具有一定的局限性，如您需要更准确和更有针对性的解决方案，建议您预约我们的财税专家进行一对一咨询！';
 
 function isAskAgainOrGenericFramework(text) {
   const t = String(text || '');
@@ -6742,11 +6742,11 @@ function hubSubOrderNo(inquiryId, index, createdAt) {
 function playHubJourney() {
   const root = document.getElementById('hubJourney');
   if (!root) return;
-  const nodes = [...root.querySelectorAll('.hub-journey-node')];
-  const lines = [...root.querySelectorAll('.hub-journey-line')];
+  const nodes = [...root.querySelectorAll('.process-card')];
+  const lines = [...root.querySelectorAll('.process-arrow')];
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   root.classList.remove('is-playing', 'is-done');
-  nodes.forEach((n) => n.classList.remove('is-on'));
+  nodes.forEach((n) => n.classList.remove('is-active', 'is-on'));
   lines.forEach((n) => n.classList.remove('is-on'));
   if (reduce) {
     root.classList.add('is-done');
@@ -6755,7 +6755,7 @@ function playHubJourney() {
   root.classList.add('is-playing');
   nodes.forEach((node, i) => {
     setTimeout(() => {
-      node.classList.add('is-on');
+      node.classList.add('is-active', 'is-on');
       if (i > 0) lines[i - 1]?.classList.add('is-on');
       if (i === nodes.length - 1) {
         setTimeout(() => root.classList.add('is-done'), 280);
