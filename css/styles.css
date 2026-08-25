@@ -5422,9 +5422,16 @@ body.modal-open {
   background: var(--accent-soft);
 }
 
-.hub-node-title {
+.hub-node-step {
   display: block;
   font-weight: 650;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.hub-node-title {
+  display: block;
+  font-weight: 500;
   color: inherit;
   white-space: nowrap;
   overflow: hidden;

@@ -7255,9 +7255,10 @@ function renderServiceProgress(services, quotes) {
           const planned = t.plannedDueDate ? fmtDate(t.plannedDueDate) : '—';
           const actual = t.actualCompletedAt ? fmtDate(t.actualCompletedAt) : '—';
           const stepNo = `Step ${String(i + 1).padStart(2, '0')}`;
-          const title = `${stepNo} ${t.title || hubT('节点', 'Step')}`;
+          const name = t.title || hubT('节点', 'Step');
           return `<li class="hub-node ${cls}">
-            <span class="hub-node-title">${escapeHtmlHub(title)}</span>
+            <span class="hub-node-step">${escapeHtmlHub(stepNo)}</span>
+            <span class="hub-node-title">${escapeHtmlHub(name)}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.plannedDueDate ? formatDate(t.plannedDueDate) : '')}">${plannedLabel} ${escapeHtmlHub(planned)}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.actualCompletedAt ? formatDate(t.actualCompletedAt) : '')}">${actualLabel} ${escapeHtmlHub(actual)}</span>
           </li>`;
