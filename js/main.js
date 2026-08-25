@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAiChatbot();
   initTaxCalculator();
   initServicesMarketplace();
-  initHubTabs();
+  initServiceHub();
   initWechatToggle();
   initFeedbackForm();
   initLoadMore();
@@ -32,6 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateExpertArticles();
     refreshPaginationLabels();
     refreshShowMoreServicesLabel();
+    if (typeof window.DAOITH_refreshHub === 'function') window.DAOITH_refreshHub();
   });
 
   window.addEventListener('daoith-auth-pending', (event) => {
@@ -6512,42 +6513,76 @@ function initShowMoreServices() {
   /* replaced by initServicesMarketplace */
 }
 
-/* Hub Tabs */
-function initHubTabs() {
-  const tabs = document.querySelectorAll('.hub-tab');
-  const tabPanes = {
-    orders: document.getElementById('ordersTab'),
-    quotes: document.getElementById('quotesTab'),
-    feedback: document.getElementById('feedbackTab'),
-  };
+/* Service Hub */
+const HUB_INQUIRY_LIMIT = 3;
+const HUB_ORDER_LIMIT = 5;
+const HUB_BANK = {
+  account: '15001942878943',
+  name: '道一天成企业管理（深圳）有限责任公司',
+  branch: '平安银行深圳梅龙支行',
+  cnaps: '307584021509',
+};
+const HUB_DISCOUNT_ZH = '1 个服务项目按原价；2 个服务项目享 9.5 折；3 个及以上服务项目享 9 折。按询价单中的服务项目数量计算（同一服务的数量不叠加折扣档）。最终成交价以顾问确认为准。';
+const HUB_DISCOUNT_EN = '1 service: list price; 2 services: 5% off; 3 or more: 10% off. Counted by distinct services on the inquiry (quantity of the same service does not change the tier). Final amount is confirmed by the advisor.';
 
-  async function refreshHubQuotes() {
+let hubQuotesCache = [];
+let hubServicesCache = [];
+let hubQuotesExpanded = false;
+let hubOrdersExpanded = false;
+let hubEventsBound = false;
+
+function hubT(zh, en) {
+  return (window.DAOITH_getLocale?.() || 'zh') === 'en' ? en : zh;
+}
+
+function hubDiscountRate(itemCount) {
+  const n = Number(itemCount) || 0;
+  if (n >= 3) return 0.9;
+  if (n === 2) return 0.95;
+  return 1;
+}
+
+function hubQuoteTotals(q) {
+  const items = Array.isArray(q?.items) ? q.items : [];
+  let standard = 0;
+  items.forEach((it) => {
+    standard += (Number(it.priceValue) || 0) * (Number(it.qty) || 1);
+  });
+  if (standard <= 0) standard = Number(q?.total) || 0;
+  const rate = hubDiscountRate(items.length);
+  const quoted = q?.quotedTotal != null && q.quotedTotal !== ''
+    ? Number(q.quotedTotal)
+    : Math.round(standard * rate * 100) / 100;
+  return { standard, quoted, rate, items };
+}
+
+function hubOrderNo(inquiryId) {
+  const id = String(inquiryId || '').trim();
+  if (!id) return '';
+  return /^INQ/i.test(id) ? `SO${id.slice(3)}` : `SO-${id}`;
+}
+
+function hubSubOrderNo(inquiryId, index) {
+  return `${hubOrderNo(inquiryId)}-${String(index + 1).padStart(2, '0')}`;
+}
+
+function initServiceHub() {
+  async function refreshHubData() {
     const quotes = await loadQuotesForHub();
-    renderQuotesList(quotes);
-    renderHubProgress(quotes);
+    hubQuotesCache = quotes;
     const services = await loadServiceProgressForHub();
-    renderServiceProgress(services);
+    hubServicesCache = services;
+    renderHubInquiries(quotes);
+    renderHubOrders(quotes, services);
+    renderServiceProgress(services, quotes);
     return quotes;
   }
 
-  function showTab(name) {
-    Object.entries(tabPanes).forEach(([k, el]) => {
-      if (el) el.style.display = k === name ? '' : 'none';
-    });
-    if (name === 'quotes' || name === 'orders') refreshHubQuotes();
-  }
-
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      tabs.forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
-      showTab(tab.dataset.tab);
-    });
-  });
-
-  refreshHubQuotes();
+  bindHubUi();
+  refreshHubData();
+  window.DAOITH_refreshHub = refreshHubData;
   window.addEventListener('daoith-auth-change', () => {
-    refreshHubQuotes();
+    refreshHubData();
   });
 }
 
@@ -6596,11 +6631,16 @@ function normalizeRemoteQuote(q) {
     contact: q.contact,
     phone: q.phone,
     total: q.total,
+    quotedTotal: q.quotedTotal,
+    standardTotal: q.standardTotal,
     items: q.items || [],
     status,
     statusHistory,
     createdAt,
     openid: q.websiteOpenid || null,
+    hasPaymentSlip: !!q.hasPaymentSlip,
+    paymentSlipName: q.paymentSlipName || '',
+    paidAt: q.paidAt || '',
   };
 }
 
@@ -6640,110 +6680,183 @@ async function loadQuotesForHub() {
 
 function formatDate(iso) {
   const d = new Date(iso);
-  if (isNaN(d)) return iso;
+  if (isNaN(d)) return iso || '—';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function formatWanHub(v) {
-  return `¥${(Number(v) || 0).toFixed(2)} 万元`;
-}
-
 function quoteStatusLabel(status) {
-  const s = status || '已提交';
-  return s;
+  return status || '已提交';
 }
 
-function renderQuotesList(quotes) {
+function formatYuanHub(v) {
+  if (typeof window.formatServicePrice === 'function') {
+    return window.formatServicePrice(v);
+  }
+  return `¥${(Number(v) || 0).toLocaleString('zh-CN')}`;
+}
+
+function hubStatusClass(status) {
+  const map = {
+    '已提交': 'hub-status-submitted',
+    '处理中': 'hub-status-processing',
+    '已报价': 'hub-status-quoted',
+    '已成交': 'hub-status-won',
+    '已关闭': 'hub-status-closed',
+  };
+  return map[status] || 'hub-status-submitted';
+}
+
+function hubServiceNames(items) {
+  return (items || [])
+    .map((it) => {
+      const title = it.title || it.name || it.id || '';
+      const qty = Number(it.qty) || 1;
+      return qty > 1 ? `${title} × ${qty}` : title;
+    })
+    .filter(Boolean)
+    .join(hubT('、', ', '));
+}
+
+function hubBankHtml() {
+  return `
+    <div><strong>${hubT('账号', 'Account')}</strong> ${escapeHtmlHub(HUB_BANK.account)}</div>
+    <div><strong>${hubT('账户名称', 'Account name')}</strong> ${escapeHtmlHub(HUB_BANK.name)}</div>
+    <div><strong>${hubT('归属网点', 'Branch')}</strong> ${escapeHtmlHub(HUB_BANK.branch)}</div>
+    <div><strong>${hubT('归属行行号', 'CNAPS')}</strong> ${escapeHtmlHub(HUB_BANK.cnaps)}</div>`;
+}
+
+function hubMoreButton(kind, hiddenCount) {
+  if (hiddenCount <= 0) return '';
+  return `<div class="hub-more-wrap"><button type="button" class="hub-more-btn" data-hub-more="${kind}">${hubT(`展开其余 ${hiddenCount} 条`, `Show ${hiddenCount} more`)}</button></div>`;
+}
+
+function renderHubInquiries(quotes) {
   const wrap = document.getElementById('quotesListWrap');
   if (!wrap) return;
   const list = Array.isArray(quotes) ? quotes : getQuotes();
   if (!list.length) {
-    wrap.innerHTML = `<div class="empty-state"><div class="icon">📬</div><h4>暂无询价记录</h4><p>在购物车提交询价后，记录将显示在这里</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="icon">📬</div><h4>${hubT('暂无询价记录', 'No inquiries yet')}</h4><p>${hubT('在购物车提交询价后，记录将显示在这里', 'Submitted inquiries will appear here.')}</p></div>`;
     return;
   }
-  wrap.innerHTML = list.map((q, i) => {
-    const services = (q.items || []).map((it) => `${it.title} × ${it.qty}`).join('、');
+  const visible = hubQuotesExpanded ? list : list.slice(0, HUB_INQUIRY_LIMIT);
+  wrap.innerHTML = visible.map((q, i) => {
+    const totals = hubQuoteTotals(q);
     const status = quoteStatusLabel(q.status);
+    const paid = q.paidAt ? formatDate(q.paidAt) : '—';
+    const slipName = q.hasPaymentSlip
+      ? (q.paymentSlipName || hubT('已上传', 'Uploaded'))
+      : hubT('未上传', 'Not uploaded');
     return `
-      <div class="quote-record">
-        <div class="quote-record-head">
-          <span class="quote-record-no">${q.inquiryId || `询价 #${list.length - i}`}</span>
-          <span class="quote-record-date">${formatDate(q.createdAt)}</span>
-          <span class="quote-record-status">${status}</span>
+      <div class="hub-record" data-inquiry-id="${escapeHtmlHub(q.inquiryId || '')}">
+        <div class="hub-record-head">
+          <span class="hub-record-no">${escapeHtmlHub(q.inquiryId || `${hubT('询价', 'Inquiry')} #${list.length - i}`)}</span>
+          <span class="hub-record-meta">${escapeHtmlHub(formatDate(q.createdAt))}</span>
+          <span class="hub-status ${hubStatusClass(status)}">${escapeHtmlHub(status)}</span>
         </div>
-        <div class="quote-record-body">
-          <div><strong>公司：</strong>${q.company || '—'} &nbsp; <strong>联系人：</strong>${q.contact || '—'} &nbsp; <strong>电话：</strong>${q.phone || '—'}</div>
-          <div class="quote-record-services">${services || '—'}</div>
-          <div class="quote-record-total">预计总价：${formatWanHub(q.total)}</div>
+        <div class="hub-record-body">
+          <dl class="hub-dl">
+            <dt>${hubT('询价单号', 'Inquiry no.')}</dt>
+            <dd>${escapeHtmlHub(q.inquiryId || '—')}</dd>
+            <dt>${hubT('提交时间', 'Submitted')}</dt>
+            <dd>${escapeHtmlHub(formatDate(q.createdAt))}</dd>
+            <dt>${hubT('服务项目', 'Services')}</dt>
+            <dd>${escapeHtmlHub(hubServiceNames(totals.items) || '—')}</dd>
+            <dt>${hubT('标准收费', 'List price')}</dt>
+            <dd class="hub-price-old">${escapeHtmlHub(formatYuanHub(totals.standard))}</dd>
+            <dt>
+              ${hubT('优惠报价', 'Preferential quote')}
+              <span class="hub-help-wrap">
+                <button type="button" class="hub-help" data-hub-help aria-expanded="false" aria-label="${hubT('优惠报价说明', 'Quote discount rules')}">?</button>
+                <span class="hub-help-tip" hidden>${escapeHtmlHub(hubT(HUB_DISCOUNT_ZH, HUB_DISCOUNT_EN))}</span>
+              </span>
+            </dt>
+            <dd class="hub-price-deal">${escapeHtmlHub(formatYuanHub(totals.quoted))}${totals.rate < 1 ? ` <span class="hub-price-old">(${totals.rate === 0.9 ? '9' : '9.5'}${hubT('折', ' off')})</span>` : ''}</dd>
+            <dt>${hubT('支付水单', 'Payment slip')}</dt>
+            <dd>
+              <div class="hub-slip-actions">
+                <span>${escapeHtmlHub(slipName)}</span>
+                ${q.hasPaymentSlip ? `<button type="button" class="hub-link-btn" data-hub-view-slip="${escapeHtmlHub(q.inquiryId || '')}">${hubT('查看', 'View')}</button>` : ''}
+                <button type="button" class="hub-link-btn" data-hub-upload="${escapeHtmlHub(q.inquiryId || '')}">${q.hasPaymentSlip ? hubT('重新上传', 'Re-upload') : hubT('上传水单', 'Upload slip')}</button>
+              </div>
+              <button type="button" class="hub-link-btn" data-hub-bank aria-expanded="false">${hubT('点击查看收款账号', 'View receiving account')}</button>
+              <div class="hub-bank" hidden>${hubBankHtml()}</div>
+            </dd>
+            <dt>${hubT('支付时间', 'Paid at')}</dt>
+            <dd>${escapeHtmlHub(paid)}</dd>
+            <dt>${hubT('询价单状态', 'Status')}</dt>
+            <dd><span class="hub-status ${hubStatusClass(status)}">${escapeHtmlHub(status)}</span></dd>
+          </dl>
         </div>
       </div>`;
-  }).join('');
+  }).join('') + (hubQuotesExpanded
+    ? (list.length > HUB_INQUIRY_LIMIT
+      ? `<div class="hub-more-wrap"><button type="button" class="hub-more-btn" data-hub-more="quotes-collapse">${hubT('收起', 'Show less')}</button></div>`
+      : '')
+    : hubMoreButton('quotes', Math.max(0, list.length - HUB_INQUIRY_LIMIT)));
 }
 
-function renderHubProgress(quotes) {
-  const wrap = document.getElementById('hubProgressWrap');
+function projectsByInquiry(services) {
+  const map = new Map();
+  (Array.isArray(services) ? services : []).forEach((s) => {
+    map.set(s.inquiryId, s);
+  });
+  return map;
+}
+
+function renderHubOrders(quotes, services) {
+  const wrap = document.getElementById('hubOrdersWrap');
   if (!wrap) return;
-  const list = Array.isArray(quotes) ? quotes : getQuotes();
+  const list = (Array.isArray(quotes) ? quotes : []).filter((q) => q.status === '已成交');
   if (!list.length) {
-    wrap.innerHTML = `<div class="empty-state"><div class="icon icon-muted">—</div><h4>暂未提交询价</h4><p>在购物车提交询价后，顾问会跟进并在此更新进度</p><a href="/cart.html" class="btn btn-primary btn-sm" style="margin-top:12px">前往购物车</a></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="icon icon-muted">—</div><h4>${hubT('暂无服务订单', 'No service orders')}</h4><p>${hubT('询价成交并完成支付后，订单将显示在这里', 'Orders appear here after an inquiry is closed-won.')}</p></div>`;
     return;
   }
-  const latest = list[0];
-  const status = latest.status || '已提交';
-  const history = latest.statusHistory && typeof latest.statusHistory === 'object' ? latest.statusHistory : {};
-  const services = (latest.items || []).map((it) => it.title).join('、');
-  const pathDone = {
-    '已提交': ['已提交', '处理中', '已报价', '已成交', '已关闭'],
-    '处理中': ['处理中', '已报价', '已成交', '已关闭'],
-    '已报价': ['已报价', '已成交', '已关闭'],
-    '已成交': ['已成交'],
-    '已关闭': ['已关闭'],
-  };
-  // 已成交 / 已关闭 终态二选一：两个节点都展示，仅选中的算完成
-  const steps = [
-    { key: '已提交', title: '询价已提交', pendingText: '—' },
-    { key: '处理中', title: '处理中', pendingText: '待处理' },
-    { key: '已报价', title: '已报价', pendingText: '待报价' },
-    { key: '已成交', title: '已成交', pendingText: status === '已关闭' ? '未选' : '—' },
-    { key: '已关闭', title: '已关闭', pendingText: status === '已成交' ? '未选' : '—' },
-  ];
-  wrap.innerHTML = `
-    <div class="quote-progress">
-      ${steps.map((step) => {
-        const done = (pathDone[step.key] || []).includes(status);
-        const skipped = (step.key === '已成交' && status === '已关闭')
-          || (step.key === '已关闭' && status === '已成交');
-        const cls = [
-          done ? 'done' : '',
-          skipped ? 'skipped' : '',
-        ].filter(Boolean).join(' ');
-        const at = history[step.key]
-          || (done && step.key === '已提交' ? latest.createdAt : '')
-          || (done ? history['已提交'] || latest.createdAt : '');
-        const sub = done
-          ? (at ? formatDate(at) : '—')
-          : (step.pendingText || '—');
-        return `
-          <div class="quote-progress-step ${cls}">
-            <div class="step-dot"></div>
-            <div class="step-body">
-              <strong>${step.title}</strong>
-              <span>${sub}</span>
-            </div>
-          </div>`;
-      }).join('')}
-    </div>
-    <div class="quote-progress-meta">
-      <span>最新询价：${services || '—'}（${status}）</span>
-      &nbsp;·&nbsp;
-      <a href="#" class="hub-tab-link" data-tab="quotes">查看全部询价记录 →</a>
-    </div>
-  `;
-  wrap.querySelector('.hub-tab-link')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    const tab = document.querySelector('.hub-tab[data-tab="quotes"]');
-    tab?.click();
-  });
+  const svcMap = projectsByInquiry(services);
+  const visible = hubOrdersExpanded ? list : list.slice(0, HUB_ORDER_LIMIT);
+  wrap.innerHTML = visible.map((q) => {
+    const totals = hubQuoteTotals(q);
+    const orderNo = hubOrderNo(q.inquiryId);
+    const svc = svcMap.get(q.inquiryId);
+    const projects = Array.isArray(svc?.projects) ? svc.projects : [];
+    const items = totals.items.length ? totals.items : [{ title: hubT('成交服务', 'Service') }];
+    const rows = items.map((it, i) => {
+      const p = projects[i] || projects.find((x) => x.serviceType === it.title) || null;
+      const subNo = p?.subOrderNo || hubSubOrderNo(q.inquiryId, i);
+      const step = p ? serviceProgressCurrentStep(p.tasks) : hubT('待启动', 'Pending start');
+      return `
+        <div class="hub-suborder">
+          <span class="hub-suborder-no">${escapeHtmlHub(subNo)}</span>
+          <span class="hub-suborder-title">${escapeHtmlHub(it.title || p?.serviceType || '—')}</span>
+          <span class="hub-suborder-step">${escapeHtmlHub(step)}</span>
+        </div>`;
+    }).join('');
+    return `
+      <div class="hub-record">
+        <div class="hub-record-head">
+          <span class="hub-record-no">${escapeHtmlHub(orderNo)}</span>
+          <span class="hub-record-meta">${hubT('联系人', 'Contact')}：${escapeHtmlHub(q.contact || '—')}</span>
+          <span class="hub-status hub-status-won">${hubT('已成交', 'Won')}</span>
+        </div>
+        <div class="hub-record-body">
+          <dl class="hub-dl">
+            <dt>${hubT('订单号', 'Order no.')}</dt>
+            <dd>${escapeHtmlHub(orderNo)}</dd>
+            <dt>${hubT('订单金额', 'Amount paid')}</dt>
+            <dd class="hub-price-deal">${escapeHtmlHub(formatYuanHub(totals.quoted))}</dd>
+            <dt>${hubT('支付时间', 'Paid at')}</dt>
+            <dd>${escapeHtmlHub(q.paidAt ? formatDate(q.paidAt) : '—')}</dd>
+            <dt>${hubT('联系人', 'Contact')}</dt>
+            <dd>${escapeHtmlHub(q.contact || '—')}</dd>
+            <dt>${hubT('服务项目', 'Services')}</dt>
+            <dd class="hub-suborders">${rows}</dd>
+          </dl>
+        </div>
+      </div>`;
+  }).join('') + (hubOrdersExpanded
+    ? (list.length > HUB_ORDER_LIMIT
+      ? `<div class="hub-more-wrap"><button type="button" class="hub-more-btn" data-hub-more="orders-collapse">${hubT('收起', 'Show less')}</button></div>`
+      : '')
+    : hubMoreButton('orders', Math.max(0, list.length - HUB_ORDER_LIMIT)));
 }
 
 function taskStatusLabelHub(status) {
@@ -6783,34 +6896,62 @@ function serviceProgressCurrentStep(tasks) {
   const list = Array.isArray(tasks) ? tasks : [];
   const active = list.find((t) => t.status === 'IN_PROGRESS' || t.status === 'OVERDUE')
     || list.find((t) => !isTaskDoneHub(t.status));
-  if (active) return active.title || '进行中';
-  if (list.length && list.every((t) => isTaskDoneHub(t.status))) return '全部完成';
-  return '待启动';
+  if (active) return active.title || hubT('进行中', 'In progress');
+  if (list.length && list.every((t) => isTaskDoneHub(t.status))) return hubT('全部完成', 'Completed');
+  return hubT('待启动', 'Pending start');
 }
 
-function renderServiceProgress(services) {
+function collectProgressCards(services, quotes) {
+  const cards = [];
+  const covered = new Set();
+  (Array.isArray(services) ? services : []).forEach((s) => {
+    (s.projects || []).forEach((p, i) => {
+      covered.add(s.inquiryId);
+      cards.push({
+        id: String(p.id || `${s.inquiryId}:${i}`),
+        inquiryId: s.inquiryId,
+        company: s.company || '',
+        title: p.serviceType || p.name || hubT('服务', 'Service'),
+        orderNo: p.orderNo || hubOrderNo(s.inquiryId),
+        subOrderNo: p.subOrderNo || hubSubOrderNo(s.inquiryId, i),
+        progress: Number(p.progress) || 0,
+        tasks: Array.isArray(p.tasks) ? p.tasks : [],
+      });
+    });
+  });
+  (Array.isArray(quotes) ? quotes : []).forEach((q) => {
+    if (q.status !== '已成交' || covered.has(q.inquiryId)) return;
+    (q.items || []).forEach((it, i) => {
+      cards.push({
+        id: `${q.inquiryId}:${i}`,
+        inquiryId: q.inquiryId,
+        company: q.company || '',
+        title: it.title || hubT('服务', 'Service'),
+        orderNo: hubOrderNo(q.inquiryId),
+        subOrderNo: hubSubOrderNo(q.inquiryId, i),
+        progress: 0,
+        tasks: [],
+      });
+    });
+  });
+  return cards;
+}
+
+function renderServiceProgress(services, quotes) {
   const wrap = document.getElementById('quoteProgressWrap');
   if (!wrap) return;
-  const list = Array.isArray(services) ? services : [];
-  const projects = list.flatMap((s) =>
-    (s.projects || []).map((p) => ({
-      ...p,
-      inquiryId: s.inquiryId,
-      company: s.company,
-    }))
-  );
+  const projects = collectProgressCards(services, quotes);
 
   if (!projects.length) {
     wrap.innerHTML = `
       <div class="empty-state">
         <div class="icon icon-muted">—</div>
-        <h4>暂无进行中的服务</h4>
-        <p>询价成交后，顾问会按服务流程在此更新进度</p>
+        <h4>${hubT('暂无进行中的服务', 'No active services')}</h4>
+        <p>${hubT('询价成交后，顾问会按服务流程在此更新进度', 'Progress updates appear here after purchase.')}</p>
       </div>`;
     return;
   }
 
-  // Single service: expand by default; multiple: collapse unless user opened before
   if (projects.length === 1 && projects[0].id) {
     serviceProgressExpandedIds.add(String(projects[0].id));
   }
@@ -6818,18 +6959,23 @@ function renderServiceProgress(services) {
   wrap.innerHTML = projects.map((p) => {
     const tasks = Array.isArray(p.tasks) ? p.tasks : [];
     const progress = Number(p.progress) || 0;
-    const id = String(p.id || `${p.inquiryId}:${p.serviceType}`);
+    const id = String(p.id);
     const open = serviceProgressExpandedIds.has(id);
     const currentStep = serviceProgressCurrentStep(tasks);
-    const toggleLabel = open ? '收起流程' : '查看详细进度';
+    const toggleLabel = open ? hubT('收起流程', 'Hide steps') : hubT('查看详细进度', 'View steps');
+    const plannedLabel = hubT('预计完成', 'ETA');
+    const actualLabel = hubT('实际完成', 'Completed');
+    const emptyTasks = !tasks.length
+      ? `<p class="service-progress-summary">${hubT('服务流程尚未启动，顾问分配后将按节点更新预计与实际完成时间。', 'The workflow has not started. Planned and actual dates will appear after the advisor assigns the project.')}</p>`
+      : '';
     return `
       <div class="service-progress-card${open ? ' is-open' : ''}" data-service-id="${escapeHtmlHub(id)}">
         <button type="button" class="service-progress-toggle" aria-expanded="${open ? 'true' : 'false'}">
           <div class="service-progress-head">
             <div class="service-progress-title">
-              <strong>${escapeHtmlHub(p.serviceType || p.name || '服务')}</strong>
-              <div class="service-progress-sub">${escapeHtmlHub(p.inquiryId || '')}${p.company ? ` · ${escapeHtmlHub(p.company)}` : ''}</div>
-              <div class="service-progress-summary">${escapeHtmlHub(currentStep)} · ${tasks.length} 个节点</div>
+              <strong>${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</strong>
+              <div class="service-progress-sub">${hubT('子订单号', 'Sub-order')} ${escapeHtmlHub(p.subOrderNo || '—')}${p.orderNo ? ` · ${escapeHtmlHub(p.orderNo)}` : ''}</div>
+              <div class="service-progress-summary">${escapeHtmlHub(currentStep)}${tasks.length ? ` · ${tasks.length} ${hubT('个节点', 'steps')}` : ''}</div>
             </div>
             <div class="service-progress-aside">
               <span class="service-progress-pct">${progress}%</span>
@@ -6838,23 +6984,22 @@ function renderServiceProgress(services) {
           </div>
         </button>
         <div class="service-progress-detail" ${open ? '' : 'hidden'}>
+          ${emptyTasks}
           <div class="quote-progress">
             ${tasks.map((t) => {
               const done = isTaskDoneHub(t.status);
               const current = t.status === 'IN_PROGRESS' || t.status === 'OVERDUE';
               const cls = [done ? 'done' : '', current ? 'current' : ''].filter(Boolean).join(' ');
-              let sub = taskStatusLabelHub(t.status);
-              if (done && t.actualCompletedAt) {
-                sub = formatDate(t.actualCompletedAt);
-              } else if (!done && t.plannedDueDate) {
-                sub = `计划 ${formatDate(t.plannedDueDate)}`;
-              }
+              const planned = t.plannedDueDate ? formatDate(t.plannedDueDate) : '—';
+              const actual = t.actualCompletedAt ? formatDate(t.actualCompletedAt) : '—';
               return `
                 <div class="quote-progress-step ${cls}">
                   <div class="step-dot"></div>
                   <div class="step-body">
-                    <strong>${escapeHtmlHub(t.title || '节点')}</strong>
-                    <span>${escapeHtmlHub(sub)}</span>
+                    <strong>${escapeHtmlHub(t.title || hubT('节点', 'Step'))}</strong>
+                    <span>${escapeHtmlHub(taskStatusLabelHub(t.status))}</span>
+                    <span class="hub-task-times">${plannedLabel}：${escapeHtmlHub(planned)}</span>
+                    <span class="hub-task-times">${actualLabel}：${escapeHtmlHub(actual)}</span>
                   </div>
                 </div>`;
             }).join('')}
@@ -6862,24 +7007,238 @@ function renderServiceProgress(services) {
         </div>
       </div>`;
   }).join('');
+}
 
-  wrap.querySelectorAll('.service-progress-toggle').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const card = btn.closest('.service-progress-card');
+function closeHubHelpTips(exceptWrap) {
+  document.querySelectorAll('.hub-help-wrap').forEach((wrap) => {
+    if (exceptWrap && wrap === exceptWrap) return;
+    const tip = wrap.querySelector('.hub-help-tip');
+    const btn = wrap.querySelector('.hub-help');
+    if (tip) tip.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function toDatetimeLocalValue(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d)) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function guessPaidAtFromName(name) {
+  const m = String(name || '').match(/(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})(?:[-_.]?(\d{2})(\d{2}))?/);
+  if (!m) return '';
+  return toDatetimeLocalValue(`${m[1]}-${m[2]}-${m[3]}T${m[4] || '12'}:${m[5] || '00'}:00`);
+}
+
+function openHubSlipModal(inquiryId) {
+  const modal = document.getElementById('hubSlipModal');
+  if (!modal) return;
+  document.getElementById('hubSlipInquiryId').value = inquiryId || '';
+  document.getElementById('hubSlipFile').value = '';
+  document.getElementById('hubSlipPaidAt').value = toDatetimeLocalValue();
+  const err = document.getElementById('hubSlipError');
+  if (err) {
+    err.hidden = true;
+    err.textContent = '';
+  }
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+}
+
+function closeHubSlipModal() {
+  const modal = document.getElementById('hubSlipModal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.classList.remove('modal-open');
+}
+
+async function viewHubSlip(inquiryId) {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) {
+    window.DAOITH_CART?.showToast?.(hubT('请先微信登录', 'Please sign in with WeChat first.'));
+    return;
+  }
+  try {
+    const res = await fetch(`${notifyApiBase()}/api/inquiry/slip?inquiryId=${encodeURIComponent(inquiryId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+  } catch (err) {
+    window.DAOITH_CART?.showToast?.(hubT(`查看失败：${err.message || '网络错误'}`, `Could not open slip: ${err.message || 'network error'}`));
+  }
+}
+
+async function submitHubSlip(e) {
+  e.preventDefault();
+  const inquiryId = document.getElementById('hubSlipInquiryId')?.value.trim() || '';
+  const file = document.getElementById('hubSlipFile')?.files?.[0];
+  const paidAt = document.getElementById('hubSlipPaidAt')?.value || '';
+  const err = document.getElementById('hubSlipError');
+  const submitBtn = document.getElementById('hubSlipSubmit');
+  const showErr = (msg) => {
+    if (!err) return;
+    err.hidden = false;
+    err.textContent = msg;
+  };
+  if (!inquiryId) {
+    showErr(hubT('缺少询价单号', 'Missing inquiry number'));
+    return;
+  }
+  if (!file) {
+    showErr(hubT('请选择银行水单文件', 'Please choose a payment slip file'));
+    return;
+  }
+  if (!paidAt) {
+    showErr(hubT('请填写水单上的支付时间', 'Please enter the payment time on the slip'));
+    return;
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    showErr(hubT('文件不能超过 8MB', 'File must be 8MB or smaller'));
+    return;
+  }
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) {
+    showErr(hubT('请先微信登录', 'Please sign in with WeChat first.'));
+    return;
+  }
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = hubT('上传中…', 'Uploading…');
+  }
+  try {
+    const content = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch(`${notifyApiBase()}/api/inquiry/slip`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inquiryId,
+        filename: file.name,
+        mimeType: file.type,
+        content,
+        paidAt: new Date(paidAt).toISOString(),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    closeHubSlipModal();
+    window.DAOITH_CART?.showToast?.(hubT('水单已上传', 'Payment slip uploaded'));
+    if (typeof window.DAOITH_refreshHub === 'function') window.DAOITH_refreshHub();
+  } catch (uploadErr) {
+    showErr(hubT(`上传失败：${uploadErr.message || '网络错误'}`, `Upload failed: ${uploadErr.message || 'network error'}`));
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = hubT('上传', 'Upload');
+    }
+  }
+}
+
+function bindHubUi() {
+  if (hubEventsBound) return;
+  hubEventsBound = true;
+  const root = document.getElementById('hub');
+  if (!root) return;
+
+  root.addEventListener('click', (e) => {
+    const helpBtn = e.target.closest('[data-hub-help]');
+    if (helpBtn) {
+      const wrap = helpBtn.closest('.hub-help-wrap');
+      const tip = wrap?.querySelector('.hub-help-tip');
+      const willOpen = !!tip?.hidden;
+      closeHubHelpTips(wrap);
+      if (tip) tip.hidden = !willOpen;
+      helpBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      e.stopPropagation();
+      return;
+    }
+
+    const bankBtn = e.target.closest('[data-hub-bank]');
+    if (bankBtn) {
+      const box = bankBtn.parentElement?.querySelector('.hub-bank');
+      if (box) {
+        const open = box.hidden;
+        box.hidden = !open;
+        bankBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      return;
+    }
+
+    const uploadBtn = e.target.closest('[data-hub-upload]');
+    if (uploadBtn) {
+      openHubSlipModal(uploadBtn.getAttribute('data-hub-upload') || '');
+      return;
+    }
+
+    const viewBtn = e.target.closest('[data-hub-view-slip]');
+    if (viewBtn) {
+      viewHubSlip(viewBtn.getAttribute('data-hub-view-slip') || '');
+      return;
+    }
+
+    const moreBtn = e.target.closest('[data-hub-more]');
+    if (moreBtn) {
+      const kind = moreBtn.getAttribute('data-hub-more');
+      if (kind === 'quotes') hubQuotesExpanded = true;
+      if (kind === 'quotes-collapse') hubQuotesExpanded = false;
+      if (kind === 'orders') hubOrdersExpanded = true;
+      if (kind === 'orders-collapse') hubOrdersExpanded = false;
+      renderHubInquiries(hubQuotesCache);
+      renderHubOrders(hubQuotesCache, hubServicesCache);
+      return;
+    }
+
+    const toggle = e.target.closest('.service-progress-toggle');
+    if (toggle) {
+      const card = toggle.closest('.service-progress-card');
       if (!card) return;
       const id = card.getAttribute('data-service-id') || '';
       const detail = card.querySelector('.service-progress-detail');
       const action = card.querySelector('.service-progress-action');
       const willOpen = !card.classList.contains('is-open');
       card.classList.toggle('is-open', willOpen);
-      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       if (detail) detail.hidden = !willOpen;
-      if (action) action.textContent = willOpen ? '收起流程' : '查看详细进度';
+      if (action) action.textContent = willOpen ? hubT('收起流程', 'Hide steps') : hubT('查看详细进度', 'View steps');
       if (id) {
         if (willOpen) serviceProgressExpandedIds.add(id);
         else serviceProgressExpandedIds.delete(id);
       }
-    });
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.hub-help-wrap')) closeHubHelpTips();
+  });
+
+  document.querySelectorAll('[data-close-hub-slip]').forEach((el) => {
+    el.addEventListener('click', closeHubSlipModal);
+  });
+  document.getElementById('hubSlipForm')?.addEventListener('submit', submitHubSlip);
+  document.getElementById('hubSlipFile')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    const paidInput = document.getElementById('hubSlipPaidAt');
+    if (!file || !paidInput || paidInput.value) return;
+    const guessed = guessPaidAtFromName(file.name);
+    if (guessed) paidInput.value = guessed;
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') closeHubSlipModal();
   });
 }
 

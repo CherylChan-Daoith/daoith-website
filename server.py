@@ -116,6 +116,23 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/inquiry/slip":
+            inquiry_id = (query.get("inquiryId") or query.get("id") or [""])[0]
+            status, data = server_auth.handle_inquiry_slip_get(
+                self.headers.get("Authorization", ""),
+                inquiry_id,
+                load_env_value,
+            )
+            if isinstance(data, dict) and data.get("file"):
+                self.send_bytes(
+                    status,
+                    data.get("body") or b"",
+                    data.get("mime") or "application/octet-stream",
+                    filename=data.get("filename"),
+                )
+                return
+            self.send_json(status, data)
+            return
         if path == "/api/service-progress":
             status, data = server_auth.handle_service_progress(
                 self.headers.get("Authorization", ""),
@@ -252,6 +269,20 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_json(400, {"error": "请求体必须是 JSON"})
                 return
             status, data = server_auth.handle_inquiry_create(
+                self.headers.get("Authorization", ""),
+                body,
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
+        if path == "/api/inquiry/slip":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_inquiry_slip_upload(
                 self.headers.get("Authorization", ""),
                 body,
                 load_env_value,
@@ -447,6 +478,17 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def send_bytes(self, status, body, content_type, filename=None):
+        payload = body if isinstance(body, (bytes, bytearray)) else b""
+        self.send_response(status)
+        self.send_header("Content-Type", content_type or "application/octet-stream")
+        self.send_header("Content-Length", str(len(payload)))
+        if filename:
+            safe = str(filename).replace('"', "").replace("\n", " ")[:180]
+            self.send_header("Content-Disposition", f'inline; filename="{safe}"')
         self.end_headers()
         self.wfile.write(payload)
 

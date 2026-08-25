@@ -1490,6 +1490,97 @@ def _ensure_status_history_column(cur, *, postgres: bool):
             )
 
 
+def _ensure_inquiry_extra_columns(cur, *, postgres: bool):
+    if postgres:
+        cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS quoted_total DOUBLE PRECISION")
+        cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS payment_slip_name TEXT")
+        cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS payment_slip_path TEXT")
+        cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS payment_slip_mime TEXT")
+        cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ")
+        return
+    cols = {r[1] for r in cur.execute("PRAGMA table_info(website_inquiries)").fetchall()}
+    specs = (
+        ("quoted_total", "REAL"),
+        ("payment_slip_name", "TEXT"),
+        ("payment_slip_path", "TEXT"),
+        ("payment_slip_mime", "TEXT"),
+        ("paid_at", "TEXT"),
+    )
+    for name, typ in specs:
+        if name not in cols:
+            cur.execute(f"ALTER TABLE website_inquiries ADD COLUMN {name} {typ}")
+
+
+SLIP_DIR = ROOT / "data" / "uploads" / "payment-slips"
+MAX_SLIP_BYTES = 8 * 1024 * 1024
+SLIP_MIME_EXT = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "application/pdf": ".pdf",
+}
+
+
+def inquiry_discount_rate(item_count: int) -> float:
+    n = int(item_count or 0)
+    if n >= 3:
+        return 0.9
+    if n == 2:
+        return 0.95
+    return 1.0
+
+
+def compute_inquiry_totals(items, total=None):
+    standard = 0.0
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        try:
+            qty = float(it.get("qty") or 1)
+        except (TypeError, ValueError):
+            qty = 1.0
+        try:
+            price = float(it.get("priceValue") or 0)
+        except (TypeError, ValueError):
+            price = 0.0
+        standard += qty * price
+    if standard <= 0:
+        try:
+            standard = float(total or 0)
+        except (TypeError, ValueError):
+            standard = 0.0
+    rate = inquiry_discount_rate(len(items or []))
+    quoted = round(standard * rate, 2)
+    return round(standard, 2), quoted, rate
+
+
+def _iso_or_str(value) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _safe_inquiry_id(inquiry_id: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "", str(inquiry_id or ""))
+
+
+def _parse_paid_at(value):
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def ensure_inquiry_db():
     global _STATUS_HISTORY_BACKFILL_DONE
     ensure_db()
@@ -1516,6 +1607,7 @@ def ensure_inquiry_db():
                     """
                 )
                 _ensure_status_history_column(cur, postgres=True)
+                _ensure_inquiry_extra_columns(cur, postgres=True)
                 cur.execute(
                     "CREATE INDEX IF NOT EXISTS idx_website_inquiries_openid ON website_inquiries(website_openid)"
                 )
@@ -1552,6 +1644,7 @@ def ensure_inquiry_db():
             """
         )
         _ensure_status_history_column(conn, postgres=False)
+        _ensure_inquiry_extra_columns(conn, postgres=False)
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_website_inquiries_openid ON website_inquiries(website_openid)"
         )
@@ -1576,14 +1669,20 @@ def save_inquiry(record: dict):
     status = record.get("status") or "已提交"
     history = record.get("statusHistory") or _merge_status_history({}, status, created_at)
     history_json = json.dumps(history, ensure_ascii=False)
+    _, quoted, _ = compute_inquiry_totals(record.get("items") or [], record.get("total"))
+    if record.get("quotedTotal") is not None:
+        try:
+            quoted = float(record.get("quotedTotal"))
+        except (TypeError, ValueError):
+            pass
     if database_url:
         with _pg_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     INSERT INTO website_inquiries
-                      (id, website_openid, company, contact, phone, total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                      (id, website_openid, company, contact, phone, total, quoted_total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
                     """,
                     (
                         record["id"],
@@ -1592,6 +1691,7 @@ def save_inquiry(record: dict):
                         record["contact"],
                         record["phone"],
                         float(record.get("total") or 0),
+                        quoted,
                         items_json,
                         status,
                         history_json,
@@ -1606,8 +1706,8 @@ def save_inquiry(record: dict):
         conn.execute(
             """
             INSERT INTO website_inquiries
-              (id, website_openid, company, contact, phone, total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (id, website_openid, company, contact, phone, total, quoted_total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["id"],
@@ -1616,6 +1716,7 @@ def save_inquiry(record: dict):
                 record["contact"],
                 record["phone"],
                 float(record.get("total") or 0),
+                quoted,
                 items_json,
                 status,
                 history_json,
@@ -1947,6 +2048,10 @@ def update_inquiry_status(inquiry_id: str, status: str):
 def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
     if postgres:
         items_raw, status, history_raw, created = r[6], r[7], r[8], r[9]
+        quoted_raw = r[10] if len(r) > 10 else None
+        slip_name = r[11] if len(r) > 11 else None
+        slip_mime = r[12] if len(r) > 12 else None
+        paid_at = r[13] if len(r) > 13 else None
         base = {
             "inquiryId": r[0],
             "websiteOpenid": r[1],
@@ -1960,6 +2065,10 @@ def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
         status = r["status"]
         history_raw = r["status_history_json"] if "status_history_json" in r.keys() else "{}"
         created = r["created_at"]
+        quoted_raw = r["quoted_total"] if "quoted_total" in r.keys() else None
+        slip_name = r["payment_slip_name"] if "payment_slip_name" in r.keys() else None
+        slip_mime = r["payment_slip_mime"] if "payment_slip_mime" in r.keys() else None
+        paid_at = r["paid_at"] if "paid_at" in r.keys() else None
         base = {
             "inquiryId": r["id"],
             "websiteOpenid": r["website_openid"],
@@ -1975,9 +2084,24 @@ def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
     created_iso = created.isoformat() if hasattr(created, "isoformat") else str(created or "")
     status = status or "已提交"
     history = _synthesize_status_history(status, created_iso, history_raw)
+    standard, quoted_default, rate = compute_inquiry_totals(items, base["total"])
+    if quoted_raw is None:
+        quoted = quoted_default
+    else:
+        try:
+            quoted = float(quoted_raw)
+        except (TypeError, ValueError):
+            quoted = quoted_default
     return {
         **base,
         "items": items,
+        "standardTotal": standard,
+        "quotedTotal": quoted,
+        "discountRate": rate,
+        "hasPaymentSlip": bool(slip_name),
+        "paymentSlipName": slip_name or "",
+        "paymentSlipMime": slip_mime or "",
+        "paidAt": _iso_or_str(paid_at),
         "status": status,
         "statusHistory": history,
         "createdAt": created_iso,
@@ -1994,7 +2118,8 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
                 cur.execute(
                     """
                     SELECT id, website_openid, company, contact, phone, total, items_json,
-                           status, status_history_json, created_at
+                           status, status_history_json, created_at,
+                           quoted_total, payment_slip_name, payment_slip_mime, paid_at
                     FROM website_inquiries
                     WHERE website_openid = %s
                     ORDER BY created_at DESC
@@ -2010,7 +2135,8 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
         rows = conn.execute(
             """
             SELECT id, website_openid, company, contact, phone, total, items_json,
-                   status, status_history_json, created_at
+                   status, status_history_json, created_at,
+                   quoted_total, payment_slip_name, payment_slip_mime, paid_at
             FROM website_inquiries
             WHERE website_openid = ?
             ORDER BY created_at DESC
@@ -2087,6 +2213,195 @@ def handle_inquiry_list(auth_header: str, env_loader, limit: int = 50):
         return err
     items = list_inquiries_for_openid(resolved["websiteOpenid"], limit=limit)
     return 200, {"ok": True, "inquiries": items}
+
+
+def _get_inquiry_row_owned(inquiry_id: str, website_openid: str):
+    ensure_inquiry_db()
+    oid = (website_openid or "").strip()
+    iid = (inquiry_id or "").strip()
+    if not oid or not iid:
+        return None
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, website_openid, payment_slip_path, payment_slip_name, payment_slip_mime
+                    FROM website_inquiries
+                    WHERE id = %s AND website_openid = %s
+                    """,
+                    (iid, oid),
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "websiteOpenid": row[1],
+            "paymentSlipPath": row[2],
+            "paymentSlipName": row[3],
+            "paymentSlipMime": row[4],
+        }
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT id, website_openid, payment_slip_path, payment_slip_name, payment_slip_mime
+            FROM website_inquiries
+            WHERE id = ? AND website_openid = ?
+            """,
+            (iid, oid),
+        ).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "websiteOpenid": row["website_openid"],
+        "paymentSlipPath": row["payment_slip_path"] if "payment_slip_path" in row.keys() else None,
+        "paymentSlipName": row["payment_slip_name"] if "payment_slip_name" in row.keys() else None,
+        "paymentSlipMime": row["payment_slip_mime"] if "payment_slip_mime" in row.keys() else None,
+    }
+
+
+def _decode_slip_content(raw: str):
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    if "," in text and text.lower().startswith("data:"):
+        text = text.split(",", 1)[1]
+    try:
+        return base64.b64decode(text, validate=False)
+    except Exception:
+        return None
+
+
+def save_inquiry_slip(inquiry_id: str, website_openid: str, *, filename: str, mime: str, content: bytes, paid_at):
+    owned = _get_inquiry_row_owned(inquiry_id, website_openid)
+    if not owned:
+        return None
+    mime_key = (mime or "").split(";")[0].strip().lower()
+    ext = SLIP_MIME_EXT.get(mime_key)
+    if not ext:
+        name = (filename or "").lower()
+        if name.endswith(".pdf"):
+            ext, mime_key = ".pdf", "application/pdf"
+        elif name.endswith(".png"):
+            ext, mime_key = ".png", "image/png"
+        elif name.endswith(".webp"):
+            ext, mime_key = ".webp", "image/webp"
+        elif name.endswith(".gif"):
+            ext, mime_key = ".gif", "image/gif"
+        elif name.endswith(".jpg") or name.endswith(".jpeg"):
+            ext, mime_key = ".jpg", "image/jpeg"
+        else:
+            raise ValueError("仅支持 JPG / PNG / WEBP / GIF / PDF 水单")
+    if not content or len(content) > MAX_SLIP_BYTES:
+        raise ValueError("水单文件过大或为空，请上传 8MB 以内的文件")
+
+    safe_id = _safe_inquiry_id(inquiry_id)
+    SLIP_DIR.mkdir(parents=True, exist_ok=True)
+    dest = SLIP_DIR / f"{safe_id}{ext}"
+    old_path = owned.get("paymentSlipPath") or ""
+    dest.write_bytes(content)
+    if old_path:
+        try:
+            old = Path(old_path)
+            if old.resolve() != dest.resolve() and old.exists() and SLIP_DIR.resolve() in old.resolve().parents:
+                old.unlink()
+        except Exception:
+            pass
+
+    paid_iso = paid_at.isoformat() if paid_at else None
+    paid_pg = paid_at
+    display_name = Path(filename or f"payment-slip{ext}").name[:180]
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE website_inquiries
+                    SET payment_slip_name = %s, payment_slip_path = %s, payment_slip_mime = %s, paid_at = %s
+                    WHERE id = %s AND website_openid = %s
+                    """,
+                    (display_name, str(dest), mime_key, paid_pg, inquiry_id, website_openid),
+                )
+            conn.commit()
+    else:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                """
+                UPDATE website_inquiries
+                SET payment_slip_name = ?, payment_slip_path = ?, payment_slip_mime = ?, paid_at = ?
+                WHERE id = ? AND website_openid = ?
+                """,
+                (display_name, str(dest), mime_key, paid_iso, inquiry_id, website_openid),
+            )
+            conn.commit()
+    return {
+        "inquiryId": inquiry_id,
+        "hasPaymentSlip": True,
+        "paymentSlipName": display_name,
+        "paymentSlipMime": mime_key,
+        "paidAt": paid_iso or "",
+    }
+
+
+def handle_inquiry_slip_upload(auth_header: str, body: dict, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    body = body or {}
+    inquiry_id = str(body.get("inquiryId") or "").strip()
+    if not inquiry_id:
+        return 400, {"error": "缺少询价单号"}
+    paid_at = _parse_paid_at(body.get("paidAt") or body.get("paymentTime"))
+    if not paid_at:
+        return 400, {"error": "请填写水单上的支付时间"}
+    content = _decode_slip_content(body.get("content") or body.get("file") or "")
+    if not content:
+        return 400, {"error": "请上传银行水单"}
+    try:
+        saved = save_inquiry_slip(
+            inquiry_id,
+            resolved["websiteOpenid"],
+            filename=str(body.get("filename") or body.get("name") or "payment-slip"),
+            mime=str(body.get("mimeType") or body.get("mime") or ""),
+            content=content,
+            paid_at=paid_at,
+        )
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    if not saved:
+        return 404, {"error": "询价单不存在"}
+    return 200, {"ok": True, **saved}
+
+
+def handle_inquiry_slip_get(auth_header: str, inquiry_id: str, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    owned = _get_inquiry_row_owned(inquiry_id, resolved["websiteOpenid"])
+    if not owned or not owned.get("paymentSlipPath"):
+        return 404, {"error": "尚未上传水单"}
+    path = Path(owned["paymentSlipPath"])
+    try:
+        resolved_path = path.resolve()
+        if SLIP_DIR.resolve() not in resolved_path.parents and resolved_path.parent != SLIP_DIR.resolve():
+            return 404, {"error": "水单文件不存在"}
+        data = resolved_path.read_bytes()
+    except Exception:
+        return 404, {"error": "水单文件不存在"}
+    return 200, {
+        "file": True,
+        "body": data,
+        "mime": owned.get("paymentSlipMime") or "application/octet-stream",
+        "filename": owned.get("paymentSlipName") or path.name,
+    }
 
 
 def handle_service_progress(auth_header: str, env_loader):
@@ -2250,6 +2565,7 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
     status = "已提交"
     created_at = datetime.now(timezone.utc).isoformat()
     status_history = {"已提交": created_at}
+    standard_total, quoted_total, discount_rate = compute_inquiry_totals(items, total)
     record = {
         "id": inquiry_id,
         "websiteOpenid": website_openid,
@@ -2257,6 +2573,7 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
         "contact": contact,
         "phone": phone,
         "total": total,
+        "quotedTotal": quoted_total,
         "items": items,
         "status": status,
         "statusHistory": status_history,
@@ -2307,6 +2624,9 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
         "ok": True,
         "inquiryId": inquiry_id,
         "status": status,
+        "quotedTotal": quoted_total,
+        "standardTotal": standard_total,
+        "discountRate": discount_rate,
         "notify": notify,
         "pm": pm,
     }

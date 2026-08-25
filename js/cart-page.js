@@ -187,6 +187,8 @@
 
     let serverOk = false;
     let inquiryId = '';
+    let quotedTotal;
+    let standardTotal;
     try {
       const cfg = window.DAOITH_CONFIG || {};
       const apiBase = (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
@@ -205,6 +207,8 @@
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       serverOk = true;
       inquiryId = data.inquiryId || '';
+      quotedTotal = data.quotedTotal;
+      standardTotal = data.standardTotal;
     } catch (submitErr) {
       if (err) {
         err.hidden = false;
@@ -226,6 +230,8 @@
       status: '已提交',
       statusHistory: { '已提交': new Date().toISOString() },
       createdAt: new Date().toISOString(),
+      quotedTotal,
+      standardTotal,
     });
 
     cartApi.clearCart();
