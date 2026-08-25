@@ -6108,6 +6108,45 @@ function resetHsHint() {
   setHsHint(defaultHsHintText(), false);
 }
 
+function extractHsProductName(result) {
+  const direct = String(result?.product_name || '').trim();
+  if (direct) return direct;
+  const blob = [result?.snippet, result?.message].filter(Boolean).join('\n');
+  const field =
+    blob.match(/\*\*商品名称\*\*\s*[:：]\s*([^\n]+)/) ||
+    blob.match(/商品名称\s*[:：]\s*([^\n]+)/);
+  if (field) return field[1].replace(/\*+/g, '').trim();
+  const qa = blob.match(/问：\s*\d{8,10}[、,，]\s*(.+?)\s*的出口退税率/);
+  if (qa) return firstHsNameSegment(qa[1]);
+  return '';
+}
+
+function firstHsNameSegment(text) {
+  let depth = 0;
+  let out = '';
+  for (const ch of String(text || '')) {
+    if ('(（'.includes(ch)) depth += 1;
+    else if (')）'.includes(ch)) depth = Math.max(0, depth - 1);
+    else if (depth === 0 && /[、,]/.test(ch)) break;
+    out += ch;
+  }
+  return out.trim();
+}
+
+function setHsProductName(name) {
+  const el = document.getElementById('hsProductName');
+  if (!el) return;
+  const text = String(name || '').trim();
+  if (!text) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  const label = isHsLocaleEn() ? 'Product name' : '商品名称';
+  el.hidden = false;
+  el.textContent = `${label}：${text}`;
+}
+
 function setHsRateSource(kind, result) {
   const el = document.getElementById('hsRateSource');
   if (!el) return;
@@ -6205,6 +6244,7 @@ function initHsRebateQuery() {
     if (rateBox) rateBox.value = '';
     setHsRateSource('refund', null);
     resetHsHint();
+    setHsProductName('');
 
     setButtonLoading(queryBtn, true, window.DAOITH_t('ai.querying'));
     try {
@@ -6238,14 +6278,17 @@ function initHsRebateQuery() {
         } else {
           resetHsHint();
         }
+        setHsProductName(extractHsProductName(result));
       } else {
         resetHsHint();
+        setHsProductName('');
         alert('未查到参考退税率，请核对海关编码后重试');
       }
     } catch (err) {
       if (rateBox) rateBox.value = '';
       setHsRateSource('refund', null);
       resetHsHint();
+      setHsProductName('');
       alert(err.message);
     } finally {
       setButtonLoading(queryBtn, false);

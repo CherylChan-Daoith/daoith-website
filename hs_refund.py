@@ -39,6 +39,12 @@ SPECIAL_FLAG_PATTERNS = [
     re.compile(r"\*\*特殊标志\*\*\s*[:：]\s*([12])"),
 ]
 
+PRODUCT_NAME_PATTERNS = [
+    re.compile(r"\*\*商品名称\*\*\s*[:：]\s*(.+)"),
+    re.compile(r"商品名称\s*[:：]\s*(.+)"),
+    re.compile(r"问：\s*\d{8,10}[、,，]\s*(.+?)\s*的出口退税率"),
+]
+
 SPECIAL_FLAG_MEANING = {
     "1": "出口征税，视同内销计提销项，对应进项可以抵扣",
     "2": "出口免税，只免销项不退税，对应进项转出",
@@ -73,6 +79,34 @@ def special_goods_flag_label(flag: str | None) -> str | None:
         return None
     meaning = SPECIAL_FLAG_MEANING.get(flag)
     return f"{flag}（{meaning}）" if meaning else flag
+
+
+def extract_product_name(content: str) -> str | None:
+    text = content or ""
+    for i, pat in enumerate(PRODUCT_NAME_PATTERNS):
+        m = pat.search(text)
+        if not m:
+            continue
+        name = re.sub(r"\*+", "", m.group(1)).splitlines()[0].strip()
+        if i == 2:
+            name = _first_name_outside_parens(name)
+        if name:
+            return name[:80]
+    return None
+
+
+def _first_name_outside_parens(text: str) -> str:
+    depth = 0
+    buf: list[str] = []
+    for ch in text or "":
+        if ch in "(（":
+            depth += 1
+        elif ch in ")）":
+            depth = max(0, depth - 1)
+        elif depth == 0 and ch in "、,":
+            break
+        buf.append(ch)
+    return "".join(buf).strip()
 
 
 def extract_refund_rate(content: str) -> float | None:
@@ -119,7 +153,7 @@ def segment_matches_hs(content: str, hs: str) -> bool:
 
 
 def pick_best_record(records: list[dict], hs: str) -> dict | None:
-    exact: list[tuple[float, dict, str, float, str | None]] = []
+    exact: list[tuple[float, dict, str, float, str | None, str | None]] = []
     for rec in records or []:
         seg = rec.get("segment") or {}
         content = seg.get("content") or ""
@@ -130,17 +164,19 @@ def pick_best_record(records: list[dict], hs: str) -> dict | None:
             continue
         score = float(rec.get("score") or 0)
         flag = extract_special_goods_flag(content)
-        exact.append((score, rec, content, rate, flag))
+        name = extract_product_name(content)
+        exact.append((score, rec, content, rate, flag, name))
     if not exact:
         return None
     exact.sort(key=lambda x: x[0], reverse=True)
-    _score, rec, content, rate, flag = exact[0]
+    _score, rec, content, rate, flag, name = exact[0]
     doc = ((rec.get("segment") or {}).get("document") or {}).get("name") or ""
     return {
         "ok": True,
         "rate": rate,
         "display": f"{rate:g}%",
         "hs_code": hs,
+        "product_name": name,
         "special_goods_flag": flag,
         "special_goods_flag_label": special_goods_flag_label(flag),
         "message": f"按商品编码「{hs}」匹配知识库出口退税率",

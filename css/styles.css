@@ -843,6 +843,15 @@ ul {
   color: #1d1d1f;
 }
 
+.diag-hs-block .hs-product-name {
+  margin-top: 4px;
+  color: #1d1d1f;
+}
+
+.diag-hs-block .hs-product-name[hidden] {
+  display: none;
+}
+
 .diag-hs-block .hs-rate-source {
   margin: 6px 0 0;
   font-size: 0.68rem;
@@ -1430,6 +1439,15 @@ ul {
 
 .ai-grid .form-panel .hs-hint.is-flag {
   color: var(--ink, #1d1d1f);
+}
+
+.ai-grid .form-panel .hs-product-name {
+  margin-top: 4px;
+  color: var(--ink, #1d1d1f);
+}
+
+.ai-grid .form-panel .hs-product-name[hidden] {
+  display: none;
 }
 
 .ai-grid .form-panel .hs-rate-source {
