@@ -1660,6 +1660,7 @@ function buildDiagnosisPlanApiQuery(userText) {
     '不得把「国内仓」写成「保税仓」，不得改写销售额档位；不得照抄方案样本示例数据。' +
     '【三大环节】核心风险诊断、合规方案、行动建议均须按「01 供应商发票和产品环节 / 02 报关出口环节 / 03 境外销售环节」展开；' +
     '【合规方案】先写各环节短事项概览（每条一行短标题），再写对应细则 `- **短标题**：说明`，不要用卡片式长文代替概览。' +
+    '禁止把版式说明、英文备忘、结尾句占位、概览→细则自检表、hard constraint / NOT write 等写作笔记输出给用户。' +
     '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后参考对应样本结构生成报告。'
   );
 }
@@ -3278,12 +3279,15 @@ function looksLikeEnglishPromptMeta(text) {
 
 /** Prompt echoes, English CoT, and format checklists that must never enter the plan panel. */
 function isDiagnosisJunkLine(line) {
-  const s = String(line || '')
+  const raw = String(line || '').trim();
+  if (!raw) return false;
+  const s = raw
     .replace(/^[-*•>]\s+/, '')
     .replace(/\*\*/g, '')
     .replace(/^[_*]+\s*|\s*[_*]+$/g, '')
+    .replace(/^[✓✔☑✅]\s*/, '')
     .trim();
-  if (!s) return false;
+  if (!s) return true;
   if (
     /^(?:业务流程一行|主要风险一行|3\s*[-–—~～]?\s*5\s*条风险|3\s*[-–—~～]?\s*6\s*条对症卡片|一段画像|对症卡片|方案卡片|风险条目|合规方案画像)\b/.test(
       s
@@ -3291,6 +3295,20 @@ function isDiagnosisJunkLine(line) {
   ) {
     return true;
   }
+  // Format scaffolding / outline leftovers from the new three-stage prompt
+  if (/^01\s*\/\s*02\s*\/\s*03/.test(s)) return true;
+  if (/环节下\s*1\s*[.．、]?\s*2\s*[.．、]?\s*3/.test(s)) return true;
+  if (/^结尾句$/.test(s) || /^报告结尾/.test(s)) return true;
+  if (/^环节(?:概览|细则)\s*[:：]?$/.test(s) || /^细则\s*[:：]?$/.test(s) || /^整改(?:概览|细则)\s*[:：]?$/.test(s)) {
+    return true;
+  }
+  if (/概览\s*[:：].*(?:细则|->|→)/.test(s) || /细则\s*[:：].*概览/.test(s)) return true;
+  if (/三大环节/.test(s) && /(必须|强制|展开|follow|must)/i.test(s)) return true;
+  if (/^方案进【|^风险进【|^行动进【/.test(s)) return true;
+  if (/NOT\s+write/i.test(s) || /don'?t\s+write/i.test(s) || /prohibit writing/i.test(s)) return true;
+  if (/hard\s*constraint/i.test(s) || /And hard constraint/i.test(s)) return true;
+  if (/needs\s+正式报关/i.test(s) || /\bwhich is\b/i.test(s) && /路径|标识|采购/.test(s)) return true;
+  if (/路径[ABCD].*禁止写/.test(s) && /(采购再销售|链路|架构)/.test(s) && s.length < 80) return true;
   if (/^实际上我应该注意|^让我先(?:写|检索|通读)|^根据提示词|^硬约束[:：]/.test(s)) return true;
   if (
     /用户本轮明确给出的新事实优先于旧档案|禁止原样复用上一份诊断报告|请先审视本轮问题与上一轮|【诊断已完成[·.]后续追问】|【本轮已识别的变化点】|【作答要求】|【前端识别的变化点/.test(
@@ -3309,12 +3327,18 @@ function isDiagnosisJunkLine(line) {
   if (/业务流程 written as/i.test(s)) return true;
   if (/【合规方案】/.test(s) && /短标题/.test(s) && /only/i.test(s)) return true;
   if (/same level/i.test(s) && /行动建议|1\.\s*2\.\s*3/.test(s)) return true;
-  if (/[✓✔]/.test(s) && /only|Titles|no dash|no bullet|items|短标题|1\.2\.3|业务流程/i.test(s)) {
+  if (
+    /[✓✔]/.test(String(line || '')) &&
+    /only|Titles|no dash|no bullet|items|短标题|1\.2\.3|业务流程|三大环节|must follow|note uses|\bGood\b|hard constraint|禁止写|概览|细则/i.test(
+      s
+    )
+  ) {
     return true;
   }
   if (/I have \d+ items/i.test(s)) return true;
   if (/^For (?:the )?业务流程\b/i.test(s) || /^For 合规方案\b/i.test(s)) return true;
   if (/开篇一段普通正文/.test(s)) return true;
+  if (/强制两段结构|短事项概览|官网会把|不再用卡片|渲染为/.test(s)) return true;
   if (
     /\b(Wait|Hmm+|Uh|Okay|Let me|I need to|I'll|I'm going to|need to be careful|re-read path|let me think|standard architecture)\b/i.test(
       s
@@ -3340,6 +3364,10 @@ function isDiagnosisJunkLine(line) {
   if (latin >= 20 && cjk <= 4) return true;
   if (latin >= 28 && cjk < latin * 0.35) return true;
   if (/^(If|When|Then|But|The|This|That|In this|First|Now|For)\b/.test(s) && latin >= 10) {
+    return true;
+  }
+  // Mixed EN/CN instructional residue
+  if (latin >= 8 && cjk >= 2 && /\b(needs|write|note|says|for|path|which|follow|must|don't|dont)\b/i.test(s)) {
     return true;
   }
   return false;
@@ -5147,7 +5175,9 @@ function formatPlanListItem(content) {
 
 /** Parse leading indent + list marker. depth 0–3 → display levels 2–5 under section titles. */
 function parsePlanListMarker(rawLine) {
-  const m = String(rawLine || '').match(/^([ \t]*)([-*•]|\d+[.)、．]|[a-zA-Z][.)、．])\s+(.*)$/);
+  const m = String(rawLine || '').match(
+    /^([ \t]*)([-*•]|(?:\d+\.)+\d+[.)、．]?|\d+[.)、．]|[a-zA-Z][.)、．])\s+(.*)$/
+  );
   if (!m) return null;
   const spaces = m[1].replace(/\t/g, '  ').length;
   let depth = Math.min(3, Math.floor(spaces / 2));
@@ -5157,7 +5187,7 @@ function parsePlanListMarker(rawLine) {
   if (isLetter && depth < 1) depth = 1;
   return {
     depth,
-    ordered: /^\d+[.)、．]$/.test(marker),
+    ordered: /^(?:\d+\.)+\d+[.)、．]?$|^\d+[.)、．]$/.test(marker),
     content: m[3],
   };
 }
@@ -5393,9 +5423,16 @@ function sanitizeDiagnosisPlanText(text) {
   t = t
     .split('\n')
     .map((ln) => ln.replace(/\s+$/g, ''))
-    .filter((ln) => !/^[-*•]\s*$/.test(ln))
+    .filter((ln) => !/^[-*•◆▪]\s*$/.test(ln))
+    .filter((ln) => !/^\s*[✓✔☑✅]\s*$/.test(ln))
     .filter((ln) => !isDiagnosisJunkLine(ln))
     .join('\n');
+
+  // Strip self-check mapping blocks: 「概览: … -> 细则: … ✓」
+  t = t.replace(/(?:^|\n)\s*[-*•]?\s*概览\s*[:：][^\n]*(?:细则|->|→)[^\n]*/g, '\n');
+  // Strip leftover bare「结尾句」placeholders
+  t = t.replace(/(?:^|\n)\s*[-*•]?\s*结尾句\s*(?=\n|$)/g, '\n');
+  t = t.replace(/\n{3,}/g, '\n\n');
 
   // Bullet + number mix: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only)
   t = t.replace(/^(\s*[-*•]\s+)\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/gm, '$1');
@@ -5426,8 +5463,9 @@ function sanitizeDiagnosisPlanText(text) {
 /** Strip leading list index from item text (avoid ● + 1 / **1** / duplicate glyphs). */
 function stripLeadingListIndex(content) {
   return String(content || '')
-    .replace(/^\*\*\s*\d+\s*[.、)）．]?\s*\*\*\s*/, '')
-    .replace(/^\*\*\d+\*\*\s*[.、)）．]?\s*/, '')
+    .replace(/^\*\*\s*\d+(?:\.\d+)*\s*[.、)）．]?\s*\*\*\s*/, '')
+    .replace(/^\*\*\d+(?:\.\d+)*\*\*\s*[.、)）．]?\s*/, '')
+    .replace(/^\d+\.\d+\s*[.)、．]?\s*/, '')
     .replace(/^\d+\s*[.、)）．]\s*/, '')
     .replace(/^[●○◆▪•·◦▪️◉]+\s*/, '')
     .trim();
@@ -5675,6 +5713,11 @@ function renderAIPlanHtml(text) {
   let planPhase = null;
   let planOverviewStages = [];
   let planDetailOpen = false;
+  /** 行动建议：当前环节大号（1/2/3）与小节（.1/.2…） */
+  let actionStageMajor = 0;
+  let actionStageMinor = 0;
+  /** Currently open staged actions <ol> major number (0 = plain decimal ol) */
+  let openActionListMajor = 0;
 
   const closeNestedUl = () => {
     if (nestedUl) {
@@ -5732,6 +5775,12 @@ function renderAIPlanHtml(text) {
     planPhase = null;
   };
 
+  const setActionStage = (numStr) => {
+    const n = parseInt(String(numStr || '').replace(/^0+/, '') || '0', 10);
+    actionStageMajor = Number.isFinite(n) && n > 0 ? n : 0;
+    actionStageMinor = 0;
+  };
+
   const closeList = () => {
     flushFlowBuffer();
     closeLi();
@@ -5742,24 +5791,48 @@ function renderAIPlanHtml(text) {
       html += '</ul>';
     }
     listMode = null;
+    openActionListMajor = 0;
     ulNestDepth = 0;
     ulLiOpenAt = [];
   };
 
   const openList = (mode) => {
-    if (listMode === mode) return;
+    const wantStaged = mode === 'ol' && sectionKind === 'actions' && actionStageMajor > 0;
+    if (listMode === mode) {
+      if (wantStaged && openActionListMajor === actionStageMajor) return;
+      if (!wantStaged && listMode === 'ol' && openActionListMajor === 0) return;
+      if (!wantStaged && mode !== 'ol') return;
+    }
     closeList();
     if (mode === 'flow') {
       html += `<ol class="result-flow">`;
       flowMode = true;
     } else if (mode === 'ol') {
-      html += `<ol class="result-list result-list-ordered">`;
+      if (wantStaged) {
+        html += `<ol class="result-list result-list-ordered result-list-actions-staged" data-stage="${actionStageMajor}">`;
+        openActionListMajor = actionStageMajor;
+      } else {
+        html += `<ol class="result-list result-list-ordered">`;
+        openActionListMajor = 0;
+      }
     } else {
       html += `<ul class="result-list result-list-l2">`;
     }
     listMode = mode;
   };
 
+  const appendActionTopItem = (contentHtml) => {
+    closeLi();
+    openList('ol');
+    let prefix = '';
+    if (sectionKind === 'actions' && actionStageMajor > 0) {
+      actionStageMinor += 1;
+      const label = `${actionStageMajor}.${actionStageMinor}`;
+      prefix = `<span class="result-action-num" aria-hidden="true">${label}</span>`;
+    }
+    html += `<li>${prefix}${contentHtml}`;
+    liOpen = true;
+  };
   /** Emit a ul item at indent depth (0=二级, 1=三级, 2=四级, 3=五级). */
   const appendUlItem = (depth, contentHtml, asKv = false) => {
     let d = Math.max(0, Math.min(3, depth | 0));
@@ -5901,6 +5974,7 @@ function renderAIPlanHtml(text) {
             html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
           }
         } else {
+          if (sectionKind === 'actions') setActionStage(stageFromHash.num);
           html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageFromHash.num)}</span>${escapeHtml(stageFromHash.title)}</h6>`;
         }
         continue;
@@ -5938,6 +6012,8 @@ function renderAIPlanHtml(text) {
       resetPlanLayout();
       const title = `【${bracketTitle[1]}】`;
       flowMode = false;
+      actionStageMajor = 0;
+      actionStageMinor = 0;
       if (/核心风险/.test(title)) sectionKind = 'risk';
       else if (/行动建议/.test(title)) sectionKind = 'actions';
       else if (/注意事项/.test(title)) sectionKind = 'notes';
@@ -5977,6 +6053,7 @@ function renderAIPlanHtml(text) {
             planOverviewStages.push({ num: stageHit.num, title: stageHit.title, items: [] });
           }
         } else {
+          if (sectionKind === 'actions') setActionStage(stageHit.num);
           html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stageHit.num)}</span>${escapeHtml(stageHit.title)}</h6>`;
         }
         continue;
@@ -5984,7 +6061,9 @@ function renderAIPlanHtml(text) {
     }
 
     const listInfo = parsePlanListMarker(rawLine);
-    const orderedMatch = listInfo?.ordered ? [null, listInfo.content] : line.match(/^\d+[.)、．]\s*(.*)$/);
+    const orderedMatch = listInfo?.ordered
+      ? [null, listInfo.content]
+      : line.match(/^(?:\d+\.)+\d+[.)、．]?\s+(.*)$/) || line.match(/^\d+[.)、．]\s*(.*)$/);
     const bulletMatch = listInfo && !listInfo.ordered ? [null, listInfo.content] : (!listInfo ? line.match(/^[-*•]\s+(.*)$/) : null);
     if (orderedMatch || bulletMatch) {
       let content = (orderedMatch ? orderedMatch[1] : bulletMatch[1]) || '';
@@ -6015,10 +6094,7 @@ function renderAIPlanHtml(text) {
         looksLikePeerActionItem(content) &&
         sectionKind === 'actions'
       ) {
-        closeLi();
-        openList('ol');
-        html += `<li>${formatPlanListItem(content)}`;
-        liOpen = true;
+        appendActionTopItem(formatPlanListItem(content));
         continue;
       }
 
@@ -6085,10 +6161,7 @@ function renderAIPlanHtml(text) {
       const effectiveDepth = sectionKind === 'notes' ? 0 : depth;
 
       if (useOrdered) {
-        closeLi();
-        openList('ol');
-        html += `<li>${formatPlanListItem(content)}`;
-        liOpen = true;
+        appendActionTopItem(formatPlanListItem(content));
       } else {
         if (listMode === 'ol' || listMode === 'flow') closeList();
         const kv = matchBoldKvContent(content);

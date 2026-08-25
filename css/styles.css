@@ -2366,14 +2366,15 @@ ul {
   align-items: baseline;
   gap: 6px;
   margin: 14px 0 8px;
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--ink);
   line-height: 1.35;
 }
 
 .result-stage-subtitle .result-plan-stage-num {
   flex-shrink: 0;
+  font-size: 0.75rem;
 }
 
 @media (max-width: 720px) {
@@ -2413,6 +2414,34 @@ ul {
   color: var(--text-secondary);
   line-height: 1.65;
   margin-bottom: 6px;
+}
+
+/* 行动建议：1.1 / 1.2 / 2.1 …（按三大环节） */
+.result-list-actions-staged {
+  list-style: none !important;
+  margin: 0 0 12px 0;
+  padding: 0;
+}
+
+.result-list-actions-staged > li {
+  list-style: none !important;
+  display: block;
+  position: relative;
+  padding-left: 2.35em;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin-bottom: 6px;
+}
+
+.result-action-num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 2.1em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #1230b0;
 }
 
 /* 二级：a b c — do not inherit decimal from parent ol */
