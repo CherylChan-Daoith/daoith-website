@@ -6100,8 +6100,15 @@ function specialGoodsFlagHintText(result) {
 function setHsHint(text, isFlag) {
   const el = document.getElementById('hsHint');
   if (!el) return;
-  el.textContent = text;
+  const t = String(text || '').trim();
   el.classList.toggle('is-flag', Boolean(isFlag));
+  if (!t) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = t;
 }
 
 function resetHsHint() {
@@ -6276,7 +6283,7 @@ function initHsRebateQuery() {
         if (isZeroExportRefund(result)) {
           setHsHint(specialGoodsFlagHintText(result), true);
         } else {
-          resetHsHint();
+          setHsHint('');
         }
         setHsProductName(extractHsProductName(result));
       } else {

@@ -839,17 +839,12 @@ ul {
   color: #86868b;
 }
 
-.diag-hs-block .hs-hint.is-flag {
-  color: #1d1d1f;
+.diag-hs-block .hs-hint[hidden] {
+  display: none;
 }
 
 .diag-hs-block .hs-product-name {
   margin-top: 4px;
-  color: #1d1d1f;
-}
-
-.diag-hs-block .hs-product-name[hidden] {
-  display: none;
 }
 
 .diag-hs-block .hs-rate-source {
@@ -1437,17 +1432,12 @@ ul {
   color: var(--text-muted);
 }
 
-.ai-grid .form-panel .hs-hint.is-flag {
-  color: var(--ink, #1d1d1f);
+.ai-grid .form-panel .hs-hint[hidden] {
+  display: none;
 }
 
 .ai-grid .form-panel .hs-product-name {
   margin-top: 4px;
-  color: var(--ink, #1d1d1f);
-}
-
-.ai-grid .form-panel .hs-product-name[hidden] {
-  display: none;
 }
 
 .ai-grid .form-panel .hs-rate-source {
