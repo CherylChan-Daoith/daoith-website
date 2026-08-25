@@ -6716,6 +6716,7 @@ function initShowMoreServices() {
 /* Service Hub */
 const HUB_INQUIRY_LIMIT = 3;
 const HUB_ORDER_LIMIT = 5;
+const HUB_PROGRESS_LIMIT = 5;
 const HUB_BANK = {
   account: '15001942878943',
   name: '道一天成企业管理（深圳）有限责任公司',
@@ -6729,6 +6730,7 @@ let hubQuotesCache = [];
 let hubServicesCache = [];
 let hubQuotesExpanded = false;
 let hubOrdersExpanded = false;
+let hubProgressExpanded = false;
 let hubEventsBound = false;
 const serviceProgressExpandedIds = new Set();
 
@@ -7047,8 +7049,8 @@ function renderHubInquiries(quotes) {
   const rows = visible.map((q) => {
     const totals = hubQuoteTotals(q);
     const status = quoteStatusLabel(q.status);
-    const slipName = q.hasPaymentSlip
-      ? (q.paymentSlipName || hubT('已上传', 'Uploaded'))
+    const slipStatus = q.hasPaymentSlip
+      ? hubT('已上传', 'Uploaded')
       : hubT('未上传', 'Not uploaded');
     const rateNote = totals.rate < 1
       ? ` <span class="hub-price-old">(${totals.rate === 0.9 ? '9' : '9.5'}${hubT('折', ' off')})</span>`
@@ -7057,15 +7059,16 @@ function renderHubInquiries(quotes) {
       <tr data-inquiry-id="${escapeHtmlHub(q.inquiryId || '')}">
         <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(hubDisplayInquiryNo(q.inquiryId, q.createdAt))}</span></td>
         <td>${hubDateCell(q.createdAt)}</td>
-        <td class="hub-cell-wrap">${hubServiceChipsHtml(totals.items)}</td>
+        <td class="hub-cell-wrap hub-td-services">${hubServiceChipsHtml(totals.items)}</td>
         <td class="hub-price-old hub-num">${escapeHtmlHub(formatYuanHub(totals.standard))}</td>
         <td class="hub-price-deal hub-num">${escapeHtmlHub(formatYuanHub(totals.quoted))}${rateNote}</td>
-        <td class="hub-cell-wrap">
-          <div class="hub-slip-actions">
-            <span>${escapeHtmlHub(slipName)}</span>
-            ${q.hasPaymentSlip ? `<button type="button" class="hub-link-btn" data-hub-view-slip="${escapeHtmlHub(q.inquiryId || '')}">${hubT('查看', 'View')}</button>` : ''}
-            <button type="button" class="hub-link-btn" data-hub-upload="${escapeHtmlHub(q.inquiryId || '')}">${q.hasPaymentSlip ? hubT('重传', 'Re-upload') : hubT('上传', 'Upload')}</button>
-            <button type="button" class="hub-link-btn" data-hub-bank aria-expanded="false">${hubT('账号', 'Account')}</button>
+        <td class="hub-cell-wrap hub-td-slip">
+          <div class="hub-slip">
+            <span class="hub-slip-status">${escapeHtmlHub(slipStatus)}</span>
+            <div class="hub-slip-btns">
+              <button type="button" class="hub-link-btn" data-hub-upload="${escapeHtmlHub(q.inquiryId || '')}">${q.hasPaymentSlip ? hubT('重传', 'Re-upload') : hubT('上传', 'Upload')}</button>
+              <button type="button" class="hub-link-btn" data-hub-bank aria-expanded="false">${hubT('查看账号', 'View account')}</button>
+            </div>
           </div>
           <div class="hub-bank" hidden>${hubBankHtml()}</div>
         </td>
@@ -7075,7 +7078,7 @@ function renderHubInquiries(quotes) {
   }).join('');
   wrap.innerHTML = `
     <div class="hub-table-scroll">
-      <table class="hub-table">
+      <table class="hub-table hub-inquiries-table">
         <thead>
           <tr>
             <th>${hubT('询价单号', 'Inquiry no.')}</th>
@@ -7141,7 +7144,7 @@ function collectOrderRows(quotes, services) {
         createdAt: q.createdAt,
         subNo: hubSubOrderNo(q.inquiryId, i, q.createdAt),
         title: it.title || p?.serviceType || '—',
-        step: p ? serviceProgressCurrentStep(p.tasks) : hubT('待启动', 'Pending start'),
+        step: hubFormatCurrentStep(p?.tasks),
         amount: hubLineQuoted(q, it),
         startAt: hubStep01Time(p?.tasks) || '',
         owner: p?.ownerName || '',
@@ -7166,15 +7169,15 @@ function renderHubOrders(quotes, services) {
   const rows = visible.map((row) => `
       <tr>
         <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(row.subNo)}</span></td>
-        <td class="hub-cell-wrap">${escapeHtmlHub(row.title)}</td>
-        <td>${escapeHtmlHub(row.step)}</td>
+        <td class="hub-cell-wrap hub-td-services">${escapeHtmlHub(row.title)}</td>
+        <td class="hub-td-step">${escapeHtmlHub(row.step)}</td>
         <td class="hub-price-deal hub-num">${escapeHtmlHub(formatYuanHub(row.amount))}</td>
         <td>${row.startAt ? hubDateCell(row.startAt) : '—'}</td>
         <td>${escapeHtmlHub(row.owner || hubT('待分配', 'Unassigned'))}</td>
       </tr>`).join('');
   wrap.innerHTML = `
     <div class="hub-table-scroll">
-      <table class="hub-table">
+      <table class="hub-table hub-orders-table">
         <thead>
           <tr>
             <th>${hubT('订单号', 'Order no.')}</th>
@@ -7220,6 +7223,17 @@ function serviceProgressCurrentStep(tasks) {
   if (active) return active.title || hubT('进行中', 'In progress');
   if (list.length && list.every((t) => isTaskDoneHub(t.status))) return hubT('全部完成', 'Completed');
   return hubT('待启动', 'Pending start');
+}
+
+function hubFormatCurrentStep(tasks) {
+  const list = Array.isArray(tasks) ? tasks.slice() : [];
+  list.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+  const name = serviceProgressCurrentStep(list);
+  if (!list.length) return `Step ${name}`;
+  let idx = list.findIndex((t) => t.status === 'IN_PROGRESS' || t.status === 'OVERDUE');
+  if (idx < 0) idx = list.findIndex((t) => !isTaskDoneHub(t.status));
+  if (idx < 0) idx = list.length - 1;
+  return `Step ${String(idx + 1).padStart(2, '0')} ${name}`;
 }
 
 function collectProgressCards(services, quotes) {
@@ -7271,10 +7285,11 @@ function renderServiceProgress(services, quotes) {
     return;
   }
 
-  const rows = projects.map((p) => {
+  const visible = hubProgressExpanded ? projects : projects.slice(0, HUB_PROGRESS_LIMIT);
+  const rows = visible.map((p) => {
     const tasks = Array.isArray(p.tasks) ? p.tasks : [];
     const progress = hubProgressPct(p);
-    const currentStep = serviceProgressCurrentStep(tasks);
+    const currentStep = hubFormatCurrentStep(tasks);
     const compact = tasks.length >= 6 || /合规代账/.test(String(p.title || ''));
     const plannedLabel = compact ? hubT('预', 'ETA') : hubT('预计完成', 'Est. complete');
     const actualLabel = compact ? hubT('实', 'Done') : hubT('实际完成', 'Actual complete');
@@ -7297,14 +7312,14 @@ function renderServiceProgress(services, quotes) {
     return `
       <tr data-service-id="${escapeHtmlHub(String(p.id))}">
         <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(p.subOrderNo || '—')}</span></td>
-        <td class="hub-cell-wrap"><span class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</span></td>
+        <td class="hub-cell-wrap hub-td-services"><span class="hub-progress-title">${escapeHtmlHub(p.title || hubT('服务', 'Service'))}</span></td>
         <td class="hub-td-bar">
           <div class="hub-bar-wrap" title="${progress}%">
             <div class="hub-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}"><i style="width:${progress}%"></i></div>
             <span class="hub-bar-pct">${progress}%</span>
           </div>
         </td>
-        <td class="hub-progress-step">${escapeHtmlHub(currentStep)}</td>
+        <td class="hub-progress-step hub-td-step">${escapeHtmlHub(currentStep)}</td>
         <td>
           <button type="button" class="hub-link-btn hub-detail-btn" data-hub-progress-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? hubT('收起', 'Hide') : hubT('查看详情', 'View details')}</button>
         </td>
@@ -7328,7 +7343,11 @@ function renderServiceProgress(services, quotes) {
         </thead>
         <tbody>${rows}</tbody>
       </table>
-    </div>`;
+    </div>` + (hubProgressExpanded
+    ? (projects.length > HUB_PROGRESS_LIMIT
+      ? `<div class="hub-more-wrap"><button type="button" class="hub-more-btn" data-hub-more="progress-collapse">${hubT('收起', 'Show less')}</button></div>`
+      : '')
+    : hubMoreButton('progress', Math.max(0, projects.length - HUB_PROGRESS_LIMIT)));
 }
 
 function closeHubHelpTips(exceptWrap) {
@@ -7516,12 +7535,6 @@ function bindHubUi() {
       return;
     }
 
-    const viewBtn = e.target.closest('[data-hub-view-slip]');
-    if (viewBtn) {
-      viewHubSlip(viewBtn.getAttribute('data-hub-view-slip') || '');
-      return;
-    }
-
     const moreBtn = e.target.closest('[data-hub-more]');
     if (moreBtn) {
       const kind = moreBtn.getAttribute('data-hub-more');
@@ -7529,8 +7542,11 @@ function bindHubUi() {
       if (kind === 'quotes-collapse') hubQuotesExpanded = false;
       if (kind === 'orders') hubOrdersExpanded = true;
       if (kind === 'orders-collapse') hubOrdersExpanded = false;
+      if (kind === 'progress') hubProgressExpanded = true;
+      if (kind === 'progress-collapse') hubProgressExpanded = false;
       renderHubInquiries(hubQuotesCache);
       renderHubOrders(hubQuotesCache, hubServicesCache);
+      renderServiceProgress(hubServicesCache, hubQuotesCache);
       return;
     }
 

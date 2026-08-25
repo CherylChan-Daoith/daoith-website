@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260825flow2">
+  <link rel="stylesheet" href="/css/styles.css?v=20260825step1">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -136,64 +136,44 @@
       </div>
 
       <div class="ai-solution-guide" aria-label="AI解决方案使用流程">
-        <ol class="ai-flow">
-          <li class="ai-flow-node" data-step="01">
-            <span class="ai-flow-num">01</span>
-            <span class="ai-flow-title">进入道一AI合规助手</span>
-          </li>
-          <li class="ai-flow-join" aria-hidden="true"></li>
-          <li class="ai-flow-node" data-step="02">
-            <span class="ai-flow-num">02</span>
-            <span class="ai-flow-title">选择路径</span>
-            <span class="ai-flow-sub">开启专属合规诊断，或直接提问</span>
-          </li>
-          <li class="ai-flow-branch" aria-label="路径分叉">
-            <div class="ai-flow-path">
-              <span class="ai-flow-edge">按AI助手提示回复7个问题</span>
-              <span class="ai-flow-path-label">专属合规诊断</span>
+        <div class="process-flow" id="aiSolutionJourney">
+          <div class="process-card" data-step="1">
+            <div class="process-step">01</div>
+            <h4>进入道一AI合规助手</h4>
+          </div>
+          <span class="process-arrow" aria-hidden="true"></span>
+          <div class="process-card process-card-branch" data-step="2">
+            <div class="process-step">02</div>
+            <h4>选择分叉</h4>
+            <div class="process-branch-rows">
+              <div class="process-branch-row">
+                <span class="process-branch-name">开启专属合规诊断</span>
+                <span class="tag">按AI助手提示回复7个问题</span>
+              </div>
+              <div class="process-branch-row">
+                <span class="process-branch-name">直接提问</span>
+                <span class="tag">描述您的问题</span>
+              </div>
             </div>
-            <div class="ai-flow-path">
-              <span class="ai-flow-edge">描述您的问题</span>
-              <span class="ai-flow-path-label">直接提问</span>
-            </div>
-          </li>
-          <li class="ai-flow-join ai-flow-join-merge" aria-hidden="true"></li>
-          <li class="ai-flow-node" data-step="04">
-            <span class="ai-flow-num">04</span>
-            <span class="ai-flow-title">等待1–2分钟生成解决方案</span>
-          </li>
-          <li class="ai-flow-join" aria-hidden="true"></li>
-          <li class="ai-flow-node" data-step="05">
-            <span class="ai-flow-num">05</span>
-            <span class="ai-flow-title">查看AI助手为您匹配的专属服务</span>
-          </li>
-        </ol>
-
-        <div class="ai-flow-hints" id="aiFlowHints" role="list">
-          <button type="button" class="ai-flow-hint is-open" data-target="resultPanel" role="listitem" aria-expanded="true">
-            <span class="ai-flow-hint-head">
-              <span class="ai-flow-hint-label">免费生成专属合规方案</span>
-              <span class="ai-flow-hint-chevron" aria-hidden="true"></span>
-            </span>
-            <span class="ai-flow-hint-body">在左侧对话区开启诊断或直接提问，右侧将展示您的专属合规方案。</span>
-          </button>
-          <button type="button" class="ai-flow-hint" data-target="diagServiceRecs" role="listitem" aria-expanded="false">
-            <span class="ai-flow-hint-head">
-              <span class="ai-flow-hint-label">查看AI助手为您匹配的专属服务</span>
-              <span class="ai-flow-hint-chevron" aria-hidden="true"></span>
-            </span>
-            <span class="ai-flow-hint-body">方案生成后，系统会推荐与您业务路径匹配的合规落地服务。</span>
-          </button>
-          <button type="button" class="ai-flow-hint" data-target="taxCalcBlock" role="listitem" aria-expanded="false">
-            <span class="ai-flow-hint-head">
-              <span class="ai-flow-hint-label">自动化测算合规税负</span>
-              <span class="ai-flow-hint-chevron" aria-hidden="true"></span>
-            </span>
-            <span class="ai-flow-hint-body">基于业务参数自动测算企业所得税与增值税/出口退税，可手动调整重算。</span>
-          </button>
+          </div>
+          <span class="process-arrow" aria-hidden="true"></span>
+          <div class="process-card" data-step="3">
+            <div class="process-step">04</div>
+            <h4>等待1–2分钟生成解决方案</h4>
+          </div>
+          <span class="process-arrow" aria-hidden="true"></span>
+          <div class="process-card" data-step="4">
+            <div class="process-step">05</div>
+            <h4>查看AI助手为您匹配的专属服务</h4>
+          </div>
         </div>
+        <button type="button" class="hub-scroll-hint" data-ai-scroll="aiWorkspace">
+          <span>下拉查看专属合规方案</span>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+        </button>
       </div>
 
+      <div class="ai-workspace" id="aiWorkspace">
       <div class="ai-grid">
         <div class="ai-left">
         <div class="form-panel diag-panel">
@@ -260,8 +240,18 @@
         </div>
       </div>
 
+      <button type="button" class="hub-scroll-hint" data-ai-scroll="diagServiceRecs">
+        <span>下拉查看匹配的专属服务</span>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+      </button>
+
       <!-- Recommended services (filled after diagnosis plan, above tax calc) -->
       <div class="diag-services-section" id="diagServiceRecs" hidden aria-live="polite"></div>
+
+      <button type="button" class="hub-scroll-hint" data-ai-scroll="taxCalcBlock">
+        <span>下拉查看合规税负测算</span>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+      </button>
 
       <!-- Tax Calculator -->
       <div class="tax-calc" id="taxCalcBlock">
@@ -877,6 +867,6 @@
   <script src="/js/cart.js?v=20260804d"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20260825flow2"></script>
+  <script src="/js/main.js?v=20260825step1"></script>
 </body>
 </html>
