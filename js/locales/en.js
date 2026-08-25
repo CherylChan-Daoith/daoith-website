@@ -271,7 +271,7 @@ window.DAOITH_I18N_EN = {
       text: 'Answer 7 questions prompted by the AI',
     },
     '#aiSolutionJourney .process-branch-row:nth-child(2) .process-branch-name': {
-      text: 'Ask a specific question',
+      text: 'Ask a specific question directly',
     },
     '#aiSolutionJourney .process-branch-row:nth-child(2) .tag': {
       text: 'Instant answers from the knowledge base',

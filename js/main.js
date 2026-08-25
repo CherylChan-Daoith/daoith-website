@@ -1175,7 +1175,7 @@ function buildLocalChatReply(message, ctx) {
 const DIAG_QUICK_REPLY_SETS = {
   modeSelect: [
     '开启专属合规诊断',
-    '我有特定问题想直接提问',
+    '特定问题直接咨询',
   ],
   platform: [
     '亚马逊 Amazon',
@@ -1368,7 +1368,7 @@ function detectDiagQuickReplySet(botText) {
 
   // Mode selection after welcome
   if (
-    /(开启专属合规诊断|特定问题想直接提问|专属合规诊断|直接提问)/.test(zone) &&
+    /(开启专属合规诊断|特定问题想直接提问|特定问题直接咨询|专属合规诊断|直接提问)/.test(zone) &&
     /(请选择|请在下方选择|还是|或者|两种|模式)/.test(zone)
   ) {
     return 'modeSelect';
@@ -1503,9 +1503,9 @@ function normalizeDiagnosisModeQuery(text) {
       '禁止说“这不是自动命令”，禁止要求用户改提其他具体问题，禁止输出欢迎语。'
     );
   }
-  if (/我有特定问题想直接提问|特定问题想直接提问/.test(t)) {
+  if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
     return (
-      '【模式选择】用户选择：我有特定问题想直接提问。' +
+      '【模式选择】用户选择：特定问题直接咨询。' +
       '请进入模式B：用一两句邀请用户描述具体问题；不要展开7步诊断问卷。'
     );
   }
@@ -1969,7 +1969,7 @@ function stripDiagnosisArchivePreamble(text) {
 function looksLikeModeSelectReply(text) {
   const t = String(text || '');
   return (
-    /(开启专属合规诊断|特定问题想直接提问)/.test(t) &&
+    /(开启专属合规诊断|特定问题想直接提问|特定问题直接咨询)/.test(t) &&
     /(请选择|还是|无法判断|仅凭)/.test(t)
   );
 }
@@ -2276,7 +2276,7 @@ function initAiChatbot() {
       setUiWizard('diagnosis', 1, '');
       return;
     }
-    if (/我有特定问题想直接提问|特定问题想直接提问/.test(t)) {
+    if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
       setUiWizard('qa', 0, '');
       return;
     }
@@ -2491,11 +2491,11 @@ function initAiChatbot() {
       `<p class="welcome-ask">请在下方选择：` +
       `<span class="welcome-option"><strong>开启专属合规诊断</strong><span class="diag-ask-hint">（需微信登录，按步骤生成诊断报告）</span></span>` +
       `，或 ` +
-      `<span class="welcome-option"><strong>我有特定问题想直接提问</strong><span class="diag-ask-hint">（基于知识库即时解答）</span></span>` +
+      `<span class="welcome-option"><strong>特定问题直接咨询</strong><span class="diag-ask-hint">（基于知识库即时解答）</span></span>` +
       `。</p>`;
     messages.appendChild(greetEl);
 
-    showQuickReplies('请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 我有特定问题想直接提问（基于知识库即时解答）。');
+    showQuickReplies('请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 特定问题直接咨询（基于知识库即时解答）。');
     scrollDiagChatToBottom();
   };
 
@@ -2570,7 +2570,7 @@ function initAiChatbot() {
 
     // Mode switch: always start a fresh Dify conversation (avoid stale上下文跑偏)
     const isModeSelect =
-      /开启专属合规诊断/.test(text) || /我有特定问题想直接提问|特定问题想直接提问/.test(text);
+      /开启专属合规诊断/.test(text) || /我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(text);
     if (isModeSelect || wantsExclusiveDiagnosis) {
       resetConversation();
     }

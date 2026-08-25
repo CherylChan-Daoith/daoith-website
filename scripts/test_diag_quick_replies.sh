@@ -24,8 +24,8 @@ function looksLikeFullDiagnosisPlan(text) {
     + chunk
     + r"""
 const cases = [
-  { name: "welcome-modeSelect-stale-step3", text: "请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 我有特定问题想直接提问（基于知识库即时解答）。", mode: "diagnosis", step: 3, platform: "亚马逊 Amazon", expect: "modeSelect" },
-  { name: "welcome-modeSelect-fresh", text: "请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 我有特定问题想直接提问（基于知识库即时解答）。", mode: "", step: 0, platform: "", expect: "modeSelect" },
+  { name: "welcome-modeSelect-stale-step3", text: "请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 特定问题直接咨询（基于知识库即时解答）。", mode: "diagnosis", step: 3, platform: "亚马逊 Amazon", expect: "modeSelect" },
+  { name: "welcome-modeSelect-fresh", text: "请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 特定问题直接咨询（基于知识库即时解答）。", mode: "", step: 0, platform: "", expect: "modeSelect" },
   { name: "step2-entity-with-shipping-echo", text: "好的，已记录发货方式为「全托管（国内仓）」。接下来第二步：您平台店铺的注册主体是中国大陆公司、中国个人、个体户、中国香港公司、外籍个人、其他境外公司？", mode: "diagnosis", step: 2, platform: "速卖通", expect: "entity" },
   { name: "step3-amazon-shipping", text: "第三步：您的发货方式是亚马逊FBA还是自发货？", mode: "diagnosis", step: 3, platform: "亚马逊 Amazon", expect: "shippingAmazon" },
   { name: "step1-platform-shein-example", text: "您在哪个电商平台上销售商品？（例如：亚马逊、TikTok Shop、eBay、速卖通、Temu、阿里国际站、SHEIN）", mode: "diagnosis", step: 1, platform: "", expect: "platform" },
