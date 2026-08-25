@@ -2160,67 +2160,19 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
 }
 
 function initAiSolutionGuide() {
-  const root = document.getElementById('aiFlowHints');
-  if (!root) return;
-  const hints = [...root.querySelectorAll('.ai-flow-hint')];
-  if (!hints.length) return;
+  const section = document.getElementById('ai-solution');
+  if (!section) return;
 
-  let active = hints.findIndex((el) => el.classList.contains('is-open'));
-  if (active < 0) active = 0;
-  let timer = null;
-  let paused = false;
-
-  const setOpen = (index) => {
-    active = ((index % hints.length) + hints.length) % hints.length;
-    hints.forEach((el, i) => {
-      const on = i === active;
-      el.classList.toggle('is-open', on);
-      el.setAttribute('aria-expanded', on ? 'true' : 'false');
-    });
-  };
-
-  const scrollToTarget = (id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (id === 'diagServiceRecs') el.hidden = false;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const startCycle = () => {
-    stopCycle();
-    timer = window.setInterval(() => {
-      if (paused) return;
-      setOpen(active + 1);
-    }, 3200);
-  };
-
-  const stopCycle = () => {
-    if (timer) {
-      window.clearInterval(timer);
-      timer = null;
-    }
-  };
-
-  hints.forEach((btn, i) => {
-    btn.addEventListener('click', () => {
-      setOpen(i);
-      scrollToTarget(btn.dataset.target || '');
-      paused = true;
-      window.setTimeout(() => {
-        paused = false;
-      }, 6000);
-    });
+  section.addEventListener('click', (e) => {
+    const hint = e.target.closest('[data-ai-scroll]');
+    if (!hint) return;
+    e.preventDefault();
+    const id = hint.getAttribute('data-ai-scroll') || '';
+    const target = document.getElementById(id);
+    if (!target) return;
+    if (id === 'diagServiceRecs') target.hidden = false;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-
-  root.addEventListener('mouseenter', () => {
-    paused = true;
-  });
-  root.addEventListener('mouseleave', () => {
-    paused = false;
-  });
-
-  setOpen(active);
-  startCycle();
 }
 
 function initAiChatbot() {
