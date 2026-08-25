@@ -127,6 +127,7 @@ function initNavigation() {
   function showView(hash, { updateHash = true, scrollTop = true } = {}) {
     const raw = String(hash || 'hero').replace(/^#/, '') || 'hero';
     const view = resolveView(raw);
+    const prevView = document.body.dataset.activeView;
 
     document.body.dataset.activeView = view;
     viewSections.forEach((el) => {
@@ -161,6 +162,10 @@ function initNavigation() {
       d.classList.remove('open');
       d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
     });
+
+    if (view === 'hub' && prevView !== 'hub') {
+      requestAnimationFrame(() => window.DAOITH_playHubJourney?.());
+    }
   }
 
   function onNavigateClick(e) {
@@ -6734,6 +6739,31 @@ function hubSubOrderNo(inquiryId, index, createdAt) {
   return `SO${date}${seq[0]}${letter}`;
 }
 
+function playHubJourney() {
+  const root = document.getElementById('hubJourney');
+  if (!root) return;
+  const nodes = [...root.querySelectorAll('.hub-journey-node')];
+  const lines = [...root.querySelectorAll('.hub-journey-line')];
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  root.classList.remove('is-playing', 'is-done');
+  nodes.forEach((n) => n.classList.remove('is-on'));
+  lines.forEach((n) => n.classList.remove('is-on'));
+  if (reduce) {
+    root.classList.add('is-done');
+    return;
+  }
+  root.classList.add('is-playing');
+  nodes.forEach((node, i) => {
+    setTimeout(() => {
+      node.classList.add('is-on');
+      if (i > 0) lines[i - 1]?.classList.add('is-on');
+      if (i === nodes.length - 1) {
+        setTimeout(() => root.classList.add('is-done'), 280);
+      }
+    }, 180 + i * 720);
+  });
+}
+
 function initServiceHub() {
   async function refreshHubData() {
     const quotes = await loadQuotesForHub();
@@ -6749,9 +6779,11 @@ function initServiceHub() {
   bindHubUi();
   refreshHubData();
   window.DAOITH_refreshHub = refreshHubData;
+  window.DAOITH_playHubJourney = playHubJourney;
   window.addEventListener('daoith-auth-change', () => {
     refreshHubData();
   });
+  if (document.body.dataset.activeView === 'hub') playHubJourney();
 }
 
 function getQuotes(openid) {
@@ -7368,6 +7400,14 @@ function bindHubUi() {
   if (!root) return;
 
   root.addEventListener('click', (e) => {
+    const scrollHint = e.target.closest('[data-hub-scroll]');
+    if (scrollHint) {
+      e.preventDefault();
+      const target = document.getElementById(scrollHint.getAttribute('data-hub-scroll') || '');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
     const helpBtn = e.target.closest('[data-hub-help]');
     if (helpBtn) {
       const wrap = helpBtn.closest('.hub-help-wrap');

@@ -376,6 +376,14 @@ window.DAOITH_I18N_EN = {
     '#hub .section-header p': {
       text: 'Manage inquiries, service orders, and delivery progress — with optional WeChat notifications.',
     },
+    '#hubJourney [data-step="1"] strong': { text: 'Inquiries' },
+    '#hubJourney [data-step="1"] .hub-journey-desc': { text: 'Submit an inquiry and pay' },
+    '#hubJourney [data-step="2"] strong': { text: 'Service orders' },
+    '#hubJourney [data-step="2"] .hub-journey-desc': { text: 'Look up orders after close-won' },
+    '#hubJourney [data-step="3"] strong': { text: 'Progress' },
+    '#hubJourney [data-step="3"] .hub-journey-desc': { text: 'Track delivery steps' },
+    '.hub-scroll-hint[data-hub-scroll="hub-orders"] span': { text: 'Scroll to service orders' },
+    '.hub-scroll-hint[data-hub-scroll="hub-progress"] span': { text: 'Scroll to service progress' },
     '.hub-notify-mini-label': { text: 'WeChat' },
     '#wechatBindTitle': { text: 'Bind WeChat notifications' },
     '#wechatBindLead': {
