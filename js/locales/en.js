@@ -241,9 +241,6 @@ window.DAOITH_I18N_EN = {
     '.process-card[data-step="3"] .tag:nth-child(1)': { text: 'Export Rebate' },
     '.process-card[data-step="3"] .tag:nth-child(2)': { text: 'Invoice-free exemption' },
     '.process-card[data-step="3"] .tag:nth-child(3)': { text: 'Multiple compliance setups' },
-    '#hero .stats > div:nth-child(1) .stat-label': { text: 'Sellers served' },
-    '#hero .stats > div:nth-child(2) .stat-label': { text: 'Compliance pass rate' },
-    '#hero .stats > div:nth-child(3) .stat-label': { text: 'Countries covered' },
     '#heroFeatures .feature-card[data-step="1"] h4': { text: 'AI Plan Generation' },
     '#heroFeatures .feature-card[data-step="1"] p': {
       text: 'Match optimal export rebate and cross-border tax strategies from platform, HS code, destination, and more.',
