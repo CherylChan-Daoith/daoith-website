@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260827scrolhint">
+  <link rel="stylesheet" href="/css/styles.css?v=20260827scrolhint2">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -178,7 +178,16 @@
         </div>
         <button type="button" class="hub-scroll-hint" data-ai-scroll="aiWorkspace">
           <span>点击体验AI解决方案</span>
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+            <defs>
+              <linearGradient id="aiScrollHintArrow" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#7eb6ff"/>
+                <stop offset="55%" stop-color="#2251ff"/>
+                <stop offset="100%" stop-color="#0b2fd6"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#aiScrollHintArrow)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/>
+          </svg>
         </button>
       </div>
 
