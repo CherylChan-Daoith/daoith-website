@@ -2409,6 +2409,12 @@ ul {
   padding: 0 0 0 0.35rem;
 }
 
+#resultItems ol.result-list-ordered,
+#resultItems .result-list-ordered {
+  list-style: decimal !important;
+  list-style-type: decimal !important;
+}
+
 .result-list-ordered > li {
   list-style-type: decimal !important;
   display: list-item;
@@ -2416,6 +2422,37 @@ ul {
   color: var(--text-secondary);
   line-height: 1.65;
   margin-bottom: 6px;
+}
+
+/* JSON 报告行动建议：强制 1. 2. 3.（不依赖浏览器 list-style） */
+.result-list-actions-flat {
+  list-style: none !important;
+  margin: 0 0 12px 0;
+  padding: 0;
+}
+
+.result-list-actions-flat > li {
+  list-style: none !important;
+  display: block;
+  position: relative;
+  padding-left: 1.85em;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin-bottom: 8px;
+}
+
+.result-list-actions-flat .result-action-num {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 1.6em;
+  font-weight: 700;
+  color: #1a3a7a;
+}
+
+.result-risk-summary {
+  margin: 0 0 12px;
 }
 
 /* 行动建议：1.1 / 1.2 / 2.1 …（按三大环节） */

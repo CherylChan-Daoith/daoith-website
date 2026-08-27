@@ -1618,6 +1618,38 @@ function formatDiagSlotsSnapshot(slots) {
   ].join('\n');
 }
 
+/** Personalized 业务流程 arrow chain from diagnosis archive slots. */
+function buildDiagnosisProcessFlowFromSlots(slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const invoice = String(s.invoice || '').trim() || '供应商发票';
+  const entity = String(s.entity || '').trim() || '店铺主体';
+  const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '').trim() || '出口方式';
+  const shipping = String(s.shipping || '').trim() || '发货方式';
+  const platform = String(s.platform || '').trim() || '平台';
+  return `${invoice} → ${entity} → ${exportMode} → ${shipping} → ${platform} → 境外消费者`;
+}
+
+function isGenericDiagnosisProcessFlow(text) {
+  const t = String(text || '')
+    .replace(/\s+/g, '')
+    .replace(/→|⟶|->|➜|➔/g, '→');
+  return (
+    /供应商发票→店铺主体→出口方式→发货方式→平台→境外消费者/.test(t) ||
+    (/供应商发票/.test(t) &&
+      /店铺主体/.test(t) &&
+      /出口方式/.test(t) &&
+      /发货方式/.test(t) &&
+      !/(专票|普票|全托管|半托管|FBA|速卖通|亚马逊|Shopee|Temu|大陆|香港|个体)/.test(t))
+  );
+}
+
+function stripDiagnosisActionStepPrefix(text) {
+  return String(text || '')
+    .replace(/^\s*(?:第[一二三四五六七八九十百零\d]+步|[1-9]\d*)[.、．:：)\s]+/, '')
+    .replace(/^\s*(?:第一步|第二步|第三步|第四步|第五步|第六步|第七步|第八步|第九步|第十步)[：:.\s]*/, '')
+    .trim();
+}
+
 function formatDiagSlotsForApi(slots) {
   const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
   const exportMode = resolveDiagExportMode(s) || '未填写';
@@ -5112,8 +5144,17 @@ function normalizeDiagnosisReportJson(obj) {
       .filter((c) => c.field),
     impact: String(src.impact || '').trim(),
     risk: {
-      processFlow: String(src.risk?.processFlow || '').trim(),
-      summary: String(src.risk?.summary || '').trim(),
+      processFlow: (() => {
+        const raw = String(src.risk?.processFlow || '').trim();
+        if (!raw || isGenericDiagnosisProcessFlow(raw)) {
+          return buildDiagnosisProcessFlowFromSlots(getDiagSlots());
+        }
+        return raw;
+      })(),
+      summary: String(src.risk?.summary || '')
+        .trim()
+        .replace(/^\s*[-*•]\s+/, '')
+        .replace(/^当前最大瓶颈是[：:]\s*/, '当前最大瓶颈是'),
       stages: normStages(src.risk?.stages),
     },
     plan: {
@@ -5122,7 +5163,7 @@ function normalizeDiagnosisReportJson(obj) {
       details: normDetails(src.plan?.details),
     },
     actions: (Array.isArray(src.actions) ? src.actions : [])
-      .map((a) => String(a || '').trim())
+      .map((a) => stripDiagnosisActionStepPrefix(String(a || '')))
       .filter(Boolean),
     notes: (Array.isArray(src.notes) ? src.notes : [])
       .map((n) => String(n || '').trim())
@@ -5231,7 +5272,7 @@ function renderDiagnosisReportJson(obj) {
   }
   if (report.risk.summary) {
     html += `<h5 class="result-section-subtitle">主要风险：</h5>`;
-    html += `<ul class="result-list result-list-l2"><li>${formatRiskOrBulletContent(report.risk.summary)}</li></ul>`;
+    html += `<p class="result-paragraph result-risk-summary">${formatRiskOrBulletContent(report.risk.summary)}</p>`;
   }
   (report.risk.stages || []).forEach((stage) => {
     html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stage.num || '01')}</span>${escapeHtml(stage.title)}</h6>`;
@@ -5263,9 +5304,13 @@ function renderDiagnosisReportJson(obj) {
   }
 
   html += `<h5 class="result-section-title">【行动建议】</h5>`;
-  html += `<ol class="result-list-ordered">`;
-  report.actions.forEach((a) => {
-    html += `<li>${formatInline(String(a))}</li>`;
+  html += `<ol class="result-list-actions-flat">`;
+  report.actions.forEach((a, i) => {
+    html +=
+      `<li>` +
+      `<span class="result-action-num" aria-hidden="true">${i + 1}.</span>` +
+      `<span class="result-action-body">${formatInline(String(a))}</span>` +
+      `</li>`;
   });
   html += `</ol>`;
 
