@@ -6098,9 +6098,18 @@ body.modal-open {
   font-size: 0.78rem;
 }
 
+.hub-more-btn {
+  color: #757575;
+  font-weight: 700;
+}
+
 .hub-link-btn:hover,
 .hub-more-btn:hover {
   text-decoration: underline;
+}
+
+.hub-more-btn:hover {
+  color: #555555;
 }
 
 .hub-bank {
