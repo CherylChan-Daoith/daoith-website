@@ -2865,7 +2865,7 @@ ul {
 
 #ai-solution .section-header,
 #ai-solution .ai-solution-header {
-  margin-bottom: 28px;
+  margin-bottom: 42px;
 }
 
 #ai-solution .section-badge {
@@ -2917,7 +2917,7 @@ ul {
   align-items: center;
   margin-left: auto;
   margin-right: auto;
-  margin-bottom: 8px;
+  margin-bottom: 0;
   gap: 0;
   width: 100%;
 }
@@ -3035,6 +3035,12 @@ ul {
   font-weight: 600;
   letter-spacing: 0.02em;
   transition: transform 0.18s ease;
+}
+
+/* Match gap below journey to header→journey spacing (42px) */
+#ai-solution .ai-solution-guide > .hub-scroll-hint {
+  margin-top: 42px;
+  margin-bottom: 8px;
 }
 
 #ai-solution .ai-solution-guide > .hub-scroll-hint > span,
