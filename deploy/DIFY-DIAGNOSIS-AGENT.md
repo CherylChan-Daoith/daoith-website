@@ -219,7 +219,10 @@ curl -s -X POST https://api.daoith.com/v1/diagnosis/chat-messages \
 ## 9. 我这边已为你准备的文件
 
 ```
-deploy/DIFY-DIAGNOSIS-AGENT.md          ← 本文
+deploy/DIFY-DIAGNOSIS-AGENT.md          ← Agent 搭建总览
+deploy/DIFY-DIAGNOSIS-REPORT-WORKFLOW.md ← 报告 JSON Workflow（方案 A）
+deploy/dify-prompts/diagnosis-report-schema.json
+deploy/dify-prompts/diagnosis-report-workflow-prompt.md
 deploy/dify-prompts/diagnosis-agent-system.md
 deploy/dify-prompts/diagnosis-agent-opening.md
 deploy/dify-prompts/diagnosis-agent-kb-instruction.md

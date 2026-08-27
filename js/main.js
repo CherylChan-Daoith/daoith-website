@@ -1652,17 +1652,13 @@ function buildDiagnosisPlanApiQuery(userText) {
   const archive = formatDiagSlotsForApi();
   const reply = String(userText || '').trim();
   return (
-    '【专属合规诊断·生成报告】第1-7步已齐。请严格按下方【诊断档案】撰写完整四章报告，禁止再提问。\n' +
+    '【专属合规诊断·生成报告】第1-7步已齐。请调用工具 `generate_diagnosis_report`，传入下方【诊断档案】；' +
+    '工具返回 JSON 后，**只向用户输出该 JSON**（version=1），不要自行写 Markdown 四章，禁止再提问。\n' +
     `${archive}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
-    '【写作铁律】必须按顺序写完四章：【核心风险诊断】【合规方案】【行动建议】【注意事项】，写完注意事项后再写专家1v1结尾句；' +
-    '禁止在【合规方案】后提前结束。业务流程、合规方案开篇画像、行动建议中出现的平台/发货/出口/发票/产品/销售额，必须与档案字段一致；' +
-    '不得把「国内仓」写成「保税仓」，不得改写销售额档位；不得照抄方案样本示例数据。' +
-    '【三大环节】核心风险诊断、合规方案须按「01 供应商发票和产品环节 / 02 报关出口环节 / 03 境外销售环节」展开；' +
-    '【行动建议】不要分三大环节，直接连续 `1. 2. 3. 4. …` 排列；' +
-    '【合规方案】先写各环节短事项概览（每条一行短标题），再写对应细则 `- **短标题**：说明`，不要用卡片式长文代替概览。' +
-    '禁止把版式说明、英文备忘、结尾句占位、概览→细则自检表、hard constraint / NOT write 等写作笔记输出给用户。' +
-    '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后参考对应样本结构生成报告。'
+    '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据；' +
+    '若工具不可用，才 fallback 写 Markdown 四章（【核心风险诊断】【合规方案】【行动建议】【注意事项】）。' +
+    '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后生成报告。'
   );
 }
 
@@ -1998,7 +1994,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
     5: '请执行第五步：只提问「5. 您目前供应商发票情况如何？（可在下方点选）」；不要在正文罗列专票/普票等选项。',
     6: '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
     7: '请执行第七步：只提问「7. 您目前年销售额约多少人民币？（可在下方点选）」；不要在正文罗列选项。',
-    8: '第1-7步已齐，请基于【诊断档案】输出完整四章：【核心风险诊断】【合规方案】【行动建议】【注意事项】，写完注意事项后再写专家1v1结尾句；禁止在【合规方案】后提前结束，不要再提问，不要声称信息缺失。',
+    8: '第1-7步已齐：必须调用工具 generate_diagnosis_report，传入【诊断档案】，向用户只输出工具返回的 JSON（version=1）；工具不可用时才 fallback 写 Markdown 四章。不要再提问。',
   };
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
   const archive = formatDiagSlotsForApi();
@@ -3024,7 +3020,8 @@ function initAiChatbot() {
           streamingPlan ||
           forcePlanWhileThinking ||
           shouldRouteDiagnosisToPlanPanel(clean) ||
-          /【核心风险诊断】|【合规方案】/.test(clean)
+          /【核心风险诊断】|【合规方案】/.test(clean) ||
+          (/"version"\s*:\s*1/.test(cleaned) && /"risk"\s*:/.test(cleaned))
         ) {
           beginPlanRouting();
           return;
@@ -3142,30 +3139,46 @@ function initAiChatbot() {
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
-        answer = prepareDiagnosisPlanMarkdown(answer);
-        if (looksLikeDiagnosisPlanScaffold(answer) || looksLikeEnglishPromptMeta(answer)) {
-          const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(result.text) || '');
-          if (salvaged && isDiagnosisPlanReadyToShow(salvaged)) answer = salvaged;
-        }
-        if (!isDiagnosisPlanReadyToShow(answer)) {
+        const jsonReport = extractDiagnosisReportJson(answer);
+        if (jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
+          publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis', jsonReport });
+          if (!planCountedThisTurn && !isPostReportFollowUp) {
+            planCountedThisTurn = true;
+            bumpDiagnosisPlanCount();
+          }
+          persistDiagnosisReport(answer);
           typing.classList.add('is-plan-status');
-          typing.textContent =
-            '方案正文不完整或含无效草稿。请点击「新建对话」后重试；并确认 Dify 已发布最新诊断提示词。';
+          const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+          typing.textContent = loggedInNow
+            ? planDoneMsg
+            : `${planDoneMsg}。请先微信登录以保存方案并继续`;
           clearQuickReplies();
-          return;
+        } else {
+          answer = prepareDiagnosisPlanMarkdown(answer);
+          if (looksLikeDiagnosisPlanScaffold(answer) || looksLikeEnglishPromptMeta(answer)) {
+            const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(result.text) || '');
+            if (salvaged && isDiagnosisPlanReadyToShow(salvaged)) answer = salvaged;
+          }
+          if (!isDiagnosisPlanReadyToShow(answer)) {
+            typing.classList.add('is-plan-status');
+            typing.textContent =
+              '方案正文不完整或含无效草稿。请点击「新建对话」后重试；并确认 Dify 已发布最新诊断提示词与报告工具。';
+            clearQuickReplies();
+            return;
+          }
+          publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis' });
+          if (!planCountedThisTurn && !isPostReportFollowUp) {
+            planCountedThisTurn = true;
+            bumpDiagnosisPlanCount();
+          }
+          persistDiagnosisReport(answer);
+          typing.classList.add('is-plan-status');
+          const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
+          typing.textContent = loggedInNow
+            ? planDoneMsg
+            : `${planDoneMsg}。请先微信登录以保存方案并继续`;
+          clearQuickReplies();
         }
-        publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis' });
-        if (!planCountedThisTurn && !isPostReportFollowUp) {
-          planCountedThisTurn = true;
-          bumpDiagnosisPlanCount();
-        }
-        persistDiagnosisReport(answer);
-        typing.classList.add('is-plan-status');
-        const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-        typing.textContent = loggedInNow
-          ? planDoneMsg
-          : `${planDoneMsg}。请先微信登录以保存方案并继续`;
-        clearQuickReplies();
       } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
         beginLongQaRouting();
         publishDiagnosisPlanToResultPanel(answer, { kind: 'qa' });
@@ -3204,6 +3217,7 @@ function initAiChatbot() {
 /** Detect structured full diagnosis / solution replies from the diagnosis Agent. */
 function looksLikeFullDiagnosisPlan(text) {
   const t = String(text || '');
+  if (extractDiagnosisReportJson(t)) return true;
   if (t.length < 160) return false;
   if (looksLikeDiagnosisPlanScaffold(t)) return false;
   const markers = [
@@ -3505,6 +3519,9 @@ function ensureDiagnosisClosingChapters(text) {
  * Avoids flashing empty headers / English meta during streaming.
  */
 function isDiagnosisPlanReadyToShow(text) {
+  const jsonReport = extractDiagnosisReportJson(text);
+  if (jsonReport && isDiagnosisReportJsonReady(jsonReport)) return true;
+
   const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
   if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return false;
   if (looksLikeEnglishPromptMeta(t) && countDiagnosisCjk(t) < 280) return false;
@@ -3642,6 +3659,7 @@ function salvageDiagnosisPlanFromRaw(raw) {
 function looksLikeDiagnosisPlanStreaming(text) {
   const t = String(text || '');
   if (t.length < 80) return false;
+  if (/"version"\s*:\s*1/.test(t) && /"risk"\s*:/.test(t)) return true;
   if (looksLikeDiagnosisPlanScaffold(t)) return false;
   if (/【核心风险诊断】|【合规方案】/.test(t)) return true;
   if (/#{1,3}\s*1[）).、]/.test(t) && /(问题理解|业务画像|风险诊断|解决方案)/.test(t)) return true;
@@ -3804,9 +3822,11 @@ function persistDiagnosisReport(markdown) {
     if (!auth?.isLoggedIn?.()) return;
     const token = auth.getToken?.();
     if (!token) return;
-    const clean = prepareDiagnosisPlanMarkdown(
-      stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
-    );
+    const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
+    const jsonReport = extractDiagnosisReportJson(cleanRaw);
+    const clean = jsonReport && isDiagnosisReportJsonReady(jsonReport)
+      ? diagnosisReportJsonToMarkdown(jsonReport)
+      : prepareDiagnosisPlanMarkdown(cleanRaw);
     if (!clean || !isDiagnosisPlanReadyToShow(clean)) return;
 
     const slots = typeof getDiagSlots === 'function' ? getDiagSlots() : {};
@@ -4149,11 +4169,51 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   content.classList.add('active');
 
   const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
+  const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
+  const jsonReport =
+    options.jsonReport ||
+    (kind === 'diagnosis' ? extractDiagnosisReportJson(cleanRaw) : null);
+
+  if (kind === 'diagnosis' && jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
+    const clean = diagnosisReportJsonToMarkdown(jsonReport);
+    if (
+      looksLikeLocalGenericHelp(clean) ||
+      looksLikeDiagnosisPlanScaffold(clean) ||
+      !isDiagnosisReportJsonReady(jsonReport)
+    ) {
+      return;
+    }
+    const body = renderDiagnosisReportJson(jsonReport);
+    const fromChat = `以下方案由左侧<strong>道一合规助手</strong>生成：`;
+    const archiveHtml = buildDiagnosisArchiveConfirmHtml();
+    const changeHtml = buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges());
+    const tipHtml = buildServiceMatchTipHtml();
+    items.innerHTML =
+      `<div class="result-body result-body-scroll">` +
+      `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
+      `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
+      archiveHtml +
+      changeHtml +
+      body +
+      tipHtml +
+      `</div>`;
+    if (serviceHost) {
+      showDiagnosisServiceRecs(clean, {
+        lead: '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
+      });
+    }
+    try {
+      items.scrollTop = 0;
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
+
   const clean =
-    options.kind === 'qa' ? cleanRaw : prepareDiagnosisPlanMarkdown(cleanRaw);
+    kind === 'qa' ? cleanRaw : prepareDiagnosisPlanMarkdown(cleanRaw);
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
-  const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
   // Local generic help / English scaffolds / prompt-meta are not diagnosis reports
   if (
     kind === 'diagnosis' &&
@@ -4957,6 +5017,270 @@ function splitPlanCardContent(content) {
   }
 
   return null;
+}
+
+const DIAGNOSIS_REPORT_JSON_VERSION = 1;
+
+/** Extract structured diagnosis report JSON from Agent / Workflow output. */
+function extractDiagnosisReportJson(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+
+  const tryParse = (candidate) => {
+    try {
+      const obj = JSON.parse(String(candidate || '').trim());
+      if (!obj || typeof obj !== 'object') return null;
+      if (obj.version !== DIAGNOSIS_REPORT_JSON_VERSION && !obj.risk && !obj.plan) return null;
+      return normalizeDiagnosisReportJson(obj);
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = tryParse(raw);
+  if (direct) return direct;
+
+  const fence = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) {
+    const fromFence = tryParse(fence[1]);
+    if (fromFence) return fromFence;
+  }
+
+  const brace = raw.match(/\{[\s\S]*"version"\s*:\s*1[\s\S]*\}/);
+  if (brace) {
+    const fromBrace = tryParse(brace[0]);
+    if (fromBrace) return fromBrace;
+  }
+
+  return null;
+}
+
+function normalizeDiagnosisReportStageItem(item) {
+  if (typeof item === 'string') return item.trim();
+  if (item && typeof item === 'object') {
+    const title = String(item.title || '').trim();
+    const body = String(item.body || item.text || '').trim();
+    if (title && body) return { title, body };
+    if (title) return title;
+    if (body) return body;
+  }
+  return '';
+}
+
+function normalizeDiagnosisReportJson(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {};
+  const normStages = (stages) =>
+    (Array.isArray(stages) ? stages : [])
+      .map((stage, idx) => {
+        if (!stage || typeof stage !== 'object') return null;
+        const num = String(stage.num || String(idx + 1).padStart(2, '0')).trim();
+        const title = String(stage.title || PLAN_STAGE_TITLES[idx] || '').trim();
+        const items = (Array.isArray(stage.items) ? stage.items : [])
+          .map(normalizeDiagnosisReportStageItem)
+          .filter(Boolean);
+        if (!title && !items.length) return null;
+        return { num, title, items };
+      })
+      .filter(Boolean);
+
+  const normDetails = (details) =>
+    (Array.isArray(details) ? details : [])
+      .map((d) => {
+        if (typeof d === 'string') {
+          const m = d.match(/^\*\*([^*]+)\*\*\s*[:：]\s*([\s\S]+)$/);
+          if (m) return { title: m[1].trim(), body: m[2].trim() };
+          return { title: '', body: d.trim() };
+        }
+        if (d && typeof d === 'object') {
+          return {
+            title: String(d.title || '').trim(),
+            body: String(d.body || d.text || '').trim(),
+          };
+        }
+        return null;
+      })
+      .filter((d) => d && (d.title || d.body));
+
+  return {
+    version: DIAGNOSIS_REPORT_JSON_VERSION,
+    changes: (Array.isArray(src.changes) ? src.changes : [])
+      .map((c) => ({
+        field: String(c?.field || c?.label || '').trim(),
+        from: String(c?.from || '').trim(),
+        to: String(c?.to || '').trim(),
+      }))
+      .filter((c) => c.field),
+    impact: String(src.impact || '').trim(),
+    risk: {
+      processFlow: String(src.risk?.processFlow || '').trim(),
+      summary: String(src.risk?.summary || '').trim(),
+      stages: normStages(src.risk?.stages),
+    },
+    plan: {
+      intro: String(src.plan?.intro || '').trim(),
+      overview: normStages(src.plan?.overview),
+      details: normDetails(src.plan?.details),
+    },
+    actions: (Array.isArray(src.actions) ? src.actions : [])
+      .map((a) => String(a || '').trim())
+      .filter(Boolean),
+    notes: (Array.isArray(src.notes) ? src.notes : [])
+      .map((n) => String(n || '').trim())
+      .filter(Boolean),
+    closing: String(
+      src.closing ||
+        '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。'
+    ).trim(),
+  };
+}
+
+function isDiagnosisReportJsonReady(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  const md = diagnosisReportJsonToMarkdown(obj);
+  if (!md || looksLikeDiagnosisPlanScaffold(md)) return false;
+  const hasRisk = Boolean(obj.risk?.processFlow || obj.risk?.stages?.length);
+  const hasPlan = Boolean(
+    obj.plan?.intro || obj.plan?.overview?.length || obj.plan?.details?.length
+  );
+  const hasActions = Array.isArray(obj.actions) && obj.actions.length >= 2;
+  const hasNotes = Array.isArray(obj.notes) && obj.notes.length >= 2;
+  const sections = [hasRisk, hasPlan, hasActions, hasNotes].filter(Boolean).length;
+  if (sections < 3) return false;
+  if (countDiagnosisCjk(md) < 160) return false;
+  return true;
+}
+
+function diagnosisReportJsonToMarkdown(obj) {
+  const report = normalizeDiagnosisReportJson(obj);
+  const lines = [];
+
+  if (report.changes?.length) {
+    lines.push('【变化点】');
+    report.changes.forEach((c) => {
+      lines.push(`- ${c.field}：${c.from} → ${c.to}`);
+    });
+    lines.push('');
+  }
+  if (report.impact) {
+    lines.push('【影响与注意事项】');
+    lines.push(report.impact);
+    lines.push('');
+  }
+
+  lines.push('【核心风险诊断】');
+  if (report.risk.processFlow) lines.push(`业务流程：${report.risk.processFlow}`);
+  if (report.risk.summary) lines.push(`主要风险：${report.risk.summary}`);
+  (report.risk.stages || []).forEach((stage) => {
+    lines.push(`${stage.num} ${stage.title}`);
+    (stage.items || []).forEach((item) => {
+      if (typeof item === 'string') lines.push(`- ${item}`);
+      else lines.push(`- **${item.title}**：${item.body}`);
+    });
+  });
+  lines.push('');
+
+  lines.push('【合规方案】');
+  if (report.plan.intro) lines.push(report.plan.intro);
+  (report.plan.overview || []).forEach((stage) => {
+    lines.push(`${stage.num} ${stage.title}`);
+    (stage.items || []).forEach((it) => lines.push(`- ${it}`));
+  });
+  (report.plan.details || []).forEach((d) => {
+    if (d.title) lines.push(`- **${d.title}**：${d.body}`);
+    else if (d.body) lines.push(`- ${d.body}`);
+  });
+  lines.push('');
+
+  lines.push('【行动建议】');
+  report.actions.forEach((a, i) => lines.push(`${i + 1}. ${a}`));
+  lines.push('');
+
+  lines.push('【注意事项】');
+  report.notes.forEach((n) => lines.push(`- ${n}`));
+  lines.push('');
+  if (report.closing) lines.push(report.closing);
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function renderDiagnosisReportJson(obj) {
+  const report = normalizeDiagnosisReportJson(obj);
+  let html = '';
+
+  if (report.changes?.length) {
+    html += `<h5 class="result-section-title">【变化点】</h5>`;
+    html += `<ul class="result-list result-list-l2">`;
+    report.changes.forEach((c) => {
+      html += `<li>${escapeHtml(c.field)}：${escapeHtml(c.from)} → ${escapeHtml(c.to)}</li>`;
+    });
+    html += `</ul>`;
+  }
+  if (report.impact) {
+    html += `<h5 class="result-section-title">【影响与注意事项】</h5>`;
+    html += `<p class="result-paragraph">${formatInline(report.impact)}</p>`;
+  }
+
+  html += `<h5 class="result-section-title">【核心风险诊断】</h5>`;
+  if (report.risk.processFlow) {
+    html += `<h5 class="result-section-subtitle result-flow-heading">业务流程：</h5>`;
+    const parts = splitArrowFlowParts(report.risk.processFlow);
+    html +=
+      parts.length >= 2
+        ? renderArrowFlowHtml(parts)
+        : `<p class="result-paragraph">${formatInline(report.risk.processFlow)}</p>`;
+  }
+  if (report.risk.summary) {
+    html += `<h5 class="result-section-subtitle">主要风险：</h5>`;
+    html += `<ul class="result-list result-list-l2"><li>${formatRiskOrBulletContent(report.risk.summary)}</li></ul>`;
+  }
+  (report.risk.stages || []).forEach((stage) => {
+    html += `<h6 class="result-stage-subtitle"><span class="result-plan-stage-num">${escapeHtml(stage.num || '01')}</span>${escapeHtml(stage.title)}</h6>`;
+    html += `<ul class="result-list result-list-l2">`;
+    (stage.items || []).forEach((item) => {
+      if (typeof item === 'string') {
+        html += `<li>${formatRiskOrBulletContent(item)}</li>`;
+      } else {
+        html += `<li><strong class="result-em">${escapeHtml(item.title)}</strong>：${formatInline(item.body || '')}</li>`;
+      }
+    });
+    html += `</ul>`;
+  });
+
+  html += `<h5 class="result-section-title">【合规方案】</h5>`;
+  if (report.plan.intro) {
+    html += `<p class="result-paragraph">${formatInline(report.plan.intro)}</p>`;
+  }
+  if (report.plan.overview?.length) {
+    html += renderPlanOverviewHtml(report.plan.overview);
+  }
+  if (report.plan.details?.length) {
+    html += `<ul class="result-plan-details">`;
+    report.plan.details.forEach((d) => {
+      const content = d.title ? `**${d.title}**：${d.body || ''}` : d.body || '';
+      html += renderPlanDetailItemHtml(content);
+    });
+    html += `</ul>`;
+  }
+
+  html += `<h5 class="result-section-title">【行动建议】</h5>`;
+  html += `<ol class="result-list result-list-ol">`;
+  report.actions.forEach((a) => {
+    html += `<li>${formatInline(String(a))}</li>`;
+  });
+  html += `</ol>`;
+
+  html += `<h5 class="result-section-title">【注意事项】</h5>`;
+  html += `<ul class="result-list result-list-l2">`;
+  report.notes.forEach((n) => {
+    html += `<li>${formatInline(String(n))}</li>`;
+  });
+  html += `</ul>`;
+
+  if (report.closing) {
+    html += `<p class="result-paragraph">${formatInline(report.closing)}</p>`;
+  }
+
+  return html;
 }
 
 const PLAN_STAGE_TITLES = [
