@@ -3015,7 +3015,9 @@ ul {
   scroll-margin-top: 88px;
 }
 
-#ai-solution .ai-solution-guide > .hub-scroll-hint {
+#ai-solution .ai-solution-guide > .hub-scroll-hint,
+#ai-solution .hub-scroll-hint.is-cta,
+#hub .hub-scroll-hint.is-cta {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3035,7 +3037,9 @@ ul {
   transition: transform 0.18s ease;
 }
 
-#ai-solution .ai-solution-guide > .hub-scroll-hint > span {
+#ai-solution .ai-solution-guide > .hub-scroll-hint > span,
+#ai-solution .hub-scroll-hint.is-cta > span,
+#hub .hub-scroll-hint.is-cta > span {
   display: inline-block;
   padding: 8px 18px;
   border-radius: 999px;
@@ -3046,27 +3050,83 @@ ul {
     0 2px 6px rgba(23, 64, 224, 0.18);
   color: #fff;
   line-height: 1.35;
+  text-align: center;
   transition:
     box-shadow 0.18s ease,
     filter 0.18s ease;
 }
 
-#ai-solution .ai-solution-guide > .hub-scroll-hint:hover {
+#ai-solution .ai-solution-guide > .hub-scroll-hint:hover,
+#ai-solution .hub-scroll-hint.is-cta:hover,
+#hub .hub-scroll-hint.is-cta:hover {
   color: #fff;
   transform: translateY(2px);
 }
 
-#ai-solution .ai-solution-guide > .hub-scroll-hint:hover > span {
+#ai-solution .ai-solution-guide > .hub-scroll-hint:hover > span,
+#ai-solution .hub-scroll-hint.is-cta:hover > span,
+#hub .hub-scroll-hint.is-cta:hover > span {
   filter: brightness(1.06);
   box-shadow:
     0 10px 24px rgba(34, 81, 255, 0.34),
     0 3px 8px rgba(23, 64, 224, 0.22);
 }
 
-#ai-solution .ai-solution-guide > .hub-scroll-hint svg {
+#ai-solution .ai-solution-guide > .hub-scroll-hint svg,
+#ai-solution .hub-scroll-hint.is-cta svg,
+#hub .hub-scroll-hint.is-cta svg {
   width: 22px;
   height: 22px;
   color: transparent;
+}
+
+/* Align AI / hub panel frames with CTA blue */
+:root {
+  --daoith-cta-border: rgba(34, 81, 255, 0.55);
+  --daoith-cta-border-soft: rgba(91, 157, 255, 0.65);
+  --daoith-cta-shadow: 0 8px 24px rgba(34, 81, 255, 0.14);
+}
+
+.diag-hs-block,
+.diag-chat,
+.result-panel {
+  border-color: var(--daoith-cta-border) !important;
+  box-shadow: var(--daoith-cta-shadow) !important;
+}
+
+.diag-services-section,
+#ai-solution .tax-calc {
+  border-color: var(--daoith-cta-border-soft) !important;
+  box-shadow: var(--daoith-cta-shadow) !important;
+}
+
+.hub-stack > .hub-panel.hub-skin-ai[data-hub-section="inquiries"],
+.hub-stack > .hub-panel.hub-skin-ai[data-hub-section="progress"] {
+  border: 1.5px solid var(--daoith-cta-border) !important;
+  box-shadow: var(--daoith-cta-shadow) !important;
+}
+
+.hub-stack > .hub-panel.hub-skin-ai[data-hub-section="inquiries"]::before,
+.hub-stack > .hub-panel.hub-skin-ai[data-hub-section="progress"]::before {
+  background: linear-gradient(
+    180deg,
+    rgba(91, 157, 255, 0.35) 0%,
+    rgba(34, 81, 255, 0.12) 45%,
+    rgba(34, 81, 255, 0) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(91, 157, 255, 0.55);
+}
+
+.diag-hs-block::before,
+.diag-chat::before,
+.result-panel::before {
+  background: linear-gradient(
+    180deg,
+    rgba(91, 157, 255, 0.32) 0%,
+    rgba(34, 81, 255, 0.1) 45%,
+    rgba(34, 81, 255, 0) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(91, 157, 255, 0.5);
 }
 
 #diagServiceRecs,

@@ -11,10 +11,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20260827riskfmt">
+  <link rel="stylesheet" href="/css/styles.css?v=20260827ctablue">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;overflow:hidden">
+    <defs>
+      <linearGradient id="hubScrollArrowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#7eb6ff"/>
+        <stop offset="55%" stop-color="#2251ff"/>
+        <stop offset="100%" stop-color="#0b2fd6"/>
+      </linearGradient>
+    </defs>
+  </svg>
 
   <!-- Header -->
   <header class="header" id="header">
@@ -176,17 +185,10 @@
             </div>
           </div>
         </div>
-        <button type="button" class="hub-scroll-hint" data-ai-scroll="aiWorkspace">
+        <button type="button" class="hub-scroll-hint is-cta" data-ai-scroll="aiWorkspace">
           <span>点击体验AI解决方案</span>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <defs>
-              <linearGradient id="aiScrollHintArrow" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#7eb6ff"/>
-                <stop offset="55%" stop-color="#2251ff"/>
-                <stop offset="100%" stop-color="#0b2fd6"/>
-              </linearGradient>
-            </defs>
-            <path fill="url(#aiScrollHintArrow)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/>
+            <path fill="url(#hubScrollArrowGrad)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/>
           </svg>
         </button>
       </div>
@@ -258,17 +260,17 @@
         </div>
       </div>
 
-      <button type="button" class="hub-scroll-hint" data-ai-scroll="diagServiceRecs">
+      <button type="button" class="hub-scroll-hint is-cta" data-ai-scroll="diagServiceRecs">
         <span>点击查看专属服务</span>
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="url(#hubScrollArrowGrad)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
       </button>
 
       <!-- Recommended services (filled after diagnosis plan, above tax calc) -->
       <div class="diag-services-section" id="diagServiceRecs" hidden aria-live="polite"></div>
 
-      <button type="button" class="hub-scroll-hint" data-ai-scroll="taxCalcBlock">
+      <button type="button" class="hub-scroll-hint is-cta" data-ai-scroll="taxCalcBlock">
         <span>点击体验自动化合规税负测算</span>
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="url(#hubScrollArrowGrad)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
       </button>
 
       <!-- Tax Calculator -->
@@ -681,9 +683,9 @@
             <div class="stat-label">覆盖城市</div>
           </div>
         </div>
-        <button type="button" class="hub-scroll-hint" data-hub-scroll="hub-inquiries">
+        <button type="button" class="hub-scroll-hint is-cta" data-hub-scroll="hub-inquiries">
           <span>点击查看询价管理</span>
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="url(#hubScrollArrowGrad)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
       </div>
     </div>
@@ -700,9 +702,9 @@
           <div id="quotesListWrap"></div>
         </div>
 
-        <button type="button" class="hub-scroll-hint" data-hub-scroll="hub-orders">
+        <button type="button" class="hub-scroll-hint is-cta" data-hub-scroll="hub-orders">
           <span>点击查看服务订单管理</span>
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="url(#hubScrollArrowGrad)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
 
         <div class="hub-panel hub-skin-tax" data-hub-section="orders" id="hub-orders">
@@ -716,9 +718,9 @@
           <div id="hubOrdersWrap"></div>
         </div>
 
-        <button type="button" class="hub-scroll-hint" data-hub-scroll="hub-progress">
+        <button type="button" class="hub-scroll-hint is-cta" data-hub-scroll="hub-progress">
           <span>点击查看服务进度跟踪</span>
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
+          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="url(#hubScrollArrowGrad)" d="M12 16.5 5.5 10l1.4-1.4L12 13.7l5.1-5.1L18.5 10z"/></svg>
         </button>
 
         <div class="hub-panel hub-skin-ai" data-hub-section="progress" id="hub-progress">
