@@ -137,6 +137,9 @@ Code 节点输入见下节（兼容 `structured_output` 与 `text`）。
 
 ## 3. Code 校验节点（Python）
 
+⚠️ **只粘贴纯 Python**：打开 `deploy/dify-prompts/diagnosis-report-code.py`，**全选复制**到 Dify Code 节点。  
+**禁止**把 `DIFY-DIAGNOSIS-REPORT-WORKFLOW.md` 或带 `目标：`、`##` 的 Markdown 贴进 Code 框（会报 `SyntaxError: invalid character '：'`）。
+
 ```python
 import json
 import re
@@ -152,6 +155,32 @@ def _strip_think(raw: str) -> str:
     s = re.sub(r"<\s*think\b[^>]*>[\s\S]*?<\s*/\s*think\s*>", "", s, flags=re.I)
     s = re.sub(r"```(?:thinking|thought|reasoning)[\s\S]*?```", "", s, flags=re.I)
     return s.strip()
+
+def _unwrap(obj):
+    if not isinstance(obj, dict):
+        return obj
+    for _ in range(3):
+        if isinstance(obj.get("structured_output"), dict):
+            obj = obj["structured_output"]
+            continue
+        if isinstance(obj.get("report_json"), str) and obj["report_json"].strip():
+            try:
+                inner = json.loads(obj["report_json"])
+                if isinstance(inner, dict):
+                    obj = inner
+                    continue
+            except Exception:
+                pass
+        if isinstance(obj.get("report_json"), dict):
+            obj = obj["report_json"]
+            continue
+        if isinstance(obj.get("data"), dict) and (
+            obj["data"].get("risk") or obj["data"].get("plan")
+        ):
+            obj = obj["data"]
+            continue
+        break
+    return obj
 
 def _parse_obj(structured_output=None, report_text: str = ""):
     obj = None
@@ -174,19 +203,33 @@ def _parse_obj(structured_output=None, report_text: str = ""):
         if not brace:
             raise ValueError("no JSON object in LLM text (got think/plain text only)")
         obj = json.loads(brace.group(0))
-    if isinstance(obj, dict) and "structured_output" in obj and isinstance(obj["structured_output"], dict):
-        obj = obj["structured_output"]
-    return obj
+    return _unwrap(obj)
+
+def _normalize_version(obj: dict) -> None:
+    ver = obj.get("version")
+    if ver is None or ver == "":
+        if obj.get("risk") or obj.get("plan"):
+            obj["version"] = 1
+            return
+        raise ValueError(f"version missing; keys={list(obj.keys())}")
+    if isinstance(ver, str):
+        ver = ver.strip()
+    if ver in (1, "1", 1.0, "1.0", "1.00"):
+        obj["version"] = 1
+        return
+    try:
+        if int(float(ver)) == 1:
+            obj["version"] = 1
+            return
+    except Exception:
+        pass
+    raise ValueError(f"version must be 1, got {repr(obj.get('version'))}; keys={list(obj.keys())}")
 
 def main(structured_output=None, report_text: str = "") -> dict:
     obj = _parse_obj(structured_output, report_text)
-    ver = obj.get("version")
-    if ver in (1, "1", 1.0, "1.0"):
-        obj["version"] = 1
-    else:
-        raise ValueError(
-            f"version must be 1, got {repr(ver)}; keys={list(obj.keys())}"
-        )
+    if not isinstance(obj, dict):
+        raise ValueError(f"expected JSON object, got {type(obj).__name__}")
+    _normalize_version(obj)
     for key in ("risk", "plan", "actions", "notes"):
         if key not in obj:
             raise ValueError(f"missing {key}; keys={list(obj.keys())}")
@@ -201,6 +244,17 @@ def main(structured_output=None, report_text: str = "") -> dict:
         raise ValueError(f"report too short (cjk={cjk})")
     return {"report_json": json.dumps(obj, ensure_ascii=False)}
 ```
+
+**若 Structured Output 常只返回 `{num,title,items}`（接线无误仍报错）**：
+
+1. LLM 节点 → **关闭 Structured Output / JSON Schema**
+2. System 末尾加一句：`只输出一个纯 JSON 对象，version=1，不要 Markdown 代码块，不要思考过程`
+3. Max Tokens 调到 **8192**
+4. Code 仍接 `structured_output` + `report_text`（`text` 里会有完整 JSON；新版 Code 优先解析 `text`）
+
+> **常见报错 `version missing; keys=['num', 'title', 'items']`**：不是 Code 接线错，而是 **Dify 把 Structured Output 解析成了环节小对象**。按上表关闭 Structured Output 即可。
+
+> **常见报错 `AssertionError: version must be 1`**：旧 Code 用了 `assert`。请替换为 `diagnosis-report-code.py` 最新版。
 
 ### 3.1 Code 节点设置
 
@@ -279,6 +333,7 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 ## 8. 相关文件
 
 ```
+deploy/dify-prompts/diagnosis-report-code.py           ← Dify Code 节点只粘贴此文件
 deploy/dify-prompts/diagnosis-report-schema.dify.json   ← Dify 粘贴用（≤10 层）
 deploy/dify-prompts/diagnosis-report-schema.json        ← 完整说明（勿直接导入 Dify）
 deploy/dify-prompts/diagnosis-report-workflow-prompt.md ← Workflow LLM 指令
