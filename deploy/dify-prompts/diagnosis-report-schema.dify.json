@@ -1,0 +1,62 @@
+{
+  "type": "object",
+  "required": ["version", "risk", "plan", "actions", "notes"],
+  "properties": {
+    "version": {
+      "type": "integer"
+    },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "from": { "type": "string" },
+          "to": { "type": "string" }
+        },
+        "required": ["field", "from", "to"]
+      }
+    },
+    "impact": {
+      "type": "string"
+    },
+    "risk": {
+      "type": "object",
+      "required": ["processFlow"],
+      "properties": {
+        "processFlow": { "type": "string" },
+        "summary": { "type": "string" },
+        "stages": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "required": ["intro", "overview", "details"],
+      "properties": {
+        "intro": { "type": "string" },
+        "overview": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "details": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "closing": {
+      "type": "string"
+    }
+  }
+}
