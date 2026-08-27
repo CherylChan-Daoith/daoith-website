@@ -1640,6 +1640,164 @@ function buildDiagnosisProcessFlowFromSlots(slots) {
   return `${invoice} → ${entity} → ${exportMode} → ${shipping} → ${platform} → 境外消费者`;
 }
 
+/** Internal path A/B/C/D from diagnosis slots (matches Workflow 路径判定). */
+function detectDiagnosisReportPath(slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const shipping = String(s.shipping || '');
+  const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
+  const product = String(s.productCategory || '');
+
+  if (/^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product)) {
+    return 'D';
+  }
+  if (isPlatformDomesticWarehouseShipping(shipping) || /由平台安排出口/.test(exportMode)) {
+    return 'C';
+  }
+  if (
+    /小包快递出口|9610|1210|未报关/.test(exportMode) ||
+    (/国内直发|POP（国内直发）|自发货（国内直发）|便捷发货/.test(shipping) &&
+      /9610|1210|小包|未报关/.test(`${exportMode}${shipping}`))
+  ) {
+    return 'B';
+  }
+  if (
+    /亚马逊\s*FBA|FBA|FBL|Shopee海外仓|海外仓发货|半托管（海外仓）|POP（海外仓|自发货（海外仓|发货到平台海外仓|供货\s*SHEIN（保税仓）/.test(
+      shipping
+    ) ||
+    /正式报关|9810|1039|委托货代|市场采购|9710|0110/.test(exportMode)
+  ) {
+    return 'A';
+  }
+  return 'A';
+}
+
+function isMainlandDiagEntity(entity) {
+  return /中国大陆公司|中国个人|个体户/.test(String(entity || ''));
+}
+
+function hasDiagSpecialInvoice(invoice) {
+  return /专用发票|专票|增值税专票/.test(String(invoice || ''));
+}
+
+function hasDiagNoInvoice(invoice) {
+  return /无法提供|无票|不能提供/.test(String(invoice || ''));
+}
+
+function isDiagRebateEligibleProduct(product) {
+  return /^普货/.test(String(product || '')) || /能正常报关出口和退税/.test(String(product || ''));
+}
+
+function planDetailsText(details) {
+  return (Array.isArray(details) ? details : [])
+    .map((d) => `${d?.title || ''} ${d?.body || ''}`)
+    .join('\n');
+}
+
+function planDetailsAlreadyCovers(details, title) {
+  const blob = planDetailsText(details);
+  if ((Array.isArray(details) ? details : []).some((d) => String(d?.title || '').includes(title))) {
+    return true;
+  }
+  if (title.includes('0110出口+香港公司')) {
+    return /0110出口\s*\+\s*香港|0110.*香港公司|香港公司.*0110/.test(blob);
+  }
+  if (title.includes('1039出口+香港公司')) {
+    return /1039出口\s*\+\s*香港|1039.*香港公司/.test(blob);
+  }
+  if (title.includes('1210出口备货至保税区')) {
+    return /1210出口备货|1210.*保税|保税.*1210/.test(blob);
+  }
+  if (title.includes('1210保税区一日游或9610')) {
+    return /1210.*一日游|9610跨境电商零售|9610.*1210/.test(blob);
+  }
+  if (title.includes('平台信息报送')) {
+    return /信息报送|采购后再销售|店铺主体.*不一致|香港公司.*店铺公司/.test(blob);
+  }
+  return false;
+}
+
+/** Mandatory plan.details rows when Workflow LLM omits named architectures. */
+function buildMandatoryPlanDetails(slots, path) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
+  const entity = String(s.entity || '');
+  const invoice = String(s.invoice || '');
+  const product = String(s.productCategory || '');
+  const freightForwarder = /委托货代|买单/.test(exportMode);
+  const rows = [];
+
+  if (path === 'A') {
+    if (isDiagRebateEligibleProduct(product) && hasDiagSpecialInvoice(invoice)) {
+      rows.push({
+        title: '0110出口+香港公司',
+        body:
+          '建议搭建「0110出口+香港公司」合规架构：国内供应商 → 进出口公司 → 香港公司 → 店铺公司 → 境外消费者。' +
+          '进出口公司以自有抬头 0110 一般贸易报关出口给香港公司（香港公司为报关单境外买家）；供应商增值税专用发票开给进出口公司，满足条件后可申请出口退免税。' +
+          (freightForwarder
+            ? '当前为委托货代出口（买单出口），须以自有抬头 0110 替代货代抬头报关，否则难以支撑退免税且存在三流不一致风险。'
+            : '') +
+          '关联公司之间须注意转让定价，勿将大部分利润留存于无实质经营的香港公司。',
+      });
+    } else if (hasDiagNoInvoice(invoice)) {
+      rows.push({
+        title: '1039出口+香港公司',
+        body:
+          '无票货源可评估「1039出口+香港公司」：国内供应商 → 个体户 → 香港公司 → 店铺公司 → 境外消费者。' +
+          '个体户在市场采购区（常建议东莞/义乌）以 1039 出口给香港公司，可享无票免征增值税与个税核定；' +
+          '单个个体户连续12个月销售额一般不超过500万，须合理安排规模。须核禁限类、知识产权备案及商检要求。',
+      });
+    }
+    if (isMainlandDiagEntity(entity)) {
+      rows.push({
+        title: '平台信息报送与主体一致性',
+        body:
+          '依据《互联网平台企业信息报送规定》，平台会向税务机关推送店铺身份与交易信息；税务机关一般要求店铺公司作为平台销售收入与所得税申报主体，收入口径为平台订单销售额（不是回款，不得扣除平台费用）。' +
+          '架构落地后须核对境外销售主体（如香港公司）与平台店铺主体是否一致；不一致时须增加「香港公司从出口主体采购后再销售给店铺公司」链路（出口主体 → 香港公司 → 店铺公司），使平台报送与店铺申报匹配。各地税局审核要点有差异，搭建前可咨询专家。',
+      });
+    }
+  } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
+    rows.push({
+      title: '1210出口备货至保税区',
+      body:
+        '非定制类普货可优先评估「1210出口备货至保税区」：国内供应商 → 进出口公司 → 备货保税区（货主香港公司）→ 店铺公司 → 境外消费者。' +
+        '先以 0110 报关进保税区给香港公司，再按平台订单 1210 一件代发离境，争取取得报关单后申报退税。' +
+        '转为1210/9610会改变物流链路，须测算物流成本与退税收益。',
+    });
+  } else if (path === 'B') {
+    rows.push({
+      title: '1210保税区一日游或9610跨境电商零售出口',
+      body:
+        '定制类普货可通过「1210保税区一日游或9610跨境电商零售出口」：国内供应商 → 进出口公司（常即店铺公司）→ 境外消费者，订单驱动 1210/9610 报关，取得清单或报关单后申请退免税（以实际通关及税务机关要求为准）。',
+    });
+  }
+
+  return rows;
+}
+
+function ensureDiagnosisReportArchitectures(report, slots) {
+  if (!report || typeof report !== 'object') return report;
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const path = detectDiagnosisReportPath(s);
+  const mandatory = buildMandatoryPlanDetails(s, path);
+  if (!mandatory.length) return report;
+
+  const details = Array.isArray(report.plan?.details) ? report.plan.details.slice() : [];
+  mandatory.forEach((item) => {
+    if (!planDetailsAlreadyCovers(details, item.title)) {
+      details.unshift(item);
+    }
+  });
+
+  if (details.length === (report.plan?.details || []).length) return report;
+  return {
+    ...report,
+    plan: {
+      ...(report.plan || {}),
+      details,
+    },
+  };
+}
+
 function isGenericDiagnosisProcessFlow(text) {
   const t = String(text || '')
     .replace(/\s+/g, '')
@@ -1683,6 +1841,24 @@ function formatDiagSlotsForApi(slots) {
   if (revenue && revenue !== '未填写') {
     hard +=
       `【硬约束·销售额】年销售额必须写「${revenue}」。禁止改用其它档位（例如档案是「500万以下」时禁止写「500-2000万」）。销售额分层建议仅在档案达到对应门槛时才写。\n`;
+  }
+  const reportPath = detectDiagnosisReportPath(s);
+  if (reportPath === 'A') {
+    if (isDiagRebateEligibleProduct(s.productCategory) && hasDiagSpecialInvoice(s.invoice)) {
+      hard +=
+        '【硬约束·架构】plan.details 必须含 title「0110出口+香港公司」及全链路（供应商→进出口公司→香港公司→店铺公司→境外消费者）；' +
+        '委托货代/买单出口须写以自有抬头0110替代货代报关。\n';
+    } else if (hasDiagNoInvoice(s.invoice)) {
+      hard += '【硬约束·架构】plan.details 必须含 title「1039出口+香港公司」及全链路。\n';
+    }
+    if (isMainlandDiagEntity(s.entity)) {
+      hard +=
+        '【硬约束·报送】大陆店铺主体：risk.stages 03 须写平台信息报送风险；plan.details 须写「平台信息报送与主体一致性」及香港公司采购后再销售给店铺公司链路。\n';
+    }
+  } else if (reportPath === 'B' && isDiagRebateEligibleProduct(s.productCategory)) {
+    hard += '【硬约束·架构】plan.details 必须含 title「1210出口备货至保税区」及 0110进区+1210离境说明。\n';
+  } else if (reportPath === 'C') {
+    hard += '【硬约束·架构】路径C禁止写「0110出口+香港公司」「1039出口+香港公司」及采购再销售链路。\n';
   }
   hard +=
     `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
@@ -5205,7 +5381,7 @@ function normalizeDiagnosisReportJson(obj) {
       })
       .filter((d) => d && (d.title || d.body));
 
-  return {
+  const normalized = {
     version: DIAGNOSIS_REPORT_JSON_VERSION,
     changes: (Array.isArray(src.changes) ? src.changes : [])
       .map((c) => ({
@@ -5245,6 +5421,7 @@ function normalizeDiagnosisReportJson(obj) {
         '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。'
     ).trim(),
   };
+  return ensureDiagnosisReportArchitectures(normalized, getDiagSlots());
 }
 
 function isDiagnosisReportJsonReady(obj) {
