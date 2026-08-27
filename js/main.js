@@ -5263,7 +5263,7 @@ function renderDiagnosisReportJson(obj) {
   }
 
   html += `<h5 class="result-section-title">【行动建议】</h5>`;
-  html += `<ol class="result-list result-list-ol">`;
+  html += `<ol class="result-list-ordered">`;
   report.actions.forEach((a) => {
     html += `<li>${formatInline(String(a))}</li>`;
   });
