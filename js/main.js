@@ -630,6 +630,17 @@ function renderPlanFaqs(ctx) {
 
 function sanitizeAiAnswer(text) {
   const raw = String(text || '');
+  // Preserve Workflow / Agent JSON report before CoT & draft stripping
+  // (JSON often contains 销售平台： etc. and would otherwise be wiped as a draft)
+  const preservedJson = extractDiagnosisReportJson(raw);
+  if (preservedJson && isDiagnosisReportJsonReady(preservedJson)) {
+    try {
+      return JSON.stringify(preservedJson);
+    } catch {
+      /* fall through */
+    }
+  }
+
   let t = raw;
 
   // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
@@ -3053,7 +3064,8 @@ function initAiChatbot() {
           forcePlanWhileThinking ||
           shouldRouteDiagnosisToPlanPanel(clean) ||
           /【核心风险诊断】|【合规方案】/.test(clean) ||
-          (/"version"\s*:\s*1/.test(cleaned) && /"risk"\s*:/.test(cleaned))
+          (/"version"\s*:\s*1/.test(cleaned) && /"risk"\s*:/.test(cleaned)) ||
+          /"report_json"\s*:/.test(cleaned)
         ) {
           beginPlanRouting();
           return;
@@ -3117,18 +3129,23 @@ function initAiChatbot() {
 
       let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
-        // Do NOT fall back to raw result.text (often still contains think / CoT)
-        const retry = sanitizeAiAnswer(result.text);
-        const salvaged = salvageDiagnosisPlanFromRaw(result.text);
-        // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
-        if (
-          streamingPlan ||
-          shouldGeneratePlanNow ||
-          (getUiMode() === 'diagnosis' && getUiStep() >= 8)
-        ) {
-          answer = retry || salvaged || '';
+        const rawJson = extractDiagnosisReportJson(result.text);
+        if (rawJson && isDiagnosisReportJsonReady(rawJson)) {
+          answer = JSON.stringify(rawJson);
         } else {
-          answer = retry || salvaged || buildLocalChatReply(text, ctx) || '';
+          // Do NOT fall back to raw result.text (often still contains think / CoT)
+          const retry = sanitizeAiAnswer(result.text);
+          const salvaged = salvageDiagnosisPlanFromRaw(result.text);
+          // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
+          if (
+            streamingPlan ||
+            shouldGeneratePlanNow ||
+            (getUiMode() === 'diagnosis' && getUiStep() >= 8)
+          ) {
+            answer = retry || salvaged || '';
+          } else {
+            answer = retry || salvaged || buildLocalChatReply(text, ctx) || '';
+          }
         }
       }
       answer = sanitizeAiAnswer(answer);
@@ -3171,14 +3188,17 @@ function initAiChatbot() {
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
-        const jsonReport = extractDiagnosisReportJson(answer);
+        // Prefer sanitized answer; also try raw API text (wrapper JSON may be stripped by sanitize)
+        const jsonReport =
+          extractDiagnosisReportJson(answer) ||
+          extractDiagnosisReportJson(result?.text || '');
         if (jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
           publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis', jsonReport });
           if (!planCountedThisTurn && !isPostReportFollowUp) {
             planCountedThisTurn = true;
             bumpDiagnosisPlanCount();
           }
-          persistDiagnosisReport(answer);
+          persistDiagnosisReport(JSON.stringify(jsonReport));
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
           typing.textContent = loggedInNow
@@ -3191,12 +3211,15 @@ function initAiChatbot() {
             const salvaged = prepareDiagnosisPlanMarkdown(salvageDiagnosisPlanFromRaw(result.text) || '');
             if (salvaged && isDiagnosisPlanReadyToShow(salvaged)) answer = salvaged;
           }
-          if (!isDiagnosisPlanReadyToShow(answer)) {
+          if (!isDiagnosisPlanReadyToShow(answer) && !isDiagnosisPlanReadyToShow(result?.text || '')) {
             typing.classList.add('is-plan-status');
             typing.textContent =
               '方案正文不完整或含无效草稿。请点击「新建对话」后重试；并确认 Dify 已发布最新诊断提示词与报告工具。';
             clearQuickReplies();
             return;
+          }
+          if (!isDiagnosisPlanReadyToShow(answer) && isDiagnosisPlanReadyToShow(result?.text || '')) {
+            answer = prepareDiagnosisPlanMarkdown(result.text);
           }
           publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis' });
           if (!planCountedThisTurn && !isPostReportFollowUp) {
@@ -3738,6 +3761,8 @@ function looksLikeDiagnosisWizardAsk(text) {
 function shouldRouteDiagnosisToPlanPanel(text) {
   const t = String(text || '').trim();
   if (!t) return false;
+  if (extractDiagnosisReportJson(t)) return true;
+  if (/"report_json"\s*:/.test(t) && /"version"\s*:/.test(t)) return true;
   if (looksLikeDiagnosisPlanScaffold(t)) return false;
   // Never park diagnostic process questions in the solution panel
   if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
@@ -5060,9 +5085,40 @@ function extractDiagnosisReportJson(text) {
 
   const tryParse = (candidate) => {
     try {
-      const obj = JSON.parse(String(candidate || '').trim());
+      let obj = JSON.parse(String(candidate || '').trim());
       if (!obj || typeof obj !== 'object') return null;
-      if (obj.version !== DIAGNOSIS_REPORT_JSON_VERSION && !obj.risk && !obj.plan) return null;
+
+      // Workflow tool often returns { report_json: "{...}" } or { report_json: {...} }
+      for (let depth = 0; depth < 3; depth++) {
+        if (obj.report_json != null) {
+          if (typeof obj.report_json === 'string') {
+            const inner = JSON.parse(obj.report_json);
+            if (inner && typeof inner === 'object') obj = inner;
+            else break;
+            continue;
+          }
+          if (typeof obj.report_json === 'object') {
+            obj = obj.report_json;
+            continue;
+          }
+        }
+        if (obj.structured_output && typeof obj.structured_output === 'object') {
+          obj = obj.structured_output;
+          continue;
+        }
+        if (obj.data && typeof obj.data === 'object' && (obj.data.risk || obj.data.plan || obj.data.report_json)) {
+          obj = obj.data;
+          continue;
+        }
+        break;
+      }
+
+      const ver = obj.version;
+      const hasBody = Boolean(obj.risk || obj.plan || obj.actions || obj.notes);
+      if (ver !== DIAGNOSIS_REPORT_JSON_VERSION && ver !== '1' && ver !== 1 && !hasBody) {
+        return null;
+      }
+      if (!hasBody) return null;
       return normalizeDiagnosisReportJson(obj);
     } catch {
       return null;
@@ -5078,10 +5134,26 @@ function extractDiagnosisReportJson(text) {
     if (fromFence) return fromFence;
   }
 
+  // Prefer object that contains report_json / version
+  const wrappers = raw.match(/\{[\s\S]*?"report_json"\s*:[\s\S]*\}/g);
+  if (wrappers) {
+    for (let i = wrappers.length - 1; i >= 0; i--) {
+      const hit = tryParse(wrappers[i]);
+      if (hit) return hit;
+    }
+  }
+
   const brace = raw.match(/\{[\s\S]*"version"\s*:\s*1[\s\S]*\}/);
   if (brace) {
     const fromBrace = tryParse(brace[0]);
     if (fromBrace) return fromBrace;
+  }
+
+  // Greedy: last big JSON-looking blob
+  const lastBrace = raw.lastIndexOf('{');
+  if (lastBrace >= 0) {
+    const fromLast = tryParse(raw.slice(lastBrace));
+    if (fromLast) return fromLast;
   }
 
   return null;

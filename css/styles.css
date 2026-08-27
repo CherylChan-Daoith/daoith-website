@@ -2341,8 +2341,12 @@ ul {
   left: 0;
   top: 0.15em;
   font-size: 0.65rem;
-  color: #2251ff;
+  color: #111 !important;
   line-height: 1;
+}
+
+#resultItems .result-plan-details > .result-plan-detail::before {
+  color: #111 !important;
 }
 
 .result-plan-detail-title {
