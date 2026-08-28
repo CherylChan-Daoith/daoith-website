@@ -4,7 +4,7 @@
 (function () {
   const ROOT_ID = 'csAssistant';
   const CONV_KEY = 'daoith_cs_conversation_id';
-  const MSG_KEY = 'daoith_cs_messages';
+  const MSG_KEY = 'daoith_cs_messages_v2';
   const DRAFT_KEY = 'daoith_cs_inquiry_draft';
   const MAX_MESSAGES = 40;
 
@@ -53,19 +53,22 @@
       placeholder: '告诉我你想做什么…',
       send: '发送',
       welcome:
-        '你好，我是道一官网智能客服。我负责帮你用好网站功能，而不是直接做税务诊断。\n\n我可以帮你：\n1. 使用「AI解决方案」生成合规方案\n2. 按国家／平台推荐标准化服务\n3. 提交询价\n4. 登录后在「服务管理」查看进度',
-      chipAi: 'AI合规诊断',
+        '您好，我是道一官网智能客服。我可以告诉您如何使用「AI解决方案」生成合规方案，按您的需求推荐标准化服务，提交询价或者进行服务管理。',
+      chipAi: 'AI合规助手',
       chipService: '推荐服务',
       chipQuote: '提交询价',
       chipHub: '查询进度',
       next: '下一步可选择：',
-      aiGuide:
-        '「AI解决方案」会按你的平台、主体、发货和出口方式，逐步生成专属合规方案，并匹配可落地的服务。不确定具体需求时，建议从这里开始。',
-      goAi: '打开 AI解决方案',
+      aiGuide: '已为您打开「道一合规助手」，请按页面提示作答，即可生成合规方案。',
+      goAi: '打开 AI合规助手',
       taxRedirect:
         '合规细节请交给「AI解决方案」或预约专家，我这边不深入解答税务法规。点击下方即可开始诊断。',
-      serviceAsk:
-        '告诉我你的目的国、电商平台或想办的事项（例如香港公司、出口退税、欧洲VAT），我帮你匹配官网服务。',
+      serviceAsk: '已为您打开「财税服务」。请告诉我您需要哪方面的服务，例如香港公司注册、出口退税、欧洲VAT等。',
+      confirmQuote: '是，去提交',
+      quoteCartAsk: '购物车里已有：{list}。是否提交目前这些服务的询价？',
+      quoteCartEmpty:
+        '购物车目前是空的。请告诉我您需要为哪项服务询价；也可以先考虑专家1v1财税咨询。',
+      progressOpened: '已为您打开「服务进度跟踪」。登录后可查看办理进度。',
       serviceHit: '根据你提到的需求，可先看这些标准化服务：',
       serviceMiss: '暂未精确匹配到单项。你可以先浏览财税服务市场，或补充国家／平台后再问我。',
       browseServices: '浏览财税服务',
@@ -104,19 +107,23 @@
       placeholder: 'Tell me what you need…',
       send: 'Send',
       welcome:
-        'Hi, I am the DAOITH site assistant. I help you use the website — I do not give tax diagnoses.\n\nI can:\n1. Guide you to AI Compliance for a tailored plan\n2. Recommend standard services by country / platform\n3. Submit an inquiry\n4. Point you to Service Hub for progress (after sign-in)',
-      chipAi: 'AI diagnosis',
+        'Hello, I am the DAOITH site assistant. I can show you how to use AI Compliance to generate a plan, recommend standard services for your needs, submit an inquiry, or manage services.',
+      chipAi: 'AI compliance assistant',
       chipService: 'Recommend services',
       chipQuote: 'Submit inquiry',
       chipHub: 'Check progress',
       next: 'Next, you can:',
-      aiGuide:
-        'AI Compliance walks through platform, entity, shipping and export mode, then generates a plan and matching services. Start here if you are unsure.',
-      goAi: 'Open AI Compliance',
+      aiGuide: 'Opened the AI compliance assistant. Follow the on-page prompts to generate a plan.',
+      goAi: 'Open AI assistant',
       taxRedirect:
         'For tax rules, please use AI Compliance or book an expert — I will not go into regulations here.',
       serviceAsk:
-        'Tell me the destination country, platform, or task (e.g. HK company, export rebate, EU VAT) and I will match a service.',
+        'Opened Tax Services. Tell me what you need — e.g. HK company setup, export rebate, or EU VAT.',
+      confirmQuote: 'Yes, submit',
+      quoteCartAsk: 'Your cart has: {list}. Submit an inquiry for these services now?',
+      quoteCartEmpty:
+        'Your cart is empty. Tell me which service you want a quote for; you can also start with Expert 1-on-1 advisory.',
+      progressOpened: 'Opened service progress tracking. Sign in to see your status.',
       serviceHit: 'Based on what you mentioned, these standard services may fit:',
       serviceMiss: 'No exact match yet. Browse the service marketplace, or add country / platform and ask again.',
       browseServices: 'Browse services',
@@ -192,11 +199,49 @@
       return;
     }
     const hash = target.startsWith('#') ? target : `#${target.replace(/^\/?#/, '')}`;
+    const id = hash.replace(/^#/, '');
     if (isHomePage()) {
-      window.location.hash = hash;
+      if (typeof window.DAOITH_showView === 'function') window.DAOITH_showView(id);
+      else window.location.hash = hash;
       return;
     }
     window.location.href = `/${hash}`;
+  }
+
+  function scrollToId(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return true;
+  }
+
+  function setResume(payload) {
+    try {
+      sessionStorage.setItem('daoith_cs_resume', JSON.stringify({ open: true, ...payload }));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function goAndScroll(hash, elementId) {
+    const hashVal = hash.startsWith('#') ? hash : `#${hash}`;
+    const id = hashVal.replace(/^#/, '');
+    if (isHomePage()) {
+      const already = currentView() === id;
+      if (!already) {
+        if (typeof window.DAOITH_showView === 'function') window.DAOITH_showView(id);
+        else window.location.hash = hashVal;
+      }
+      setTimeout(() => scrollToId(elementId), already ? 60 : 400);
+      return;
+    }
+    persistMessages();
+    setResume({ scrollId: elementId });
+    window.location.href = `/${hashVal}`;
+  }
+
+  function isCartPage() {
+    return /\/cart\.html$/i.test(window.location.pathname || '');
   }
 
   function serviceHref(id) {
@@ -239,7 +284,11 @@
     if (/^(你好|您好|hi+|hello|hey|在吗)$/i.test(q)) return 'greet';
     if (/进度|订单状态|服务管理|查(询)?(一下)?(进度|状态)|track|progress|hub/i.test(q)) return 'progress';
     if (/询价|报价|多少钱|怎么买|提交联系|leave (my )?contact|inquiry|quote/i.test(q)) return 'inquiry';
-    if (/ai\s*诊断|ai\s*方案|合规诊断|生成方案|不确定|不知道(该|怎么)|ai compliance|diagnosis/i.test(q)) {
+    if (
+      /ai\s*合规助手|ai合规助手|ai\s*诊断|ai\s*方案|合规诊断|生成方案|不确定|不知道(该|怎么)|ai compliance|diagnosis/i.test(
+        q
+      )
+    ) {
       return 'diagnosis';
     }
     const wantsService =
@@ -512,42 +561,32 @@
   }
 
   function handleDiagnosis() {
-    const onAi = currentView() === 'ai-solution';
-    appendBubble(onAi ? t('onAiPage') : t('aiGuide'), 'bot');
-    renderChips([
-      { id: 'go-ai', label: t('goAi') },
-      { id: 'service', label: t('chipService') },
-      { id: 'inquiry', label: t('chipQuote') },
-    ]);
-    if (!onAi) go('#ai-solution');
+    appendBubble(t('aiGuide'), 'bot');
+    renderChips(defaultChips());
+    goAndScroll('#ai-solution', 'aiWorkspace');
   }
 
   function handleTax() {
     appendBubble(t('taxRedirect'), 'bot');
     renderChips([
-      { id: 'go-ai', label: t('goAi') },
+      { id: 'diagnosis', label: t('chipAi') },
       { id: 'inquiry', label: t('chipQuote') },
     ]);
   }
 
   function handleService(text) {
-    const hits = matchServices(text);
-    const featuredIds = ['consult-1v1', 'hk-company', 'domestic-rebate', 'overseas-vat'];
-    if (!hits.length && /推荐服务|有什么服务|服务有哪些|recommend/i.test(text)) {
+    const q = String(text || '').trim();
+    const justAsk = /^(推荐服务|recommend services?)$/i.test(q) || !q;
+    const hits = justAsk ? [] : matchServices(q);
+    if (justAsk || !hits.length) {
       appendBubble(t('serviceAsk'), 'bot');
-      renderServiceCards(featuredIds.map((id) => SERVICE_INDEX.find((s) => s.id === id)).filter(Boolean));
-      renderChips([
-        { id: 'go-services', label: t('browseServices') },
-        { id: 'inquiry', label: t('chipQuote') },
-      ]);
-      return;
-    }
-    if (!hits.length) {
-      appendBubble(t('serviceMiss'), 'bot');
-      renderChips([
-        { id: 'go-services', label: t('browseServices') },
-        { id: 'diagnosis', label: t('chipAi') },
-      ]);
+      renderChips(defaultChips());
+      if (isHomePage()) go('#services');
+      else {
+        persistMessages();
+        setResume({});
+        go('#services');
+      }
       return;
     }
     selectedServiceIds = hits.map((s) => s.id);
@@ -559,57 +598,79 @@
     ]);
   }
 
-  function handleInquiry() {
-    appendBubble(t('quoteGuide'), 'bot');
-    const returnTo = isHomePage() ? `${window.location.pathname}#hero` : window.location.pathname;
-    if (!requireAuth('cs_inquiry', returnTo)) {
-      try {
-        sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ ids: selectedServiceIds }));
-      } catch {
-        /* ignore */
-      }
-      renderChips([{ id: 'go-cart', label: t('goCart') }]);
+  function handleInquiryArrive() {
+    const items = window.DAOITH_CART?.getCart?.() || [];
+    if (items.length) {
+      const list = items
+        .map((i) => `${i.title || i.id}${i.qty && i.qty > 1 ? ` ×${i.qty}` : ''}`)
+        .join(isEn() ? '; ' : '、');
+      appendBubble(t('quoteCartAsk').replace('{list}', list), 'bot');
+      renderChips([
+        { id: 'confirm-quote', label: t('confirmQuote') },
+        { id: 'service', label: t('chipService') },
+      ]);
       return;
     }
-    renderInquiryForm();
-    renderChips([
-      { id: 'go-cart', label: t('goCart') },
-      { id: 'service', label: t('chipService') },
-    ]);
+    appendBubble(t('quoteCartEmpty'), 'bot');
+    const one = SERVICE_INDEX.find((s) => s.id === 'consult-1v1');
+    if (one) {
+      selectedServiceIds = ['consult-1v1'];
+      renderServiceCards([one]);
+    }
+    renderChips(defaultChips());
+  }
+
+  function handleInquiry() {
+    if (isCartPage()) {
+      handleInquiryArrive();
+      return;
+    }
+    persistMessages();
+    setResume({ action: 'inquiry' });
+    window.location.href = '/cart.html';
   }
 
   function handleProgress() {
-    appendBubble(t('hubGuide'), 'bot');
-    const returnTo = isHomePage() ? '/#hub' : '/#hub';
-    if (!window.DAOITH_AUTH?.isLoggedIn?.()) {
-      requireAuth('cs_hub', returnTo);
-    } else {
-      go('#hub');
-    }
-    renderChips([
-      { id: 'go-hub', label: t('goHub') },
-      { id: 'inquiry', label: t('chipQuote') },
-    ]);
+    appendBubble(t('progressOpened'), 'bot');
+    renderChips(defaultChips());
+    goAndScroll('#hub', 'hub-progress');
   }
 
   function handleChip(id) {
-    if (id === 'diagnosis') return sendMessage(t('chipAi'), { fromChip: true });
-    if (id === 'service') return sendMessage(t('chipService'), { fromChip: true });
+    if (id === 'diagnosis') {
+      appendBubble(t('chipAi'), 'user');
+      return handleDiagnosis();
+    }
+    if (id === 'service') {
+      appendBubble(t('chipService'), 'user');
+      return handleService(t('chipService'));
+    }
     if (id === 'inquiry') {
       appendBubble(t('chipQuote'), 'user');
+      persistMessages();
       return handleInquiry();
     }
     if (id === 'progress') {
       appendBubble(t('chipHub'), 'user');
       return handleProgress();
     }
-    if (id === 'go-ai') return go('#ai-solution');
+    if (id === 'go-ai') return handleDiagnosis();
     if (id === 'go-services') return go('#services');
     if (id === 'go-cart') {
+      setResume({ action: 'inquiry' });
       window.location.href = '/cart.html';
       return;
     }
-    if (id === 'go-hub') return go('#hub');
+    if (id === 'go-hub') return goAndScroll('#hub', 'hub-progress');
+    if (id === 'confirm-quote') {
+      if (isCartPage()) {
+        document.getElementById('openQuoteBtn')?.click();
+        return;
+      }
+      setResume({ action: 'inquiry-confirm' });
+      window.location.href = '/cart.html';
+      return;
+    }
     if (id.startsWith('open-service:')) {
       window.location.href = serviceHref(id.slice(13));
     }
@@ -862,18 +923,26 @@
 
   function resumeAfterLogin(action) {
     setOpen(true);
-    if (action === 'cs_inquiry') {
-      try {
-        const draft = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || '{}');
-        if (Array.isArray(draft.ids)) selectedServiceIds = draft.ids;
-      } catch {
-        /* ignore */
-      }
-      handleInquiry();
-    } else if (action === 'cs_hub') {
-      go('#hub');
-      handleProgress();
+    if (action === 'cs_inquiry') handleInquiry();
+    else if (action === 'cs_hub') handleProgress();
+  }
+
+  function consumeResume() {
+    let resume;
+    try {
+      resume = JSON.parse(sessionStorage.getItem('daoith_cs_resume') || 'null');
+      sessionStorage.removeItem('daoith_cs_resume');
+    } catch {
+      resume = null;
     }
+    if (!resume) return;
+    setOpen(true);
+    if (resume.action === 'inquiry') handleInquiryArrive();
+    if (resume.action === 'inquiry-confirm') {
+      handleInquiryArrive();
+      setTimeout(() => document.getElementById('openQuoteBtn')?.click(), 450);
+    }
+    if (resume.scrollId) setTimeout(() => scrollToId(resume.scrollId), 420);
   }
 
   function init() {
@@ -882,6 +951,7 @@
     bind();
     if (!restoreMessages()) showWelcome();
     refreshChrome();
+    consumeResume();
 
     window.addEventListener('localechange', () => {
       refreshChrome();
