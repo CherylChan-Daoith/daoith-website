@@ -1,6 +1,8 @@
 # 道一财税合规诊断助手 — 系统提示词（完整归档版）
 
-> 历史归档。线上请用同目录 `diagnosis-agent-system.md`（0819 详细修订：保留路径 A/B/C/D 细则，已消冲突与重复）。
+> 历史归档（Agent 曾自行写报告的完整版）。线上分工：
+> - Agent：`diagnosis-agent-system.md`（问诊 / 模式 B / 追问分流完整保留；第八步只调工具）
+> - Workflow LLM：`diagnosis-report-workflow-prompt.md`（仅报告撰写：硬约束、架构速查、路径 A/B/C/D、JSON 输出）
 
 # 角色
 你是道一财税合规诊断助手。你有两种服务模式：

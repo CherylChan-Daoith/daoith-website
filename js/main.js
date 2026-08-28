@@ -791,6 +791,8 @@ function sanitizeAiAnswer(text) {
     .replace(/^\s*\n+/, '')
     .trim();
 
+  t = stripKnowledgeBaseDisclaimers(t);
+
   return t;
 }
 
@@ -1082,9 +1084,30 @@ function renderChatBubbleHtml(text) {
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
 }
 
+function stripKnowledgeBaseDisclaimers(text) {
+  let t = String(text || '');
+  t = t.replace(
+    /[（(]\s*知识库(?:尚未收录|未检索到|未命中|无[^）)]{0,120})\s*[）)]\s*[:：]?/g,
+    ''
+  );
+  t = t.replace(
+    /(?:^|\n)\s*(?:结论\s*[:：]\s*)?知识库(?:尚未收录|未检索到|未命中|无精确匹配|无该条目)[^。；\n]*[。；]?\s*/g,
+    '\n'
+  );
+  t = t.replace(/(?:由于|因)?AI和知识库具有一定的局限性[^。]*[。]?/g, '');
+  t = t.replace(/(?:由于|因)?知识库(?:具有一定的局限性|存在局限性)[^。]*[。]?/g, '');
+  t = t.replace(/未在知识库(?:中)?(?:检索|收录|找到)[^。；\n]*[。；]?\s*/g, '');
+  t = t.replace(/(?:目前|我)?(?:的)?知识库(?:中)?尚未收录[^。；\n]*[。；]?\s*/g, '');
+  t = t.replace(/知识库返回为空[^。；\n]*[。；]?\s*/g, '');
+  t = t.replace(/(?:^|\n)\s*[-*•]\s*\*\*\s*[:：]/gm, '\n');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function isKnowledgeMissRefusal(text) {
   const t = String(text || '');
-  return /知识库尚未收录|目前的知识库尚未|未在知识库|建议查阅官方税务局|信息还需补充，或者预约专家/.test(t);
+  return /知识库尚未收录|知识库未检索到|知识库未命中|目前的知识库尚未|未在知识库|建议查阅官方税务局|信息还需补充，或者预约专家/.test(
+    t
+  );
 }
 
 function buildLocalChatReply(message, ctx) {
@@ -5174,6 +5197,11 @@ function formatInline(text) {
     /(?<![\d])(0110|9610|9810|9710|1210|1039|FBA|FBT|VOEC|IOSS|HS)(?![\d])/gi,
     '<span class="result-code">$1</span>'
   );
+  // 8–10 digit HS codes (e.g. 7113119090, 84701000) and dotted forms (8470.10.00)
+  s = s.replace(
+    /(?<![\d.])(\d{4}(?:\.\d{2}){1,2}|\d{8,10})(?![\d.])/g,
+    '<span class="result-code">$1</span>'
+  );
   s = s.replace(/([（(])\s*(<span class="result-code">)/g, '$1$2');
   s = s.replace(/(<\/span>)\s*([）)])/g, '$1$2');
   // Keep CJK corner brackets from sitting flush against code pills
@@ -6076,12 +6104,26 @@ function sanitizeDiagnosisPlanText(text) {
     t = `${t.replace(/\s+$/, '')}\n\n${expertTip}`;
   }
 
+  t = stripKnowledgeBaseDisclaimers(t);
+
   return t;
+}
+
+/** True when leading token is an 8–10 digit HS/customs code (not a list ordinal). */
+function looksLikeLeadingHsCode(content) {
+  const s = String(content || '').trim();
+  return (
+    /^\*\*(\d{8,10})\*\*/.test(s) ||
+    /^(\d{8,10})\s*[:：]/.test(s) ||
+    /^\*\*(\d{8,10})\s*[:：]/.test(s)
+  );
 }
 
 /** Strip leading list index from item text (avoid ● + 1 / **1** / duplicate glyphs). */
 function stripLeadingListIndex(content) {
-  return String(content || '')
+  const s = String(content || '').trim();
+  if (looksLikeLeadingHsCode(s)) return s;
+  return s
     .replace(/^\*\*\s*\d+(?:\.\d+)*\s*[.、)）．]?\s*\*\*\s*/, '')
     .replace(/^\*\*\d+(?:\.\d+)*\*\*\s*[.、)）．]?\s*/, '')
     .replace(/^\d+\.\d+\s*[.)、．]?\s*/, '')
@@ -6144,7 +6186,7 @@ function convertMarkdownTablesToBullets(text) {
 }
 
 const SOLUTION_GREETING =
-  '您好，我是您的AI合规助手，我将基于财税知识库给您提供合规方案，供您一般性参考。由于AI和知识库具有一定的局限性，如您需要更准确和更有针对性的解决方案，建议您预约我们的财税专家进行一对一咨询！';
+  '您好，我是您的AI合规助手，我将基于财税知识库给您提供合规方案，供您一般性参考。如您需要更准确和更有针对性的解决方案，建议您预约我们的财税专家进行一对一咨询！';
 
 function isAskAgainOrGenericFramework(text) {
   const t = String(text || '');
