@@ -4,7 +4,7 @@
 (function () {
   const ROOT_ID = 'csAssistant';
   const CONV_KEY = 'daoith_cs_conversation_id';
-  const MSG_KEY = 'daoith_cs_messages_v2';
+  const MSG_KEY = 'daoith_cs_messages_v3';
   const DRAFT_KEY = 'daoith_cs_inquiry_draft';
   const MAX_MESSAGES = 40;
 
@@ -53,7 +53,7 @@
       placeholder: '告诉我你想做什么…',
       send: '发送',
       welcome:
-        '您好，我是道一官网智能客服。我可以告诉您如何使用「AI解决方案」生成合规方案，按您的需求推荐标准化服务，提交询价或者进行服务管理。',
+        '您好，我是**道一官网智能客服**。我可以告诉您如何使用「**AI解决方案**」生成合规方案，按您的需求推荐合规服务，提交询价或者进行服务管理。',
       chipAi: 'AI合规助手',
       chipService: '推荐服务',
       chipQuote: '提交询价',
@@ -107,7 +107,7 @@
       placeholder: 'Tell me what you need…',
       send: 'Send',
       welcome:
-        'Hello, I am the DAOITH site assistant. I can show you how to use AI Compliance to generate a plan, recommend standard services for your needs, submit an inquiry, or manage services.',
+        'Hello, I am the **DAOITH site assistant**. I can show you how to use **AI Compliance** to generate a plan, recommend compliance services for your needs, submit an inquiry, or manage services.',
       chipAi: 'AI compliance assistant',
       chipService: 'Recommend services',
       chipQuote: 'Submit inquiry',
