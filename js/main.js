@@ -1797,28 +1797,119 @@ function buildMandatoryPlanDetails(slots, path) {
   return rows;
 }
 
+function overviewItemsAlreadyCover(items, needle) {
+  const list = Array.isArray(items) ? items : [];
+  const n = String(needle || '');
+  return list.some((it) => {
+    const t = String(it || '');
+    if (n.includes('0110') && /0110/.test(t) && /香港/.test(t)) return true;
+    if (n.includes('1039') && /1039/.test(t) && /香港/.test(t)) return true;
+    if (n.includes('1210') && /1210|9610/.test(t)) return true;
+    if (n.includes('香港公司销售') && /香港/.test(t) && /店铺/.test(t) && /销售|采购/.test(t)) {
+      return true;
+    }
+    if (n.includes('订单销售额') && /订单销售额|平台订单/.test(t)) return true;
+    if (n.includes('自有抬头') && /自有抬头|0110/.test(t) && /货代|买单|替代/.test(t)) return true;
+    return t.includes(n) || n.includes(t);
+  });
+}
+
+function ensureDiagnosisReportOverview(report, slots, path) {
+  if (!report?.plan) return report;
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
+  const invoice = String(s.invoice || '');
+  const product = String(s.productCategory || '');
+  const freightForwarder = /委托货代|买单/.test(exportMode);
+
+  const overview = Array.isArray(report.plan.overview)
+    ? report.plan.overview.map((st) => ({
+        ...st,
+        items: Array.isArray(st.items) ? st.items.slice() : [],
+      }))
+    : [];
+
+  const ensureStage = (num, title) => {
+    let stage = overview.find((st) => String(st.num) === num || String(st.num) === num.replace(/^0/, ''));
+    if (!stage) {
+      stage = { num, title, items: [] };
+      overview.push(stage);
+    }
+    if (!stage.title) stage.title = title;
+    if (!Array.isArray(stage.items)) stage.items = [];
+    return stage;
+  };
+
+  const pushUnique = (stage, item) => {
+    if (!item || overviewItemsAlreadyCover(stage.items, item)) return;
+    // Drop known-wrong generic export tips that contradict 0110+HK
+    stage.items = stage.items.filter(
+      (it) => !/报关抬头回归店铺公司|取得代理证明/.test(String(it || ''))
+    );
+    stage.items.push(item);
+  };
+
+  if (path === 'A') {
+    const s02 = ensureStage('02', '报关出口环节');
+    if (isDiagRebateEligibleProduct(product) && hasDiagSpecialInvoice(invoice)) {
+      pushUnique(s02, '搭建0110出口+香港公司');
+    } else if (hasDiagNoInvoice(invoice)) {
+      pushUnique(s02, '搭建1039出口+香港公司');
+    }
+    if (freightForwarder) {
+      pushUnique(s02, '自有抬头0110替代委托货代');
+    }
+    if (isMainlandDiagEntity(s.entity)) {
+      const s03 = ensureStage('03', '境外销售环节');
+      pushUnique(s03, '香港公司销售给店铺公司（主体不一致时）');
+      pushUnique(s03, '按平台订单销售额确认收入');
+    }
+  } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
+    const s02 = ensureStage('02', '报关出口环节');
+    pushUnique(s02, '搭建1210出口备货至保税区');
+  }
+
+  // Keep 01/02/03 order
+  const order = { '01': 1, '1': 1, '02': 2, '2': 2, '03': 3, '3': 3 };
+  overview.sort((a, b) => (order[String(a.num)] || 9) - (order[String(b.num)] || 9));
+
+  return {
+    ...report,
+    plan: {
+      ...report.plan,
+      overview,
+    },
+  };
+}
+
 function ensureDiagnosisReportArchitectures(report, slots) {
   if (!report || typeof report !== 'object') return report;
   const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
   const path = detectDiagnosisReportPath(s);
+  let next = report;
+
   const mandatory = buildMandatoryPlanDetails(s, path);
-  if (!mandatory.length) return report;
-
-  const details = Array.isArray(report.plan?.details) ? report.plan.details.slice() : [];
-  mandatory.forEach((item) => {
-    if (!planDetailsAlreadyCovers(details, item.title)) {
-      details.unshift(item);
+  if (mandatory.length) {
+    const details = Array.isArray(next.plan?.details) ? next.plan.details.slice() : [];
+    let changed = false;
+    mandatory.forEach((item) => {
+      if (!planDetailsAlreadyCovers(details, item.title)) {
+        details.unshift(item);
+        changed = true;
+      }
+    });
+    if (changed) {
+      next = {
+        ...next,
+        plan: {
+          ...(next.plan || {}),
+          details,
+        },
+      };
     }
-  });
+  }
 
-  if (details.length === (report.plan?.details || []).length) return report;
-  return {
-    ...report,
-    plan: {
-      ...(report.plan || {}),
-      details,
-    },
-  };
+  return ensureDiagnosisReportOverview(next, s, path);
 }
 
 function isGenericDiagnosisProcessFlow(text) {
