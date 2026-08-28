@@ -6082,12 +6082,13 @@ function sanitizeDiagnosisPlanText(text) {
   t = t.replace(/\n{3,}/g, '\n\n');
 
   // Bullet + number mix: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only)
-  t = t.replace(/^(\s*[-*•]\s+)\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/gm, '$1');
-  t = t.replace(/^(\s*[-*•]\s+)\*\*\d+\*\*\s*[.、)）]?\s*/gm, '$1');
-  t = t.replace(/^(\s*[-*•]\s+)\d+\s*[.、)）]\s+/gm, '$1');
+  // Never strip 4+ digit tokens here — those are HS / customs codes (e.g. **7113119090**).
+  t = t.replace(/^(\s*[-*•]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*\s*/gm, '$1');
+  t = t.replace(/^(\s*[-*•]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?\s*/gm, '$1');
+  t = t.replace(/^(\s*[-*•]\s+)(\d{1,3})(?:\.\d+)*\s*[.、)）]\s+/gm, '$1');
   // Ordered list with redundant bold number already in marker: "1. **1** 内容"
-  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\s*\d+\s*[.、)）]?\s*\*\*\s*/gm, '$1');
-  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\d+\*\*\s*[.、)）]?\s*/gm, '$1');
+  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*\s*/gm, '$1');
+  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?\s*/gm, '$1');
 
   // Replace closing consult questions with a fixed tip (no 问句)
   const expertTip = '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。';
@@ -6109,25 +6110,22 @@ function sanitizeDiagnosisPlanText(text) {
   return t;
 }
 
-/** True when leading token is an 8–10 digit HS/customs code (not a list ordinal). */
+/** True when leading token looks like HS/customs code (≥4 digits), not a list ordinal. */
 function looksLikeLeadingHsCode(content) {
   const s = String(content || '').trim();
-  return (
-    /^\*\*(\d{8,10})\*\*/.test(s) ||
-    /^(\d{8,10})\s*[:：]/.test(s) ||
-    /^\*\*(\d{8,10})\s*[:：]/.test(s)
-  );
+  return /^\*{0,2}\d{4,}/.test(s);
 }
 
 /** Strip leading list index from item text (avoid ● + 1 / **1** / duplicate glyphs). */
 function stripLeadingListIndex(content) {
   const s = String(content || '').trim();
+  // Preserve HS codes / long numeric tax ids (never treat 4+ digits as list indexes)
   if (looksLikeLeadingHsCode(s)) return s;
   return s
-    .replace(/^\*\*\s*\d+(?:\.\d+)*\s*[.、)）．]?\s*\*\*\s*/, '')
-    .replace(/^\*\*\d+(?:\.\d+)*\*\*\s*[.、)）．]?\s*/, '')
-    .replace(/^\d+\.\d+\s*[.)、．]?\s*/, '')
-    .replace(/^\d+\s*[.、)）．]\s*/, '')
+    .replace(/^\*\*\s*\d{1,3}(?:\.\d+)*\s*[.、)）．]?\s*\*\*\s*/, '')
+    .replace(/^\*\*\d{1,3}(?:\.\d+)*\*\*\s*[.、)）．]?\s*/, '')
+    .replace(/^\d{1,3}\.\d+\s*[.)、．]?\s*/, '')
+    .replace(/^\d{1,3}\s*[.、)）．]\s*/, '')
     .replace(/^[●○◆▪•·◦▪️◉]+\s*/, '')
     .trim();
 }
