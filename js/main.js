@@ -2236,7 +2236,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
     5: '请执行第五步：只提问「5. 您目前供应商发票情况如何？（可在下方点选）」；不要在正文罗列专票/普票等选项。',
     6: '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
     7: '请执行第七步：只提问「7. 您目前年销售额约多少人民币？（可在下方点选）」；不要在正文罗列选项。',
-    8: '第1-7步已齐：必须调用工具 generate_diagnosis_report，传入【诊断档案】，向用户只输出工具返回的 JSON（version=1）；工具不可用时才 fallback 写 Markdown 四章。不要再提问。',
+    8: '第1-7步已齐：必须调用工具 generate_diagnosis_report，传入【诊断档案】，向用户只输出工具返回的 JSON（version=1，含 risk.processFlow / stages 01-03 / plan.overview+details）；禁止自行写 Markdown 1.2.3. 四章。工具失败时只说失败请重试，不要 fallback 写方案。不要再提问。',
   };
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
   const archive = formatDiagSlotsForApi();
@@ -3387,12 +3387,18 @@ function initAiChatbot() {
 
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
-        // Prefer sanitized answer; also try raw API text (wrapper JSON may be stripped by sanitize)
+        // Prefer sanitized answer; also try raw API text + tool observation JSON
         const jsonReport =
           extractDiagnosisReportJson(answer) ||
-          extractDiagnosisReportJson(result?.text || '');
+          extractDiagnosisReportJson(result?.text || '') ||
+          (result?.reportJson && isDiagnosisReportJsonReady(result.reportJson)
+            ? result.reportJson
+            : null);
         if (jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
-          publishDiagnosisPlanToResultPanel(answer, { kind: 'diagnosis', jsonReport });
+          publishDiagnosisPlanToResultPanel(answer || JSON.stringify(jsonReport), {
+            kind: 'diagnosis',
+            jsonReport,
+          });
           if (!planCountedThisTurn && !isPostReportFollowUp) {
             planCountedThisTurn = true;
             bumpDiagnosisPlanCount();
@@ -3404,6 +3410,15 @@ function initAiChatbot() {
             ? planDoneMsg
             : `${planDoneMsg}。请先微信登录以保存方案并继续`;
           clearQuickReplies();
+        } else if (
+          looksLikeNonStructuredDiagnosisMarkdown(answer) ||
+          looksLikeNonStructuredDiagnosisMarkdown(result?.text || '')
+        ) {
+          typing.classList.add('is-plan-status');
+          typing.textContent =
+            '方案未按结构化格式生成（缺少业务流程/三大环节）。请确认 Dify 已挂载并发布 generate_diagnosis_report 工具后，点击「新建对话」重试。';
+          clearQuickReplies();
+          return;
         } else {
           answer = prepareDiagnosisPlanMarkdown(answer);
           if (looksLikeDiagnosisPlanScaffold(answer) || looksLikeEnglishPromptMeta(answer)) {
@@ -3769,6 +3784,30 @@ function ensureDiagnosisClosingChapters(text) {
 }
 
 /**
+ * Markdown that only has「1. 2. 3.」chapters without 业务流程 / 01·02·03 stages —
+ * Agent fallback or rewrite; must not replace JSON structured reports.
+ */
+function looksLikeNonStructuredDiagnosisMarkdown(text) {
+  const t = String(text || '');
+  if (!t || extractDiagnosisReportJson(t)) return false;
+  if (!/【核心风险诊断】/.test(t) || !/【合规方案】/.test(t)) return false;
+  const hasFlow = /业务流程\s*[:：]/.test(t);
+  const hasStages =
+    /0?1\s*供应商发票和产品环节/.test(t) &&
+    /0?2\s*报关出口环节/.test(t);
+  if (hasFlow && hasStages) return false;
+  // Classic wrong shape: numbered lists under risk/plan titles
+  if (
+    /【核心风险诊断】\s*\n+\s*1[.、．)]/.test(t) ||
+    /【合规方案】\s*\n+\s*(?:您属于[^\n]*\n+)?\s*1[.、．)]/.test(t)
+  ) {
+    return true;
+  }
+  if (!hasFlow && !hasStages && countDiagnosisCjk(t) >= 160) return true;
+  return false;
+}
+
+/**
  * Only paint the right panel when the plan has real Chinese body under sections.
  * Avoids flashing empty headers / English meta during streaming.
  */
@@ -3778,6 +3817,7 @@ function isDiagnosisPlanReadyToShow(text) {
 
   const t = normalizeDiagnosisSectionTitles(stripEnglishPromptMeta(String(text || '')));
   if (!t || looksLikeDiagnosisPlanScaffold(t) || looksLikeLocalGenericHelp(t)) return false;
+  if (looksLikeNonStructuredDiagnosisMarkdown(t)) return false;
   if (looksLikeEnglishPromptMeta(t) && countDiagnosisCjk(t) < 280) return false;
   if (diagnosisHasLeakedEnglish(t) && countDiagnosisCjk(t) < 280) return false;
 
@@ -3790,6 +3830,10 @@ function isDiagnosisPlanReadyToShow(text) {
   const hit = markers.filter((re) => re.test(t)).length;
   if (hit < 2) return false;
   if (countDiagnosisCjk(t) < 160) return false;
+
+  // Formal markdown must include process flow + stage labels (JSON path preferred)
+  if (!/业务流程\s*[:：]/.test(t)) return false;
+  if (!/0?1\s*供应商发票和产品环节/.test(t)) return false;
 
   // Body between titles must not be empty (headers-only drafts)
   const bodyOnly = t
@@ -4687,11 +4731,15 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
     const data = await res.json();
     const text = extractDifyAnswer(data);
-    if (!text) throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
-    if (typeof onChunk === 'function') onChunk(text);
+    const reportJson = extractDiagnosisReportJson(text) || extractDiagnosisReportJson(JSON.stringify(data));
+    if (!text && !(reportJson && isDiagnosisReportJsonReady(reportJson))) {
+      throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+    }
+    if (typeof onChunk === 'function' && text) onChunk(text);
     return {
-      text,
+      text: text || (reportJson ? JSON.stringify(reportJson) : ''),
       conversationId: data.conversation_id || conversationId || '',
+      reportJson: reportJson && isDiagnosisReportJsonReady(reportJson) ? reportJson : null,
     };
   }
 
@@ -4706,6 +4754,16 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   let nextConversationId = conversationId || '';
   let streamError = '';
   let lastPaint = 0;
+  let toolReportJson = null;
+
+  const tryCaptureReportJson = (blob) => {
+    const hit = extractDiagnosisReportJson(String(blob || ''));
+    if (hit && isDiagnosisReportJsonReady(hit)) {
+      toolReportJson = hit;
+      return true;
+    }
+    return false;
+  };
 
   const emit = (force) => {
     if (typeof onChunk !== 'function' || !answer) return;
@@ -4733,11 +4791,42 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       return;
     }
 
-    // Never surface agent thinking / tool traces in the chat UI
+    // Capture diagnosis report JSON from tool observations (Agent often only says「请看右侧」)
     if (
       event === 'agent_thought' ||
       event === 'thought' ||
       event === 'agent_log' ||
+      /tool/i.test(event)
+    ) {
+      const blobs = [
+        data.observation,
+        data.tool_observation,
+        data.tool_input,
+        data.thought,
+        data.answer,
+        data.text,
+        data.data?.observation,
+        data.data?.outputs,
+        typeof data.data?.outputs === 'object' ? JSON.stringify(data.data.outputs) : '',
+      ];
+      if (Array.isArray(data.tool_labels) || data.tool) {
+        blobs.push(typeof data.observation === 'string' ? data.observation : '');
+      }
+      for (const blob of blobs) {
+        if (blob == null || blob === '') continue;
+        if (typeof blob === 'object') {
+          tryCaptureReportJson(JSON.stringify(blob));
+        } else {
+          tryCaptureReportJson(blob);
+        }
+      }
+      // Still never paint thoughts/tools into the chat bubble
+      if (event === 'agent_thought' || event === 'thought' || event === 'agent_log' || /thought|tool|retriev|log/i.test(event)) {
+        return;
+      }
+    }
+
+    if (
       event === 'message_file' ||
       event === 'tts_message' ||
       event === 'tts_message_end' ||
@@ -4745,7 +4834,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       event === 'node_finished' ||
       event === 'parallel_branch_started' ||
       event === 'parallel_branch_finished' ||
-      /thought|tool|retriev|log/i.test(event)
+      /retriev|log/i.test(event)
     ) {
       return;
     }
@@ -4764,6 +4853,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       // Skip pure thought payloads some Agent builds put in answer
       if (delta && typeof data.thought === 'string' && data.thought === delta) return;
       if (delta) {
+        tryCaptureReportJson(delta);
         answer += delta;
         emit(false);
       }
@@ -4778,6 +4868,10 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
         '';
       if (finalAnswer && finalAnswer.length > answer.length) {
         answer = finalAnswer;
+      }
+      tryCaptureReportJson(finalAnswer);
+      if (data.data?.outputs) {
+        tryCaptureReportJson(JSON.stringify(data.data.outputs));
       }
       emit(true);
     }
@@ -4813,13 +4907,15 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
 
   emit(true);
 
-  if (!answer) {
+  // Allow empty chat text when tool already returned a structured report
+  if (!answer && !toolReportJson) {
     throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
   }
 
   return {
-    text: answer,
+    text: answer || (toolReportJson ? JSON.stringify(toolReportJson) : ''),
     conversationId: nextConversationId || conversationId || '',
+    reportJson: toolReportJson || null,
   };
 }
 
