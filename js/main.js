@@ -824,15 +824,34 @@ function stripDiagnosisIntroBoilerplate(text) {
     .trim();
 }
 
+/** Mode B / follow-up Q&A: force bold section labels for display. */
+function emphasizeQaSectionLabels(text) {
+  return String(text || '').replace(
+    /(^|\n)[ \t]*(?:\*\*)?(结论|依据|缺关键信息|边界说明)(?:\*\*)?[ \t]*[:：]/gm,
+    '$1**$2**：'
+  );
+}
+
+/** If answer discusses 9810 but omits uncertainty tip, append the hard reminder. */
+function ensure9810UncertaintyTip(text) {
+  const t = String(text || '');
+  if (!/9810/.test(t)) return t;
+  if (/实操[^。\n]{0,12}不确定|退税不确定|销售佐证|收汇证明/.test(t)) return t;
+  return (
+    `${t.replace(/\s+$/, '')}\n\n` +
+    '- **9810退税实操提示**：9810出口退税实操存在不确定性；如采用须提前与主管税局沟通退税流程与资料要求，特别是销售佐证材料与收汇证明。实务上常优先评估「0110出口+香港公司」。'
+  );
+}
+
 /** 轻度排版：已有列表/加粗则原样渲染，避免改写 Dify 完整答复 */
 function enhanceChatMarkdown(text) {
-  let t = String(text || '').trim();
+  let t = emphasizeQaSectionLabels(String(text || '').trim());
   if (!t) return t;
 
   // 已有结构：只做标题行加粗，不拆句重写
   if (/^#{1,4}\s|^\s*[-*•]\s|^\s*\d+[.)、]\s|\*\*[^*\n]{2,}\*\*/m.test(t)) {
     t = t.replace(/^(【?[^】\n]{2,20}】?)[:：]\s*$/gm, '**$1**');
-    return t;
+    return emphasizeQaSectionLabels(t);
   }
 
   // 短散文才整理；长文保持原样，防止丢内容
@@ -846,7 +865,7 @@ function enhanceChatMarkdown(text) {
   if (parts.length >= 2 && parts.length <= 6) {
     const lead = parts[0].replace(/\*\*/g, '');
     const rest = parts.slice(1).map((p) => `- ${p.replace(/\*\*/g, '')}`);
-    return `**${lead}**\n\n${rest.join('\n')}`;
+    return emphasizeQaSectionLabels(`**${lead}**\n\n${rest.join('\n')}`);
   }
   return t;
 }
@@ -2195,7 +2214,7 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
-    '- 若用户在问可行性/政策点（如「我能走1039吗」）：先直接用中文回答该问题（结论+2～4点依据），再说明若要改出口方式对现有发货模式的影响；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
+    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据**（标签加粗）；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。'
   );
@@ -4602,7 +4621,9 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   }
 
   const clean =
-    kind === 'qa' ? cleanRaw : prepareDiagnosisPlanMarkdown(cleanRaw);
+    kind === 'qa'
+      ? ensure9810UncertaintyTip(emphasizeQaSectionLabels(cleanRaw))
+      : prepareDiagnosisPlanMarkdown(cleanRaw);
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
   // Local generic help / English scaffolds / prompt-meta are not diagnosis reports
