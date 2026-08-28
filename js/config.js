@@ -2,12 +2,14 @@
 window.DAOITH_CONFIG = {
   difyApiBase: 'https://api.daoith.com',
   // Plan generation / HS / tax → 「道一合规方案助手」via /v1/chat-messages
-  // Floating chatbot → 「道一财税诊断助手」Agent via /v1/diagnosis/chat-messages
+  // AI 解决方案页左侧诊断 → 「道一财税诊断助手」Agent via /v1/diagnosis/chat-messages
+  // 全站智能客服 → 独立 Agent via /v1/cs/chat-messages（提示词见 deploy/dify-prompts/cs-assistant-system.md）
   difyEndpoint: '/v1/chat-messages',
   difyDiagnosisEndpoint: '/v1/chat-messages',
   difyHsRateEndpoint: '/v1/chat-messages',
   difyTaxCalcEndpoint: '/v1/chat-messages',
   difyChatEndpoint: '/v1/diagnosis/chat-messages',
+  difyCsEndpoint: '/v1/cs/chat-messages',
   // Left-side HS export rebate → Dataset Retrieve via Aliyun API (not Chat app)
   hsRefundApiPath: '/api/hs-refund-rate',
   // WeChat Open Platform — AppID is public; AppSecret stays server-side only

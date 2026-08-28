@@ -3502,7 +3502,7 @@ ul {
   color: var(--accent);
 }
 
-/* Daoith floating chatbot — AI 解决方案页内固定浮动 */
+/* Daoith floating chatbot — site-wide intelligent customer service */
 .ai-chatbot {
   position: fixed;
   right: max(20px, calc((100vw - 1120px) / 2));
@@ -3517,10 +3517,6 @@ ul {
 
 .ai-chatbot > * {
   pointer-events: auto;
-}
-
-body:not([data-active-view="ai-solution"]) .ai-chatbot {
-  display: none;
 }
 
 .ai-chatbot-fab {
@@ -3570,6 +3566,12 @@ body:not([data-active-view="ai-solution"]) .ai-chatbot {
   background: #fff;
   object-fit: contain;
   flex-shrink: 0;
+}
+
+.cs-assistant .ai-chatbot-fab img,
+.cs-assistant .ai-chatbot-title img {
+  object-fit: cover;
+  background: #e8eef6;
 }
 
 .ai-chatbot-fab-copy {
@@ -3851,6 +3853,142 @@ body:not([data-active-view="ai-solution"]) .ai-chatbot {
   .ai-chatbot-fab-sub {
     display: none;
   }
+}
+
+.cs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 14px 10px;
+  background: #fff;
+  border-top: 1px solid #eef2f7;
+  flex-shrink: 0;
+}
+
+.cs-chips[hidden] {
+  display: none !important;
+}
+
+.cs-chip {
+  border: 1px solid rgba(34, 81, 255, 0.22);
+  background: #f5f8ff;
+  color: #1a3370;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 7px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.cs-chip:hover {
+  border-color: #2251ff;
+  background: #eaf0ff;
+  color: #2251ff;
+}
+
+.cs-chip.is-primary {
+  background: #2251ff;
+  border-color: #2251ff;
+  color: #fff;
+}
+
+.cs-chip.is-primary:hover {
+  background: #1a44d6;
+  color: #fff;
+}
+
+.cs-service-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.cs-service-card {
+  background: #fff;
+  border: 1px solid rgba(15, 28, 63, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(15, 28, 63, 0.04);
+}
+
+.cs-service-card strong {
+  display: block;
+  font-size: 0.8125rem;
+  color: #0f1c3f;
+  margin-bottom: 4px;
+}
+
+.cs-service-card p {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.cs-service-price {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #2251ff;
+  margin-bottom: 8px;
+}
+
+.cs-service-actions,
+.cs-inquiry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.cs-inquiry-card {
+  width: 100%;
+  background: #fff;
+  border: 1px solid rgba(15, 28, 63, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.cs-inquiry-card p {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  color: #1f2937;
+}
+
+.cs-inquiry-form label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.cs-inquiry-form input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid #d5dde8;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  background: #f8fafc;
+}
+
+.cs-inquiry-form input:focus {
+  outline: none;
+  border-color: #2251ff;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(34, 81, 255, 0.12);
+}
+
+.cs-inquiry-error {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  color: #b42318;
 }
 
 /* ===== EXPERT INSIGHTS ===== */
