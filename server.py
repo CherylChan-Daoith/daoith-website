@@ -140,6 +140,23 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/service-file":
+            file_id = (query.get("id") or query.get("fileId") or [""])[0]
+            status, data = server_auth.handle_service_file_get(
+                self.headers.get("Authorization", ""),
+                file_id,
+                load_env_value,
+            )
+            if isinstance(data, dict) and data.get("file"):
+                self.send_bytes(
+                    status,
+                    data.get("body") or b"",
+                    data.get("mime") or "application/octet-stream",
+                    filename=data.get("filename"),
+                )
+                return
+            self.send_json(status, data)
+            return
         if path == "/api/auth/wechat/notify/status":
             status, data = server_auth.handle_notify_status(
                 self.headers.get("Authorization", ""),
@@ -283,6 +300,20 @@ class Handler(SimpleHTTPRequestHandler):
                 self.send_json(400, {"error": "请求体必须是 JSON"})
                 return
             status, data = server_auth.handle_inquiry_slip_upload(
+                self.headers.get("Authorization", ""),
+                body,
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
+        if path == "/api/service-file":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_service_file_upload(
                 self.headers.get("Authorization", ""),
                 body,
                 load_env_value,

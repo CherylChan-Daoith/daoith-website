@@ -1671,18 +1671,16 @@ def ensure_inquiry_db():
             pass
 
 
-_INQ_SEQ_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_INQ_SEQ_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def _two_char_seq(n: int) -> str:
     if n < 1:
         n = 1
-    if n <= 99:
-        return f"{n:02d}"
-    rest = n - 100
-    first = min(rest // 36, 25)
-    second = rest % 36
-    return chr(ord("A") + first) + _INQ_SEQ_CHARS[second]
+    n -= 1
+    first = (n // 26) % 26
+    second = n % 26
+    return _INQ_SEQ_CHARS[first] + _INQ_SEQ_CHARS[second]
 
 
 def _inquiry_ids_starting(prefix: str) -> set:
@@ -2023,6 +2021,42 @@ def fetch_service_progress_from_pm(openid: str, env_loader=None):
         "ok": True,
         "services": services if isinstance(services, list) else [],
     }
+
+
+def sync_file_to_pm(payload: dict, env_loader=None):
+    set_env_loader(env_loader)
+    base = (load_env_value("PM_SYNC_URL", env_loader) or "https://pm.daoith.com").rstrip("/")
+    headers = _pm_headers(env_loader)
+    if not headers:
+        return {"ok": False, "skipped": True, "reason": "missing PM_SYNC_SECRET"}
+    url = f"{base}/api/website/files/sync"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers=headers,
+    )
+    with _NO_PROXY_OPENER.open(req, timeout=30) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def fetch_file_from_pm(file_id: str, openid: str, env_loader=None):
+    set_env_loader(env_loader)
+    base = (load_env_value("PM_SYNC_URL", env_loader) or "https://pm.daoith.com").rstrip("/")
+    headers = _pm_headers(env_loader)
+    if not headers:
+        return None
+    url = f"{base}/api/website/files/{urllib.parse.quote(file_id)}?openid={urllib.parse.quote(openid or '')}"
+    req = urllib.request.Request(url, method="GET", headers=headers)
+    with _NO_PROXY_OPENER.open(req, timeout=20) as resp:
+        body = resp.read()
+        mime = resp.headers.get("Content-Type") or "application/octet-stream"
+        disp = resp.headers.get("Content-Disposition") or ""
+        filename = "file"
+        match = re.search(r"filename\\*=UTF-8''([^;]+)", disp)
+        if match:
+            filename = urllib.parse.unquote(match.group(1))
+        return {"body": body, "mime": mime, "filename": filename}
 
 
 def update_inquiry_status(inquiry_id: str, status: str):
@@ -2429,6 +2463,20 @@ def handle_inquiry_slip_upload(auth_header: str, body: dict, env_loader):
         return 400, {"error": str(e)}
     if not saved:
         return 404, {"error": "询价单不存在"}
+    try:
+        sync_file_to_pm(
+            {
+                "inquiryId": inquiry_id,
+                "kind": "PAYMENT_SLIP",
+                "filename": saved.get("paymentSlipName") or "payment-slip",
+                "mimeType": saved.get("paymentSlipMime") or "",
+                "content": base64.b64encode(content).decode("ascii"),
+                "paidAt": saved.get("paidAt") or "",
+            },
+            env_loader,
+        )
+    except Exception:
+        pass
     return 200, {"ok": True, **saved}
 
 
@@ -2469,6 +2517,63 @@ def handle_service_progress(auth_header: str, env_loader):
     if data.get("skipped"):
         return 200, {"ok": True, "services": [], "skipped": data.get("reason")}
     return 200, {"ok": True, "services": data.get("services") or []}
+
+
+def handle_service_file_upload(auth_header: str, body: dict, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    body = body or {}
+    inquiry_id = str(body.get("inquiryId") or "").strip()
+    if not inquiry_id:
+        return 400, {"error": "缺少询价单号"}
+    owned = _get_inquiry_row_owned(inquiry_id, resolved["websiteOpenid"])
+    if not owned:
+        return 404, {"error": "询价单不存在"}
+    content = _decode_slip_content(body.get("content") or body.get("file") or "")
+    if not content:
+        return 400, {"error": "请选择要上传的文件"}
+    try:
+        pm = sync_file_to_pm(
+            {
+                "inquiryId": inquiry_id,
+                "projectId": str(body.get("projectId") or "").strip(),
+                "taskId": str(body.get("taskId") or "").strip(),
+                "kind": "CUSTOMER_DOC",
+                "filename": str(body.get("filename") or body.get("name") or "document"),
+                "mimeType": str(body.get("mimeType") or body.get("mime") or ""),
+                "content": base64.b64encode(content).decode("ascii"),
+            },
+            env_loader,
+        )
+    except Exception as e:
+        return 502, {"error": f"同步到项目管理失败：{e}"}
+    if not pm or pm.get("ok") is False:
+        return 502, {"error": pm.get("error") if isinstance(pm, dict) else "同步失败"}
+    return 200, {"ok": True, **(pm if isinstance(pm, dict) else {})}
+
+
+def handle_service_file_get(auth_header: str, file_id: str, env_loader):
+    set_env_loader(env_loader)
+    resolved, err = _bearer_payload(auth_header, env_loader)
+    if err:
+        return err
+    fid = (file_id or "").strip()
+    if not fid:
+        return 400, {"error": "缺少文件"}
+    try:
+        data = fetch_file_from_pm(fid, resolved["websiteOpenid"], env_loader)
+    except Exception as e:
+        return 502, {"error": f"读取文件失败：{e}"}
+    if not data:
+        return 404, {"error": "文件不存在"}
+    return 200, {
+        "file": True,
+        "body": data["body"],
+        "mime": data.get("mime") or "application/octet-stream",
+        "filename": data.get("filename") or "file",
+    }
 
 
 def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader):

@@ -411,7 +411,7 @@ window.DAOITH_I18N_EN = {
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .hub-hero h1': { text: 'Service Hub' },
     '#hub .hub-hero .hero-subtitle': {
-      text: 'Manage inquiries, service orders, and delivery progress — with optional WeChat notifications.',
+      text: 'Manage inquiries, service orders, and delivery progress. WeChat notifications are only available in Inquiry management.',
     },
     '#hubJourney [data-step="1"] h4': { text: 'Inquiries' },
     '#hubJourney [data-step="1"] .tag': { text: 'Submit an inquiry and pay' },

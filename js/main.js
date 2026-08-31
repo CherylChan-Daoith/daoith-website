@@ -7860,7 +7860,7 @@ function hubYymmdd(iso) {
 }
 
 function hubTwoCharFromSeed(seed) {
-  const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let h = 2166136261;
   const s = String(seed || '');
   for (let i = 0; i < s.length; i++) {
@@ -7868,12 +7868,12 @@ function hubTwoCharFromSeed(seed) {
     h = Math.imul(h, 16777619);
   }
   h >>>= 0;
-  return chars[h % 36] + chars[Math.floor(h / 36) % 36];
+  return chars[h % 26] + chars[Math.floor(h / 26) % 26];
 }
 
 function hubParseInquiryCode(inquiryId, createdAt) {
   const id = String(inquiryId || '').trim().toUpperCase();
-  if (/^INQ\d{6}[0-9A-Z]{2}$/.test(id) && id.length === 11) {
+  if (/^INQ\d{6}[A-Z0-9]{2}$/.test(id) && id.length === 11) {
     return { date: id.slice(3, 9), seq: id.slice(9, 11), inquiryNo: id };
   }
   const date = hubYymmdd(createdAt);
@@ -7892,8 +7892,7 @@ function hubOrderNo(inquiryId, createdAt) {
 
 function hubSubOrderNo(inquiryId, index, createdAt) {
   const { date, seq } = hubParseInquiryCode(inquiryId, createdAt);
-  const letter = String.fromCharCode(65 + (Number(index) || 0) % 26);
-  return `SO${date}${seq[0]}${letter}`;
+  return `SO${date}${seq}${String((Number(index) || 0) + 1).padStart(2, '0')}`;
 }
 
 function playHubJourney() {
@@ -8232,11 +8231,12 @@ function collectOrderRows(quotes, services) {
       rows.push({
         inquiryId: q.inquiryId,
         createdAt: q.createdAt,
-        subNo: hubSubOrderNo(q.inquiryId, i, q.createdAt),
+        subNo: p?.subOrderNo || hubSubOrderNo(q.inquiryId, i, q.createdAt),
         title: it.title || p?.serviceType || '—',
-        step: hubFormatCurrentStep(p?.tasks),
         amount: hubLineQuoted(q, it),
-        startAt: hubStep01Time(p?.tasks) || '',
+        paidAt: p?.paidAt || q.paidAt || '',
+        startAt: p?.startDate || '',
+        endAt: p?.estimatedEndDate || '',
         owner: p?.ownerName || '',
       });
     });
@@ -8260,9 +8260,10 @@ function renderHubOrders(quotes, services) {
       <tr>
         <td class="hub-cell-id"><span class="hub-record-no">${escapeHtmlHub(row.subNo)}</span></td>
         <td class="hub-cell-wrap hub-td-services">${escapeHtmlHub(row.title)}</td>
-        <td class="hub-td-step">${escapeHtmlHub(row.step)}</td>
-        <td class="hub-price-deal hub-num">${escapeHtmlHub(formatYuanHub(row.amount))}</td>
+        <td>${row.paidAt ? hubDateCell(row.paidAt) : '—'}</td>
         <td>${row.startAt ? hubDateCell(row.startAt) : '—'}</td>
+        <td>${row.endAt ? hubDateCell(row.endAt) : '—'}</td>
+        <td class="hub-price-deal hub-num">${escapeHtmlHub(formatYuanHub(row.amount))}</td>
         <td>${escapeHtmlHub(row.owner || hubT('待分配', 'Unassigned'))}</td>
       </tr>`).join('');
   wrap.innerHTML = `
@@ -8272,9 +8273,10 @@ function renderHubOrders(quotes, services) {
           <tr>
             <th>${hubT('订单号', 'Order no.')}</th>
             <th>${hubT('服务项目', 'Service')}</th>
-            <th>${hubT('最新进度', 'Latest step')}</th>
+            <th>${hubT('支付完成时间', 'Paid at')}</th>
+            <th>${hubT('服务开启时间', 'Service start')}</th>
+            <th>${hubT('预计服务结束时间', 'Est. end')}</th>
             <th>${hubT('订单金额', 'Amount')}</th>
-            <th>${hubT('项目启动时间', 'Project start')}</th>
             <th>${hubT('项目负责人', 'Owner')}</th>
           </tr>
         </thead>
@@ -8337,8 +8339,9 @@ function collectProgressCards(services, quotes) {
         inquiryId: s.inquiryId,
         company: s.company || '',
         title: p.serviceType || p.name || hubT('服务', 'Service'),
-        orderNo: hubOrderNo(s.inquiryId, s.createdAt),
-        subOrderNo: hubSubOrderNo(s.inquiryId, i, s.createdAt),
+        orderNo: p.orderNo || hubOrderNo(s.inquiryId, s.createdAt),
+        subOrderNo: p.subOrderNo || hubSubOrderNo(s.inquiryId, i, s.createdAt),
+        ownerName: p.ownerName || '',
         progress: Number(p.progress) || 0,
         tasks: Array.isArray(p.tasks) ? p.tasks : [],
       });
@@ -8354,6 +8357,7 @@ function collectProgressCards(services, quotes) {
         title: it.title || hubT('服务', 'Service'),
         orderNo: hubOrderNo(q.inquiryId, q.createdAt),
         subOrderNo: hubSubOrderNo(q.inquiryId, i, q.createdAt),
+        ownerName: '',
         progress: 0,
         tasks: [],
       });
@@ -8394,11 +8398,18 @@ function renderServiceProgress(services, quotes) {
           const actual = t.actualCompletedAt ? fmtDate(t.actualCompletedAt) : '—';
           const stepNo = `Step ${String(i + 1).padStart(2, '0')}`;
           const name = t.title || hubT('节点', 'Step');
+          const files = Array.isArray(t.files) ? t.files : [];
+          const fileLinks = files.map((f) => `<button type="button" class="hub-link-btn" data-hub-file="${escapeHtmlHub(f.id)}">${escapeHtmlHub(f.filename)}</button>`).join(' ');
+          const uploadBtn = p.id && t.id
+            ? `<button type="button" class="hub-link-btn" data-hub-node-upload data-inquiry-id="${escapeHtmlHub(p.inquiryId || '')}" data-project-id="${escapeHtmlHub(String(p.id))}" data-task-id="${escapeHtmlHub(t.id)}">${hubT('上传资料', 'Upload')}</button>`
+            : '';
           return `<li class="hub-node ${cls}">
             <span class="hub-node-step">${escapeHtmlHub(stepNo)}</span>
             <span class="hub-node-title">${escapeHtmlHub(name)}</span>
+            <span class="hub-node-owner">${hubT('负责人', 'Owner')} ${escapeHtmlHub(t.assigneeName || hubT('待分配', 'Unassigned'))}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.plannedDueDate ? formatDate(t.plannedDueDate) : '')}">${plannedLabel} ${escapeHtmlHub(planned)}</span>
             <span class="hub-node-time" title="${escapeHtmlHub(t.actualCompletedAt ? formatDate(t.actualCompletedAt) : '')}">${actualLabel} ${escapeHtmlHub(actual)}</span>
+            <span class="hub-node-files">${fileLinks || ''}${uploadBtn}</span>
           </li>`;
         }).join('')}</ol>`
       : `<p class="hub-nodes-empty">${hubT('服务流程尚未启动', 'Workflow not started yet')}</p>`;
@@ -8414,12 +8425,13 @@ function renderServiceProgress(services, quotes) {
           </div>
         </td>
         <td class="hub-progress-step hub-td-step">${escapeHtmlHub(currentStep)}</td>
+        <td class="hub-td-owner">${escapeHtmlHub(p.ownerName || hubT('待分配', 'Unassigned'))}</td>
         <td>
           <button type="button" class="hub-link-btn hub-detail-btn" data-hub-progress-toggle aria-expanded="${open ? 'true' : 'false'}">${open ? hubT('收起', 'Hide') : hubT('点击查看详情', 'Click to view details')}</button>
         </td>
       </tr>
       <tr class="hub-progress-detail-row" data-hub-progress-detail ${open ? '' : 'hidden'}>
-        <td colspan="5">${nodes}</td>
+        <td colspan="6">${nodes}</td>
       </tr>`;
   }).join('');
 
@@ -8432,6 +8444,7 @@ function renderServiceProgress(services, quotes) {
             <th>${hubT('服务项目', 'Service')}</th>
             <th>${hubT('服务进度', 'Progress')}</th>
             <th>${hubT('当前进展', 'Current step')}</th>
+            <th>${hubT('项目负责人', 'Owner')}</th>
             <th>${hubT('更多功能', 'More')}</th>
           </tr>
         </thead>
@@ -8487,6 +8500,84 @@ function closeHubSlipModal() {
   if (!modal) return;
   modal.hidden = true;
   document.body.classList.remove('modal-open');
+}
+
+async function viewHubServiceFile(fileId) {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token || !fileId) {
+    window.DAOITH_CART?.showToast?.(hubT('请先微信登录', 'Please sign in with WeChat first.'));
+    return;
+  }
+  try {
+    const res = await fetch(`${notifyApiBase()}/api/service-file?id=${encodeURIComponent(fileId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+  } catch (err) {
+    window.DAOITH_CART?.showToast?.(hubT(`查看失败：${err.message || '网络错误'}`, `Could not open file: ${err.message || 'network error'}`));
+  }
+}
+
+function pickAndUploadHubNodeFile(btn) {
+  const inquiryId = btn.getAttribute('data-inquiry-id') || '';
+  const projectId = btn.getAttribute('data-project-id') || '';
+  const taskId = btn.getAttribute('data-task-id') || '';
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf,.png,.jpg,.jpeg,.webp,.gif,.doc,.docx,.xls,.xlsx,.zip';
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    if (file) submitHubNodeFile({ inquiryId, projectId, taskId, file });
+  });
+  input.click();
+}
+
+async function submitHubNodeFile({ inquiryId, projectId, taskId, file }) {
+  const token = window.DAOITH_AUTH?.getToken?.();
+  if (!token) {
+    window.DAOITH_CART?.showToast?.(hubT('请先微信登录', 'Please sign in with WeChat first.'));
+    return;
+  }
+  if (!file) return;
+  if (file.size > 8 * 1024 * 1024) {
+    window.DAOITH_CART?.showToast?.(hubT('文件不能超过 8MB', 'File must be 8MB or smaller'));
+    return;
+  }
+  try {
+    const content = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('read failed'));
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch(`${notifyApiBase()}/api/service-file`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inquiryId,
+        projectId,
+        taskId,
+        filename: file.name,
+        mimeType: file.type,
+        content,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    window.DAOITH_CART?.showToast?.(hubT('资料已上传', 'File uploaded'));
+    if (typeof window.DAOITH_refreshHub === 'function') window.DAOITH_refreshHub();
+  } catch (err) {
+    window.DAOITH_CART?.showToast?.(hubT(`上传失败：${err.message || '网络错误'}`, `Upload failed: ${err.message || 'network error'}`));
+  }
 }
 
 async function viewHubSlip(inquiryId) {
@@ -8629,6 +8720,18 @@ function bindHubUi() {
       return;
     }
 
+    const nodeUploadBtn = e.target.closest('[data-hub-node-upload]');
+    if (nodeUploadBtn) {
+      pickAndUploadHubNodeFile(nodeUploadBtn);
+      return;
+    }
+
+    const fileBtn = e.target.closest('[data-hub-file]');
+    if (fileBtn) {
+      viewHubServiceFile(fileBtn.getAttribute('data-hub-file') || '');
+      return;
+    }
+
     const moreBtn = e.target.closest('[data-hub-more]');
     if (moreBtn) {
       const kind = moreBtn.getAttribute('data-hub-more');
@@ -8696,7 +8799,7 @@ function notifyApiBase() {
 }
 
 function wechatToggles() {
-  return Array.from(document.querySelectorAll('.wechat-toggle'));
+  return Array.from(document.querySelectorAll('#wechatToggle'));
 }
 
 function setWechatToggleUi(on) {

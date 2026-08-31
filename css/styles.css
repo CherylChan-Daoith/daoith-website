@@ -5972,6 +5972,15 @@ body.modal-open {
   white-space: nowrap;
 }
 
+.hub-node-owner,
+.hub-node-files {
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .hub-nodes-empty {
   margin: 0;
   font-size: 0.72rem;
