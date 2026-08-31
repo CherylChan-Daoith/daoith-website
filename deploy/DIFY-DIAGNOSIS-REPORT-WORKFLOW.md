@@ -1,28 +1,29 @@
-# 诊断报告 JSON Workflow（方案 A）
+# 诊断报告 JSON Workflow
 
-> 目标：报告格式由 **JSON Schema + 官网渲染器** 保证稳定；Agent 主提示词只保留问诊与业务规则，版式细节迁到 Workflow。
+> 目标：报告格式由 **JSON Schema + 官网渲染器** 保证稳定；问诊 Agent 只负责问卷与调工具；报告正文在 Workflow 内 **自检索知识库后写 JSON**。
 
-## 架构
+## 架构（推荐：方案 B · Agent 节点自检索）
 
 ```text
 用户完成 7 问
   → 诊断 Agent 调用工具 generate_diagnosis_report
-  → Workflow：检索 KB → LLM(Structured Output) → Code 校验
-  → 返回 JSON（version: 1）
-  → 官网 extractDiagnosisReportJson → renderDiagnosisReportJson
+    → Workflow：
+         开始
+           → Agent 节点（挂「合规解决方案必读」知识库工具；先检索 ≥4 次再写 JSON）
+           → Code（校验 version、必填字段）
+           → 结束（report_json）
+  → 问诊 Agent 原样输出 JSON
+  → 官网 extractDiagnosisReportJson → 右侧方案区
 ```
 
-Markdown 四章仍可作为**过渡期 fallback**（旧报告 / 工具未挂载时）。
+备选（方案 A）：`知识检索节点 → LLM`（更快，但模型不能自己多轮改 query；质量依赖固定 query）。详见下文「方案 A 备选」。
 
 ---
 
-## 1. 创建 Workflow
+## 1. 创建 / 改造 Workflow（方案 B）
 
-1. Dify 控制台 → **工作室** → **创建应用** → **Workflow**
-2. 名称：`generate_diagnosis_report`
-3. 描述：`根据诊断档案生成结构化 JSON 报告`
-
-### 开始节点 · 输入变量
+1. Dify → **工作室** → 打开已有 `generate_diagnosis_report` Workflow（或新建同名 Workflow）
+2. **开始节点**输入变量保持不变：
 
 | 变量 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -30,52 +31,52 @@ Markdown 四章仍可作为**过渡期 fallback**（旧报告 / 工具未挂载�
 | `user_reply` | 文本 | 否 | 用户最后一轮答复 |
 | `follow_up_changes` | 文本 | 否 | 追问变化点 JSON 字符串 |
 
-### 节点链路
+3. **画布改线**（从旧方案 A 改造时）：
+   - 删除（或断开）原来的 **知识检索 → LLM** 两段
+   - 添加 **Agent** 节点（有的版本叫「Agent / 智能体」）
+   - 连线：`开始 → Agent → Code → 结束`
 
 ```text
-开始
-  → 知识检索（合规解决方案必读文件，Top K 4–6）
-  → LLM（Structured Output / JSON Schema）
-  → Code（校验 version、必填字段、中文字数）
-  → 结束（输出 report_json）
+开始 → Agent（知识库工具） → Code → 结束
 ```
 
 ---
 
-## 2. LLM 节点配置（逐步）
+## 2. Agent 节点配置（方案 B · 关键）
 
-### 2.1 添加并连线
+### 2.1 模型
 
-1. 画布点 **+** → 选 **LLM**
-2. 连线：**知识检索** → **LLM** → **Code** → **结束**
+| 参数 | 建议 |
+|------|------|
+| 模型 | 与问诊 Agent 同级或略强（DeepSeek / GPT-4o 等） |
+| 温度 | **0.2～0.3** |
+| Max tokens | **4096～8192** |
+| 深度思考 / Reasoning | **关闭** |
+| 最大迭代 / 工具轮次 | **≥ 6**（至少覆盖 4 次检索 + 1 次写 JSON；太小会检索未完就截断） |
 
----
+### 2.2 挂载知识库工具
 
-### 2.2 模型参数（Settings / 设置）
+1. Agent 节点 → **工具** → 添加 **知识库**（Dataset）
+2. 勾选数据集：**合规解决方案必读文件**（及你们实际用于出报告的库）
+3. Top K：**4～6**（单次检索）；整体靠「多次调用」覆盖硬约束/知识点/样本
+4. 工具描述可粘贴（可选）：
 
-| 参数 | 建议值 | 说明 |
-|------|--------|------|
-| **模型** | 与「道一财税诊断助手」Agent **相同**；若无偏好，选你们已在用的 **DeepSeek / GPT-4o / Claude** 等中等偏强模型 | 报告要综合推理，不要用过小模型 |
-| **温度 (Temperature)** | **0.25**（范围 0.2～0.35） | 低温度，少编造税率/路径 |
-| **Top P** | 默认或 **0.9** | 一般不用改 |
-| **最大 Token (Max Tokens)** | **4096**（报告常被截断时调到 **8192**） | JSON 四章内容较长 |
-| **频率惩罚 / 存在惩罚** | 默认 **0** | 不用改 |
+```text
+检索「合规解决方案必读」知识库。出报告时必须多次调用：硬约束与路径要点、必须知道的知识点、问题分篇注意事项、对应方案样本。返回原文片段供写 JSON 采信。
+```
 
-**不要开**：联网搜索、Vision、深度思考/Reasoning（若可选）—— 知识已在检索节点提供。
+也可把 `deploy/dify-prompts/diagnosis-agent-kb-instruction.md` 里「出诊断报告时的检索流水线」缩进贴到工具说明。
 
----
+### 2.3 系统提示词（Instruction）
 
-### 2.3 系统提示词（SYSTEM / 指令）
+1. 打开 `deploy/dify-prompts/diagnosis-report-workflow-agent-prompt.md`
+2. **全选复制** → 粘贴到 Agent 节点 **系统提示词 / Instruction**（先清空旧 LLM 提示词）
 
-1. 打开 Cursor 里的 `deploy/dify-prompts/diagnosis-report-workflow-prompt.md`
-2. **源码视图**全选复制（`⌘A` → `⌘C`）
-3. 粘贴到 LLM 节点的 **系统提示词 / System** 框（先清空旧内容）
+该文件已包含：**强制 ≥4 次检索** + 原 Workflow 硬约束 / 路径 / JSON 结构。
 
----
+### 2.4 用户消息（Query / USER）
 
-### 2.4 用户消息（USER / 上下文）
-
-在 **USER** 或 **上下文 / Prompt** 区域粘贴下面模板，变量用 `{x}` 按钮从上游节点选取（不要手打错名）：
+Agent 节点的用户输入只喂档案，**不要**再接旧「知识检索.result」变量：
 
 ```text
 【诊断档案】
@@ -87,51 +88,54 @@ Markdown 四章仍可作为**过渡期 fallback**（旧报告 / 工具未挂载�
 【变化点（若有）】
 {{#start.follow_up_changes#}}
 
-【知识库检索结果】
-{{#知识检索.result#}}
+请按系统指令：先完成强制检索流水线，再只输出 version=1 的 JSON。
 ```
 
-> Dify 里变量名可能是 `用户输入 / diagnosis_archive`、`知识检索 / result` 等，**以画布上 `{x}` 列表为准**。
+> 变量名以画布 `{x}` 为准。
 
-若 USER 框只能写一条，把上面整段放在 USER；系统提示词仍单独在 SYSTEM。
+### 2.5 输出接到 Code
 
----
+- Agent 节点输出一般为 `text` / `files` 等；把 **最终文本** 接到 Code 的 `report_text`
+- **不要**依赖 Structured Output（Agent 节点常不稳定）；靠提示词「只输出 JSON」+ Code 剥 ```json
 
-### 2.5 结构化输出（JSON Schema）—— 关键
+Code 输入与逻辑仍用 `deploy/dify-prompts/diagnosis-report-code.py`（见下文第 3 节）。
 
-1. 找到 **输出 / Output** 或 **Structured Output / 结构化输出**
-2. 开启 **JSON** 或 **Structured Output**
-3. **请用 Dify 专用简化 Schema**（避免「Schema exceeds maximum depth of 10」）  
-   打开 `deploy/dify-prompts/diagnosis-report-schema.dify.json`，**整文件复制**粘贴到 Schema 框  
-   ⚠️ **不要**导入 `diagnosis-report-schema.json`（完整版供文档/Code 校验，嵌套过深）
+### 2.6 自测 Agent 节点
 
-**内层字段形状**（Schema 不强制，靠提示词 + Code 节点；LLM 须按此填写）：
+单独 Run Workflow，输入一份完整档案，检查日志：
 
-- `risk.stages[]`：`{ "num": "01", "title": "供应商发票和产品环节", "items": [{ "title": "…", "body": "…" }] }`
-- `plan.overview[]`：`{ "num": "01", "title": "…", "items": ["短事项1", "短事项2"] }`
-- `plan.details[]`：`{ "title": "专票梳理", "body": "…" }`
+- [ ] 出现 **≥4 次** 知识库工具调用
+- [ ] query 中能看到「硬约束」「知识点」「方案样本」等字样
+- [ ] 最终输出为合法 JSON，`version: 1`
+- [ ] `processFlow` 是具体业务值，不是「供应商发票 → 店铺主体 → …」字段名模板
+- [ ] 路径 A 有票时 `plan.details` 含「0110出口+香港公司」等架构名
 
-**若仍报 depth 超限**：关掉 Structured Output，仅在 SYSTEM 末尾加「只输出纯 JSON，version=1」；由 **Code 节点**做校验（见第 3 节）。
-
-**若模型包 ```json 代码块**：Code 节点会剥除，可正常处理。
+若只检索 1 次就写 JSON：提高「最大迭代」，并确认 Instruction 里「至少调用 4 次」未被旧提示词覆盖。
 
 ---
 
-### 2.6 LLM 节点输出变量
+## 3. Code 节点与结束节点
 
-开启 **Structured Output** 后：
+与原先相同：Code 校验后输出 `report_json`；结束节点映射 `report_json`。配置细节见下方「Code 校验节点」。
 
-| 变量 | 含义 |
-|------|------|
-| `structured_output` | **主输出**（Object，即整份报告 JSON） |
-| `text` | 可能为空或重复 JSON，**Code 节点优先用 structured_output** |
-| `usage` | Token 用量，可忽略 |
+---
 
-**关于输出区的橙色「必填」**：这是 Schema 里标记为 `required` 的字段（如 `version`、`risk.processFlow`、`plan.intro`），**属于正常提示，不是配置错误**，可以忽略。
+## 方案 A 备选（Knowledge → LLM，更快）
 
-若「结构化输出」标题旁有 ⚠️ 三角：点 **配置** → 确认已 **保存** Schema → 展开 `structured_output` 向下滚动，应还能看到 `actions`、`notes`、`closing`。
+若 Agent 节点过慢或迭代不够，可暂时回到：
 
-Code 节点输入见下节（兼容 `structured_output` 与 `text`）。
+```text
+开始 → 知识检索（query 用档案拼接串，Top K 6–8） → LLM → Code → 结束
+```
+
+LLM 提示词用 `diagnosis-report-workflow-prompt.md`。query 示例：
+
+```text
+出报告硬约束与路径要点；必须知道的知识点；
+平台/发货/出口/发票/产品/销售额（从档案摘录）；方案样本路径
+```
+
+方案 A 若开 Structured Output：用 `diagnosis-report-schema.dify.json`（勿用深度过大的完整 schema）；解析不稳时关闭 SO，靠 Code 吃 `text`。
 
 ---
 
@@ -330,41 +334,17 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 
 ---
 
-## 8. 报告质量：检索放在 LLM「里面」还是前面？
+## 8. 方案 B 小结（你正在用的）
 
-### 结论（可做，但别指望只换位置就变好）
+画布：`开始 → Agent（必读库工具）→ Code → 结束`  
+提示词：`diagnosis-report-workflow-agent-prompt.md`  
+要点：最大迭代 ≥6、先检索 ≥4 次再出 JSON、问诊 Agent 仍只调工具并原样贴 JSON。
 
-Dify **普通 Workflow 的 LLM 节点不能内嵌知识库检索**——检索要么是：
-
-| 方式 | 谁决定查什么 | 适用 |
-|------|--------------|------|
-| **A. Knowledge 节点在 LLM 前**（现状） | 你用固定/模板 query | 稳定、快；质量靠 **query 写好** |
-| **B. Workflow 里用「Agent」节点**（带知识库工具） | 模型自己多次检索再写 | 更像「完整版 Agent」；慢、贵、可能多轮 |
-| **C. 把报告 Workflow 改成 Chatflow/Agent 应用当工具** | 同 B | 与问诊 Agent 对称，调试稍重 |
-
-「LLM 根据自己检索的内容生产报告」≈ **方案 B**：画布改为  
-`开始 → Agent（挂「合规解决方案必读」知识库工具）→ Code → 结束`，  
-Agent 系统提示词用 `diagnosis-report-workflow-prompt.md` + `diagnosis-agent-kb-instruction.md` 的「出报告检索流水线」，并强制：先按序调用知识库工具 ≥3 次，再输出 JSON。
-
-**不推荐**只把「前一个 Knowledge 节点删掉、也不给 LLM 挂检索工具」——那样模型更容易空写。
-
-### 若暂时仍用方案 A（Knowledge → LLM），优先改 query（性价比最高）
-
-Knowledge 节点的 **查询语句不要只用用户一句话**，改为由档案拼成的强制检索串，例如：
-
-```text
-出报告硬约束与路径要点；必须知道的知识点；
-平台={{平台}} 发货={{发货}} 出口={{出口}} 发票={{发票}} 产品={{产品}} 销售额={{销售额}}；
-对应问题分篇与方案样本路径
-```
-
-可用 **Code/模板节点** 在 Knowledge 之前根据 `diagnosis_archive` 生成 `kb_query`，再接到 Knowledge。Top K 建议 **6～8**，并勾选必读库。
-
-质量差时先看一次 Run 的「知识检索结果」是否命中：硬约束篇、知识点、方案样本——若没命中，换 B 也救不了。
+旧「检索在前还是 LLM 里」讨论已收敛为本方案；方案 A 仅作加速备选。
 
 ---
 
-## 9. 提高 `generate_diagnosis_report` 调用效率与成功率
+## 9. 提高问诊侧 `generate_diagnosis_report` 调用效率与成功率
 
 ### 故障面（按出现频率）
 
@@ -411,12 +391,11 @@ Knowledge 节点的 **查询语句不要只用用户一句话**，改为由档�
 ## 10. 相关文件
 
 ```
-deploy/dify-prompts/diagnosis-report-code.py           ← Dify Code 节点只粘贴此文件
-deploy/dify-prompts/diagnosis-report-schema.dify.json   ← Dify 粘贴用（≤10 层）
-deploy/dify-prompts/diagnosis-report-schema.json        ← 完整说明（勿直接导入 Dify）
-deploy/dify-prompts/diagnosis-report-workflow-prompt.md ← Workflow LLM 指令
-deploy/dify-prompts/diagnosis-agent-system.md         ← Agent 主提示词（选项已外置到官网）
-deploy/dify-prompts/diagnosis-agent-kb-instruction.md ← 检索流水线说明
-js/main.js                                            ← extract/render JSON
-deploy/DIFY-DIAGNOSIS-AGENT.md                        ← Agent 搭建总览
+deploy/dify-prompts/diagnosis-report-workflow-agent-prompt.md  ← 【方案B】Workflow 内 Agent 节点 Instruction（先贴这个）
+deploy/dify-prompts/diagnosis-report-workflow-prompt.md        ← 【方案A】Knowledge→LLM 时的 System 提示词
+deploy/dify-prompts/diagnosis-report-code.py                   ← Code 节点
+deploy/dify-prompts/diagnosis-report-schema.dify.json           ← 方案A 可选 SO
+deploy/dify-prompts/diagnosis-agent-system.md                  ← 问诊 Agent
+deploy/dify-prompts/diagnosis-agent-kb-instruction.md          ← 知识库工具说明（可选贴到工具描述）
+js/main.js
 ```
