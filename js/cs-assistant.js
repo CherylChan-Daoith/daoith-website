@@ -70,21 +70,26 @@
         '购物车目前是空的。请告诉我您需要为哪项服务询价；也可以先考虑专家1v1财税咨询。',
       progressOpened: '已为您打开「服务进度跟踪」。登录后可查看办理进度。',
       progressNeedLogin:
-        '查进度需要先微信登录。登录后我可以直接告诉您办到哪一步；您也可以在顶部导航「服务管理」→「服务进度跟踪」查看。',
+        '查进度需要先微信登录。登录后我可以直接告诉您办到哪一步；您也可以在顶部导航「**服务管理**」→「**服务进度跟踪**」查看。',
       progressHow:
-        '查看路径：顶部导航点「服务管理」，进入后向下找到「服务进度跟踪」。\n您也可以把服务订单号发给我（一般以 SO 开头），我直接帮您查当前办到哪一步。',
-      progressFail: '进度暂时查不到。您可以在顶部导航「服务管理」→「服务进度跟踪」查看，或把服务订单号发给我。',
+        '查看路径：顶部导航点「**服务管理**」，进入后向下找到「**服务进度跟踪**」。\n您也可以把**服务单号**发给我（一般以 **SO** 开头），我直接帮您查当前办到哪一步。',
+      progressFail:
+        '进度暂时查不到。您可以在顶部导航「**服务管理**」→「**服务进度跟踪**」查看，或把**服务单号**发给我。',
       progressEmpty:
-        '目前还没有进行中的服务订单。如果您已购买，请把服务订单号发给我（以 SO 开头），我帮您查。\n查看路径：顶部导航 →「服务管理」→「服务进度跟踪」。',
+        '目前还没有进行中的服务订单。如果您已购买，请把**服务单号**发给我（以 **SO** 开头），我帮您查。\n查看路径：顶部导航 →「**服务管理**」→「**服务进度跟踪**」。',
       progressMiss:
-        '没有找到与「{q}」匹配的进行中服务。请把服务订单号发给我（以 SO 开头），我帮您查。\n查看路径：顶部导航 →「服务管理」→「服务进度跟踪」。',
-      progressWhere: '您也可以随时在顶部导航「服务管理」→「服务进度跟踪」查看详情。',
-      progressAskNo: '若不是以上记录，请把服务订单号发给我（以 SO 开头）。',
-      progressLine: '「{title}」{no}目前{pct}，当前节点：{step}。{owner}',
-      progressInquiry: '「{title}」目前是询价状态：{status}（尚未成交，成交后才会进入服务进度）。',
-      progressOwner: '项目负责人：{name}。',
-      progressNoOwner: '',
-      progressPct: '进度 {n}%',
+        '没有找到与「{q}」匹配的进行中服务。请把**服务单号**发给我（以 **SO** 开头），我帮您查。\n查看路径：顶部导航 →「**服务管理**」→「**服务进度跟踪**」。',
+      progressWhere: '您也可以随时在顶部导航「**服务管理**」→「**服务进度跟踪**」查看详情。',
+      progressAskNo: '若不是以上记录，请把**服务单号**发给我（以 **SO** 开头）。',
+      progressHead: '为您查到以下服务进度：',
+      progressLabelService: '服务',
+      progressLabelNo: '服务单号',
+      progressLabelPct: '进度',
+      progressLabelStep: '当前节点',
+      progressLabelOwner: '项目负责人',
+      progressLabelInquiry: '询价单号',
+      progressLabelStatus: '询价状态',
+      progressInquiryNote: '尚未成交，成交后才会进入服务进度。',
       progressPending: '待启动',
       serviceHit: '根据你提到的需求，可先看这些标准化服务：',
       serviceMiss: '暂未精确匹配到单项。你可以先浏览财税服务市场，或补充国家／平台后再问我。',
@@ -142,21 +147,25 @@
         'Your cart is empty. Tell me which service you want a quote for; you can also start with Expert 1-on-1 advisory.',
       progressOpened: 'Opened service progress tracking. Sign in to see your status.',
       progressNeedLogin:
-        'Please sign in with WeChat first. After that I can tell you the current step, or you can open Service Hub → Service progress.',
+        'Please sign in with WeChat first. After that I can tell you the current step, or you can open **Service Hub** → **Service progress**.',
       progressHow:
-        'Path: top nav → Service Hub → Service progress tracking.\nYou can also send me the service order number (starts with SO) and I will look it up.',
-      progressFail: 'Could not load progress. Open Service Hub → Service progress, or send me the order number.',
+        'Path: top nav → **Service Hub** → **Service progress**.\nYou can also send me the **service order number** (starts with **SO**) and I will look it up.',
+      progressFail: 'Could not load progress. Open **Service Hub** → **Service progress**, or send me the **service order number**.',
       progressEmpty:
-        'No active service orders yet. If you already purchased, send me the order number (starts with SO).\nPath: top nav → Service Hub → Service progress.',
+        'No active service orders yet. If you already purchased, send me the **service order number** (starts with **SO**).\nPath: top nav → **Service Hub** → **Service progress**.',
       progressMiss:
-        'No in-progress service matched “{q}”. Send me the order number (starts with SO).\nPath: top nav → Service Hub → Service progress.',
-      progressWhere: 'You can also open top nav → Service Hub → Service progress for details.',
-      progressAskNo: 'If this is not the right record, send me the service order number (starts with SO).',
-      progressLine: '“{title}” {no}is at {pct}, current step: {step}. {owner}',
-      progressInquiry: '“{title}” is still an inquiry ({status}); progress appears after it is closed-won.',
-      progressOwner: 'Owner: {name}.',
-      progressNoOwner: '',
-      progressPct: '{n}% complete',
+        'No in-progress service matched “{q}”. Send me the **service order number** (starts with **SO**).\nPath: top nav → **Service Hub** → **Service progress**.',
+      progressWhere: 'You can also open top nav → **Service Hub** → **Service progress** for details.',
+      progressAskNo: 'If this is not the right record, send me the **service order number** (starts with **SO**).',
+      progressHead: 'Here is the service progress I found:',
+      progressLabelService: 'Service',
+      progressLabelNo: 'Order no.',
+      progressLabelPct: 'Progress',
+      progressLabelStep: 'Current step',
+      progressLabelOwner: 'Owner',
+      progressLabelInquiry: 'Inquiry no.',
+      progressLabelStatus: 'Inquiry status',
+      progressInquiryNote: 'Not closed-won yet; service progress appears after purchase.',
       progressPending: 'Pending start',
       serviceHit: 'Based on what you mentioned, these standard services may fit:',
       serviceMiss: 'No exact match yet. Browse the service marketplace, or add country / platform and ask again.',
@@ -198,7 +207,10 @@
   }
 
   function t(key) {
-    return (COPY[locale()] || COPY.zh)[key] || COPY.zh[key] || key;
+    const pack = COPY[locale()] || COPY.zh;
+    if (Object.prototype.hasOwnProperty.call(pack, key)) return pack[key];
+    if (Object.prototype.hasOwnProperty.call(COPY.zh, key)) return COPY.zh[key];
+    return key;
   }
 
   function isEn() {
@@ -347,18 +359,55 @@
     };
   }
 
+  function csYymmdd(iso) {
+    const d = iso ? new Date(iso) : new Date();
+    if (isNaN(d)) return '000000';
+    return `${String(d.getFullYear()).slice(-2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function csTwoCharFromSeed(seed) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let h = 2166136261;
+    const s = String(seed || '');
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    h >>>= 0;
+    return chars[h % 26] + chars[Math.floor(h / 26) % 26];
+  }
+
+  function csParseInquiryCode(inquiryId, createdAt) {
+    const id = String(inquiryId || '').trim().toUpperCase();
+    if (/^INQ\d{6}[A-Z0-9]{2}$/.test(id) && id.length === 11) {
+      return { date: id.slice(3, 9), seq: id.slice(9, 11), inquiryNo: id };
+    }
+    const date = csYymmdd(createdAt);
+    const seq = csTwoCharFromSeed(id || date);
+    return { date, seq, inquiryNo: `INQ${date}${seq}` };
+  }
+
+  function csInquiryNo(inquiryId, createdAt) {
+    return csParseInquiryCode(inquiryId, createdAt).inquiryNo;
+  }
+
+  function csSubOrderNo(inquiryId, index, createdAt) {
+    const { date, seq } = csParseInquiryCode(inquiryId, createdAt);
+    return `SO${date}${seq}${String((Number(index) || 0) + 1).padStart(2, '0')}`;
+  }
+
   function flattenProgressCards(quotes, services) {
     const cards = [];
     const covered = new Set();
     (services || []).forEach((s) => {
-      (s.projects || []).forEach((p) => {
+      (s.projects || []).forEach((p, i) => {
         covered.add(s.inquiryId);
         cards.push({
           kind: 'service',
           inquiryId: s.inquiryId || '',
-          title: p.serviceType || p.name || t('chipHub'),
+          title: p.serviceType || p.name || t('progressLabelService'),
           orderNo: p.orderNo || '',
-          subOrderNo: p.subOrderNo || '',
+          subOrderNo: p.subOrderNo || csSubOrderNo(s.inquiryId, i, s.createdAt),
           ownerName: p.ownerName || '',
           progress: Number(p.progress) || 0,
           tasks: Array.isArray(p.tasks) ? p.tasks : [],
@@ -367,20 +416,20 @@
     });
     (quotes || []).forEach((q) => {
       if (q.status !== '已成交' || covered.has(q.inquiryId)) return;
-      (q.items || []).forEach((it) => {
+      (q.items || []).forEach((it, i) => {
         cards.push({
           kind: 'service',
           inquiryId: q.inquiryId || '',
           title: it.title || it.name || '',
           orderNo: '',
-          subOrderNo: '',
+          subOrderNo: csSubOrderNo(q.inquiryId, i, q.createdAt),
           ownerName: '',
           progress: 0,
           tasks: [],
         });
       });
     });
-    return cards;
+    return dedupeProgressCards(cards);
   }
 
   function flattenInquiryCards(quotes) {
@@ -389,9 +438,25 @@
       .map((q) => ({
         kind: 'inquiry',
         inquiryId: q.inquiryId || '',
+        inquiryNo: csInquiryNo(q.inquiryId, q.createdAt),
         title: (q.items || []).map((it) => it.title || it.name || '').filter(Boolean).join(isEn() ? '; ' : '、'),
         status: q.status || '',
       }));
+  }
+
+  function dedupeProgressCards(cards) {
+    const seen = new Set();
+    return (cards || []).filter((c) => {
+      const no = (c.subOrderNo || '').toUpperCase();
+      const key = no
+        ? `no:${no}`
+        : `id:${c.inquiryId || ''}|${(c.title || '').toLowerCase()}`;
+      const titleKey = `id:${c.inquiryId || ''}|${(c.title || '').toLowerCase()}`;
+      if (seen.has(key) || seen.has(titleKey)) return false;
+      seen.add(key);
+      seen.add(titleKey);
+      return true;
+    });
   }
 
   function recordSearchBlob(rec) {
@@ -426,19 +491,28 @@
     });
   }
 
-  function formatProgressLine(card) {
-    const no = card.subOrderNo || card.orderNo;
-    const noBit = no ? (isEn() ? `(${no}) ` : `（订单号 ${no}）`) : '';
-    const owner = card.ownerName
-      ? t('progressOwner').replace('{name}', card.ownerName)
-      : t('progressNoOwner');
-    return t('progressLine')
-      .replace('{title}', card.title || (isEn() ? 'Service' : '服务'))
-      .replace('{no}', noBit)
-      .replace('{pct}', t('progressPct').replace('{n}', String(progressPct(card))))
-      .replace('{step}', progressStepLabel(card.tasks))
-      .replace('{owner}', owner)
-      .trim();
+  function formatProgressCard(card, index) {
+    const title = card.title || t('progressLabelService');
+    const no = card.subOrderNo || card.orderNo || csSubOrderNo(card.inquiryId, index, '');
+    const lines = [
+      `**${index + 1}. ${title}**`,
+      `- **${t('progressLabelNo')}：** ${no}`,
+      `- **${t('progressLabelPct')}：** ${progressPct(card)}%`,
+      `- **${t('progressLabelStep')}：** ${progressStepLabel(card.tasks)}`,
+    ];
+    if (card.ownerName) lines.push(`- **${t('progressLabelOwner')}：** ${card.ownerName}`);
+    return lines.join('\n');
+  }
+
+  function formatInquiryCard(card, index) {
+    const title = card.title || (isEn() ? 'Inquiry' : '询价');
+    const no = card.inquiryNo || csInquiryNo(card.inquiryId, '');
+    return [
+      `**${index + 1}. ${title}**`,
+      `- **${t('progressLabelInquiry')}：** ${no}`,
+      `- **${t('progressLabelStatus')}：** ${card.status || '—'}`,
+      `- ${t('progressInquiryNote')}`,
+    ].join('\n');
   }
 
   function serviceHref(id) {
@@ -886,18 +960,12 @@
         return;
       }
 
-      const lines = [];
-      svcHits.slice(0, 5).forEach((card) => lines.push(formatProgressLine(card)));
+      const blocks = [];
+      svcHits.slice(0, 5).forEach((card, i) => blocks.push(formatProgressCard(card, i)));
       if (!svcHits.length) {
-        inqHits.slice(0, 3).forEach((card) => {
-          lines.push(
-            t('progressInquiry')
-              .replace('{title}', card.title || (isEn() ? 'Inquiry' : '询价'))
-              .replace('{status}', card.status || '—')
-          );
-        });
+        inqHits.slice(0, 3).forEach((card, i) => blocks.push(formatInquiryCard(card, i)));
       }
-      if (!lines.length) {
+      if (!blocks.length) {
         awaitingOrderNo = true;
         setBotHtml(typing, formatBubble(t('progressEmpty')));
         renderChips(defaultChips());
@@ -907,7 +975,10 @@
 
       awaitingOrderNo = svcHits.length !== 1;
       const extra = awaitingOrderNo ? `\n${t('progressAskNo')}` : '';
-      setBotHtml(typing, formatBubble(`${lines.join('\n')}\n${t('progressWhere')}${extra}`));
+      setBotHtml(
+        typing,
+        formatBubble(`${t('progressHead')}\n\n${blocks.join('\n\n')}\n\n${t('progressWhere')}${extra}`)
+      );
       renderChips(defaultChips());
       goAndScroll('#hub', 'hub-progress');
     } catch {
