@@ -2000,17 +2000,21 @@ function formatDiagSlotsForApi(slots) {
 }
 
 /** Dedicated query when generating the first full diagnosis report (step 7 → 8). */
-function buildDiagnosisPlanApiQuery(userText) {
+function buildDiagnosisPlanApiQuery(userText, options = {}) {
   const archive = formatDiagSlotsForApi();
   const reply = String(userText || '').trim();
+  const retry = Boolean(options.retry);
   return (
-    '【专属合规诊断·生成报告】第1-7步已齐。请调用工具 `generate_diagnosis_report`，传入下方【诊断档案】；' +
-    '工具返回 JSON 后，**只向用户输出该 JSON**（version=1），不要自行写 Markdown 四章，禁止再提问。\n' +
+    (retry
+      ? '【重试·强制】上一轮未返回可用 JSON。'
+      : '【专属合规诊断·生成报告】第1-7步已齐。') +
+    '请**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】；' +
+    '工具返回后，**必须把完整 JSON 原样输出给用户**（可包在 ```json 代码块中；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
+    '禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问。\n' +
     `${archive}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
-    '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据；' +
-    '若工具不可用，才 fallback 写 Markdown 四章（【核心风险诊断】【合规方案】【行动建议】【注意事项】）。' +
-    '先通读知识库15与00，再按档案检索问题X注意事项，判定路径后生成报告。'
+    '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据。' +
+    '若工具调用失败：只输出一句「报告生成失败，请稍后重试」，不要写任何【核心风险诊断】Markdown。'
   );
 }
 
@@ -3495,15 +3499,48 @@ function initAiChatbot() {
         else answer = `好的，已记录。请继续回答 ${getUiStep()}. 相关问题。`;
       }
 
+      const pickJsonReport = (ans, res) =>
+        extractDiagnosisReportJson(ans) ||
+        extractDiagnosisReportJson(res?.text || '') ||
+        (res?.reportJson && isDiagnosisReportJsonReady(res.reportJson) ? res.reportJson : null);
+
+      // First plan attempt returned Markdown 1.2.3. / no JSON → one forced tool+JSON retry
+      if (
+        shouldGeneratePlanNow &&
+        !isPostReportFollowUp &&
+        (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) &&
+        !pickJsonReport(answer, result) &&
+        (looksLikeNonStructuredDiagnosisMarkdown(answer) ||
+          looksLikeNonStructuredDiagnosisMarkdown(result?.text || '') ||
+          !isDiagnosisPlanReadyToShow(answer))
+      ) {
+        typing.classList.add('is-plan-status');
+        typing.textContent = '方案格式不完整，正在强制重试生成…';
+        try {
+          const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
+          const retryRes = await callDifyStream({
+            endpoint,
+            query: retryQuery,
+            inputs: {},
+            conversationId: result.conversationId || conversationId || '',
+            onChunk: paintStream,
+          });
+          if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
+          const retryAnswer = sanitizeAiAnswer(retryRes?.text || '');
+          const retryJson = pickJsonReport(retryAnswer, retryRes);
+          if (retryJson && isDiagnosisReportJsonReady(retryJson)) {
+            result = retryRes;
+            answer = retryAnswer || JSON.stringify(retryJson);
+          }
+        } catch {
+          /* keep original answer / error path below */
+        }
+      }
+
       if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
         beginPlanRouting();
         // Prefer sanitized answer; also try raw API text + tool observation JSON
-        const jsonReport =
-          extractDiagnosisReportJson(answer) ||
-          extractDiagnosisReportJson(result?.text || '') ||
-          (result?.reportJson && isDiagnosisReportJsonReady(result.reportJson)
-            ? result.reportJson
-            : null);
+        const jsonReport = pickJsonReport(answer, result);
         if (jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
           publishDiagnosisPlanToResultPanel(answer || JSON.stringify(jsonReport), {
             kind: 'diagnosis',
@@ -3526,7 +3563,7 @@ function initAiChatbot() {
         ) {
           typing.classList.add('is-plan-status');
           typing.textContent =
-            '方案未按结构化格式生成（缺少业务流程/三大环节）。请确认 Dify 已挂载并发布 generate_diagnosis_report 工具后，点击「新建对话」重试。';
+            '方案未按结构化 JSON 生成（Agent 可能未调用 generate_diagnosis_report，或未把工具 JSON 输出到回复）。请到 Dify 查看该次运行是否有 Tool call，确认工具已发布后点「新建对话」重试。';
           clearQuickReplies();
           return;
         } else {
