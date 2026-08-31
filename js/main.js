@@ -4501,30 +4501,36 @@ function diagBrandLogoHtml(extraClass) {
 }
 
 function buildResultWorkingHtml() {
-  const labels = collectDiagWorkingChipLabels();
-  const positions = [
-    { right: '112%', top: '2%' },
-    { left: '112%', top: '2%' },
-    { right: '118%', top: '38%' },
-    { left: '118%', top: '38%' },
-    { right: '108%', top: '74%' },
-    { left: '108%', top: '74%' },
-    { left: '50%', top: '-34%' },
-  ];
-  const chipHtml = labels.length
-    ? labels
-        .map((label, i) => {
-          const pos = positions[i % positions.length];
-          const place = [
-            pos.left != null ? `left:${pos.left}` : '',
-            pos.right != null ? `right:${pos.right}` : '',
-            `top:${pos.top}`,
-            pos.left === '50%' ? 'transform:translateX(-50%)' : '',
-          ]
-            .filter(Boolean)
-            .join(';');
+  const s = getDiagSlots();
+  const exportMode =
+    s.exportMode ||
+    (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '');
+
+  // Long labels (esp. 产品类别) stay on the LEFT of the logo so text is not clipped.
+  const chipDefs = [
+    { label: s.platform, place: 'right:112%;top:2%' },
+    { label: s.entity, place: 'left:112%;top:2%' },
+    { label: s.shipping, place: 'right:118%;top:38%' },
+    { label: exportMode, place: 'left:118%;top:38%' },
+    { label: s.invoice, place: 'right:108%;top:62%' },
+    {
+      label: s.productCategory,
+      place: 'right:108%;top:78%;max-width:min(280px,42vw);white-space:normal;text-align:right',
+      long: true,
+    },
+    {
+      label: s.revenue,
+      place: 'left:50%;top:-34%;transform:translateX(-50%)',
+    },
+  ].filter((c) => String(c.label || '').trim());
+
+  const chipHtml = chipDefs.length
+    ? chipDefs
+        .map((chip, i) => {
+          const label = String(chip.label || '').trim();
+          const extra = chip.long ? ' rw-chip-long' : '';
           return (
-            `<span class="rw-chip rw-chip-${(i % 7) + 1}" style="${place}">` +
+            `<span class="rw-chip rw-chip-${(i % 7) + 1}${extra}" style="${chip.place}">` +
             `${escapeHtml(label)}` +
             `</span>`
           );

@@ -1869,6 +1869,14 @@ ul {
   animation: rw-chip-flash 5.6s ease-in-out infinite;
 }
 
+/* Product / long option chips: left of logo, wrap so full label stays visible */
+.result-working-scene .rw-chip-long {
+  white-space: normal;
+  border-radius: 14px;
+  line-height: 1.35;
+  z-index: 2;
+}
+
 .result-working-scene .rw-chip-1 { animation-delay: 0s; }
 .result-working-scene .rw-chip-2 { animation-delay: 0.8s; }
 .result-working-scene .rw-chip-3 { animation-delay: 1.6s; }
