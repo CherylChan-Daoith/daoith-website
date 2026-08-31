@@ -91,6 +91,9 @@
       progressLabelStatus: '询价状态',
       progressInquiryNote: '尚未成交，成交后才会进入服务进度。',
       progressPending: '待启动',
+      progressOwnerNone: '该订单尚未分配负责人。',
+      progressOwnerHas: '**{title}**（**服务单号：** {no}）的**项目负责人**是 **{name}**。',
+      progressStepHas: '**{title}**（**服务单号：** {no}）当前节点是 **{step}**，进度 **{pct}%**。',
       serviceHit: '根据你提到的需求，可先看这些标准化服务：',
       serviceMiss: '暂未精确匹配到单项。你可以先浏览财税服务市场，或补充国家／平台后再问我。',
       browseServices: '浏览财税服务',
@@ -167,6 +170,9 @@
       progressLabelStatus: 'Inquiry status',
       progressInquiryNote: 'Not closed-won yet; service progress appears after purchase.',
       progressPending: 'Pending start',
+      progressOwnerNone: 'This order has no owner assigned yet.',
+      progressOwnerHas: '**{title}** (**order no.:** {no}) is owned by **{name}**.',
+      progressStepHas: '**{title}** (**order no.:** {no}) is at **{step}**, **{pct}%** complete.',
       serviceHit: 'Based on what you mentioned, these standard services may fit:',
       serviceMiss: 'No exact match yet. Browse the service marketplace, or add country / platform and ask again.',
       browseServices: 'Browse services',
@@ -201,6 +207,8 @@
   let selectedServiceIds = [];
   let lastTopic = '';
   let awaitingOrderNo = false;
+  let lastProgressCards = [];
+  const CTX_KEY = 'daoith_cs_ctx';
 
   function locale() {
     return window.DAOITH_getLocale?.() === 'en' ? 'en' : 'zh';
@@ -314,6 +322,48 @@
     return /^(查询进度|check progress)$/i.test(String(text || '').trim());
   }
 
+  function isOrderRelatedQuery(text) {
+    return /负责人|谁负责|谁跟进|谁对接|谁是.*负责|当前节点|办到哪|到哪一步|服务单号|这个服务|这笔(订单|服务)|该(笔|个)?(订单|服务)|什么时候(完成|结束|开始)|预计结束|owner|assignee/i.test(
+      String(text || '')
+    );
+  }
+
+  function orderFocus(text) {
+    const q = String(text || '');
+    if (/负责人|谁负责|谁跟进|谁对接|谁是.*负责|owner|assignee/i.test(q)) return 'owner';
+    if (/当前节点|办到哪|到哪一步|哪一步/i.test(q)) return 'step';
+    if (/多少进度|进度多少|百分之/i.test(q)) return 'pct';
+    return 'full';
+  }
+
+  function isDeicticOrderQuery(text) {
+    return /这个|那个|这笔|刚才|该(笔|个)?(服务|订单)?/i.test(String(text || ''));
+  }
+
+  function saveCsCtx() {
+    try {
+      sessionStorage.setItem(
+        CTX_KEY,
+        JSON.stringify({ lastTopic, awaitingOrderNo, lastProgressCards })
+      );
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function loadCsCtx() {
+    try {
+      const raw = sessionStorage.getItem(CTX_KEY);
+      const ctx = raw ? JSON.parse(raw) : null;
+      if (!ctx || typeof ctx !== 'object') return;
+      lastTopic = ctx.lastTopic || '';
+      awaitingOrderNo = !!ctx.awaitingOrderNo;
+      lastProgressCards = Array.isArray(ctx.lastProgressCards) ? ctx.lastProgressCards : [];
+    } catch {
+      /* ignore */
+    }
+  }
+
   function isTaskDone(status) {
     return status === 'COMPLETED' || status === 'NOT_APPLICABLE';
   }
@@ -330,6 +380,16 @@
     }
     if (list.length && list.every((x) => isTaskDone(x.status))) return isEn() ? 'Completed' : '全部完成';
     return t('progressPending');
+  }
+
+  function cardOwnerName(card) {
+    if (card?.ownerName) return String(card.ownerName).trim();
+    const tasks = Array.isArray(card?.tasks) ? card.tasks.slice() : [];
+    tasks.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+    const active =
+      tasks.find((x) => x.status === 'IN_PROGRESS' || x.status === 'OVERDUE') ||
+      tasks.find((x) => !isTaskDone(x.status));
+    return String(active?.assigneeName || '').trim();
   }
 
   function progressPct(card) {
@@ -500,7 +560,7 @@
       `- **${t('progressLabelPct')}：** ${progressPct(card)}%`,
       `- **${t('progressLabelStep')}：** ${progressStepLabel(card.tasks)}`,
     ];
-    if (card.ownerName) lines.push(`- **${t('progressLabelOwner')}：** ${card.ownerName}`);
+    if (cardOwnerName(card)) lines.push(`- **${t('progressLabelOwner')}：** ${cardOwnerName(card)}`);
     return lines.join('\n');
   }
 
@@ -513,6 +573,36 @@
       `- **${t('progressLabelStatus')}：** ${card.status || '—'}`,
       `- ${t('progressInquiryNote')}`,
     ].join('\n');
+  }
+
+  function cardServiceNo(card, index) {
+    return card.subOrderNo || card.orderNo || csSubOrderNo(card.inquiryId, index, '');
+  }
+
+  function formatOwnerReply(cards) {
+    return (cards || [])
+      .map((card, i) => {
+        const title = card.title || t('progressLabelService');
+        const no = cardServiceNo(card, i);
+        const name = cardOwnerName(card);
+        if (name) {
+          return t('progressOwnerHas').replace('{title}', title).replace('{no}', no).replace('{name}', name);
+        }
+        return `**${title}**（**${t('progressLabelNo')}：** ${no}）${t('progressOwnerNone')}`;
+      })
+      .join('\n');
+  }
+
+  function formatStepReply(cards) {
+    return (cards || [])
+      .map((card, i) =>
+        t('progressStepHas')
+          .replace('{title}', card.title || t('progressLabelService'))
+          .replace('{no}', cardServiceNo(card, i))
+          .replace('{step}', progressStepLabel(card.tasks))
+          .replace('{pct}', String(progressPct(card)))
+      )
+      .join('\n');
   }
 
   function serviceHref(id) {
@@ -560,7 +650,8 @@
     ) {
       return 'progress';
     }
-    if (lastTopic === 'progress' && awaitingOrderNo) return 'progress';
+    if (isOrderRelatedQuery(q)) return 'progress';
+    if (lastTopic === 'progress' && (awaitingOrderNo || isDeicticOrderQuery(q))) return 'progress';
     if (/询价|报价|多少钱|怎么买|提交联系|leave (my )?contact|inquiry|quote/i.test(q)) return 'inquiry';
     if (
       /ai\s*合规助手|ai合规助手|ai\s*诊断|ai\s*方案|合规诊断|生成方案|不确定|不知道(该|怎么)|ai compliance|diagnosis/i.test(
@@ -841,6 +932,7 @@
   function handleDiagnosis() {
     lastTopic = 'diagnosis';
     awaitingOrderNo = false;
+    saveCsCtx();
     appendBubble(t('aiGuide'), 'bot');
     renderChips(defaultChips());
     goAndScroll('#ai-solution', 'aiWorkspace');
@@ -857,6 +949,7 @@
   function handleService(text) {
     lastTopic = 'service';
     awaitingOrderNo = false;
+    saveCsCtx();
     const q = String(text || '').trim();
     const justAsk = /^(推荐服务|recommend services?)$/i.test(q) || !q;
     const hits = justAsk ? [] : matchServices(q);
@@ -905,6 +998,7 @@
   function handleInquiry() {
     lastTopic = 'inquiry';
     awaitingOrderNo = false;
+    saveCsCtx();
     if (isCartPage()) {
       handleInquiryArrive();
       return;
@@ -918,6 +1012,7 @@
     lastTopic = 'progress';
     const howOnly = !!opts.howOnly;
     const q = String(query || '').trim();
+    const focus = opts.focus || orderFocus(q);
     const wantsLookup = !!(
       extractOrderNo(q) ||
       matchServices(q).length ||
@@ -926,6 +1021,7 @@
 
     if (!window.DAOITH_AUTH?.isLoggedIn?.()) {
       awaitingOrderNo = false;
+      saveCsCtx();
       appendBubble(howOnly ? t('progressHow') : t('progressNeedLogin'), 'bot');
       renderChips(defaultChips());
       requireAuth('cs_hub', '/#hub');
@@ -933,7 +1029,8 @@
       return;
     }
 
-    if (howOnly && !wantsLookup) {
+    if (howOnly && focus === 'full' && !wantsLookup) {
+      saveCsCtx();
       appendBubble(t('progressHow'), 'bot');
       renderChips(defaultChips());
       goAndScroll('#hub', 'hub-progress');
@@ -944,48 +1041,100 @@
     busy = true;
     const typing = appendBubble(t('busy'), 'bot');
     try {
-      const data = await fetchProgressRecords();
-      const services = flattenProgressCards(data.quotes, data.services);
-      const inquiries = flattenInquiryCards(data.quotes);
-      const specific = !isProgressChipQuery(q) && !isProgressHowQuery(q) && !!(q && (extractOrderNo(q) || matchServices(q).length || /代账|退税|vat|注册|陪跑|审计|gst/i.test(q) || awaitingOrderNo));
-      let svcHits = specific ? filterProgressQuery(services, q) : services;
-      let inqHits = specific ? filterProgressQuery(inquiries, q) : inquiries;
+      const useCached =
+        isDeicticOrderQuery(q) &&
+        lastProgressCards.length &&
+        (focus === 'owner' || focus === 'step' || focus === 'pct');
+      let services = useCached ? lastProgressCards : [];
+      let inquiries = [];
+      if (!useCached) {
+        const data = await fetchProgressRecords();
+        services = flattenProgressCards(data.quotes, data.services);
+        inquiries = flattenInquiryCards(data.quotes);
+      }
+      const named =
+        focus === 'full' &&
+        !isProgressChipQuery(q) &&
+        !isProgressHowQuery(q) &&
+        !isDeicticOrderQuery(q) &&
+        !!(
+          q &&
+          (extractOrderNo(q) ||
+            matchServices(q).length ||
+            /代账|退税|vat|注册|陪跑|审计|gst/i.test(q) ||
+            awaitingOrderNo)
+        );
+      let svcHits = named ? filterProgressQuery(services, q) : services;
+      let inqHits = named ? filterProgressQuery(inquiries, q) : inquiries;
+      if (!svcHits.length && useCached) svcHits = lastProgressCards;
 
-      if (specific && !svcHits.length && !inqHits.length) {
+      if (named && !svcHits.length && !inqHits.length) {
         awaitingOrderNo = true;
-        const hint = q.replace(/我(买的|的)?|到什么进度了|进度|服务/g, '').trim() || q;
+        saveCsCtx();
+        const hint = q.replace(/我(买的|的)?|到什么进度了|进度|服务|负责人是谁|谁负责/g, '').trim() || q;
         setBotHtml(typing, formatBubble(t('progressMiss').replace('{q}', hint)));
         renderChips(defaultChips());
-        goAndScroll('#hub', 'hub-progress');
+        if (focus === 'full') goAndScroll('#hub', 'hub-progress');
         return;
       }
 
-      const blocks = [];
-      svcHits.slice(0, 5).forEach((card, i) => blocks.push(formatProgressCard(card, i)));
-      if (!svcHits.length) {
-        inqHits.slice(0, 3).forEach((card, i) => blocks.push(formatInquiryCard(card, i)));
-      }
-      if (!blocks.length) {
-        awaitingOrderNo = true;
-        setBotHtml(typing, formatBubble(t('progressEmpty')));
-        renderChips(defaultChips());
-        goAndScroll('#hub', 'hub-progress');
-        return;
+      if (svcHits.length) lastProgressCards = svcHits.slice(0, 5);
+
+      let body = '';
+      if (focus === 'owner') {
+        if (svcHits.length) body = formatOwnerReply(svcHits.slice(0, 5));
+        else if (inqHits.length) {
+          body = inqHits
+            .slice(0, 3)
+            .map((card, i) => {
+              const title = card.title || (isEn() ? 'Inquiry' : '询价');
+              const no = card.inquiryNo || csInquiryNo(card.inquiryId, '');
+              return `**${title}**（**${t('progressLabelInquiry')}：** ${no}）${t('progressOwnerNone')}`;
+            })
+            .join('\n');
+        } else {
+          awaitingOrderNo = true;
+          saveCsCtx();
+          setBotHtml(typing, formatBubble(t('progressEmpty')));
+          renderChips(defaultChips());
+          return;
+        }
+      } else if ((focus === 'step' || focus === 'pct') && svcHits.length) {
+        body = formatStepReply(svcHits.slice(0, 5));
+      } else {
+        const blocks = [];
+        svcHits.slice(0, 5).forEach((card, i) => blocks.push(formatProgressCard(card, i)));
+        if (!svcHits.length) {
+          inqHits.slice(0, 3).forEach((card, i) => blocks.push(formatInquiryCard(card, i)));
+        }
+        if (!blocks.length) {
+          awaitingOrderNo = true;
+          saveCsCtx();
+          setBotHtml(typing, formatBubble(t('progressEmpty')));
+          renderChips(defaultChips());
+          goAndScroll('#hub', 'hub-progress');
+          return;
+        }
+        awaitingOrderNo = svcHits.length !== 1;
+        const extra = awaitingOrderNo ? `\n${t('progressAskNo')}` : '';
+        body = `${t('progressHead')}\n\n${blocks.join('\n\n')}\n\n${t('progressWhere')}${extra}`;
       }
 
-      awaitingOrderNo = svcHits.length !== 1;
-      const extra = awaitingOrderNo ? `\n${t('progressAskNo')}` : '';
-      setBotHtml(
-        typing,
-        formatBubble(`${t('progressHead')}\n\n${blocks.join('\n\n')}\n\n${t('progressWhere')}${extra}`)
-      );
+      if (focus === 'owner' && svcHits.length && svcHits.every((c) => !cardOwnerName(c))) {
+        awaitingOrderNo = svcHits.length !== 1;
+      } else if (focus !== 'full') {
+        awaitingOrderNo = svcHits.length !== 1;
+      }
+      saveCsCtx();
+      setBotHtml(typing, formatBubble(body));
       renderChips(defaultChips());
-      goAndScroll('#hub', 'hub-progress');
+      if (focus === 'full') goAndScroll('#hub', 'hub-progress');
     } catch {
       awaitingOrderNo = true;
+      saveCsCtx();
       setBotHtml(typing, formatBubble(t('progressFail')));
       renderChips(defaultChips());
-      goAndScroll('#hub', 'hub-progress');
+      if (focus === 'full') goAndScroll('#hub', 'hub-progress');
     } finally {
       busy = false;
     }
@@ -1116,8 +1265,15 @@
     appendBubble(text, 'user');
 
     const intent = opts.intent || classify(text);
-    if (intent === 'other' && lastTopic === 'progress' && (isProgressHowQuery(text) || extractOrderNo(text) || awaitingOrderNo)) {
-      return handleProgress(text, { howOnly: isProgressHowQuery(text) && !extractOrderNo(text) });
+    if (
+      intent === 'other' &&
+      (isOrderRelatedQuery(text) ||
+        (lastTopic === 'progress' && (isProgressHowQuery(text) || extractOrderNo(text) || awaitingOrderNo || isDeicticOrderQuery(text))))
+    ) {
+      return handleProgress(text, {
+        howOnly: isProgressHowQuery(text) && !extractOrderNo(text) && orderFocus(text) === 'full',
+        focus: orderFocus(text),
+      });
     }
     if (intent === 'greet') {
       appendBubble(t('greet'), 'bot');
@@ -1129,7 +1285,7 @@
     if (intent === 'service') return handleService(text);
     if (intent === 'inquiry') return handleInquiry();
     if (intent === 'progress-how') return handleProgress(text, { howOnly: true });
-    if (intent === 'progress') return handleProgress(text);
+    if (intent === 'progress') return handleProgress(text, { focus: orderFocus(text) });
 
     busy = true;
     const typing = appendBubble(t('busy'), 'bot');
@@ -1234,6 +1390,8 @@
       selectedServiceIds = [];
       lastTopic = '';
       awaitingOrderNo = false;
+      lastProgressCards = [];
+      saveCsCtx();
       showWelcome();
     });
     document.getElementById('csAssistantForm')?.addEventListener('submit', (e) => {
@@ -1311,6 +1469,7 @@
     inject();
     bind();
     if (!restoreMessages()) showWelcome();
+    loadCsCtx();
     refreshChrome();
     consumeResume();
 
