@@ -4543,21 +4543,23 @@ function buildResultWorkingHtml() {
     s.exportMode ||
     (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '');
 
-  // Long labels (esp. 产品类别) stay on the LEFT of the logo so text is not clipped.
+  // Long product label sits bottom-center so it won't cover left-side chips (发票等).
   const chipDefs = [
     { label: s.platform, place: 'right:112%;top:2%' },
     { label: s.entity, place: 'left:112%;top:2%' },
     { label: s.shipping, place: 'right:118%;top:38%' },
     { label: exportMode, place: 'left:118%;top:38%' },
-    { label: s.invoice, place: 'right:108%;top:62%' },
+    { label: s.invoice, place: 'right:108%;top:68%' },
     {
       label: s.productCategory,
-      place: 'right:108%;top:78%;max-width:min(280px,42vw);white-space:normal;text-align:right',
+      place: 'top:96%',
       long: true,
+      center: true,
     },
     {
       label: s.revenue,
-      place: 'left:50%;top:-34%;transform:translateX(-50%)',
+      place: 'top:-34%',
+      center: true,
     },
   ].filter((c) => String(c.label || '').trim());
 
@@ -4565,15 +4567,21 @@ function buildResultWorkingHtml() {
     ? chipDefs
         .map((chip, i) => {
           const label = String(chip.label || '').trim();
-          const extra = chip.long ? ' rw-chip-long' : '';
+          const extras = [
+            chip.long ? 'rw-chip-long' : '',
+            chip.center ? 'rw-chip-center' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+          const extraCls = extras ? ` ${extras}` : '';
           return (
-            `<span class="rw-chip rw-chip-${(i % 7) + 1}${extra}" style="${chip.place}">` +
+            `<span class="rw-chip rw-chip-${(i % 7) + 1}${extraCls}" style="${chip.place}">` +
             `${escapeHtml(label)}` +
             `</span>`
           );
         })
         .join('')
-    : `<span class="rw-chip rw-chip-1" style="left:50%;top:-34%;transform:translateX(-50%)">梳理诊断要点</span>`;
+    : `<span class="rw-chip rw-chip-1 rw-chip-center" style="top:-34%">梳理诊断要点</span>`;
 
   return (
     `<div class="result-working" id="resultWorking" role="status" aria-live="polite">` +
