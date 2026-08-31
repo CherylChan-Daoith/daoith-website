@@ -1,26 +1,28 @@
 # 诊断报告 JSON Workflow
 
-> 目标：问诊 Agent **先定路径 A/B/C/D（不读库）** → 工具传入 `report_path` → Workflow **按路径检索** → LLM 写 JSON → Code。  
-> 路径判定规则与四条 `kb_query` 见：`deploy/dify-prompts/diagnosis-report-path-kb-queries.md`。
+> 目标：问诊 Agent **先定路径 A/B/C/D/X（不读库）** → 工具传入 `report_path` → Workflow **必返两篇全文**（硬约束 + 本路径方案样本）→ 补充检索可选 → LLM 写 JSON → Code。  
+> 细则与 query：`deploy/dify-prompts/diagnosis-report-path-kb-queries.md`（含路径 X：阿里国际站）。
 
 ## 架构（推荐）
 
 ```text
 用户完成 7 问
-  → 诊断 Agent：按发货+出口+产品判定 report_path（A/B/C/D）
+  → 诊断 Agent：按平台+发货+出口+产品判定 report_path（A/B/C/D/X）
   → 调用 generate_diagnosis_report(diagnosis_archive, report_path, …)
     → Workflow：
          开始
-           →（可选）按 report_path 选出 kb_query
-           → 知识检索（按路径 query；挂必读等库；Top K 6）
-           → LLM（diagnosis-report-workflow-prompt.md；只写 JSON）
+           ├─→ 知识检索·硬约束（15-…，全篇优先）
+           └─→ 知识检索·路径样本（按 report_path：20/21/22/23，全篇优先）
+               （可选并行：知识检索·补充）
+           → 汇合 → LLM（USER 分栏：必返①② + 补充）
            → Code
            → 结束 report_json
   → 问诊 Agent 原样输出 JSON
   → 官网右侧方案区
 ```
 
-**不要**先广撒网检索再让模型猜路径；**不要**在 Workflow 再开一轮「只判路径」的 LLM（费 token）。
+**必返**：①《出报告硬约束与路径要点》②当前路径方案样本——两份全篇给写报告 LLM。其余命中仅作补充。  
+**不要**先广撒网再猜路径；**不要**在 Workflow 再开「只判路径」LLM。
 
 ---
 
@@ -29,7 +31,7 @@
 | 变量 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `diagnosis_archive` | 文本 | 是 | `【诊断档案·必须逐字采信】` 全文 |
-| `report_path` | 文本 | 是 | `A` / `B` / `C` / `D`（问诊 Agent 传入） |
+| `report_path` | 文本 | 是 | `A` / `B` / `C` / `D` / `X`（问诊 Agent 传入） |
 | `user_reply` | 文本 | 否 | 用户最后一轮答复 |
 | `follow_up_changes` | 文本 | 否 | 追问变化点 |
 
@@ -38,17 +40,20 @@
 ## 2. 画布连线
 
 ```text
-开始 → 知识检索 → LLM → Code → 结束
+开始 → 检索·硬约束 ∥ 检索·路径样本(分支) 〔可选∥ 检索·补充〕 → 汇合 → LLM → Code → 结束
 ```
 
-知识检索的**查询文本**必须按 `report_path` 选用  
-`diagnosis-report-path-kb-queries.md` 里对应路径的 query，并拼接 `diagnosis_archive`。  
-实现方式任选：条件分支四路 / 模板节点 / 短 Code 节点生成 `kb_query`。
+两路必返检索**并行**（路径已定，互不依赖）。拆两个节点是为了各锁一篇全文，不是为了串行。
 
-勾选库、Top K、Rerank：见同文件第 5 节（与此前多库清单一致）。**查询不要再用裸 `user_reply`。**
+- **硬约束**：query 固定 `15-出报告硬约束与路径要点`（Top K **8～12**）
+- **路径样本**：条件分支四路，query 对应 `20/21/22/23`（Top K **8～12**）
+- **补充**（可选并行）：档案关键词 + 知识点等（Top K **4～6**）
+- 详见 `diagnosis-report-path-kb-queries.md` 第 3～5 节
+
+**查询不要再用裸 `user_reply`。** 必读库须已收录 `15` 与 `20–23`；建议整篇或大块入库。
 
 LLM System：粘贴 `diagnosis-report-workflow-prompt.md`。  
-LLM USER：见 `diagnosis-report-path-kb-queries.md` 第 6 节（须含 `report_path` + 档案 + 检索结果）。
+LLM USER：见 `diagnosis-report-path-kb-queries.md` 第 6 节（**必返两栏 + 补充栏**）。
 
 Code / 结束：仍用 `diagnosis-report-code.py`，输出 `report_json`。
 
@@ -95,14 +100,15 @@ Code / 结束：仍用 `diagnosis-report-code.py`，输出 `report_json`。
 | **按需挂** | `DAOITH跨境电商知识库` | 300问 / 平台税等；补平台口径，避免与必读冲突时以档案+必读为准 |
 | 慎挂过多 | 各国/平台税制分库 | 出报告主路径用得少；挂太多易串库、变慢 |
 
-3. 单次检索 Top K：**4～6**；整体靠「多次调用」覆盖硬约束 / 知识点 / 样本 / 退税率
-4. 工具描述可粘贴：
+3. **知识检索节点（推荐）**：硬约束 / 路径样本 Top K **8～12**；补充 **4～6**。Score 阈值建议先关，避免滤掉必返文档。
+4. 若用 Agent 自检索，工具描述可粘贴：
 
 ```text
-检索道一财税知识库（必读、实操、出口退税率文库等）。出报告时必须多次调用：
-1）出报告硬约束与路径要点；2）必须知道的知识点；3）问题分篇注意事项；
-4）对应方案样本；5）需要时查海关编码/出口退税率或实操附件。
-返回原文片段供写 JSON 采信；冲突时用户档案与硬约束优先。
+检索道一财税知识库。出报告时必须先取回：
+1）出报告硬约束与路径要点（全篇优先）；
+2）与 report_path 对应的一篇方案样本 20/21/22/23（全篇优先，勿混其它路径样本）；
+再可选补充：知识点、问题分篇、实操、出口退税率。
+冲突时：用户档案 > 必返两篇 > 补充。
 ```
 
 也可参考 `deploy/dify-prompts/diagnosis-agent-kb-instruction.md`。
@@ -337,7 +343,7 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 
 ```text
 生成专属合规诊断报告。
-必填：diagnosis_archive（诊断档案全文）、report_path（A/B/C/D，由你按发货+出口+产品判定，勿对用户说出路径字母）。
+必填：diagnosis_archive（诊断档案全文）、report_path（A/B/C/D/X，由你按平台+发货+出口+产品判定，勿对用户说出路径字母）。
 可选：user_reply、follow_up_changes。
 返回 version=1 的 JSON。调用成功后向用户只输出工具返回的 JSON，禁止自行写 Markdown 四章、禁止改写 JSON。
 ```
@@ -355,7 +361,7 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 - [ ] 输出合法 JSON，`version: 1`
 - [ ] 含 `risk.processFlow`、`plan.overview` 三列、`plan.details` 连续细则
 - [ ] `actions` 为数组，无 01/02/03 小标题
-- [ ] 无路径 A/B/C/D、无 Markdown 表、无 URL
+- [ ] 无路径 A/B/C/D/X、无 Markdown 表、无 URL
 
 ### Agent 端到端
 

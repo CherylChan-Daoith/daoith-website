@@ -1685,12 +1685,22 @@ function buildDiagnosisProcessFlowFromSlots(slots) {
 /** Internal path A/B/C/D from diagnosis slots (matches Workflow 路径判定). */
 function detectDiagnosisReportPath(slots) {
   const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const platform = String(s.platform || '');
   const shipping = String(s.shipping || '');
   const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
   const product = String(s.productCategory || '');
 
   if (/^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product)) {
     return 'D';
+  }
+  // Path X: 阿里国际站 / 一达通履约（优先于 A/B/C；产品 D 已在上方拦截）
+  // 一达通仅国际站提供——发货含一达通即 X，避免 platform 槽位空时误判 A 并灌入 0110+香港
+  if (
+    /阿里国际站|国际站|Alibaba\.com/i.test(platform) ||
+    /一达通/.test(shipping) ||
+    (/自营出口|市场采购出口|便捷发货出口/.test(shipping) && /国际站|一达通/.test(`${platform} ${shipping}`))
+  ) {
+    return 'X';
   }
   if (isPlatformDomesticWarehouseShipping(shipping) || /由平台安排出口/.test(exportMode)) {
     return 'C';
@@ -1711,6 +1721,51 @@ function detectDiagnosisReportPath(slots) {
     return 'A';
   }
   return 'A';
+}
+
+/** When diag slots are empty/stale, recover platform/shipping from Agent JSON (processFlow/intro). */
+function hydrateDiagSlotsFromReport(report, slots) {
+  const s = { ...(slots && typeof slots === 'object' ? slots : {}) };
+  const blob = [
+    report?.risk?.processFlow,
+    report?.plan?.intro,
+    JSON.stringify(report?.plan?.overview || []),
+    JSON.stringify(report?.plan?.details || []),
+  ]
+    .map((x) => String(x || ''))
+    .join('\n');
+
+  if (!s.platform) {
+    if (/阿里国际站/.test(blob)) s.platform = '阿里国际站';
+  }
+  if (!s.shipping || !/一达通|自营出口|市场采购|便捷发货/.test(String(s.shipping))) {
+    if (/一达通代理出口\s*[（(]?3\s*\+\s*N/.test(blob) || /一达通代理出口3\+N/.test(blob)) {
+      s.shipping = '一达通代理出口3+N';
+    } else if (/一达通代理出口\s*[（(]?2\s*\+\s*N/.test(blob) || /一达通代理出口2\+N/.test(blob)) {
+      s.shipping = '一达通代理出口2+N';
+    } else if (/一达通/.test(blob)) {
+      s.shipping = '一达通代理出口3+N';
+    } else if (/便捷发货/.test(blob) && /国际站|阿里/.test(blob)) {
+      s.shipping = '便捷发货出口';
+    } else if (/自营出口/.test(blob) && /国际站|阿里/.test(blob)) {
+      s.shipping = '自营出口';
+    } else if (/市场采购出口/.test(blob) && /国际站|阿里/.test(blob)) {
+      s.shipping = '市场采购出口';
+    }
+  }
+  if (!s.entity && /中国大陆公司/.test(blob)) s.entity = '中国大陆公司';
+  return s;
+}
+
+function resolveDiagnosisReportPath(report, slots) {
+  const hydrated = hydrateDiagSlotsFromReport(report, slots);
+  let path = detectDiagnosisReportPath(hydrated);
+  const blob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''}`;
+  // Hard override: Agent already wrote 国际站/一达通 → never treat as A (would inject 0110+HK)
+  if (path === 'A' && /一达通|阿里国际站/.test(blob)) {
+    path = 'X';
+  }
+  return { path, slots: hydrated };
 }
 
 function isMainlandDiagEntity(entity) {
@@ -1754,6 +1809,9 @@ function planDetailsAlreadyCovers(details, title) {
   }
   if (title.includes('平台信息报送')) {
     return /信息报送|采购后再销售|店铺主体.*不一致|香港公司.*店铺公司/.test(blob);
+  }
+  if (title.includes('国际站正式报关履约')) {
+    return /国际站|一达通|视同自产|正式报关履约|合规申报纳税/.test(blob);
   }
   return false;
 }
@@ -1811,6 +1869,72 @@ function buildMandatoryPlanDetails(slots, path) {
       body:
         '定制类普货可通过「1210保税区一日游或9610跨境电商零售出口」：国内供应商 → 进出口公司（常即店铺公司）→ 境外消费者，订单驱动 1210/9610 报关，取得清单或报关单后申请退免税（以实际通关及税务机关要求为准）。',
     });
+  } else if (path === 'X') {
+    const shipping = String(s.shipping || '');
+    const convenient = /便捷发货/.test(shipping);
+    const productionLike = /一达通代理出口\s*[（(]?3\s*\+\s*N|一达通代理出口3\+N|一达通.*3\s*\+\s*N/.test(
+      shipping
+    );
+    const pathDProduct =
+      /^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product);
+    if (convenient) {
+      if (pathDProduct) {
+        rows.push({
+          title: '无法退免税产品的税负控制',
+          body:
+            '阿里国际站便捷发货且产品为0退税率或海关备案商标暂未授权时，不宜以1210/9610创造退税条件；应先按特殊商品标识区分出口免税或视同内销口径，控制税负，复杂情形建议专家1v1。',
+        });
+      } else if (/商检/.test(product)) {
+        rows.push({
+          title: '1210出口备货至保税区',
+          body:
+            '阿里国际站「便捷发货」多为小包未报关，报关费高、难退税，存在视同内销风险（销售额超过约500万可能按13%补缴增值税），且资金常提现至个人账户。' +
+            '涉检商品宜走「1210出口备货至保税仓」一件代发，争取0110/1210报关单；1210一日游或9610商检成本通常过高。' +
+            '须评估可走1210/9610的物流商及费用；若评估后仍无法正式报关，建议咨询财税专家重估业务模式。',
+        });
+      } else if (isDiagRebateEligibleProduct(product)) {
+        rows.push({
+          title: '1210出口备货至保税区',
+          body:
+            '阿里国际站「便捷发货」多为小包未报关。非定制普货可评估「1210出口备货至保税仓」一件代发，争取0110或1210报关单退税；定制类普货可评估「1210保税区一日游或9610跨境电商零售出口」。' +
+            '改造会改变物流链路并可能增本，须重点评估物流商与费用；若不能通过1210/9610正式报关，建议咨询财税专家重估业务模式。',
+        });
+        rows.push({
+          title: '1210保税区一日游或9610跨境电商零售出口',
+          body:
+            '若产品为定制类普货，可通过「1210保税区一日游或9610跨境电商零售出口」获取报关清单/报关单后申请退免税；涉检商品一般不优先此路径。',
+        });
+      } else {
+        rows.push({
+          title: '1210保税区一日游或9610跨境电商零售出口',
+          body:
+            '阿里国际站便捷发货场景下，可通过1210/9610分送集报降低报关费并争取退免税单据；须测算物流成本。若无法落地正式报关，建议咨询财税专家重估业务模式。',
+        });
+      }
+    } else {
+      const invoice = String(s.invoice || '');
+      let invoiceTip = '';
+      if (hasDiagNoInvoice(invoice)) {
+        invoiceTip =
+          '当前较难取得进项发票时，合规税负往往偏高，宜优先评估市场采购出口等与无票更匹配的履约/出口安排，并梳理可取得专票的供应商。';
+      } else if (/普通发票|普票/.test(invoice) && !hasDiagSpecialInvoice(invoice)) {
+        invoiceTip =
+          '目前主要为增值税普通发票，通常无法支撑退税，须重点梳理供应商发票、争取改开专票。';
+      } else if (/部分专票|部分普票|部分无票/.test(invoice)) {
+        invoiceTip = '存在专票不全或混用情形，须逐家梳理供应商开票，普票/无票部分无法按专票退税。';
+      }
+      rows.push({
+        title: '国际站正式报关履约与纳税申报',
+        body:
+          '您已选择自营出口、一达通代理出口或市场采购出口等需凭报关单收汇的履约方式，具备正式报关条件；方案侧重依法合规申报纳税、核对退免税资料齐套，而非从零改造出口通道。' +
+          invoiceTip +
+          (productionLike
+            ? '一达通3+N仅合作生产型企业，默认您为生产型企业：若存在外购，须判断是否满足视同自产；不满足则不能退税、仅可按免税处理。'
+            : /自营出口|一达通代理出口\s*[（(]?2\s*\+\s*N|一达通代理出口2\+N|2\+N/.test(shipping)
+              ? '自营出口或一达通2+N等不默认您为生产型企业：仅当确认为生产型企业且存在外购成品时，才须判断视同自产（不满足则免税不可退税）；贸易型企业按免退税口径，勿套用生产型视同自产默认。'
+              : ''),
+      });
+    }
   }
 
   return rows;
@@ -1886,6 +2010,24 @@ function ensureDiagnosisReportOverview(report, slots, path) {
   } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
     const s02 = ensureStage('02', '报关出口环节');
     pushUnique(s02, '搭建1210出口备货至保税区');
+  } else if (path === 'X') {
+    const shippingX = String(s.shipping || '');
+    const s02 = ensureStage('02', '报关出口环节');
+    if (/便捷发货/.test(shippingX)) {
+      const productX = String(s.productCategory || '');
+      if (/^0退税率|商标.*暂未获得授权|暂未获得授权/.test(productX)) {
+        pushUnique(s02, '按无法退免税口径控税负');
+      } else {
+        pushUnique(s02, '评估1210/9610正式报关替代便捷发货');
+        pushUnique(s02, '测算可走1210/9610的物流成本');
+      }
+    } else {
+      pushUnique(s02, '凭报关单收汇并合规申报纳税');
+      pushUnique(s02, '梳理供应商发票与退税资格');
+      if (/一达通代理出口\s*[（(]?3\s*\+\s*N|一达通代理出口3\+N|一达通.*3\s*\+\s*N/.test(shippingX)) {
+        pushUnique(s02, '外购货物核视同自产条件');
+      }
+    }
   }
 
   // Keep 01/02/03 order
@@ -1901,13 +2043,66 @@ function ensureDiagnosisReportOverview(report, slots, path) {
   };
 }
 
+function isForbiddenHkResaleOr0110Item(text) {
+  const t = String(text || '');
+  if (!t) return false;
+  if (/搭建\s*0110\s*出口\s*\+?\s*香港|0110出口\s*\+\s*香港公司/.test(t)) return true;
+  if (/搭建\s*1039\s*出口\s*\+?\s*香港|1039出口\s*\+\s*香港公司/.test(t)) return true;
+  if (/香港公司销售给店铺|采购后再销售给店铺|出口主体\s*→\s*香港公司\s*→\s*店铺/.test(t)) {
+    return true;
+  }
+  if (/平台信息报送与主体一致性/.test(t) && /香港|采购再销售|店铺公司/.test(t)) return true;
+  return false;
+}
+
+/** Always strip 0110/1039+HK and HK→shop resale for C/D/X and any 国际站/一达通 report. */
+function shouldStripForbiddenHkArchitectures(report, path, slots) {
+  if (/^[CDX]$/.test(String(path || ''))) return true;
+  const s = slots && typeof slots === 'object' ? slots : {};
+  if (/一达通|阿里国际站|国际站/.test(`${s.platform || ''} ${s.shipping || ''}`)) return true;
+  const blob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''} ${JSON.stringify(report?.plan?.overview || [])} ${JSON.stringify(report?.plan?.details || [])}`;
+  if (/一达通|阿里国际站/.test(blob)) return true;
+  return false;
+}
+
+function stripForbiddenArchitecturesForPath(report, path, slots) {
+  if (!report?.plan || !shouldStripForbiddenHkArchitectures(report, path, slots)) return report;
+  const next = {
+    ...report,
+    plan: { ...(report.plan || {}) },
+  };
+  if (Array.isArray(next.plan.overview)) {
+    next.plan.overview = next.plan.overview.map((st) => ({
+      ...st,
+      items: (Array.isArray(st.items) ? st.items : []).filter((it) => !isForbiddenHkResaleOr0110Item(it)),
+    }));
+  }
+  if (Array.isArray(next.plan.details)) {
+    next.plan.details = next.plan.details.filter((d) => {
+      const title = String(d?.title || '');
+      const body = String(d?.body || '');
+      if (/^0110出口\s*\+\s*香港|^1039出口\s*\+\s*香港/.test(title)) return false;
+      if (/平台信息报送与主体一致性/.test(title)) return false;
+      if (isForbiddenHkResaleOr0110Item(`${title} ${body}`)) return false;
+      return true;
+    });
+  }
+  return next;
+}
+
 function ensureDiagnosisReportArchitectures(report, slots) {
   if (!report || typeof report !== 'object') return report;
-  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
-  const path = detectDiagnosisReportPath(s);
+  const rawSlots = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const { path, slots: s } = resolveDiagnosisReportPath(report, rawSlots);
   let next = report;
 
-  const mandatory = buildMandatoryPlanDetails(s, path);
+  // Never inject path-A 0110/HK architectures for 国际站/一达通 reports
+  // (even if slots mis-detect as A — Agent JSON is already correct).
+  const reportBlob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''} ${JSON.stringify(report?.plan?.overview || [])}`;
+  const isIntlStationReport = /一达通|阿里国际站/.test(reportBlob) || path === 'X';
+  const effectivePath = isIntlStationReport && path === 'A' ? 'X' : path;
+
+  const mandatory = buildMandatoryPlanDetails(s, effectivePath);
   if (mandatory.length) {
     const details = Array.isArray(next.plan?.details) ? next.plan.details.slice() : [];
     let changed = false;
@@ -1928,7 +2123,9 @@ function ensureDiagnosisReportArchitectures(report, slots) {
     }
   }
 
-  return ensureDiagnosisReportOverview(next, s, path);
+  next = ensureDiagnosisReportOverview(next, s, effectivePath);
+  // Always strip forbidden HK/0110 items for 国际站/一达通 (and C/D/X)
+  return stripForbiddenArchitecturesForPath(next, effectivePath, s);
 }
 
 function isGenericDiagnosisProcessFlow(text) {
@@ -1996,6 +2193,15 @@ function formatDiagSlotsForApi(slots) {
   } else if (reportPath === 'D') {
     hard +=
       '【硬约束·架构】路径D：按特殊商品标识写免税或视同内销口径；禁止硬套 0110/1039 退税香港架构为首选。\n';
+  } else if (reportPath === 'X') {
+    hard +=
+      '【硬约束·路径X·国际站】report_path 必须为 X，禁止改判为 A。' +
+      '禁止写入「搭建0110出口+香港公司」「搭建1039出口+香港公司」「0110出口+香港公司」「1039出口+香港公司」；' +
+      '禁止写入「香港公司销售给店铺公司」「平台信息报送与主体一致性」下的采购再销售链路；禁止建议更换香港公司作为店铺主体。' +
+      '安全型（自营/一达通/市场采购）details title 须用「国际站正式报关履约与纳税申报」：侧重合规申报纳税与供应商发票风险（无票宜评估市场采购出口，普票无法退税须梳理专票）。' +
+      '**仅一达通3+N**可默认生产型企业并须写外购视同自产（不满足则免税不可退税）；自营出口、一达通2+N、市场采购等**不得**默认生产型企业——仅当用户确认为生产型且有外购时才写视同自产。' +
+      '高危型（便捷发货）：须写未报关/视同内销（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
+      '若产品为0退税率或商标未授权，按路径D口径写、禁止1210/9610；其余普货/涉检才写1210/9610、物流成本评估及「若无法正式报关则咨询专家重估」强制句。\n';
   }
   hard +=
     `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
@@ -2013,8 +2219,12 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
     (retry
       ? '【重试·强制】上一轮未返回可用 version=1 JSON。'
       : '【专属合规诊断·生成报告】第1-7步已齐。') +
-    `请先按档案内部判定 report_path（官网预判为 ${reportPath}，若与规则冲突以你按发货+出口+产品重判为准；禁止对用户说出路径字母），` +
-    '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（A/B/C/D）；' +
+    `请先按档案判定 report_path（官网预判为 ${reportPath}` +
+    (reportPath === 'X'
+      ? '；平台为阿里国际站或发货含一达通时**必须传 X，禁止因正式报关/专票改判为 A**'
+      : '；若与规则冲突以你按发货+出口+产品重判为准') +
+    '；禁止对用户说出路径字母），' +
+    '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（A/B/C/D/X）；' +
     '工具成功后，你的回复**正文第一行起必须是完整 JSON**（可包在 ```json 代码块；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
     '可在 JSON 代码块前后各加至多一句：「报告已生成，请查看右侧方案区。」' +
     '禁止输出思考过程/检索过程/工具调用旁白；禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问；禁止为定路径去检索知识库。\n' +
@@ -3415,6 +3625,7 @@ function initAiChatbot() {
         inputs: {},
         conversationId,
         onChunk: paintStream,
+        timeoutMs: forcePlanWhileThinking ? 240000 : 180000,
       });
 
       let result;
@@ -3503,6 +3714,7 @@ function initAiChatbot() {
               inputs: {},
               conversationId: result.conversationId || conversationId || '',
               onChunk: paintStream,
+              timeoutMs: 240000,
             });
             if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
             const retryJson = pickJsonReport(retryRes?.text || '', retryRes);
@@ -3570,6 +3782,7 @@ function initAiChatbot() {
             inputs: {},
             conversationId: result.conversationId || conversationId || '',
             onChunk: paintStream,
+            timeoutMs: 240000,
           });
           if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
           const retryAnswer = sanitizeAiAnswer(retryRes?.text || '');
@@ -4597,12 +4810,12 @@ function buildResultWorkingHtml() {
     { label: s.shipping, place: 'right:118%;top:38%' },
     { label: exportMode, place: 'left:118%;top:38%' },
     { label: s.invoice, place: 'right:108%;top:68%' },
-    { label: s.productCategory, place: 'left:108%;top:68%' },
     {
-      label: s.revenue,
+      label: s.productCategory,
       place: 'top:-34%',
       center: true,
     },
+    { label: s.revenue, place: 'left:108%;top:68%' },
   ].filter((c) => String(c.label || '').trim());
 
   const chipHtml = chipDefs.length
@@ -4630,7 +4843,7 @@ function buildResultWorkingHtml() {
     `<span class="result-working-ai-tag">AI</span>` +
     `<span class="result-working-title-rest">正在生成专属合规方案</span>` +
     `</p>` +
-    `<p class="result-working-sub">正在根据您的选项梳理方案<span class="result-working-dots" aria-hidden="true"></span></p>` +
+    `<p class="result-working-sub">正在根据您的选项梳理方案（含知识检索，通常需1～3分钟）<span class="result-working-dots" aria-hidden="true"></span></p>` +
     `</div>`
   );
 }
@@ -4880,7 +5093,7 @@ function extractDifyAnswer(data) {
  * Dify SSE streaming chat. Calls onChunk(accumulatedAnswer) as tokens arrive.
  * Returns { text, conversationId }.
  */
-async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk }) {
+async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk, timeoutMs }) {
   const cfg = getDifyConfig();
   const path = endpoint || cfg.difyEndpoint || '/v1/chat-messages';
   const url = `${cfg.difyApiBase}${path}`;
@@ -4893,6 +5106,18 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   };
   if (conversationId) payload.conversation_id = conversationId;
 
+  const waitMs = Math.max(30000, Number(timeoutMs) || 180000);
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller
+    ? setTimeout(() => {
+        try {
+          controller.abort();
+        } catch {
+          /* ignore */
+        }
+      }, waitMs)
+    : null;
+
   let res;
   try {
     res = await fetch(url, {
@@ -4902,15 +5127,28 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
         Accept: 'text/event-stream',
       },
       body: JSON.stringify(payload),
+      signal: controller?.signal,
     });
-  } catch {
+  } catch (err) {
+    if (timer) clearTimeout(timer);
+    if (err?.name === 'AbortError') {
+      throw new Error(
+        `方案生成超时（>${Math.round(waitMs / 1000)}秒）。请到 Dify 查看该次运行是否调用了 generate_diagnosis_report、Workflow 是否成功；确认已发布含路径 X 的 Agent/Workflow 后「新建对话」重试。`
+      );
+    }
     throw new Error('无法连接道一 AI 服务（api.daoith.com），请检查网络或稍后重试');
   }
 
+  const clearWait = () => {
+    if (timer) clearTimeout(timer);
+  };
+
+  try {
   const contentType = String(res.headers.get('content-type') || '');
 
   // Non-SSE error body (e.g. classifier 400 JSON)
   if (!res.ok) {
+    clearWait();
     let msg = `请求失败（HTTP ${res.status}）`;
     try {
       const errData = await res.json();
@@ -4928,6 +5166,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
 
   // Some proxies may fall back to a single JSON body even when streaming was requested
   if (contentType.includes('application/json') && !contentType.includes('text/event-stream')) {
+    clearWait();
     const data = await res.json();
     const text = extractDifyAnswer(data);
     const reportJson = extractDiagnosisReportJson(text) || extractDiagnosisReportJson(JSON.stringify(data));
@@ -4943,6 +5182,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   }
 
   if (!res.body || typeof res.body.getReader !== 'function') {
+    clearWait();
     throw new Error('当前浏览器不支持流式响应，请升级浏览器后重试');
   }
 
@@ -5097,7 +5337,19 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   };
 
   while (true) {
-    const { done, value } = await reader.read();
+    let chunk;
+    try {
+      chunk = await reader.read();
+    } catch (err) {
+      clearWait();
+      if (err?.name === 'AbortError') {
+        throw new Error(
+          `方案生成超时（>${Math.round(waitMs / 1000)}秒）。请到 Dify 查看该次运行是否调用了 generate_diagnosis_report、Workflow 是否成功；确认已发布含路径 X 的 Agent/Workflow 后「新建对话」重试。`
+        );
+      }
+      throw err;
+    }
+    const { done, value } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
 
@@ -5136,6 +5388,9 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     conversationId: nextConversationId || conversationId || '',
     reportJson: toolReportJson || null,
   };
+  } finally {
+    clearWait();
+  }
 }
 
 async function callDify({ endpoint, inputs, query, conversationId, returnMeta }) {
