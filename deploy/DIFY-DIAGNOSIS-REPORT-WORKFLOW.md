@@ -326,18 +326,97 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 
 ## 7. 同步 Agent 主提示词
 
-将 `deploy/dify-prompts/diagnosis-agent-system.md` 粘贴到 Agent Instruction（含第八步「调用工具」说明）。
+将 `deploy/dify-prompts/diagnosis-agent-system.md` 粘贴到 Agent Instruction 并 **发布**（已删减各步选项清单，选项只由官网 chips 提供；含第八步「调用工具 + 原样输出 JSON」）。
 
 ---
 
-## 8. 相关文件
+## 8. 报告质量：检索放在 LLM「里面」还是前面？
+
+### 结论（可做，但别指望只换位置就变好）
+
+Dify **普通 Workflow 的 LLM 节点不能内嵌知识库检索**——检索要么是：
+
+| 方式 | 谁决定查什么 | 适用 |
+|------|--------------|------|
+| **A. Knowledge 节点在 LLM 前**（现状） | 你用固定/模板 query | 稳定、快；质量靠 **query 写好** |
+| **B. Workflow 里用「Agent」节点**（带知识库工具） | 模型自己多次检索再写 | 更像「完整版 Agent」；慢、贵、可能多轮 |
+| **C. 把报告 Workflow 改成 Chatflow/Agent 应用当工具** | 同 B | 与问诊 Agent 对称，调试稍重 |
+
+「LLM 根据自己检索的内容生产报告」≈ **方案 B**：画布改为  
+`开始 → Agent（挂「合规解决方案必读」知识库工具）→ Code → 结束`，  
+Agent 系统提示词用 `diagnosis-report-workflow-prompt.md` + `diagnosis-agent-kb-instruction.md` 的「出报告检索流水线」，并强制：先按序调用知识库工具 ≥3 次，再输出 JSON。
+
+**不推荐**只把「前一个 Knowledge 节点删掉、也不给 LLM 挂检索工具」——那样模型更容易空写。
+
+### 若暂时仍用方案 A（Knowledge → LLM），优先改 query（性价比最高）
+
+Knowledge 节点的 **查询语句不要只用用户一句话**，改为由档案拼成的强制检索串，例如：
+
+```text
+出报告硬约束与路径要点；必须知道的知识点；
+平台={{平台}} 发货={{发货}} 出口={{出口}} 发票={{发票}} 产品={{产品}} 销售额={{销售额}}；
+对应问题分篇与方案样本路径
+```
+
+可用 **Code/模板节点** 在 Knowledge 之前根据 `diagnosis_archive` 生成 `kb_query`，再接到 Knowledge。Top K 建议 **6～8**，并勾选必读库。
+
+质量差时先看一次 Run 的「知识检索结果」是否命中：硬约束篇、知识点、方案样本——若没命中，换 B 也救不了。
+
+---
+
+## 9. 提高 `generate_diagnosis_report` 调用效率与成功率
+
+### 故障面（按出现频率）
+
+1. Agent **没调工具** → 自行写 Markdown / 空话  
+2. 调了工具，但**最终回复没贴 JSON**（只说请看右侧）  
+3. Workflow **太慢/超时**（检索+长 JSON，2～3 分钟）  
+4. Workflow 成功，JSON 被 Agent **改写/截断**  
+5. 官网解析失败（已加强 observation 捕获；仍依赖工具返回完整 `report_json`）
+
+### Agent 侧（成功率）
+
+| 项 | 建议 |
+|----|------|
+| 工具描述 | 用上文第 5 节文案；强调「成功后必须原样输出 JSON，禁止改写」 |
+| Instruction 第八步 | 用最新 `diagnosis-agent-system.md`（已写「立刻调用 + 原样 JSON」） |
+| 官网注入 | 第 8 步 query 已要求「正文第一行起必须是 JSON」——保持 |
+| Agent 参数 | 温度 0.2～0.3；**关闭深度思考**；Max tokens ≥ 4096（贴 JSON 用） |
+| 最大迭代 / 工具轮次 | 保证至少允许 **1 次工具调用**；出报告轮不要为了「再检索」空转 |
+
+### Workflow 侧（效率）
+
+| 项 | 建议 |
+|----|------|
+| 报告模型 | 可用比问诊稍强的模型，但 **关掉 reasoning**；温度 ≤ 0.3 |
+| Max tokens | 4096～8192，避免 JSON 截断导致 Code 失败、Agent 重试 |
+| 检索 | 固定/模板 query + Top K 6～8；避免无目的广撒网 |
+| Structured Output | 若总解析错，关闭 SO，让 LLM 出纯 JSON，靠 Code 校验（见第 3 节） |
+| Code 失败即失败 | 缺架构标题 / `processFlow` 为字段名模板 → 返回明确错误，逼 LLM 重写或让 Agent 提示重试（比静默烂报告好） |
+| 结束输出 | 只输出 **一个** `report_json` 字符串，减少 Agent 挑字段失败 |
+
+### 端到端体验
+
+- 工具成功后 Agent **禁止再检索、禁止摘要**：只回传 JSON（+ 一句「报告已生成」）。  
+- 官网已支持：observation 里有 JSON 也可上屏；空正文会自动重试一次。  
+- 用户侧：生成中勿关页；预计可能 1～2 分钟属正常，可在 Workflow 压检索与 token 降到 60～90 秒更稳。
+
+### 可选进阶（以后做）
+
+- Agent 工具改成「HTTP 调你们自己的报告 API」：内部跑同一套检索+LLM，超时与日志更好控。  
+- 或 Workflow 用 **Agent 节点自检索（方案 B）** 提质量，同时把报告模型单独调优。
+
+---
+
+## 10. 相关文件
 
 ```
 deploy/dify-prompts/diagnosis-report-code.py           ← Dify Code 节点只粘贴此文件
 deploy/dify-prompts/diagnosis-report-schema.dify.json   ← Dify 粘贴用（≤10 层）
 deploy/dify-prompts/diagnosis-report-schema.json        ← 完整说明（勿直接导入 Dify）
 deploy/dify-prompts/diagnosis-report-workflow-prompt.md ← Workflow LLM 指令
-deploy/dify-prompts/diagnosis-agent-system.md         ← Agent 主提示词（已更新第八步）
+deploy/dify-prompts/diagnosis-agent-system.md         ← Agent 主提示词（选项已外置到官网）
+deploy/dify-prompts/diagnosis-agent-kb-instruction.md ← 检索流水线说明
 js/main.js                                            ← extract/render JSON
 deploy/DIFY-DIAGNOSIS-AGENT.md                        ← Agent 搭建总览
 ```
