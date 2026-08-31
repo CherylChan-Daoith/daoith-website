@@ -5984,9 +5984,15 @@ body.modal-open {
 .hub-node-files {
   display: block;
   margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.hub-file-record {
+  display: block;
+  color: var(--text-muted, #757575);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  word-break: break-all;
 }
 
 .hub-nodes-empty {

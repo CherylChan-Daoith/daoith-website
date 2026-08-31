@@ -2292,6 +2292,251 @@ def handle_inquiry_status_update(headers, body: dict, env_loader):
     }
 
 
+def _existing_inquiry_for_upsert(inquiry_id: str):
+    ensure_inquiry_db()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT website_openid, status, status_history_json, created_at, paid_at
+                    FROM website_inquiries WHERE id = %s
+                    """,
+                    (inquiry_id,),
+                )
+                row = cur.fetchone()
+        if not row:
+            return None
+        return {
+            "websiteOpenid": row[0],
+            "status": row[1],
+            "statusHistory": row[2],
+            "createdAt": row[3],
+            "paidAt": row[4],
+        }
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            """
+            SELECT website_openid, status, status_history_json, created_at, paid_at
+            FROM website_inquiries WHERE id = ?
+            """,
+            (inquiry_id,),
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "websiteOpenid": row["website_openid"],
+            "status": row["status"],
+            "statusHistory": row["status_history_json"],
+            "createdAt": row["created_at"],
+            "paidAt": row["paid_at"] if "paid_at" in row.keys() else None,
+        }
+
+
+def upsert_inquiry_from_pm(record: dict):
+    ensure_inquiry_db()
+    inquiry_id = str(record.get("inquiryId") or record.get("id") or "").strip()
+    if not inquiry_id:
+        raise ValueError("缺少 inquiryId")
+    status = str(record.get("status") or "已提交").strip()
+    if status not in ALLOWED_INQUIRY_STATUS:
+        raise ValueError(f"无效状态：{status}")
+    now = datetime.now(timezone.utc).isoformat()
+    items = record.get("items") if isinstance(record.get("items"), list) else []
+    items_json = json.dumps(items, ensure_ascii=False)
+    company = str(record.get("company") or "").strip() or "—"
+    contact = str(record.get("contact") or "").strip() or "—"
+    phone = str(record.get("phone") or "").strip() or "—"
+    total = float(record.get("total") or 0)
+    _, quoted, _ = compute_inquiry_totals(items, total)
+    if record.get("quotedTotal") is not None:
+        try:
+            quoted = float(record.get("quotedTotal"))
+        except (TypeError, ValueError):
+            pass
+    openid = str(record.get("websiteOpenid") or "").strip() or None
+    paid = _parse_paid_at(record.get("paidAt"))
+    created_at = record.get("createdAt") or now
+    existing = _existing_inquiry_for_upsert(inquiry_id)
+    if existing and not openid:
+        openid = existing.get("websiteOpenid") or None
+    history = _merge_status_history(
+        existing.get("statusHistory") if existing else {},
+        status,
+        now,
+    )
+    history_json = json.dumps(history, ensure_ascii=False)
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO website_inquiries
+                      (id, website_openid, company, contact, phone, total, quoted_total, items_json,
+                       status, status_history_json, notify_sent, pm_synced, created_at, paid_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, TRUE, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                      website_openid = COALESCE(EXCLUDED.website_openid, website_inquiries.website_openid),
+                      company = EXCLUDED.company,
+                      contact = EXCLUDED.contact,
+                      phone = EXCLUDED.phone,
+                      total = EXCLUDED.total,
+                      quoted_total = EXCLUDED.quoted_total,
+                      items_json = EXCLUDED.items_json,
+                      status = EXCLUDED.status,
+                      status_history_json = EXCLUDED.status_history_json,
+                      pm_synced = TRUE,
+                      paid_at = COALESCE(EXCLUDED.paid_at, website_inquiries.paid_at)
+                    """,
+                    (
+                        inquiry_id,
+                        openid,
+                        company,
+                        contact,
+                        phone,
+                        total,
+                        quoted,
+                        items_json,
+                        status,
+                        history_json,
+                        existing.get("createdAt") if existing else created_at,
+                        paid,
+                    ),
+                )
+            conn.commit()
+        return {"inquiryId": inquiry_id, "status": status, "created": not existing}
+
+    paid_iso = paid.isoformat() if paid else None
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO website_inquiries
+              (id, website_openid, company, contact, phone, total, quoted_total, items_json,
+               status, status_history_json, notify_sent, pm_synced, created_at, paid_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              website_openid = COALESCE(excluded.website_openid, website_inquiries.website_openid),
+              company = excluded.company,
+              contact = excluded.contact,
+              phone = excluded.phone,
+              total = excluded.total,
+              quoted_total = excluded.quoted_total,
+              items_json = excluded.items_json,
+              status = excluded.status,
+              status_history_json = excluded.status_history_json,
+              pm_synced = 1,
+              paid_at = COALESCE(excluded.paid_at, website_inquiries.paid_at)
+            """,
+            (
+                inquiry_id,
+                openid,
+                company,
+                contact,
+                phone,
+                total,
+                quoted,
+                items_json,
+                status,
+                history_json,
+                (existing.get("createdAt") if existing else created_at) or now,
+                paid_iso,
+            ),
+        )
+        conn.commit()
+    return {"inquiryId": inquiry_id, "status": status, "created": not existing}
+
+
+def handle_inquiry_upsert_from_pm(headers, body: dict, env_loader):
+    set_env_loader(env_loader)
+    if not _authorize_website_sync(headers, env_loader):
+        return 401, {"error": "无效的同步密钥"}
+    try:
+        saved = upsert_inquiry_from_pm(body or {})
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    return 200, {"ok": True, **saved}
+
+
+def _list_payment_slips():
+    ensure_inquiry_db()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, payment_slip_path, payment_slip_name, payment_slip_mime, paid_at
+                    FROM website_inquiries
+                    WHERE payment_slip_path IS NOT NULL AND payment_slip_path <> ''
+                    """
+                )
+                rows = cur.fetchall()
+        return [
+            {
+                "id": r[0],
+                "path": r[1],
+                "name": r[2],
+                "mime": r[3],
+                "paidAt": r[4],
+            }
+            for r in rows
+        ]
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT id, payment_slip_path, payment_slip_name, payment_slip_mime, paid_at
+            FROM website_inquiries
+            WHERE payment_slip_path IS NOT NULL AND payment_slip_path <> ''
+            """
+        ).fetchall()
+    return [
+        {
+            "id": r["id"],
+            "path": r["payment_slip_path"],
+            "name": r["payment_slip_name"] if "payment_slip_name" in r.keys() else None,
+            "mime": r["payment_slip_mime"] if "payment_slip_mime" in r.keys() else None,
+            "paidAt": r["paid_at"] if "paid_at" in r.keys() else None,
+        }
+        for r in rows
+    ]
+
+
+def handle_push_slips_to_pm(headers, env_loader):
+    set_env_loader(env_loader)
+    if not _authorize_website_sync(headers, env_loader):
+        return 401, {"error": "无效的同步密钥"}
+    results = []
+    for row in _list_payment_slips():
+        path = Path(str(row.get("path") or ""))
+        try:
+            data = path.read_bytes()
+        except Exception as e:
+            results.append({"inquiryId": row["id"], "ok": False, "error": str(e)})
+            continue
+        try:
+            sync_file_to_pm(
+                {
+                    "inquiryId": row["id"],
+                    "kind": "PAYMENT_SLIP",
+                    "filename": row.get("name") or path.name or "payment-slip",
+                    "mimeType": row.get("mime") or "",
+                    "content": base64.b64encode(data).decode("ascii"),
+                    "paidAt": _iso_or_str(row.get("paidAt")) or "",
+                    "skipIfExists": True,
+                },
+                env_loader,
+            )
+            results.append({"inquiryId": row["id"], "ok": True})
+        except Exception as e:
+            results.append({"inquiryId": row["id"], "ok": False, "error": str(e)})
+    failed = sum(1 for r in results if not r.get("ok"))
+    return 200, {"ok": failed == 0, "synced": len(results) - failed, "failed": failed, "results": results}
+
+
 def handle_inquiry_list(auth_header: str, env_loader, limit: int = 50):
     set_env_loader(env_loader)
     resolved, err = _bearer_payload(auth_header, env_loader)
@@ -2475,8 +2720,8 @@ def handle_inquiry_slip_upload(auth_header: str, body: dict, env_loader):
             },
             env_loader,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        return 502, {"error": f"水单已保存，但同步到项目管理失败：{e}"}
     return 200, {"ok": True, **saved}
 
 

@@ -334,6 +334,34 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/inquiry/upsert":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_inquiry_upsert_from_pm(
+                self.headers,
+                body,
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
+        if path == "/api/inquiry/files/push-to-pm":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                if length:
+                    json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_push_slips_to_pm(
+                self.headers,
+                load_env_value,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/diagnosis/reports":
             length = int(self.headers.get("Content-Length", 0))
             try:

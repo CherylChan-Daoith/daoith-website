@@ -8184,6 +8184,9 @@ function renderHubInquiries(quotes) {
     const slipStatus = q.hasPaymentSlip
       ? hubT('已上传', 'Uploaded')
       : hubT('未上传', 'Not uploaded');
+    const slipName = q.hasPaymentSlip && q.paymentSlipName
+      ? `<span class="hub-file-record">${escapeHtmlHub(q.paymentSlipName)}</span>`
+      : '';
     const rateNote = totals.rate < 1
       ? ` <span class="hub-price-old">(${totals.rate === 0.9 ? '9' : '9.5'}${hubT('折', ' off')})</span>`
       : '';
@@ -8197,6 +8200,7 @@ function renderHubInquiries(quotes) {
         <td class="hub-cell-wrap hub-td-slip">
           <div class="hub-slip">
             <span class="hub-slip-status">${escapeHtmlHub(slipStatus)}</span>
+            ${slipName}
             <div class="hub-slip-btns">
               <button type="button" class="hub-link-btn" data-hub-upload="${escapeHtmlHub(q.inquiryId || '')}">${q.hasPaymentSlip ? hubT('重传', 'Re-upload') : hubT('上传', 'Upload')}</button>
               <button type="button" class="hub-link-btn" data-hub-bank aria-expanded="false">${hubT('查看账号', 'View account')}</button>
@@ -8238,14 +8242,6 @@ function renderHubInquiries(quotes) {
     : hubMoreButton('quotes', Math.max(0, list.length - HUB_INQUIRY_LIMIT)));
 }
 
-function projectsByInquiry(services) {
-  const map = new Map();
-  (Array.isArray(services) ? services : []).forEach((s) => {
-    map.set(s.inquiryId, s);
-  });
-  return map;
-}
-
 function hubLineQuoted(q, it) {
   const totals = hubQuoteTotals(q);
   const lineStd = (Number(it?.priceValue) || 0) * (Number(it?.qty) || 1);
@@ -8253,34 +8249,50 @@ function hubLineQuoted(q, it) {
   return Math.round((lineStd / totals.standard) * totals.quoted * 100) / 100;
 }
 
-function hubStep01Time(tasks) {
-  const list = Array.isArray(tasks) ? tasks.slice() : [];
-  list.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
-  const first = list[0];
-  if (!first) return '';
-  return first.plannedDueDate || first.actualCompletedAt || '';
 }
 
 function collectOrderRows(quotes, services) {
-  const svcMap = projectsByInquiry(services);
+  const quoteMap = new Map();
+  (Array.isArray(quotes) ? quotes : []).forEach((q) => {
+    if (q && q.inquiryId) quoteMap.set(q.inquiryId, q);
+  });
   const rows = [];
-  (Array.isArray(quotes) ? quotes : []).filter((q) => q.status === '已成交').forEach((q) => {
-    const totals = hubQuoteTotals(q);
-    const svc = svcMap.get(q.inquiryId);
-    const projects = Array.isArray(svc?.projects) ? svc.projects : [];
-    const items = totals.items.length ? totals.items : [{ title: hubT('成交服务', 'Service') }];
-    items.forEach((it, i) => {
-      const p = projects[i] || projects.find((x) => x.serviceType === it.title) || null;
+  const covered = new Set();
+  (Array.isArray(services) ? services : []).forEach((s) => {
+    const projects = Array.isArray(s.projects) ? s.projects : [];
+    if (!projects.length) return;
+    covered.add(s.inquiryId);
+    const q = quoteMap.get(s.inquiryId);
+    const totals = q ? hubQuoteTotals(q) : { items: [] };
+    projects.forEach((p, i) => {
+      const it = totals.items[i] || {};
       rows.push({
-        inquiryId: q.inquiryId,
-        createdAt: q.createdAt,
-        subNo: p?.subOrderNo || hubSubOrderNo(q.inquiryId, i, q.createdAt),
-        title: it.title || p?.serviceType || '—',
-        amount: hubLineQuoted(q, it),
-        paidAt: p?.paidAt || q.paidAt || '',
+        inquiryId: s.inquiryId,
+        createdAt: s.createdAt || q?.createdAt,
+        subNo: p?.subOrderNo || hubSubOrderNo(s.inquiryId, i, s.createdAt || q?.createdAt),
+        title: p?.serviceType || p?.name || it.title || '—',
+        amount: q ? hubLineQuoted(q, it) : 0,
+        paidAt: p?.paidAt || q?.paidAt || '',
         startAt: p?.startDate || '',
         endAt: p?.estimatedEndDate || '',
         owner: p?.ownerName || '',
+      });
+    });
+  });
+  (Array.isArray(quotes) ? quotes : []).filter((q) => q.status === '已成交' && !covered.has(q.inquiryId)).forEach((q) => {
+    const totals = hubQuoteTotals(q);
+    const items = totals.items.length ? totals.items : [{ title: hubT('成交服务', 'Service') }];
+    items.forEach((it, i) => {
+      rows.push({
+        inquiryId: q.inquiryId,
+        createdAt: q.createdAt,
+        subNo: hubSubOrderNo(q.inquiryId, i, q.createdAt),
+        title: it.title || '—',
+        amount: hubLineQuoted(q, it),
+        paidAt: q.paidAt || '',
+        startAt: '',
+        endAt: '',
+        owner: '',
       });
     });
   });
@@ -8442,7 +8454,10 @@ function renderServiceProgress(services, quotes) {
           const stepNo = `Step ${String(i + 1).padStart(2, '0')}`;
           const name = t.title || hubT('节点', 'Step');
           const files = Array.isArray(t.files) ? t.files : [];
-          const fileLinks = files.map((f) => `<button type="button" class="hub-link-btn" data-hub-file="${escapeHtmlHub(f.id)}">${escapeHtmlHub(f.filename)}</button>`).join(' ');
+          const fileLinks = files.map((f) => {
+            const when = f.createdAt ? formatDateCompact(f.createdAt) : '';
+            return `<span class="hub-file-record">${escapeHtmlHub(f.filename)}${when ? ` · ${escapeHtmlHub(when)}` : ''}</span>`;
+          }).join('');
           const uploadBtn = p.id && t.id
             ? `<button type="button" class="hub-link-btn" data-hub-node-upload data-inquiry-id="${escapeHtmlHub(p.inquiryId || '')}" data-project-id="${escapeHtmlHub(String(p.id))}" data-task-id="${escapeHtmlHub(t.id)}">${hubT('上传资料', 'Upload')}</button>`
             : '';
@@ -8545,28 +8560,6 @@ function closeHubSlipModal() {
   document.body.classList.remove('modal-open');
 }
 
-async function viewHubServiceFile(fileId) {
-  const token = window.DAOITH_AUTH?.getToken?.();
-  if (!token || !fileId) {
-    window.DAOITH_CART?.showToast?.(hubT('请先微信登录', 'Please sign in with WeChat first.'));
-    return;
-  }
-  try {
-    const res = await fetch(`${notifyApiBase()}/api/service-file?id=${encodeURIComponent(fileId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener');
-  } catch (err) {
-    window.DAOITH_CART?.showToast?.(hubT(`查看失败：${err.message || '网络错误'}`, `Could not open file: ${err.message || 'network error'}`));
-  }
-}
-
 function pickAndUploadHubNodeFile(btn) {
   const inquiryId = btn.getAttribute('data-inquiry-id') || '';
   const projectId = btn.getAttribute('data-project-id') || '';
@@ -8623,26 +8616,6 @@ async function submitHubNodeFile({ inquiryId, projectId, taskId, file }) {
   }
 }
 
-async function viewHubSlip(inquiryId) {
-  const token = window.DAOITH_AUTH?.getToken?.();
-  if (!token) {
-    window.DAOITH_CART?.showToast?.(hubT('请先微信登录', 'Please sign in with WeChat first.'));
-    return;
-  }
-  try {
-    const res = await fetch(`${notifyApiBase()}/api/inquiry/slip?inquiryId=${encodeURIComponent(inquiryId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener');
-  } catch (err) {
-    window.DAOITH_CART?.showToast?.(hubT(`查看失败：${err.message || '网络错误'}`, `Could not open slip: ${err.message || 'network error'}`));
-  }
 }
 
 async function submitHubSlip(e) {
@@ -8766,12 +8739,6 @@ function bindHubUi() {
     const nodeUploadBtn = e.target.closest('[data-hub-node-upload]');
     if (nodeUploadBtn) {
       pickAndUploadHubNodeFile(nodeUploadBtn);
-      return;
-    }
-
-    const fileBtn = e.target.closest('[data-hub-file]');
-    if (fileBtn) {
-      viewHubServiceFile(fileBtn.getAttribute('data-hub-file') || '');
       return;
     }
 
