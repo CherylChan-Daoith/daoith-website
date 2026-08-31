@@ -3440,9 +3440,18 @@ function initAiChatbot() {
       persistConversationId(nextId, true);
       setAskCount(askCount + 1);
 
+      const pickJsonReport = (ans, res) => {
+        const list = [
+          extractDiagnosisReportJson(ans),
+          extractDiagnosisReportJson(res?.text || ''),
+          res?.reportJson || null,
+        ].filter(Boolean);
+        return list.find((c) => isDiagnosisReportJsonReady(c)) || null;
+      };
+
       let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
-        const rawJson = extractDiagnosisReportJson(result.text);
+        const rawJson = pickJsonReport(result.text, result);
         if (rawJson && isDiagnosisReportJsonReady(rawJson)) {
           answer = JSON.stringify(rawJson);
         } else {
@@ -3469,6 +3478,41 @@ function initAiChatbot() {
       }
       if ((!answer || answer.length < 4) && result?.text) {
         answer = salvageDiagnosisPlanFromRaw(result.text) || '';
+      }
+      // Tool JSON alone is enough even when chat answer was pure thinking / empty
+      if ((!answer || answer.length < 4) && result?.reportJson && isDiagnosisReportJsonReady(result.reportJson)) {
+        answer = JSON.stringify(result.reportJson);
+      }
+      if (!answer || answer.length < 4) {
+        if (streamingPlan || forcePlanWhileThinking || shouldGeneratePlanNow) {
+          beginPlanRouting();
+          typing.classList.add('is-plan-status');
+          typing.textContent = '方案正文未就绪，正在强制重试生成…';
+          try {
+            const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
+            const retryRes = await callDifyStream({
+              endpoint,
+              query: retryQuery,
+              inputs: {},
+              conversationId: result.conversationId || conversationId || '',
+              onChunk: paintStream,
+            });
+            if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
+            const retryJson = pickJsonReport(retryRes?.text || '', retryRes);
+            if (retryJson && isDiagnosisReportJsonReady(retryJson)) {
+              result = retryRes;
+              answer = sanitizeAiAnswer(retryRes?.text || '') || JSON.stringify(retryJson);
+            } else {
+              const retryAns = sanitizeAiAnswer(retryRes?.text || '');
+              if (retryAns && retryAns.length >= 4) {
+                result = retryRes;
+                answer = retryAns;
+              }
+            }
+          } catch {
+            /* fall through to error tip */
+          }
+        }
       }
       if (!answer || answer.length < 4) {
         if (streamingPlan || forcePlanWhileThinking) {
@@ -3498,11 +3542,6 @@ function initAiChatbot() {
         else if (getUiStep() === 3) answer = localDiagnosisShippingAsk(getUiPlatform());
         else answer = `好的，已记录。请继续回答 ${getUiStep()}. 相关问题。`;
       }
-
-      const pickJsonReport = (ans, res) =>
-        extractDiagnosisReportJson(ans) ||
-        extractDiagnosisReportJson(res?.text || '') ||
-        (res?.reportJson && isDiagnosisReportJsonReady(res.reportJson) ? res.reportJson : null);
 
       // First plan attempt returned Markdown 1.2.3. / no JSON → one forced tool+JSON retry
       if (
@@ -4921,7 +4960,19 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
 
   const tryCaptureReportJson = (blob) => {
     const hit = extractDiagnosisReportJson(String(blob || ''));
-    if (hit && isDiagnosisReportJsonReady(hit)) {
+    if (!hit) return false;
+    // Prefer fully ready reports; otherwise keep best risk+plan payload as fallback
+    if (isDiagnosisReportJsonReady(hit)) {
+      toolReportJson = hit;
+      return true;
+    }
+    if (
+      !toolReportJson &&
+      hit.risk &&
+      (hit.risk.processFlow || hit.risk.stages?.length) &&
+      hit.plan &&
+      (hit.plan.overview?.length || hit.plan.details?.length || hit.plan.intro)
+    ) {
       toolReportJson = hit;
       return true;
     }
@@ -5543,8 +5594,15 @@ const DIAGNOSIS_REPORT_JSON_VERSION = 1;
 
 /** Extract structured diagnosis report JSON from Agent / Workflow output. */
 function extractDiagnosisReportJson(text) {
-  const raw = String(text || '').trim();
+  let raw = String(text || '').trim();
   if (!raw) return null;
+
+  // Tool / Workflow wrappers often prefix the payload
+  raw = raw
+    .replace(/^\s*(?:Success|成功|工具返回|Observation|output)\s*[:：]\s*/i, '')
+    .replace(/^\s*```(?:json)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim();
 
   const tryParse = (candidate) => {
     try {
@@ -5573,6 +5631,10 @@ function extractDiagnosisReportJson(text) {
           obj = obj.data;
           continue;
         }
+        if (obj.text && typeof obj.text === 'string' && /"version"\s*:/.test(obj.text)) {
+          const inner = extractDiagnosisReportJson(obj.text);
+          if (inner) return inner;
+        }
         break;
       }
 
@@ -5586,6 +5648,33 @@ function extractDiagnosisReportJson(text) {
     } catch {
       return null;
     }
+  };
+
+  const extractBalancedJson = (src, fromIdx) => {
+    const start = src.indexOf('{', Math.max(0, fromIdx || 0));
+    if (start < 0) return '';
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    for (let i = start; i < src.length; i++) {
+      const ch = src[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') {
+        inStr = true;
+        continue;
+      }
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) return src.slice(start, i + 1);
+      }
+    }
+    return '';
   };
 
   const direct = tryParse(raw);
@@ -5603,6 +5692,23 @@ function extractDiagnosisReportJson(text) {
     for (let i = wrappers.length - 1; i >= 0; i--) {
       const hit = tryParse(wrappers[i]);
       if (hit) return hit;
+      const balanced = extractBalancedJson(wrappers[i], 0);
+      if (balanced) {
+        const hit2 = tryParse(balanced);
+        if (hit2) return hit2;
+      }
+    }
+  }
+
+  const versionAt = raw.search(/"version"\s*:\s*1\b/);
+  if (versionAt >= 0) {
+    // Walk back to the opening brace of this object
+    let start = versionAt;
+    while (start > 0 && raw[start] !== '{') start -= 1;
+    const balanced = extractBalancedJson(raw, start);
+    if (balanced) {
+      const fromBalanced = tryParse(balanced);
+      if (fromBalanced) return fromBalanced;
     }
   }
 
@@ -5610,12 +5716,18 @@ function extractDiagnosisReportJson(text) {
   if (brace) {
     const fromBrace = tryParse(brace[0]);
     if (fromBrace) return fromBrace;
+    const balanced = extractBalancedJson(brace[0], 0);
+    if (balanced) {
+      const fromBalanced = tryParse(balanced);
+      if (fromBalanced) return fromBalanced;
+    }
   }
 
   // Greedy: last big JSON-looking blob
   const lastBrace = raw.lastIndexOf('{');
   if (lastBrace >= 0) {
-    const fromLast = tryParse(raw.slice(lastBrace));
+    const balanced = extractBalancedJson(raw, lastBrace);
+    const fromLast = tryParse(balanced || raw.slice(lastBrace));
     if (fromLast) return fromLast;
   }
 
@@ -5722,6 +5834,8 @@ function isDiagnosisReportJsonReady(obj) {
   const hasActions = Array.isArray(obj.actions) && obj.actions.length >= 2;
   const hasNotes = Array.isArray(obj.notes) && obj.notes.length >= 2;
   const sections = [hasRisk, hasPlan, hasActions, hasNotes].filter(Boolean).length;
+  // risk + plan is the core deliverable; actions/notes may be thin after architecture fill
+  if (hasRisk && hasPlan && countDiagnosisCjk(md) >= 120) return true;
   if (sections < 3) return false;
   if (countDiagnosisCjk(md) < 160) return false;
   return true;
