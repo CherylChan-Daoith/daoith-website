@@ -8249,8 +8249,6 @@ function hubLineQuoted(q, it) {
   return Math.round((lineStd / totals.standard) * totals.quoted * 100) / 100;
 }
 
-}
-
 function collectOrderRows(quotes, services) {
   const quoteMap = new Map();
   (Array.isArray(quotes) ? quotes : []).forEach((q) => {
@@ -8614,8 +8612,6 @@ async function submitHubNodeFile({ inquiryId, projectId, taskId, file }) {
   } catch (err) {
     window.DAOITH_CART?.showToast?.(hubT(`上传失败：${err.message || '网络错误'}`, `Upload failed: ${err.message || 'network error'}`));
   }
-}
-
 }
 
 async function submitHubSlip(e) {
