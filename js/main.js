@@ -2006,11 +2006,12 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
   const retry = Boolean(options.retry);
   return (
     (retry
-      ? '【重试·强制】上一轮未返回可用 JSON。'
+      ? '【重试·强制】上一轮未返回可用 version=1 JSON。'
       : '【专属合规诊断·生成报告】第1-7步已齐。') +
     '请**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】；' +
-    '工具返回后，**必须把完整 JSON 原样输出给用户**（可包在 ```json 代码块中；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
-    '禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问。\n' +
+    '工具成功后，你的回复**正文第一行起必须是完整 JSON**（可包在 ```json 代码块；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
+    '可在 JSON 代码块前后各加至多一句：「报告已生成，请查看右侧方案区。」' +
+    '禁止输出思考过程/检索过程/工具调用旁白；禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问。\n' +
     `${archive}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
     '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据。' +
@@ -3554,7 +3555,7 @@ function initAiChatbot() {
           !isDiagnosisPlanReadyToShow(answer))
       ) {
         typing.classList.add('is-plan-status');
-        typing.textContent = '方案格式不完整，正在强制重试生成…';
+        typing.textContent = '正在重新拉取结构化方案，请稍候…';
         try {
           const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
           const retryRes = await callDifyStream({
@@ -4582,19 +4583,15 @@ function buildResultWorkingHtml() {
     s.exportMode ||
     (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '');
 
-  // Long product label sits bottom-center so it won't cover left-side chips (发票等).
+  // Same placement style as 平台/主体: float beside logo, single-line (nowrap).
+  // Do NOT center long labels inside the 72px scene — that forces one-char-per-line wrap.
   const chipDefs = [
     { label: s.platform, place: 'right:112%;top:2%' },
     { label: s.entity, place: 'left:112%;top:2%' },
     { label: s.shipping, place: 'right:118%;top:38%' },
     { label: exportMode, place: 'left:118%;top:38%' },
     { label: s.invoice, place: 'right:108%;top:68%' },
-    {
-      label: s.productCategory,
-      place: 'top:96%',
-      long: true,
-      center: true,
-    },
+    { label: s.productCategory, place: 'left:108%;top:68%' },
     {
       label: s.revenue,
       place: 'top:-34%',
@@ -4606,13 +4603,7 @@ function buildResultWorkingHtml() {
     ? chipDefs
         .map((chip, i) => {
           const label = String(chip.label || '').trim();
-          const extras = [
-            chip.long ? 'rw-chip-long' : '',
-            chip.center ? 'rw-chip-center' : '',
-          ]
-            .filter(Boolean)
-            .join(' ');
-          const extraCls = extras ? ` ${extras}` : '';
+          const extraCls = chip.center ? ' rw-chip-center' : '';
           return (
             `<span class="rw-chip rw-chip-${(i % 7) + 1}${extraCls}" style="${chip.place}">` +
             `${escapeHtml(label)}` +
@@ -5025,6 +5016,14 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       ];
       if (Array.isArray(data.tool_labels) || data.tool) {
         blobs.push(typeof data.observation === 'string' ? data.observation : '');
+      }
+      // Always try the full event when the diagnosis report tool is involved
+      if (/generate_diagnosis_report/i.test(String(data.tool || data.tool_name || ''))) {
+        try {
+          blobs.push(JSON.stringify(data));
+        } catch {
+          /* ignore */
+        }
       }
       for (const blob of blobs) {
         if (blob == null || blob === '') continue;
