@@ -14,19 +14,13 @@
 - `user_reply`：用户最后一轮答复（可为空）
 - `follow_up_changes`：可选，追问变化点 JSON 字符串
 
-## 检索要求（Knowledge 节点在 LLM 之前，或 Agent 节点自检索）
+## 检索要求（由上游传入 report_path，按路径检索）
 
-**推荐默认**：Knowledge 节点在 LLM 前，但 **query 必须由诊断档案拼成的强制检索串**（不要只用用户最后一句），并按序采信：
+Workflow **不要**用用户最后一句当 query。问诊 Agent 已判定 `report_path`（A/B/C/D）；知识检索使用  
+`deploy/dify-prompts/diagnosis-report-path-kb-queries.md` 中对应路径的 query，并拼接诊断档案。
 
-1. `出报告硬约束与路径要点`
-2. `必须知道的知识点`（按用户选项命中对应块）
-3. 对应 `01-问题X` 分篇
-4. 命中的一篇【方案样本】路径 A/B/C/D（只对齐结构与口径，**按档案改写，禁止照抄样本画像**）
-5. 需要时补《跨境电商实操知识》
-
-**可选（质量优先）**：用 Workflow「Agent」节点挂知识库工具，让模型按 `diagnosis-agent-kb-instruction.md` 流水线**自行多次检索后再写 JSON**（更慢）。详见 `deploy/DIFY-DIAGNOSIS-REPORT-WORKFLOW.md` 第 8 节。
-
-冲突时：**用户档案 > 下方硬约束与路径要点 > 知识库**。
+每条路径仍应命中：`出报告硬约束与路径要点` + `必须知道的知识点` + **该路径一篇方案样本** +（D/产品复杂时）出口退税率文库。  
+冲突时：**用户档案 > 硬约束与路径要点 > 知识库**。
 
 ---
 

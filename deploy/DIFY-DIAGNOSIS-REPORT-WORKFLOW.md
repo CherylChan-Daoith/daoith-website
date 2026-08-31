@@ -1,48 +1,75 @@
 # 诊断报告 JSON Workflow
 
-> 目标：报告格式由 **JSON Schema + 官网渲染器** 保证稳定；问诊 Agent 只负责问卷与调工具；报告正文在 Workflow 内 **自检索知识库后写 JSON**。
+> 目标：问诊 Agent **先定路径 A/B/C/D（不读库）** → 工具传入 `report_path` → Workflow **按路径检索** → LLM 写 JSON → Code。  
+> 路径判定规则与四条 `kb_query` 见：`deploy/dify-prompts/diagnosis-report-path-kb-queries.md`。
 
-## 架构（推荐：方案 B · Agent 节点自检索）
+## 架构（推荐）
 
 ```text
 用户完成 7 问
-  → 诊断 Agent 调用工具 generate_diagnosis_report
+  → 诊断 Agent：按发货+出口+产品判定 report_path（A/B/C/D）
+  → 调用 generate_diagnosis_report(diagnosis_archive, report_path, …)
     → Workflow：
          开始
-           → Agent 节点（挂「合规解决方案必读」知识库工具；先检索 ≥4 次再写 JSON）
-           → Code（校验 version、必填字段）
-           → 结束（report_json）
+           →（可选）按 report_path 选出 kb_query
+           → 知识检索（按路径 query；挂必读等库；Top K 6）
+           → LLM（diagnosis-report-workflow-prompt.md；只写 JSON）
+           → Code
+           → 结束 report_json
   → 问诊 Agent 原样输出 JSON
-  → 官网 extractDiagnosisReportJson → 右侧方案区
+  → 官网右侧方案区
 ```
 
-备选（方案 A）：`知识检索节点 → LLM`（更快，但模型不能自己多轮改 query；质量依赖固定 query）。详见下文「方案 A 备选」。
+**不要**先广撒网检索再让模型猜路径；**不要**在 Workflow 再开一轮「只判路径」的 LLM（费 token）。
 
 ---
 
-## 1. 创建 / 改造 Workflow（方案 B）
-
-1. Dify → **工作室** → 打开已有 `generate_diagnosis_report` Workflow（或新建同名 Workflow）
-2. **开始节点**输入变量保持不变：
+## 1. 开始节点变量
 
 | 变量 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `diagnosis_archive` | 文本 | 是 | `【诊断档案·必须逐字采信】` 全文 |
+| `report_path` | 文本 | 是 | `A` / `B` / `C` / `D`（问诊 Agent 传入） |
 | `user_reply` | 文本 | 否 | 用户最后一轮答复 |
-| `follow_up_changes` | 文本 | 否 | 追问变化点 JSON 字符串 |
-
-3. **画布改线**（从旧方案 A 改造时）：
-   - 删除（或断开）原来的 **知识检索 → LLM** 两段
-   - 添加 **Agent** 节点（有的版本叫「Agent / 智能体」）
-   - 连线：`开始 → Agent → Code → 结束`
-
-```text
-开始 → Agent（知识库工具） → Code → 结束
-```
+| `follow_up_changes` | 文本 | 否 | 追问变化点 |
 
 ---
 
-## 2. Agent 节点配置（方案 B · 关键）
+## 2. 画布连线
+
+```text
+开始 → 知识检索 → LLM → Code → 结束
+```
+
+知识检索的**查询文本**必须按 `report_path` 选用  
+`diagnosis-report-path-kb-queries.md` 里对应路径的 query，并拼接 `diagnosis_archive`。  
+实现方式任选：条件分支四路 / 模板节点 / 短 Code 节点生成 `kb_query`。
+
+勾选库、Top K、Rerank：见同文件第 5 节（与此前多库清单一致）。**查询不要再用裸 `user_reply`。**
+
+LLM System：粘贴 `diagnosis-report-workflow-prompt.md`。  
+LLM USER：见 `diagnosis-report-path-kb-queries.md` 第 6 节（须含 `report_path` + 档案 + 检索结果）。
+
+Code / 结束：仍用 `diagnosis-report-code.py`，输出 `report_json`。
+
+---
+
+## 3. 挂到问诊 Agent
+
+1. Workflow **发布**（输入变量含 `report_path`）
+2. 问诊 Agent 工具 `generate_diagnosis_report`：同步工具入参，描述用 `diagnosis-report-path-kb-queries.md` 第 7 节
+3. 问诊 Agent Instruction：粘贴最新 `diagnosis-agent-system.md`（第八步含路径判定 + 传 `report_path`）并 **发布**
+
+---
+
+## 备选说明
+
+- Workflow 内 **Agent 节点自检索**：仅当知识检索节点无法按路径分支时再考虑；仍应把 `report_path` 写入 Instruction，强制先按该路径检索。
+- 旧「Knowledge → LLM 且 query=user_reply」：已废弃。
+
+以下章节保留 Code 粘贴、Schema、排错等细节（编号顺延处请以标题为准）。
+
+---
 
 ### 2.1 模型
 
@@ -309,9 +336,10 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 4. 工具描述（Agent 可见）：
 
 ```text
-生成专属合规诊断报告。输入诊断档案全文，返回 version=1 的 JSON 报告。
-第 1～7 步齐全后必须调用；报告更新（追问改条件）时也须重新调用。
-调用成功后，向用户只输出工具返回的 JSON，不要自行写 Markdown 四章。
+生成专属合规诊断报告。
+必填：diagnosis_archive（诊断档案全文）、report_path（A/B/C/D，由你按发货+出口+产品判定，勿对用户说出路径字母）。
+可选：user_reply、follow_up_changes。
+返回 version=1 的 JSON。调用成功后向用户只输出工具返回的 JSON，禁止自行写 Markdown 四章、禁止改写 JSON。
 ```
 
 5. Agent **发布**
@@ -404,11 +432,10 @@ Agent 调用 Workflow 工具时，会拿到 `report_json` 字符串。
 ## 10. 相关文件
 
 ```
-deploy/dify-prompts/diagnosis-report-workflow-agent-prompt.md  ← 【方案B】Workflow 内 Agent 节点 Instruction（先贴这个）
-deploy/dify-prompts/diagnosis-report-workflow-prompt.md        ← 【方案A】Knowledge→LLM 时的 System 提示词
-deploy/dify-prompts/diagnosis-report-code.py                   ← Code 节点
-deploy/dify-prompts/diagnosis-report-schema.dify.json           ← 方案A 可选 SO
-deploy/dify-prompts/diagnosis-agent-system.md                  ← 问诊 Agent
-deploy/dify-prompts/diagnosis-agent-kb-instruction.md          ← 知识库工具说明（可选贴到工具描述）
-js/main.js
+deploy/dify-prompts/diagnosis-report-path-kb-queries.md   ← 路径规则 + 四条 kb_query + 工具描述（先看）
+deploy/dify-prompts/diagnosis-report-workflow-prompt.md   ← Workflow LLM System
+deploy/dify-prompts/diagnosis-report-code.py
+deploy/dify-prompts/diagnosis-agent-system.md             ← 问诊 Agent（第八步含 report_path）
+deploy/dify-prompts/diagnosis-agent-kb-instruction.md
+js/main.js                                                ← 官网预判路径写入档案硬约束
 ```

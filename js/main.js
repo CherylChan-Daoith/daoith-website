@@ -1976,6 +1976,7 @@ function formatDiagSlotsForApi(slots) {
       `【硬约束·销售额】年销售额必须写「${revenue}」。禁止改用其它档位（例如档案是「500万以下」时禁止写「500-2000万」）。销售额分层建议仅在档案达到对应门槛时才写。\n`;
   }
   const reportPath = detectDiagnosisReportPath(s);
+  hard += `【内部路径】report_path=${reportPath}（调用工具时必须传入同名字段；禁止对用户说出路径字母）。\n`;
   if (reportPath === 'A') {
     if (isDiagRebateEligibleProduct(s.productCategory) && hasDiagSpecialInvoice(s.invoice)) {
       hard +=
@@ -1992,6 +1993,9 @@ function formatDiagSlotsForApi(slots) {
     hard += '【硬约束·架构】plan.details 必须含 title「1210出口备货至保税区」及 0110进区+1210离境说明。\n';
   } else if (reportPath === 'C') {
     hard += '【硬约束·架构】路径C禁止写「0110出口+香港公司」「1039出口+香港公司」及采购再销售链路。\n';
+  } else if (reportPath === 'D') {
+    hard +=
+      '【硬约束·架构】路径D：按特殊商品标识写免税或视同内销口径；禁止硬套 0110/1039 退税香港架构为首选。\n';
   }
   hard +=
     `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
@@ -2004,14 +2008,16 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
   const archive = formatDiagSlotsForApi();
   const reply = String(userText || '').trim();
   const retry = Boolean(options.retry);
+  const reportPath = detectDiagnosisReportPath(getDiagSlots());
   return (
     (retry
       ? '【重试·强制】上一轮未返回可用 version=1 JSON。'
       : '【专属合规诊断·生成报告】第1-7步已齐。') +
-    '请**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】；' +
+    `请先按档案内部判定 report_path（官网预判为 ${reportPath}，若与规则冲突以你按发货+出口+产品重判为准；禁止对用户说出路径字母），` +
+    '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（A/B/C/D）；' +
     '工具成功后，你的回复**正文第一行起必须是完整 JSON**（可包在 ```json 代码块；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
     '可在 JSON 代码块前后各加至多一句：「报告已生成，请查看右侧方案区。」' +
-    '禁止输出思考过程/检索过程/工具调用旁白；禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问。\n' +
+    '禁止输出思考过程/检索过程/工具调用旁白；禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问；禁止为定路径去检索知识库。\n' +
     `${archive}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
     '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据。' +
