@@ -69,6 +69,23 @@
       quoteCartEmpty:
         '购物车目前是空的。请告诉我您需要为哪项服务询价；也可以先考虑专家1v1财税咨询。',
       progressOpened: '已为您打开「服务进度跟踪」。登录后可查看办理进度。',
+      progressNeedLogin:
+        '查进度需要先微信登录。登录后我可以直接告诉您办到哪一步；您也可以在顶部导航「服务管理」→「服务进度跟踪」查看。',
+      progressHow:
+        '查看路径：顶部导航点「服务管理」，进入后向下找到「服务进度跟踪」。\n您也可以把服务订单号发给我（一般以 SO 开头），我直接帮您查当前办到哪一步。',
+      progressFail: '进度暂时查不到。您可以在顶部导航「服务管理」→「服务进度跟踪」查看，或把服务订单号发给我。',
+      progressEmpty:
+        '目前还没有进行中的服务订单。如果您已购买，请把服务订单号发给我（以 SO 开头），我帮您查。\n查看路径：顶部导航 →「服务管理」→「服务进度跟踪」。',
+      progressMiss:
+        '没有找到与「{q}」匹配的进行中服务。请把服务订单号发给我（以 SO 开头），我帮您查。\n查看路径：顶部导航 →「服务管理」→「服务进度跟踪」。',
+      progressWhere: '您也可以随时在顶部导航「服务管理」→「服务进度跟踪」查看详情。',
+      progressAskNo: '若不是以上记录，请把服务订单号发给我（以 SO 开头）。',
+      progressLine: '「{title}」{no}目前{pct}，当前节点：{step}。{owner}',
+      progressInquiry: '「{title}」目前是询价状态：{status}（尚未成交，成交后才会进入服务进度）。',
+      progressOwner: '项目负责人：{name}。',
+      progressNoOwner: '',
+      progressPct: '进度 {n}%',
+      progressPending: '待启动',
       serviceHit: '根据你提到的需求，可先看这些标准化服务：',
       serviceMiss: '暂未精确匹配到单项。你可以先浏览财税服务市场，或补充国家／平台后再问我。',
       browseServices: '浏览财税服务',
@@ -124,6 +141,23 @@
       quoteCartEmpty:
         'Your cart is empty. Tell me which service you want a quote for; you can also start with Expert 1-on-1 advisory.',
       progressOpened: 'Opened service progress tracking. Sign in to see your status.',
+      progressNeedLogin:
+        'Please sign in with WeChat first. After that I can tell you the current step, or you can open Service Hub → Service progress.',
+      progressHow:
+        'Path: top nav → Service Hub → Service progress tracking.\nYou can also send me the service order number (starts with SO) and I will look it up.',
+      progressFail: 'Could not load progress. Open Service Hub → Service progress, or send me the order number.',
+      progressEmpty:
+        'No active service orders yet. If you already purchased, send me the order number (starts with SO).\nPath: top nav → Service Hub → Service progress.',
+      progressMiss:
+        'No in-progress service matched “{q}”. Send me the order number (starts with SO).\nPath: top nav → Service Hub → Service progress.',
+      progressWhere: 'You can also open top nav → Service Hub → Service progress for details.',
+      progressAskNo: 'If this is not the right record, send me the service order number (starts with SO).',
+      progressLine: '“{title}” {no}is at {pct}, current step: {step}. {owner}',
+      progressInquiry: '“{title}” is still an inquiry ({status}); progress appears after it is closed-won.',
+      progressOwner: 'Owner: {name}.',
+      progressNoOwner: '',
+      progressPct: '{n}% complete',
+      progressPending: 'Pending start',
       serviceHit: 'Based on what you mentioned, these standard services may fit:',
       serviceMiss: 'No exact match yet. Browse the service marketplace, or add country / platform and ask again.',
       browseServices: 'Browse services',
@@ -156,6 +190,8 @@
 
   let busy = false;
   let selectedServiceIds = [];
+  let lastTopic = '';
+  let awaitingOrderNo = false;
 
   function locale() {
     return window.DAOITH_getLocale?.() === 'en' ? 'en' : 'zh';
@@ -244,6 +280,167 @@
     return /\/cart\.html$/i.test(window.location.pathname || '');
   }
 
+  function notifyApiBase() {
+    const cfg = window.DAOITH_CONFIG || {};
+    return (cfg.notifyApiBase || cfg.difyApiBase || 'https://api.daoith.com').replace(/\/$/, '');
+  }
+
+  function extractOrderNo(text) {
+    const m = String(text || '')
+      .toUpperCase()
+      .match(/\b(?:SO|INQ)[A-Z0-9]{6,}\b/);
+    return m ? m[0] : '';
+  }
+
+  function isProgressHowQuery(text) {
+    return /怎么看|如何看|在哪(里|儿)?看|在哪(里|儿)?查|怎么查|如何查|查看路径|已经登[录陸陆]/i.test(
+      String(text || '')
+    );
+  }
+
+  function isProgressChipQuery(text) {
+    return /^(查询进度|check progress)$/i.test(String(text || '').trim());
+  }
+
+  function isTaskDone(status) {
+    return status === 'COMPLETED' || status === 'NOT_APPLICABLE';
+  }
+
+  function progressStepLabel(tasks) {
+    const list = Array.isArray(tasks) ? tasks.slice() : [];
+    list.sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0));
+    const active =
+      list.find((t) => t.status === 'IN_PROGRESS' || t.status === 'OVERDUE') ||
+      list.find((t) => !isTaskDone(t.status));
+    if (active) {
+      const idx = Math.max(0, list.indexOf(active));
+      return `Step ${String(idx + 1).padStart(2, '0')} ${active.title || t('progressPending')}`;
+    }
+    if (list.length && list.every((x) => isTaskDone(x.status))) return isEn() ? 'Completed' : '全部完成';
+    return t('progressPending');
+  }
+
+  function progressPct(card) {
+    const reported = Number(card?.progress);
+    if (Number.isFinite(reported) && reported > 0) return Math.max(0, Math.min(100, Math.round(reported)));
+    const tasks = Array.isArray(card?.tasks) ? card.tasks : [];
+    if (!tasks.length) return 0;
+    return Math.round((tasks.filter((x) => isTaskDone(x.status)).length / tasks.length) * 100);
+  }
+
+  async function fetchProgressRecords() {
+    const token = window.DAOITH_AUTH?.getToken?.();
+    if (!token) return { loggedIn: false, quotes: [], services: [] };
+    const headers = { Authorization: `Bearer ${token}` };
+    const base = notifyApiBase();
+    const [qRes, sRes] = await Promise.all([
+      fetch(`${base}/api/inquiry?limit=50`, { headers }),
+      fetch(`${base}/api/service-progress`, { headers }),
+    ]);
+    const qData = await qRes.json().catch(() => ({}));
+    const sData = await sRes.json().catch(() => ({}));
+    if (!qRes.ok && !sRes.ok) throw new Error('progress');
+    return {
+      loggedIn: true,
+      quotes: qRes.ok && Array.isArray(qData.inquiries) ? qData.inquiries : [],
+      services: sRes.ok && Array.isArray(sData.services) ? sData.services : [],
+    };
+  }
+
+  function flattenProgressCards(quotes, services) {
+    const cards = [];
+    const covered = new Set();
+    (services || []).forEach((s) => {
+      (s.projects || []).forEach((p) => {
+        covered.add(s.inquiryId);
+        cards.push({
+          kind: 'service',
+          inquiryId: s.inquiryId || '',
+          title: p.serviceType || p.name || t('chipHub'),
+          orderNo: p.orderNo || '',
+          subOrderNo: p.subOrderNo || '',
+          ownerName: p.ownerName || '',
+          progress: Number(p.progress) || 0,
+          tasks: Array.isArray(p.tasks) ? p.tasks : [],
+        });
+      });
+    });
+    (quotes || []).forEach((q) => {
+      if (q.status !== '已成交' || covered.has(q.inquiryId)) return;
+      (q.items || []).forEach((it) => {
+        cards.push({
+          kind: 'service',
+          inquiryId: q.inquiryId || '',
+          title: it.title || it.name || '',
+          orderNo: '',
+          subOrderNo: '',
+          ownerName: '',
+          progress: 0,
+          tasks: [],
+        });
+      });
+    });
+    return cards;
+  }
+
+  function flattenInquiryCards(quotes) {
+    return (quotes || [])
+      .filter((q) => q.status && q.status !== '已成交' && q.status !== '已关闭')
+      .map((q) => ({
+        kind: 'inquiry',
+        inquiryId: q.inquiryId || '',
+        title: (q.items || []).map((it) => it.title || it.name || '').filter(Boolean).join(isEn() ? '; ' : '、'),
+        status: q.status || '',
+      }));
+  }
+
+  function recordSearchBlob(rec) {
+    return `${rec.title || ''} ${rec.subOrderNo || ''} ${rec.orderNo || ''} ${rec.inquiryId || ''} ${rec.status || ''}`.toLowerCase();
+  }
+
+  function filterProgressQuery(records, query) {
+    const q = String(query || '').trim();
+    if (!q || isProgressChipQuery(q) || isProgressHowQuery(q)) return records;
+    const no = extractOrderNo(q);
+    if (no) {
+      return records.filter((r) =>
+        `${r.subOrderNo || ''} ${r.orderNo || ''} ${r.inquiryId || ''}`.toUpperCase().includes(no)
+      );
+    }
+    const tokens = [];
+    matchServices(q).forEach((s) => {
+      tokens.push(s.title, s.id, ...(String(s.keys || '').split(/\s+/)));
+    });
+    const stripped = q
+      .replace(
+        /我(买的|的)?|到什么进度了|现在(到)?(哪|那)|进度|订单|服务|怎么看|如何看|请?帮我(查|看)|已经登[录陸陆]了|查询进度|check progress/gi,
+        ' '
+      )
+      .trim();
+    if (stripped.length >= 2) tokens.push(...stripped.split(/\s+/));
+    const uniq = [...new Set(tokens.map((x) => String(x).toLowerCase()).filter((x) => x.length >= 2))];
+    if (!uniq.length) return records;
+    return records.filter((r) => {
+      const blob = recordSearchBlob(r);
+      return uniq.some((tok) => blob.includes(tok));
+    });
+  }
+
+  function formatProgressLine(card) {
+    const no = card.subOrderNo || card.orderNo;
+    const noBit = no ? (isEn() ? `(${no}) ` : `（订单号 ${no}）`) : '';
+    const owner = card.ownerName
+      ? t('progressOwner').replace('{name}', card.ownerName)
+      : t('progressNoOwner');
+    return t('progressLine')
+      .replace('{title}', card.title || (isEn() ? 'Service' : '服务'))
+      .replace('{no}', noBit)
+      .replace('{pct}', t('progressPct').replace('{n}', String(progressPct(card))))
+      .replace('{step}', progressStepLabel(card.tasks))
+      .replace('{owner}', owner)
+      .trim();
+  }
+
   function serviceHref(id) {
     return `/service.html?id=${encodeURIComponent(id)}`;
   }
@@ -282,7 +479,14 @@
     const q = String(text || '').trim();
     if (!q) return 'other';
     if (/^(你好|您好|hi+|hello|hey|在吗)$/i.test(q)) return 'greet';
-    if (/进度|订单状态|服务管理|查(询)?(一下)?(进度|状态)|track|progress|hub/i.test(q)) return 'progress';
+    if (extractOrderNo(q) || (awaitingOrderNo && /^(SO|INQ)[A-Z0-9]{6,}$/i.test(q))) return 'progress';
+    if (isProgressHowQuery(q)) return 'progress-how';
+    if (
+      /进度|订单状态|服务管理|服务订单|订单号|我的订单|查(询)?(一下)?(进度|状态)|track|progress|hub/i.test(q)
+    ) {
+      return 'progress';
+    }
+    if (lastTopic === 'progress' && awaitingOrderNo) return 'progress';
     if (/询价|报价|多少钱|怎么买|提交联系|leave (my )?contact|inquiry|quote/i.test(q)) return 'inquiry';
     if (
       /ai\s*合规助手|ai合规助手|ai\s*诊断|ai\s*方案|合规诊断|生成方案|不确定|不知道(该|怎么)|ai compliance|diagnosis/i.test(
@@ -561,6 +765,8 @@
   }
 
   function handleDiagnosis() {
+    lastTopic = 'diagnosis';
+    awaitingOrderNo = false;
     appendBubble(t('aiGuide'), 'bot');
     renderChips(defaultChips());
     goAndScroll('#ai-solution', 'aiWorkspace');
@@ -575,6 +781,8 @@
   }
 
   function handleService(text) {
+    lastTopic = 'service';
+    awaitingOrderNo = false;
     const q = String(text || '').trim();
     const justAsk = /^(推荐服务|recommend services?)$/i.test(q) || !q;
     const hits = justAsk ? [] : matchServices(q);
@@ -621,6 +829,8 @@
   }
 
   function handleInquiry() {
+    lastTopic = 'inquiry';
+    awaitingOrderNo = false;
     if (isCartPage()) {
       handleInquiryArrive();
       return;
@@ -630,10 +840,84 @@
     window.location.href = '/cart.html';
   }
 
-  function handleProgress() {
-    appendBubble(t('progressOpened'), 'bot');
-    renderChips(defaultChips());
-    goAndScroll('#hub', 'hub-progress');
+  async function handleProgress(query, opts = {}) {
+    lastTopic = 'progress';
+    const howOnly = !!opts.howOnly;
+    const q = String(query || '').trim();
+    const wantsLookup = !!(
+      extractOrderNo(q) ||
+      matchServices(q).length ||
+      /代账|退税|vat|注册|陪跑|审计|gst/i.test(q)
+    );
+
+    if (!window.DAOITH_AUTH?.isLoggedIn?.()) {
+      awaitingOrderNo = false;
+      appendBubble(howOnly ? t('progressHow') : t('progressNeedLogin'), 'bot');
+      renderChips(defaultChips());
+      requireAuth('cs_hub', '/#hub');
+      goAndScroll('#hub', 'hub-progress');
+      return;
+    }
+
+    if (howOnly && !wantsLookup) {
+      appendBubble(t('progressHow'), 'bot');
+      renderChips(defaultChips());
+      goAndScroll('#hub', 'hub-progress');
+      return;
+    }
+
+    if (busy) return;
+    busy = true;
+    const typing = appendBubble(t('busy'), 'bot');
+    try {
+      const data = await fetchProgressRecords();
+      const services = flattenProgressCards(data.quotes, data.services);
+      const inquiries = flattenInquiryCards(data.quotes);
+      const specific = !isProgressChipQuery(q) && !isProgressHowQuery(q) && !!(q && (extractOrderNo(q) || matchServices(q).length || /代账|退税|vat|注册|陪跑|审计|gst/i.test(q) || awaitingOrderNo));
+      let svcHits = specific ? filterProgressQuery(services, q) : services;
+      let inqHits = specific ? filterProgressQuery(inquiries, q) : inquiries;
+
+      if (specific && !svcHits.length && !inqHits.length) {
+        awaitingOrderNo = true;
+        const hint = q.replace(/我(买的|的)?|到什么进度了|进度|服务/g, '').trim() || q;
+        setBotHtml(typing, formatBubble(t('progressMiss').replace('{q}', hint)));
+        renderChips(defaultChips());
+        goAndScroll('#hub', 'hub-progress');
+        return;
+      }
+
+      const lines = [];
+      svcHits.slice(0, 5).forEach((card) => lines.push(formatProgressLine(card)));
+      if (!svcHits.length) {
+        inqHits.slice(0, 3).forEach((card) => {
+          lines.push(
+            t('progressInquiry')
+              .replace('{title}', card.title || (isEn() ? 'Inquiry' : '询价'))
+              .replace('{status}', card.status || '—')
+          );
+        });
+      }
+      if (!lines.length) {
+        awaitingOrderNo = true;
+        setBotHtml(typing, formatBubble(t('progressEmpty')));
+        renderChips(defaultChips());
+        goAndScroll('#hub', 'hub-progress');
+        return;
+      }
+
+      awaitingOrderNo = svcHits.length !== 1;
+      const extra = awaitingOrderNo ? `\n${t('progressAskNo')}` : '';
+      setBotHtml(typing, formatBubble(`${lines.join('\n')}\n${t('progressWhere')}${extra}`));
+      renderChips(defaultChips());
+      goAndScroll('#hub', 'hub-progress');
+    } catch {
+      awaitingOrderNo = true;
+      setBotHtml(typing, formatBubble(t('progressFail')));
+      renderChips(defaultChips());
+      goAndScroll('#hub', 'hub-progress');
+    } finally {
+      busy = false;
+    }
   }
 
   function handleChip(id) {
@@ -661,7 +945,7 @@
       window.location.href = '/cart.html';
       return;
     }
-    if (id === 'go-hub') return goAndScroll('#hub', 'hub-progress');
+    if (id === 'go-hub') return handleProgress(t('chipHub'));
     if (id === 'confirm-quote') {
       if (isCartPage()) {
         document.getElementById('openQuoteBtn')?.click();
@@ -761,6 +1045,9 @@
     appendBubble(text, 'user');
 
     const intent = opts.intent || classify(text);
+    if (intent === 'other' && lastTopic === 'progress' && (isProgressHowQuery(text) || extractOrderNo(text) || awaitingOrderNo)) {
+      return handleProgress(text, { howOnly: isProgressHowQuery(text) && !extractOrderNo(text) });
+    }
     if (intent === 'greet') {
       appendBubble(t('greet'), 'bot');
       renderChips(defaultChips());
@@ -770,7 +1057,8 @@
     if (intent === 'tax') return handleTax();
     if (intent === 'service') return handleService(text);
     if (intent === 'inquiry') return handleInquiry();
-    if (intent === 'progress') return handleProgress();
+    if (intent === 'progress-how') return handleProgress(text, { howOnly: true });
+    if (intent === 'progress') return handleProgress(text);
 
     busy = true;
     const typing = appendBubble(t('busy'), 'bot');
@@ -873,6 +1161,8 @@
       localStorage.removeItem(CONV_KEY);
       sessionStorage.removeItem(MSG_KEY);
       selectedServiceIds = [];
+      lastTopic = '';
+      awaitingOrderNo = false;
       showWelcome();
     });
     document.getElementById('csAssistantForm')?.addEventListener('submit', (e) => {
