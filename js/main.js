@@ -3625,7 +3625,7 @@ function initAiChatbot() {
         inputs: {},
         conversationId,
         onChunk: paintStream,
-        timeoutMs: forcePlanWhileThinking ? 240000 : 180000,
+        timeoutMs: forcePlanWhileThinking ? 360000 : 180000,
       });
 
       let result;
@@ -3714,7 +3714,7 @@ function initAiChatbot() {
               inputs: {},
               conversationId: result.conversationId || conversationId || '',
               onChunk: paintStream,
-              timeoutMs: 240000,
+              timeoutMs: 360000,
             });
             if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
             const retryJson = pickJsonReport(retryRes?.text || '', retryRes);
@@ -3738,12 +3738,12 @@ function initAiChatbot() {
           beginPlanRouting();
           typing.classList.add('is-plan-status');
           typing.textContent =
-            '方案生成未得到可用正文（可能被模型思考过程占用）。请点击「新建对话」后重试；若多次失败请检查 Dify 诊断助手是否已发布最新提示词。';
+            '暂时未能生成可用方案，请点击「新建对话」后重试。';
           clearQuickReplies();
           return;
         }
         persistConversationId(newUuid(), false);
-        throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+        throw new Error('暂时未能生成方案，请点击「新建对话」后重试');
       }
 
       // If API app ignores mode-A start, fall back to local step-1 so官网仍可点选继续
@@ -3782,7 +3782,7 @@ function initAiChatbot() {
             inputs: {},
             conversationId: result.conversationId || conversationId || '',
             onChunk: paintStream,
-            timeoutMs: 240000,
+            timeoutMs: 360000,
           });
           if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
           const retryAnswer = sanitizeAiAnswer(retryRes?.text || '');
@@ -3822,7 +3822,7 @@ function initAiChatbot() {
         ) {
           typing.classList.add('is-plan-status');
           typing.textContent =
-            '方案未按结构化 JSON 生成（Agent 可能未调用 generate_diagnosis_report，或未把工具 JSON 输出到回复）。请到 Dify 查看该次运行是否有 Tool call，确认工具已发布后点「新建对话」重试。';
+            '暂时未能生成结构化方案，请点击「新建对话」后重试。';
           clearQuickReplies();
           return;
         } else {
@@ -3834,7 +3834,7 @@ function initAiChatbot() {
           if (!isDiagnosisPlanReadyToShow(answer) && !isDiagnosisPlanReadyToShow(result?.text || '')) {
             typing.classList.add('is-plan-status');
             typing.textContent =
-              '方案正文不完整或含无效草稿。请点击「新建对话」后重试；并确认 Dify 已发布最新诊断提示词与报告工具。';
+              '方案内容不完整，请点击「新建对话」后重试。';
             clearQuickReplies();
             return;
           }
@@ -3866,13 +3866,25 @@ function initAiChatbot() {
         maybeShowServiceRecsAfterAnswer(answer);
       }
     } catch (err) {
-      const msg = String(err?.message || '');
+      let msg = String(err?.message || '');
+      // Never expose internal tooling / Dify ops hints to end users
+      msg = msg
+        .replace(/请到\s*Dify[\s\S]*?(?=。|$)/gi, '')
+        .replace(/generate_diagnosis_report/gi, '')
+        .replace(/Workflow|Agent\/Workflow|路径\s*X/gi, '')
+        .replace(/Tool\s*call/gi, '')
+        .replace(/\s{2,}/g, ' ')
+        .replace(/[；;]\s*[；;]/g, '；')
+        .trim();
+      if (!msg || /Dify|Workflow|generate_diagnosis|路径\s*[ABCDX]/i.test(msg)) {
+        msg = '方案生成时间较长或暂时未能完成，请点击「新建对话」后重试。';
+      }
       if (/HTTP|无法连接|Failed to fetch/i.test(msg)) {
         setBotBubble(typing, `**暂时无法连接**\n\n- ${msg}\n- 请稍后重试`);
       } else {
         setBotBubble(
           typing,
-          `**暂时未能完成回答**\n\n- ${msg || '未知错误'}\n- 请点击「新建对话」后重试`
+          `**暂时未能完成回答**\n\n- ${msg}\n- 请点击「新建对话」后重试`
         );
       }
     } finally {
@@ -4843,7 +4855,7 @@ function buildResultWorkingHtml() {
     `<span class="result-working-ai-tag">AI</span>` +
     `<span class="result-working-title-rest">正在生成专属合规方案</span>` +
     `</p>` +
-    `<p class="result-working-sub">正在根据您的选项梳理方案（含知识检索，通常需1～3分钟）<span class="result-working-dots" aria-hidden="true"></span></p>` +
+    `<p class="result-working-sub">正在根据您的选项梳理方案（含知识检索，通常需1～5分钟，请耐心等待）<span class="result-working-dots" aria-hidden="true"></span></p>` +
     `</div>`
   );
 }
@@ -5106,17 +5118,37 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   };
   if (conversationId) payload.conversation_id = conversationId;
 
-  const waitMs = Math.max(30000, Number(timeoutMs) || 180000);
+  // Idle timeout resets on each SSE chunk; hard cap bounds total wait (plan gen often >4min).
+  const idleMs = Math.max(60000, Number(timeoutMs) || 180000);
+  const hardCapMs = Math.max(idleMs + 60000, Math.min(idleMs * 2.5, 600000));
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = controller
-    ? setTimeout(() => {
-        try {
-          controller.abort();
-        } catch {
-          /* ignore */
-        }
-      }, waitMs)
-    : null;
+  let idleTimer = null;
+  let hardTimer = null;
+  const clearWait = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (hardTimer) clearTimeout(hardTimer);
+    idleTimer = null;
+    hardTimer = null;
+  };
+  const abortSoft = () => {
+    try {
+      controller?.abort();
+    } catch {
+      /* ignore */
+    }
+  };
+  const armIdle = () => {
+    if (!controller) return;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(abortSoft, idleMs);
+  };
+  if (controller) {
+    armIdle();
+    hardTimer = setTimeout(abortSoft, hardCapMs);
+  }
+
+  const userTimeoutMsg =
+    '方案生成时间较长，请点击「新建对话」后重试；若多次失败可稍后再试，或预约页面下方专家咨询。';
 
   let res;
   try {
@@ -5130,18 +5162,12 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       signal: controller?.signal,
     });
   } catch (err) {
-    if (timer) clearTimeout(timer);
+    clearWait();
     if (err?.name === 'AbortError') {
-      throw new Error(
-        `方案生成超时（>${Math.round(waitMs / 1000)}秒）。请到 Dify 查看该次运行是否调用了 generate_diagnosis_report、Workflow 是否成功；确认已发布含路径 X 的 Agent/Workflow 后「新建对话」重试。`
-      );
+      throw new Error(userTimeoutMsg);
     }
-    throw new Error('无法连接道一 AI 服务（api.daoith.com），请检查网络或稍后重试');
+    throw new Error('无法连接道一 AI 服务，请检查网络或稍后重试');
   }
-
-  const clearWait = () => {
-    if (timer) clearTimeout(timer);
-  };
 
   try {
   const contentType = String(res.headers.get('content-type') || '');
@@ -5171,7 +5197,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     const text = extractDifyAnswer(data);
     const reportJson = extractDiagnosisReportJson(text) || extractDiagnosisReportJson(JSON.stringify(data));
     if (!text && !(reportJson && isDiagnosisReportJsonReady(reportJson))) {
-      throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+      throw new Error('暂时未能生成方案，请点击「新建对话」后重试');
     }
     if (typeof onChunk === 'function' && text) onChunk(text);
     return {
@@ -5194,6 +5220,12 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
   let streamError = '';
   let lastPaint = 0;
   let toolReportJson = null;
+
+  const finishWithReport = () => ({
+    text: answer || (toolReportJson ? JSON.stringify(toolReportJson) : ''),
+    conversationId: nextConversationId || conversationId || '',
+    reportJson: toolReportJson || null,
+  });
 
   const tryCaptureReportJson = (blob) => {
     const hit = extractDiagnosisReportJson(String(blob || ''));
@@ -5343,14 +5375,17 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     } catch (err) {
       clearWait();
       if (err?.name === 'AbortError') {
-        throw new Error(
-          `方案生成超时（>${Math.round(waitMs / 1000)}秒）。请到 Dify 查看该次运行是否调用了 generate_diagnosis_report、Workflow 是否成功；确认已发布含路径 X 的 Agent/Workflow 后「新建对话」重试。`
-        );
+        // Agent/Workflow often finishes tool JSON before chat text; still show the report
+        if (toolReportJson) {
+          return finishWithReport();
+        }
+        throw new Error(userTimeoutMsg);
       }
       throw err;
     }
     const { done, value } = chunk;
     if (done) break;
+    armIdle();
     buffer += decoder.decode(value, { stream: true });
 
     // SSE frames separated by blank line; each data line may be "data: {...}"
@@ -5380,14 +5415,10 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
 
   // Allow empty chat text when tool already returned a structured report
   if (!answer && !toolReportJson) {
-    throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+    throw new Error('暂时未能生成方案，请点击「新建对话」后重试');
   }
 
-  return {
-    text: answer || (toolReportJson ? JSON.stringify(toolReportJson) : ''),
-    conversationId: nextConversationId || conversationId || '',
-    reportJson: toolReportJson || null,
-  };
+  return finishWithReport();
   } finally {
     clearWait();
   }
@@ -5459,7 +5490,7 @@ async function callDify({ endpoint, inputs, query, conversationId, returnMeta })
   }
 
   if (!text) {
-    throw new Error('AI 返回内容为空，请点击「新建对话」后重试');
+    throw new Error('暂时未能生成方案，请点击「新建对话」后重试');
   }
 
   if (returnMeta) {
