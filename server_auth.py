@@ -154,6 +154,7 @@ def ensure_db():
                     cur.execute(
                         f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {ddl}"
                     )
+                _ensure_ask_quota_table(cur, postgres=True)
             conn.commit()
         return
 
@@ -195,7 +196,230 @@ def ensure_db():
             if col not in cols:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)")
+        _ensure_ask_quota_table(conn, postgres=False)
         conn.commit()
+
+
+FREE_ASK_LIMIT = 10
+_DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{8,80}$")
+
+
+def _ensure_ask_quota_table(cur, *, postgres: bool):
+    if postgres:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS diagnosis_ask_quota (
+              kind TEXT NOT NULL,
+              ident TEXT NOT NULL,
+              ask_count INTEGER NOT NULL DEFAULT 0,
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              PRIMARY KEY (kind, ident)
+            )
+            """
+        )
+        cur.execute("SELECT to_regclass('public.diagnosis_ask_counts')")
+        old = cur.fetchone()
+        if old and old[0]:
+            cur.execute(
+                """
+                INSERT INTO diagnosis_ask_quota (kind, ident, ask_count, updated_at)
+                SELECT 'ip', ip, ask_count, updated_at
+                FROM diagnosis_ask_counts
+                ON CONFLICT (kind, ident) DO NOTHING
+                """
+            )
+        return
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS diagnosis_ask_quota (
+          kind TEXT NOT NULL,
+          ident TEXT NOT NULL,
+          ask_count INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (kind, ident)
+        )
+        """
+    )
+    try:
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO diagnosis_ask_quota (kind, ident, ask_count, updated_at)
+            SELECT 'ip', ip, ask_count, updated_at FROM diagnosis_ask_counts
+            """
+        )
+    except Exception:
+        pass
+
+
+def _parse_device_id(headers, body=None):
+    raw = ""
+    if isinstance(body, dict):
+        raw = str(body.get("deviceId") or body.get("device_id") or "").strip()
+    if not raw and headers:
+        raw = str(
+            (headers.get("X-Daoith-Device-Id") if hasattr(headers, "get") else None)
+            or (headers.get("x-daoith-device-id") if hasattr(headers, "get") else None)
+            or ""
+        ).strip()
+    if raw and _DEVICE_ID_RE.match(raw):
+        return raw
+    return None
+
+
+def _quota_count_for(cur, kind, ident, *, postgres: bool) -> int:
+    if not ident:
+        return 0
+    if postgres:
+        cur.execute(
+            "SELECT ask_count FROM diagnosis_ask_quota WHERE kind = %s AND ident = %s",
+            (kind, ident),
+        )
+        row = cur.fetchone()
+    else:
+        row = cur.execute(
+            "SELECT ask_count FROM diagnosis_ask_quota WHERE kind = ? AND ident = ?",
+            (kind, ident),
+        ).fetchone()
+    if not row:
+        return 0
+    return int((row[0] if not isinstance(row, dict) else row.get("ask_count")) or 0)
+
+
+def _quota_bump(cur, kind, ident, *, postgres: bool, now: str, limit: int):
+    if not ident:
+        return
+    if postgres:
+        cur.execute(
+            """
+            INSERT INTO diagnosis_ask_quota (kind, ident, ask_count, updated_at)
+            VALUES (%s, %s, 1, NOW())
+            ON CONFLICT (kind, ident) DO UPDATE
+              SET ask_count = diagnosis_ask_quota.ask_count + 1,
+                  updated_at = NOW()
+            WHERE diagnosis_ask_quota.ask_count < %s
+            """,
+            (kind, ident, limit),
+        )
+        return
+    cur.execute(
+        "SELECT ask_count FROM diagnosis_ask_quota WHERE kind = ? AND ident = ?",
+        (kind, ident),
+    )
+    row = cur.fetchone()
+    current = int(row[0] or 0) if row else 0
+    if current >= limit:
+        return
+    nxt = current + 1
+    cur.execute(
+        """
+        INSERT INTO diagnosis_ask_quota (kind, ident, ask_count, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(kind, ident) DO UPDATE SET
+          ask_count = excluded.ask_count,
+          updated_at = excluded.updated_at
+        """,
+        (kind, ident, nxt, now),
+    )
+
+
+def _read_quota_counts(ip: str, device_id: str):
+    ensure_db()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                ip_count = _quota_count_for(cur, "ip", ip, postgres=True)
+                device_count = _quota_count_for(cur, "device", device_id, postgres=True)
+        return ip_count, device_count
+    with sqlite3.connect(DB_PATH) as conn:
+        ip_count = _quota_count_for(conn, "ip", ip, postgres=False)
+        device_count = _quota_count_for(conn, "device", device_id, postgres=False)
+    return ip_count, device_count
+
+
+def consume_diagnosis_ask(ip: str, device_id: str):
+    """Count one free ask for IP and device. Limited if either is already at the cap."""
+    ensure_db()
+    ip = (ip or "").strip()
+    device_id = (device_id or "").strip()
+    if not ip and not device_id:
+        raise ValueError("missing ip")
+    limit = FREE_ASK_LIMIT
+    ip_count, device_count = _read_quota_counts(ip, device_id)
+    used = max(ip_count, device_count)
+    if used >= limit:
+        return True, used, limit
+
+    database_url = get_database_url()
+    now = datetime.now(timezone.utc).isoformat()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                _quota_bump(cur, "ip", ip, postgres=True, now=now, limit=limit)
+                _quota_bump(cur, "device", device_id, postgres=True, now=now, limit=limit)
+            conn.commit()
+    else:
+        with sqlite3.connect(DB_PATH, isolation_level="IMMEDIATE") as conn:
+            _quota_bump(conn, "ip", ip, postgres=False, now=now, limit=limit)
+            _quota_bump(conn, "device", device_id, postgres=False, now=now, limit=limit)
+            conn.commit()
+    ip_count, device_count = _read_quota_counts(ip, device_id)
+    used = max(ip_count, device_count)
+    return False, used, limit
+
+
+def handle_diagnosis_ask_quota(
+    headers, env_loader, client_address=None, *, consume: bool, body=None
+):
+    """Logged-in users bypass; anonymous users are counted by IP and device id."""
+    set_env_loader(env_loader)
+    auth = ""
+    if headers:
+        auth = headers.get("Authorization") or headers.get("authorization") or ""
+    if auth:
+        resolved, err = _bearer_payload(auth, env_loader)
+        if not err and resolved:
+            return 200, {
+                "ok": True,
+                "limited": False,
+                "bypassed": True,
+                "limit": FREE_ASK_LIMIT,
+            }
+    ip = extract_quota_ip(headers, client_address)
+    device_id = _parse_device_id(headers, body)
+    if not ip and not device_id:
+        return 400, {"error": "无法识别访问来源，请微信登录后继续"}
+    ip_count, device_count = _read_quota_counts(ip or "", device_id or "")
+    used = max(ip_count, device_count)
+    if not consume:
+        limited = used >= FREE_ASK_LIMIT
+        return 200, {
+            "ok": True,
+            "limited": limited,
+            "count": used,
+            "ipCount": ip_count,
+            "deviceCount": device_count,
+            "limit": FREE_ASK_LIMIT,
+            "remaining": max(0, FREE_ASK_LIMIT - used),
+        }
+    limited, count, limit = consume_diagnosis_ask(ip or "", device_id or "")
+    if limited:
+        return 403, {
+            "ok": False,
+            "limited": True,
+            "count": count,
+            "limit": limit,
+            "remaining": 0,
+            "error": f"免费体验已达 {limit} 次。请微信登录后继续咨询，登录后可保留当前会话记忆。",
+            "needLogin": True,
+        }
+    return 200, {
+        "ok": True,
+        "limited": False,
+        "count": count,
+        "limit": limit,
+        "remaining": max(0, limit - count),
+    }
 
 
 def _row_to_user(row):
@@ -480,7 +704,7 @@ _PRIVATE_IP_RE = re.compile(
 )
 
 
-def extract_client_ip(headers, client_address=None):
+def _ip_candidates(headers, client_address=None):
     candidates = []
     if headers:
         for key in (
@@ -499,11 +723,28 @@ def extract_client_ip(headers, client_address=None):
         host = client_address[0] if isinstance(client_address, (list, tuple)) else client_address
         if host:
             candidates.append(str(host))
+    cleaned = []
     for raw in candidates:
         ip = str(raw or "").replace("::ffff:", "").strip()
-        if ip and not _PRIVATE_IP_RE.match(ip) and ip.lower() != "unknown":
+        if ip and ip.lower() != "unknown":
+            cleaned.append(ip)
+    return cleaned
+
+
+def extract_client_ip(headers, client_address=None):
+    for ip in _ip_candidates(headers, client_address):
+        if not _PRIVATE_IP_RE.match(ip):
             return ip
     return None
+
+
+def extract_quota_ip(headers, client_address=None):
+    """Public IP if present, otherwise any client IP (for local/dev)."""
+    public = extract_client_ip(headers, client_address)
+    if public:
+        return public
+    cands = _ip_candidates(headers, client_address)
+    return cands[0] if cands else None
 
 
 def _normalize_province(raw):

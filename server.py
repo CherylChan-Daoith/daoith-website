@@ -107,6 +107,15 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/diagnosis/ask-quota":
+            status, data = server_auth.handle_diagnosis_ask_quota(
+                self.headers,
+                load_env_value,
+                client_address=self.client_address,
+                consume=False,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/inquiry":
             limit = int((query.get("limit") or ["50"])[0] or 50)
             status, data = server_auth.handle_inquiry_list(
@@ -252,6 +261,23 @@ class Handler(SimpleHTTPRequestHandler):
                 body,
                 load_env_value,
                 client_ip=server_auth.extract_client_ip(self.headers, self.client_address),
+            )
+            self.send_json(status, data)
+            return
+        if path == "/api/diagnosis/ask-quota":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                body = {}
+            if not isinstance(body, dict):
+                body = {}
+            status, data = server_auth.handle_diagnosis_ask_quota(
+                self.headers,
+                load_env_value,
+                client_address=self.client_address,
+                consume=True,
+                body=body,
             )
             self.send_json(status, data)
             return

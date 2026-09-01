@@ -1795,11 +1795,11 @@ function planDetailsAlreadyCovers(details, title) {
   if ((Array.isArray(details) ? details : []).some((d) => String(d?.title || '').includes(title))) {
     return true;
   }
-  if (title.includes('0110出口+香港公司')) {
-    return /0110出口\s*\+\s*香港|0110.*香港公司|香港公司.*0110/.test(blob);
+  if (title.includes('0110出口+香港公司') || title.includes('0110出口+境外/香港公司')) {
+    return /0110出口\s*\+\s*(境外\/)?香港|0110.*(?:境外\/)?香港公司|(?:境外\/)?香港公司.*0110/.test(blob);
   }
-  if (title.includes('1039出口+香港公司')) {
-    return /1039出口\s*\+\s*香港|1039.*香港公司/.test(blob);
+  if (title.includes('1039出口+香港公司') || title.includes('1039出口+境外/香港公司')) {
+    return /1039出口\s*\+\s*(境外\/)?香港|1039.*(?:境外\/)?香港公司/.test(blob);
   }
   if (title.includes('1210出口备货至保税区')) {
     return /1210出口备货|1210.*保税|保税.*1210/.test(blob);
@@ -1829,22 +1829,22 @@ function buildMandatoryPlanDetails(slots, path) {
   if (path === 'A') {
     if (isDiagRebateEligibleProduct(product) && hasDiagSpecialInvoice(invoice)) {
       rows.push({
-        title: '0110出口+香港公司',
+        title: '0110出口+境外/香港公司',
         body:
-          '建议搭建「0110出口+香港公司」合规架构：国内供应商 → 进出口公司 → 香港公司 → 店铺公司 → 境外消费者。' +
-          '进出口公司以自有抬头 0110 一般贸易报关出口给香港公司（香港公司为报关单境外买家）；供应商增值税专用发票开给进出口公司，满足条件后可申请出口退免税。' +
+          '建议搭建「0110出口+境外/香港公司」合规架构：国内供应商 → 进出口公司 → 境外/香港公司 → 店铺公司 → 境外消费者。' +
+          '进出口公司以自有抬头 0110 一般贸易报关出口给境外/香港公司（境外/香港公司为报关单境外买家）；供应商增值税专用发票开给进出口公司，满足条件后可申请出口退免税。' +
           (freightForwarder
             ? '当前为委托货代出口（买单出口），须以自有抬头 0110 替代货代抬头报关，否则难以支撑退免税且存在三流不一致风险。'
             : '') +
-          '关联公司之间须注意转让定价，勿将大部分利润留存于无实质经营的香港公司。',
+          '关联公司之间须注意转让定价，勿将大部分利润留存于无实质经营的境外/香港公司。',
       });
     } else if (hasDiagNoInvoice(invoice)) {
       rows.push({
-        title: '1039出口+香港公司',
+        title: '1039出口+境外/香港公司',
         body:
-          '无票货源可评估「1039出口+香港公司」：国内供应商 → 个体户 → 香港公司 → 店铺公司 → 境外消费者。' +
-          '个体户在市场采购区（常建议东莞/义乌）以 1039 出口给香港公司，可享无票免征增值税与个税核定；' +
-          '单个个体户连续12个月销售额一般不超过500万，须合理安排规模。须核禁限类、知识产权备案及商检要求。',
+          '无票货源可评估「1039出口+境外/香港公司」：国内供应商 → 个体户 → 境外/香港公司 → 店铺公司 → 境外消费者。' +
+          '个体户在市场采购区（常建议东莞/义乌）以 1039 出口给境外/香港公司，可享无票免征增值税与个税核定；' +
+          '如需享受核定征收，单个个体户连续12个月销售额一般不超过500万，须合理安排规模；查账征收没有销售额限制但需注意税负。须核禁限类、知识产权备案及商检要求。',
       });
     }
     if (isMainlandDiagEntity(entity)) {
@@ -1852,7 +1852,7 @@ function buildMandatoryPlanDetails(slots, path) {
         title: '平台信息报送与主体一致性',
         body:
           '依据《互联网平台企业信息报送规定》，平台会向税务机关推送店铺身份与交易信息；税务机关一般要求店铺公司作为平台销售收入与所得税申报主体，收入口径为平台订单销售额（不是回款，不得扣除平台费用）。' +
-          '架构落地后须核对境外销售主体（如香港公司）与平台店铺主体是否一致；不一致时须增加「香港公司从出口主体采购后再销售给店铺公司」链路（出口主体 → 香港公司 → 店铺公司），使平台报送与店铺申报匹配。各地税局审核要点有差异，搭建前可咨询专家。',
+          '架构落地后须核对境外销售主体（如香港公司）与平台店铺主体是否一致；不一致时须增加「境外公司从出口主体采购后再销售给店铺公司」链路（出口主体 → 境外公司 → 店铺公司），使平台报送与店铺申报匹配。各地税局审核要点有差异，搭建前可咨询专家。',
       });
     }
   } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
@@ -1995,16 +1995,16 @@ function ensureDiagnosisReportOverview(report, slots, path) {
   if (path === 'A') {
     const s02 = ensureStage('02', '报关出口环节');
     if (isDiagRebateEligibleProduct(product) && hasDiagSpecialInvoice(invoice)) {
-      pushUnique(s02, '搭建0110出口+香港公司');
+      pushUnique(s02, '搭建0110出口+境外/香港公司');
     } else if (hasDiagNoInvoice(invoice)) {
-      pushUnique(s02, '搭建1039出口+香港公司');
+      pushUnique(s02, '搭建1039出口+境外/香港公司');
     }
     if (freightForwarder) {
       pushUnique(s02, '自有抬头0110替代委托货代');
     }
     if (isMainlandDiagEntity(s.entity)) {
       const s03 = ensureStage('03', '境外销售环节');
-      pushUnique(s03, '香港公司销售给店铺公司（主体不一致时）');
+      pushUnique(s03, '境外/香港公司销售给店铺公司（主体不一致时）');
       pushUnique(s03, '按平台订单销售额确认收入');
     }
   } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
@@ -2046,9 +2046,9 @@ function ensureDiagnosisReportOverview(report, slots, path) {
 function isForbiddenHkResaleOr0110Item(text) {
   const t = String(text || '');
   if (!t) return false;
-  if (/搭建\s*0110\s*出口\s*\+?\s*香港|0110出口\s*\+\s*香港公司/.test(t)) return true;
-  if (/搭建\s*1039\s*出口\s*\+?\s*香港|1039出口\s*\+\s*香港公司/.test(t)) return true;
-  if (/香港公司销售给店铺|采购后再销售给店铺|出口主体\s*→\s*香港公司\s*→\s*店铺/.test(t)) {
+  if (/搭建\s*0110\s*出口\s*\+?\s*(境外\/)?香港|0110出口\s*\+\s*(境外\/)?香港公司/.test(t)) return true;
+  if (/搭建\s*1039\s*出口\s*\+?\s*(境外\/)?香港|1039出口\s*\+\s*(境外\/)?香港公司/.test(t)) return true;
+  if (/(?:境外\/)?香港公司销售给店铺|采购后再销售给店铺|出口主体\s*→\s*(?:境外\/)?香港公司\s*→\s*店铺|出口主体\s*→\s*境外公司\s*→\s*店铺/.test(t)) {
     return true;
   }
   if (/平台信息报送与主体一致性/.test(t) && /香港|采购再销售|店铺公司/.test(t)) return true;
@@ -2142,6 +2142,86 @@ function isGenericDiagnosisProcessFlow(text) {
   );
 }
 
+/** Known platform tokens for archive-vs-report mismatch checks. */
+const DIAG_KNOWN_PLATFORM_TOKENS = [
+  '阿里国际站',
+  '国际站',
+  'TikTok',
+  '速卖通',
+  '亚马逊',
+  'Temu',
+  'Shopee',
+  'SHEIN',
+  '美客多',
+  'Walmart',
+  'eBay',
+  'Lazada',
+];
+
+function compactDiagnosisText(text) {
+  return String(text || '').replace(/\s+/g, '');
+}
+
+/** True when report body clearly describes a different case than current UI slots. */
+function diagnosisReportConflictsWithSlots(report, slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const platform = String(s.platform || '').trim();
+  const entity = String(s.entity || '').trim();
+  if (!platform && !entity) return false;
+
+  const flow = String(report?.risk?.processFlow || '').trim();
+  const blob = compactDiagnosisText(
+    [
+      flow,
+      report?.plan?.intro,
+      report?.risk?.summary,
+      JSON.stringify(report?.risk?.stages || []),
+      JSON.stringify(report?.plan?.overview || []),
+      JSON.stringify(report?.plan?.details || []),
+    ].join('\n')
+  );
+  if (!blob) return false;
+
+  const platKey = compactDiagnosisText(platform);
+  const flowKey = compactDiagnosisText(flow);
+
+  if (platKey && flowKey) {
+    const platformInFlow =
+      flowKey.includes(platKey) ||
+      (platKey.length >= 4 && flowKey.includes(platKey.slice(0, 4)));
+    if (!platformInFlow) {
+      const otherPlatform = DIAG_KNOWN_PLATFORM_TOKENS.some((token) => {
+        const tok = compactDiagnosisText(token);
+        if (!tok || platKey.includes(tok) || tok.includes(platKey.slice(0, Math.min(4, platKey.length)))) {
+          return false;
+        }
+        return flowKey.includes(tok) || blob.includes(tok);
+      });
+      if (otherPlatform) return true;
+    }
+  }
+
+  if (/香港公司/.test(entity) && /中国大陆公司/.test(flow) && !/香港/.test(flow)) {
+    return true;
+  }
+  if (/大陆公司|中国个人|个体户/.test(entity) && /中国香港公司/.test(flow) && !/大陆|个人|个体/.test(flow)) {
+    return true;
+  }
+
+  // Slots are not 国际站 but report body is clearly 阿里国际站
+  if (
+    platform &&
+    !/阿里国际站|国际站/.test(platform) &&
+    /阿里国际站/.test(blob) &&
+    !blob.includes(platKey) &&
+    !(platKey.length >= 4 && blob.includes(platKey.slice(0, 4)))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 function stripDiagnosisActionStepPrefix(text) {
   return String(text || '')
     .replace(/^\s*(?:第[一二三四五六七八九十百零\d]+步|[1-9]\d*)[.、．:：)\s]+/, '')
@@ -2177,27 +2257,27 @@ function formatDiagSlotsForApi(slots) {
   if (reportPath === 'A') {
     if (isDiagRebateEligibleProduct(s.productCategory) && hasDiagSpecialInvoice(s.invoice)) {
       hard +=
-        '【硬约束·架构】plan.details 必须含 title「0110出口+香港公司」及全链路（供应商→进出口公司→香港公司→店铺公司→境外消费者）；' +
+        '【硬约束·架构】plan.details 必须含 title「0110出口+境外/香港公司」及全链路（供应商→进出口公司→境外/香港公司→店铺公司→境外消费者）；' +
         '委托货代/买单出口须写以自有抬头0110替代货代报关。\n';
     } else if (hasDiagNoInvoice(s.invoice)) {
-      hard += '【硬约束·架构】plan.details 必须含 title「1039出口+香港公司」及全链路。\n';
+      hard += '【硬约束·架构】plan.details 必须含 title「1039出口+境外/香港公司」及全链路。\n';
     }
     if (isMainlandDiagEntity(s.entity)) {
       hard +=
-        '【硬约束·报送】大陆店铺主体：risk.stages 03 须写平台信息报送风险；plan.details 须写「平台信息报送与主体一致性」及香港公司采购后再销售给店铺公司链路。\n';
+        '【硬约束·报送】大陆店铺主体：risk.stages 03 须写平台信息报送风险；plan.details 须写「平台信息报送与主体一致性」及境外公司采购后再销售给店铺公司链路。\n';
     }
   } else if (reportPath === 'B' && isDiagRebateEligibleProduct(s.productCategory)) {
     hard += '【硬约束·架构】plan.details 必须含 title「1210出口备货至保税区」及 0110进区+1210离境说明。\n';
   } else if (reportPath === 'C') {
-    hard += '【硬约束·架构】路径C禁止写「0110出口+香港公司」「1039出口+香港公司」及采购再销售链路。\n';
+    hard += '【硬约束·架构】路径C禁止写「0110出口+境外/香港公司」「1039出口+境外/香港公司」及采购再销售链路。\n';
   } else if (reportPath === 'D') {
     hard +=
-      '【硬约束·架构】路径D：按特殊商品标识写免税或视同内销口径；禁止硬套 0110/1039 退税香港架构为首选。\n';
+      '【硬约束·架构】路径D：按特殊商品标识写免税或视同内销口径；禁止硬套 0110/1039 退税境外/香港架构为首选。\n';
   } else if (reportPath === 'X') {
     hard +=
       '【硬约束·路径X·国际站】report_path 必须为 X，禁止改判为 A。' +
-      '禁止写入「搭建0110出口+香港公司」「搭建1039出口+香港公司」「0110出口+香港公司」「1039出口+香港公司」；' +
-      '禁止写入「香港公司销售给店铺公司」「平台信息报送与主体一致性」下的采购再销售链路；禁止建议更换香港公司作为店铺主体。' +
+      '禁止写入「搭建0110出口+境外/香港公司」「搭建1039出口+境外/香港公司」「0110出口+境外/香港公司」「1039出口+境外/香港公司」「0110出口+香港公司」「1039出口+香港公司」；' +
+      '禁止写入「境外/香港公司销售给店铺公司」「香港公司销售给店铺公司」「平台信息报送与主体一致性」下的采购再销售链路；禁止建议更换香港公司作为店铺主体。' +
       '安全型（自营/一达通/市场采购）details title 须用「国际站正式报关履约与纳税申报」：侧重合规申报纳税与供应商发票风险（无票宜评估市场采购出口，普票无法退税须梳理专票）。' +
       '**仅一达通3+N**可默认生产型企业并须写外购视同自产（不满足则免税不可退税）；自营出口、一达通2+N、市场采购等**不得**默认生产型企业——仅当用户确认为生产型且有外购时才写视同自产。' +
       '高危型（便捷发货）：须写未报关/视同内销（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
@@ -2217,12 +2297,14 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
   const reportPath = detectDiagnosisReportPath(getDiagSlots());
   return (
     (retry
-      ? '【重试·强制】上一轮未返回可用 version=1 JSON。'
+      ? '【重试·强制】上一轮未返回可用 version=1 JSON，或 JSON 与本轮【诊断档案】不一致（疑似沿用旧会话档案）。'
       : '【专属合规诊断·生成报告】第1-7步已齐。') +
+    '【铁律·本轮档案】只采信下方【诊断档案】；禁止沿用对话历史中上一轮平台/主体/发货/出口/发票；' +
+    'risk.processFlow 必须按本轮档案逐字串成：供应商发票 → 店铺主体 → 出口方式 → 发货方式 → 平台 → 境外消费者。' +
     `请先按档案判定 report_path（官网预判为 ${reportPath}` +
     (reportPath === 'X'
       ? '；平台为阿里国际站或发货含一达通时**必须传 X，禁止因正式报关/专票改判为 A**'
-      : '；若与规则冲突以你按发货+出口+产品重判为准') +
+      : '；若与规则冲突以你按发货+出口+产品重判为准；**非阿里国际站禁止传 X**') +
     '；禁止对用户说出路径字母），' +
     '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（A/B/C/D/X）；' +
     '工具成功后，你的回复**正文第一行起必须是完整 JSON**（可包在 ```json 代码块；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
@@ -2230,7 +2312,7 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
     '禁止输出思考过程/检索过程/工具调用旁白；禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问；禁止为定路径去检索知识库。\n' +
     `${archive}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
-    '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据。' +
+    '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据；不得混入历史会话中的其它平台案例。' +
     '若工具调用失败：只输出一句「报告生成失败，请稍后重试」，不要写任何【核心风险诊断】Markdown。'
   );
 }
@@ -2789,7 +2871,6 @@ function initAiChatbot() {
   if (!root || !form || !input || !messages) return;
 
   const CONV_KEY = 'daoith_diagnosis_conversation_id';
-  const COUNT_KEY = 'daoith_diagnosis_ask_count';
   const BOUND_KEY = 'daoith_diagnosis_conversation_bound';
   const MODE_KEY = 'daoith_diagnosis_ui_mode';
   const STEP_KEY = 'daoith_diagnosis_ui_step';
@@ -2810,13 +2891,28 @@ function initAiChatbot() {
       ? crypto.randomUUID()
       : `c-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-  const getAskCount = () => {
-    const n = parseInt(localStorage.getItem(COUNT_KEY) || '0', 10);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  };
-
-  const setAskCount = (n) => {
-    localStorage.setItem(COUNT_KEY, String(Math.max(0, n | 0)));
+  const consumeFreeAskQuota = async () => {
+    const deviceId = getDaoithDeviceId();
+    const res = await fetch(`${notifyApiBase()}/api/diagnosis/ask-quota`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Daoith-Device-Id': deviceId,
+      },
+      body: JSON.stringify({ deviceId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 403 || data.limited) {
+      return {
+        limited: true,
+        limit: data.limit || FREE_ASK_LIMIT,
+        error: data.error || `免费体验已达 ${FREE_ASK_LIMIT} 次。请微信登录后继续咨询，登录后可保留当前会话记忆。`,
+      };
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+    return { limited: false, count: data.count, limit: data.limit || FREE_ASK_LIMIT };
   };
 
   const getUiMode = () => localStorage.getItem(MODE_KEY) || '';
@@ -2922,7 +3018,6 @@ function initAiChatbot() {
       id = newUuid();
       localStorage.setItem(CONV_KEY, id);
       localStorage.setItem(BOUND_KEY, '0');
-      setAskCount(0);
       resetUiWizard();
     }
     return id;
@@ -2932,7 +3027,6 @@ function initAiChatbot() {
     const id = newUuid();
     localStorage.setItem(CONV_KEY, id);
     localStorage.setItem(BOUND_KEY, '0');
-    setAskCount(0);
     resetUiWizard();
     return id;
   };
@@ -3127,14 +3221,19 @@ function initAiChatbot() {
       return;
     }
 
-    const askCount = getAskCount();
-    if (!loggedIn && askCount >= FREE_ASK_LIMIT) {
-      appendBubble(
-        '免费体验已达 10 次。请微信登录后继续咨询，登录后可保留当前会话记忆。',
-        'bot'
-      );
-      window.DAOITH_AUTH?.requireLogin?.('ai_chat', returnToAi);
-      return;
+    if (!loggedIn) {
+      try {
+        const quota = await consumeFreeAskQuota();
+        if (quota.limited) {
+          appendBubble(quota.error, 'bot');
+          window.DAOITH_AUTH?.requireLogin?.('ai_chat', returnToAi);
+          return;
+        }
+      } catch {
+        appendBubble('免费次数校验失败，请稍后重试或微信登录后继续。', 'bot');
+        window.DAOITH_AUTH?.requireLogin?.('ai_chat', returnToAi);
+        return;
+      }
     }
 
     clearQuickReplies();
@@ -3503,13 +3602,11 @@ function initAiChatbot() {
         const resolved = await resolveExportRefundRate(hsForRefund);
         if (resolved?.ok && resolved.rate != null) {
           const reply = formatStructuredRefundReply(resolved, hsForRefund);
-          setAskCount(askCount + 1);
           setBotBubble(typing, reply);
           showQuickReplies(reply);
           maybeShowServiceRecsAfterAnswer(reply);
           return;
         }
-        setAskCount(askCount + 1);
         const miss = `未查到海关编码 ${hsForRefund} 的出口退税率，请核对编码后重试，或以国家税务总局出口退税率文库为准。`;
         setBotBubble(typing, miss);
         showQuickReplies(miss);
@@ -3519,7 +3616,6 @@ function initAiChatbot() {
 
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
-        setAskCount(askCount + 1);
         if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
           publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
           typing.classList.add('is-plan-status');
@@ -3629,7 +3725,15 @@ function initAiChatbot() {
       });
 
       let result;
-      let conversationId = isModeSelect ? '' : (isConversationBound() ? sessionId : '');
+      // First full report: empty conversation so Agent cannot reuse a prior case's tool JSON
+      let conversationId =
+        shouldGeneratePlanNow && !isPostReportFollowUp
+          ? ''
+          : isModeSelect
+            ? ''
+            : isConversationBound()
+              ? sessionId
+              : '';
       try {
         result = await callChat(conversationId);
       } catch (firstErr) {
@@ -3656,7 +3760,6 @@ function initAiChatbot() {
 
       const nextId = result.conversationId || sessionId;
       persistConversationId(nextId, true);
-      setAskCount(askCount + 1);
 
       const pickJsonReport = (ans, res) => {
         const list = [
@@ -3712,7 +3815,7 @@ function initAiChatbot() {
               endpoint,
               query: retryQuery,
               inputs: {},
-              conversationId: result.conversationId || conversationId || '',
+              conversationId: shouldGeneratePlanNow && !isPostReportFollowUp ? '' : result.conversationId || conversationId || '',
               onChunk: paintStream,
               timeoutMs: 360000,
             });
@@ -3780,7 +3883,7 @@ function initAiChatbot() {
             endpoint,
             query: retryQuery,
             inputs: {},
-            conversationId: result.conversationId || conversationId || '',
+            conversationId: '',
             onChunk: paintStream,
             timeoutMs: 360000,
           });
@@ -3793,6 +3896,47 @@ function initAiChatbot() {
           }
         } catch {
           /* keep original answer / error path below */
+        }
+      }
+
+      // Report JSON describes a different case than current UI archive → fresh-session retry
+      if (shouldGeneratePlanNow || expectFollowUpPlan) {
+        const conflictJson = pickJsonReport(answer, result);
+        if (
+          conflictJson &&
+          isDiagnosisReportJsonReady(conflictJson) &&
+          diagnosisReportConflictsWithSlots(conflictJson, getDiagSlots())
+        ) {
+          typing.classList.add('is-plan-status');
+          typing.textContent = '检测到方案与当前档案不一致，正在按本轮档案重新生成…';
+          try {
+            const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
+            const retryRes = await callDifyStream({
+              endpoint,
+              query: retryQuery,
+              inputs: {},
+              conversationId: '',
+              onChunk: paintStream,
+              timeoutMs: 360000,
+            });
+            if (retryRes?.conversationId) persistConversationId(retryRes.conversationId, true);
+            const retryAnswer = sanitizeAiAnswer(retryRes?.text || '');
+            const retryJson = pickJsonReport(retryAnswer, retryRes);
+            if (
+              retryJson &&
+              isDiagnosisReportJsonReady(retryJson) &&
+              !diagnosisReportConflictsWithSlots(retryJson, getDiagSlots())
+            ) {
+              result = retryRes;
+              answer = retryAnswer || JSON.stringify(retryJson);
+            } else if (retryJson && isDiagnosisReportJsonReady(retryJson)) {
+              // Still mismatched: keep retry JSON but processFlow will be forced from slots on normalize
+              result = retryRes;
+              answer = retryAnswer || JSON.stringify(retryJson);
+            }
+          } catch {
+            /* keep original */
+          }
         }
       }
 
@@ -4987,6 +5131,50 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
 }
 
 /* Dify API (api.daoith.com) — no API keys in frontend */
+function getDaoithDeviceId() {
+  const KEY = 'daoith_device_id';
+  const readCookie = (name) => {
+    const parts = String(document.cookie || '').split(';');
+    for (const part of parts) {
+      const [k, ...rest] = part.trim().split('=');
+      if (k === name) return decodeURIComponent(rest.join('=') || '');
+    }
+    return '';
+  };
+  let id = '';
+  try {
+    id = localStorage.getItem(KEY) || '';
+  } catch {
+    id = '';
+  }
+  if (!id) id = readCookie(KEY) || '';
+  if (!id) {
+    try {
+      id = localStorage.getItem('daoith_dify_user_id') || '';
+    } catch {
+      id = '';
+    }
+  }
+  id = String(id || '').trim();
+  if (!id) {
+    id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? `web-${crypto.randomUUID()}`
+        : `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+  try {
+    localStorage.setItem(KEY, id);
+  } catch {
+    /* ignore */
+  }
+  try {
+    document.cookie = `${KEY}=${encodeURIComponent(id)};path=/;max-age=63072000;SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
+  return id;
+}
+
 function getDifyUserId() {
   const authUser = window.DAOITH_AUTH?.getUser?.();
   if (authUser?.openid) return `wx-${authUser.openid}`;
@@ -5010,7 +5198,6 @@ function syncDifyUserConversation() {
     localStorage.setItem('daoith_ai_conversation_bound', '0');
     localStorage.removeItem('daoith_diagnosis_conversation_id');
     localStorage.setItem('daoith_diagnosis_conversation_bound', '0');
-    localStorage.setItem('daoith_diagnosis_ask_count', '0');
   }
   localStorage.setItem(USER_MARK, current);
 }
@@ -6083,9 +6270,15 @@ function normalizeDiagnosisReportJson(obj) {
     impact: String(src.impact || '').trim(),
     risk: {
       processFlow: (() => {
+        const slots = getDiagSlots();
+        const fromSlots = buildDiagnosisProcessFlowFromSlots(slots);
         const raw = String(src.risk?.processFlow || '').trim();
+        // Prefer current UI archive whenever slots are filled — Agent may echo a prior case
+        if (slots.platform && slots.entity && slots.shipping) {
+          return fromSlots;
+        }
         if (!raw || isGenericDiagnosisProcessFlow(raw)) {
-          return buildDiagnosisProcessFlowFromSlots(getDiagSlots());
+          return fromSlots;
         }
         return raw;
       })(),
@@ -7987,30 +8180,25 @@ function initTaxCalculator() {
         ? (revenue / (1 + 0.01)) * 0.01
         : (revenue / (1 + vatLevyRate / 100)) * (vatLevyRate / 100);
       const vatOrRebate = useDeemedDomestic ? deemedDomesticVat : exportRebate;
-      const total = useDeemedDomestic
-        ? incomeTax + deemedDomesticVat
-        : incomeTax - exportRebate;
 
-      // 出口退税收益（销售额低于 500 万时不计算）
+      // 出口退税收益：仅满足退免税且退税率>0 时计算
       // (年出口销售额×产品成本率)×(1+供应商取票税点)×出口退税率/(1+13%)
       // − (年出口销售额×产品成本率)×供应商取票税点
-      const rebateBenefit = smallScale
-        ? null
-        : costBase * (1 + supplierPoint) * (refundRate / 100) / (1 + vatLevyRate / 100) -
-          costBase * supplierPoint;
-      // 税负率：视同内销时 =（企业所得税 + 视同内销增值税）/（出口销售额/(1+征税率)）
-      // 销售额低于 500 万按 1%，否则按 13%；其余 = 企业所得税 / 销售额
-      const burdenSalesBase = useDeemedDomestic
-        ? revenue / (1 + citVatRate)
-        : salesForCit;
-      const burdenNumerator = useDeemedDomestic
+      const showRebateBenefit = !useDeemedDomestic;
+      const rebateBenefit = showRebateBenefit
+        ? exportRebate - costBase * supplierPoint
+        : null;
+
+      // 无退税税负 = 增值税 + 企业所得税；有退税税负 = 企业所得税 − 出口退税收益
+      const total = useDeemedDomestic
         ? incomeTax + deemedDomesticVat
-        : incomeTax;
-      const burdenRatePct =
-        burdenSalesBase > 0 ? (burdenNumerator / burdenSalesBase) * 100 : null;
+        : incomeTax - rebateBenefit;
+
+      // 税负率 = 合规税负 / 销售额（年出口销售额）
+      const burdenRatePct = revenue > 0 ? (total / revenue) * 100 : null;
 
       const locale = window.DAOITH_getLocale?.() || 'zh';
-      const burdenNum = smallScale ? '3' : '4';
+      const burdenNum = showRebateBenefit ? '4' : '3';
       const copy = locale === 'en'
         ? {
             income: '1) Corporate income tax',
@@ -8031,11 +8219,11 @@ function initTaxCalculator() {
               '(Sales × product cost) × (1 + supplier invoice VAT point) × export rebate rate / (1 + 13%) − (Sales × product cost) × supplier invoice VAT point',
             burdenRate: `${burdenNum}) Tax burden rate`,
             burdenRateFormula: useDeemedDomestic
-              ? smallScale
-                ? '(Corporate income tax + deemed domestic-sales VAT) ÷ (export sales ÷ (1 + 1%))'
-                : '(Corporate income tax + deemed domestic-sales VAT) ÷ (export sales ÷ (1 + 13%))'
-              : 'Corporate income tax ÷ sales',
-            total: 'Net domestic tax burden',
+              ? 'Compliant tax burden (CIT + VAT) ÷ annual export sales'
+              : 'Compliant tax burden (CIT − export rebate net benefit) ÷ annual export sales',
+            total: useDeemedDomestic
+              ? 'Compliant tax burden (CIT + VAT)'
+              : 'Compliant tax burden (CIT − export rebate net benefit)',
             disclaimer: 'Note: this calculation is based on simplified assumptions and should not be used directly for business decisions. For a precise tax-burden analysis, please consult a tax expert.',
           }
         : {
@@ -8057,11 +8245,11 @@ function initTaxCalculator() {
               '（年出口销售额 × 产品成本率）×（1 + 供应商取票税点）× 出口退税率 /（1 + 13%）−（年出口销售额 × 产品成本率）× 供应商取票税点',
             burdenRate: `${burdenNum}）税负率`,
             burdenRateFormula: useDeemedDomestic
-              ? smallScale
-                ? '（企业所得税 + 视同内销增值税）÷（出口销售额 /（1 + 1%））'
-                : '（企业所得税 + 视同内销增值税）÷（出口销售额 /（1 + 13%））'
-              : '企业所得税 ÷ 销售额',
-            total: '国内税负合计（净额）',
+              ? '合规税负（增值税 + 企业所得税）÷ 年出口销售额'
+              : '合规税负（企业所得税 − 出口退税收益）÷ 年出口销售额',
+            total: useDeemedDomestic
+              ? '合规税负（增值税 + 企业所得税）'
+              : '合规税负（企业所得税 − 出口退税收益）',
             disclaimer: '注意说明：以上计算基于一定的假设，不能直接作为企业决策依据，如需精准的税负分析，可咨询财税专家。',
           };
       const vatLabel = useDeemedDomestic ? copy.vatDeemed : copy.vatYes;
@@ -8073,12 +8261,12 @@ function initTaxCalculator() {
           burdenRatePct == null ? '—' : `${burdenRatePct.toFixed(2)}%`;
       }
       const rebateBenefitMetric = rebateBenefitEl?.closest('.tax-result-metric');
-      if (rebateBenefitMetric) rebateBenefitMetric.hidden = !!smallScale;
+      if (rebateBenefitMetric) rebateBenefitMetric.hidden = !showRebateBenefit;
       if (rebateBenefitEl) {
         rebateBenefitEl.textContent =
           rebateBenefit == null ? '—' : formatWan(rebateBenefit);
       }
-      const rebateBenefitSection = smallScale
+      const rebateBenefitSection = !showRebateBenefit
         ? ''
         : `
           <div class="tax-breakdown-section">
