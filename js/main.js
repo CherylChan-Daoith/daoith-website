@@ -8613,11 +8613,11 @@ function setQuotesCache(list) {
 }
 
 function normalizeRemoteQuote(q) {
-  const status = q.status || '已提交';
+  const status = q.status === '已报价' ? '待付款' : (q.status || '已提交');
   const createdAt = q.createdAt;
   let statusHistory = q.statusHistory && typeof q.statusHistory === 'object' ? { ...q.statusHistory } : {};
   // Client-side backfill if API/cache missing intermediate times
-  const order = ['已提交', '处理中', '已报价'];
+  const order = ['已提交', '处理中', '待付款'];
   const path = (status === '已成交' || status === '已关闭')
     ? [...order, status]
     : (order.includes(status) ? order.slice(0, order.indexOf(status) + 1) : ['已提交']);
@@ -8625,6 +8625,10 @@ function normalizeRemoteQuote(q) {
   path.forEach((key) => {
     if (!statusHistory[key] && fallbackAt) statusHistory[key] = fallbackAt;
   });
+  if (statusHistory['已报价'] && !statusHistory['待付款']) {
+    statusHistory['待付款'] = statusHistory['已报价'];
+  }
+  delete statusHistory['已报价'];
   return {
     inquiryId: q.inquiryId,
     company: q.company,
@@ -8732,6 +8736,7 @@ function hubProgressPct(card) {
 }
 
 function quoteStatusLabel(status) {
+  if (status === '已报价') return '待付款';
   return status || '已提交';
 }
 
@@ -8746,6 +8751,7 @@ function hubStatusClass(status) {
   const map = {
     '已提交': 'hub-status-submitted',
     '处理中': 'hub-status-processing',
+    '待付款': 'hub-status-quoted',
     '已报价': 'hub-status-quoted',
     '已成交': 'hub-status-won',
     '已关闭': 'hub-status-closed',

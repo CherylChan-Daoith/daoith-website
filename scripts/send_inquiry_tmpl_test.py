@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-ALLOWED_STATUS = {"已提交", "处理中", "已报价", "已成交", "已关闭"}
+ALLOWED_STATUS = {"已提交", "处理中", "待付款", "已报价", "已成交", "已关闭"}
 
 
 def load_env():
@@ -58,7 +58,7 @@ def main():
             "thing3": {"value": "官网询价"},
             "time4": {"value": now},
             "character_string5": {"value": "TEST" + datetime.now().strftime("%m%d%H%M%S")},
-            "const12": {"value": status},
+            "const12": {"value": "已报价" if status == "待付款" else status},
             "time29": {"value": due},
         },
     }

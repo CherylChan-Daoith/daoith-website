@@ -1605,15 +1605,34 @@ def handle_notify_disable(auth_header: str, env_loader):
     }
 
 
-ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "已报价", "已成交", "已关闭"}
-_INQUIRY_STATUS_ORDER = ["已提交", "处理中", "已报价"]
+ALLOWED_INQUIRY_STATUS = {"已提交", "处理中", "待付款", "已成交", "已关闭"}
+_INQUIRY_STATUS_ALIASES = {"已报价": "待付款"}
+_INQUIRY_STATUS_ORDER = ["已提交", "处理中", "待付款"]
 _INQUIRY_TERMINALS = {"已成交", "已关闭"}
 # WeChat template const12 enums currently approved in the OA console
 _WECHAT_TMPL_STATUSES = frozenset({"已提交", "处理中", "已报价", "已成交", "已关闭"})
+_WECHAT_TMPL_STATUS_ALIAS = {"待付款": "已报价"}
+
+
+def canonical_inquiry_status(status: str) -> str:
+    raw = (status or "").strip() or "已提交"
+    return _INQUIRY_STATUS_ALIASES.get(raw, raw)
+
+
+def _canonical_status_history(history: dict) -> dict:
+    out = {}
+    for key, value in (history or {}).items():
+        canon = canonical_inquiry_status(str(key))
+        if not canon or not value:
+            continue
+        if canon not in out:
+            out[canon] = str(value)
+    return out
 
 
 def _inquiry_status_path(status: str) -> list:
     """Statuses from 已提交 up to and including `status` (终态二选一)."""
+    status = canonical_inquiry_status(status)
     if status in _INQUIRY_TERMINALS:
         return list(_INQUIRY_STATUS_ORDER) + [status]
     if status in _INQUIRY_STATUS_ORDER:
@@ -1624,16 +1643,18 @@ def _inquiry_status_path(status: str) -> list:
 
 def _parse_status_history(raw) -> dict:
     if isinstance(raw, dict):
-        return {str(k): str(v) for k, v in raw.items() if k and v}
-    if not raw:
-        return {}
-    try:
-        data = json.loads(raw) if isinstance(raw, str) else {}
-    except Exception:
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return {str(k): str(v) for k, v in data.items() if k and v}
+        parsed = {str(k): str(v) for k, v in raw.items() if k and v}
+    elif not raw:
+        parsed = {}
+    else:
+        try:
+            data = json.loads(raw) if isinstance(raw, str) else {}
+        except Exception:
+            parsed = {}
+        else:
+            parsed = data if isinstance(data, dict) else {}
+            parsed = {str(k): str(v) for k, v in parsed.items() if k and v}
+    return _canonical_status_history(parsed)
 
 
 def _merge_status_history(existing, status: str, at: str) -> dict:
@@ -1652,7 +1673,7 @@ def _merge_status_history(existing, status: str, at: str) -> dict:
 def _synthesize_status_history(status: str, created_iso: str, raw_history=None) -> dict:
     """Build a complete timeline for API/UI; used for legacy rows with empty history."""
     history = _parse_status_history(raw_history)
-    status = status or "已提交"
+    status = canonical_inquiry_status(status or "已提交")
     at = created_iso or datetime.now(timezone.utc).isoformat()
     if "已提交" not in history:
         history = _merge_status_history(history, "已提交", at)
@@ -1716,6 +1737,58 @@ def _backfill_empty_status_histories():
 
 
 _STATUS_HISTORY_BACKFILL_DONE = False
+_STATUS_RENAME_DONE = False
+
+
+def _rename_quoted_status():
+    """Rename stored 已报价 → 待付款, including status_history keys."""
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE website_inquiries SET status = %s WHERE status = %s",
+                    ("待付款", "已报价"),
+                )
+                cur.execute(
+                    """
+                    SELECT id, status_history_json FROM website_inquiries
+                    WHERE status_history_json LIKE %s
+                    """,
+                    ("%已报价%",),
+                )
+                rows = cur.fetchall()
+                for inquiry_id, raw in rows:
+                    history_json = json.dumps(
+                        _parse_status_history(raw), ensure_ascii=False
+                    )
+                    if history_json != (raw or ""):
+                        cur.execute(
+                            "UPDATE website_inquiries SET status_history_json = %s WHERE id = %s",
+                            (history_json, inquiry_id),
+                        )
+            conn.commit()
+        return
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            "UPDATE website_inquiries SET status = ? WHERE status = ?",
+            ("待付款", "已报价"),
+        )
+        rows = conn.execute(
+            """
+            SELECT id, status_history_json FROM website_inquiries
+            WHERE status_history_json LIKE ?
+            """,
+            ("%已报价%",),
+        ).fetchall()
+        for inquiry_id, raw in rows:
+            history_json = json.dumps(_parse_status_history(raw), ensure_ascii=False)
+            if history_json != (raw or ""):
+                conn.execute(
+                    "UPDATE website_inquiries SET status_history_json = ? WHERE id = ?",
+                    (history_json, inquiry_id),
+                )
+        conn.commit()
 
 
 def _ensure_status_history_column(cur, *, postgres: bool):
@@ -1837,7 +1910,7 @@ def _parse_paid_at(value):
 
 
 def ensure_inquiry_db():
-    global _STATUS_HISTORY_BACKFILL_DONE
+    global _STATUS_HISTORY_BACKFILL_DONE, _STATUS_RENAME_DONE
     ensure_db()
     database_url = get_database_url()
     if database_url:
@@ -1876,6 +1949,12 @@ def ensure_inquiry_db():
                 _STATUS_HISTORY_BACKFILL_DONE = True
             except Exception:
                 pass
+        if not _STATUS_RENAME_DONE:
+            try:
+                _rename_quoted_status()
+                _STATUS_RENAME_DONE = True
+            except Exception:
+                pass
         return
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -1908,6 +1987,12 @@ def ensure_inquiry_db():
         try:
             _backfill_empty_status_histories()
             _STATUS_HISTORY_BACKFILL_DONE = True
+        except Exception:
+            pass
+    if not _STATUS_RENAME_DONE:
+        try:
+            _rename_quoted_status()
+            _STATUS_RENAME_DONE = True
         except Exception:
             pass
 
@@ -2053,8 +2138,11 @@ def update_inquiry_flags(inquiry_id: str, *, notify_sent=None, pm_synced=None):
 
 def _inquiry_template_status(status: str):
     """WeChat const12 must match OA enum exactly; None means do not push."""
-    if status in _WECHAT_TMPL_STATUSES:
-        return status
+    mapped = _WECHAT_TMPL_STATUS_ALIAS.get(
+        canonical_inquiry_status(status), canonical_inquiry_status(status)
+    )
+    if mapped in _WECHAT_TMPL_STATUSES:
+        return mapped
     return None
 
 
@@ -2302,6 +2390,7 @@ def fetch_file_from_pm(file_id: str, openid: str, env_loader=None):
 
 def update_inquiry_status(inquiry_id: str, status: str):
     ensure_inquiry_db()
+    status = canonical_inquiry_status(status)
     if status not in ALLOWED_INQUIRY_STATUS:
         raise ValueError(f"无效状态：{status}")
     now = datetime.now(timezone.utc).isoformat()
@@ -2319,7 +2408,7 @@ def update_inquiry_status(inquiry_id: str, status: str):
                 row = cur.fetchone()
                 if not row:
                     return None
-                prev_status = row[1] or "已提交"
+                prev_status = canonical_inquiry_status(row[1] or "已提交")
                 created_at = row[3]
                 history = _merge_status_history(row[2], status, now)
                 history_json = json.dumps(history, ensure_ascii=False)
@@ -2354,7 +2443,7 @@ def update_inquiry_status(inquiry_id: str, status: str):
         ).fetchone()
         if not row:
             return None
-        prev_status = row["status"] or "已提交"
+        prev_status = canonical_inquiry_status(row["status"] or "已提交")
         history = _merge_status_history(row["status_history_json"], status, now)
         history_json = json.dumps(history, ensure_ascii=False)
         conn.execute(
@@ -2409,7 +2498,7 @@ def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
     except Exception:
         items = []
     created_iso = created.isoformat() if hasattr(created, "isoformat") else str(created or "")
-    status = status or "已提交"
+    status = canonical_inquiry_status(status or "已提交")
     history = _synthesize_status_history(status, created_iso, history_raw)
     standard, quoted_default, rate = compute_inquiry_totals(items, base["total"])
     if quoted_raw is None:
@@ -2497,7 +2586,7 @@ def handle_inquiry_status_update(headers, body: dict, env_loader):
         return 401, {"error": "无效的同步密钥"}
     body = body or {}
     inquiry_id = (body.get("inquiryId") or body.get("id") or "").strip()
-    status = (body.get("status") or "").strip()
+    status = canonical_inquiry_status((body.get("status") or "").strip())
     if not inquiry_id:
         return 400, {"error": "缺少 inquiryId"}
     if status not in ALLOWED_INQUIRY_STATUS:
@@ -2581,7 +2670,7 @@ def upsert_inquiry_from_pm(record: dict):
     inquiry_id = str(record.get("inquiryId") or record.get("id") or "").strip()
     if not inquiry_id:
         raise ValueError("缺少 inquiryId")
-    status = str(record.get("status") or "已提交").strip()
+    status = canonical_inquiry_status(str(record.get("status") or "已提交").strip())
     if status not in ALLOWED_INQUIRY_STATUS:
         raise ValueError(f"无效状态：{status}")
     now = datetime.now(timezone.utc).isoformat()
