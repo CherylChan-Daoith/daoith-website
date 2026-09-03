@@ -1255,7 +1255,6 @@ const DIAG_QUICK_REPLY_SETS = {
     '一达通代理出口2+N',
     '市场采购出口',
     '便捷发货出口',
-    '其他',
   ],
   shippingShein: [
     '供货 SHEIN（国内仓）',
@@ -1543,10 +1542,20 @@ function detectDiagQuickReplySet(botText) {
   return null;
 }
 
-function shippingQuickReplySetForPlatform(platformLabel) {
+function shippingQuickReplySetForPlatform(platformLabel, entityLabel) {
   const t = String(platformLabel || '');
+  const entity = String(
+    entityLabel ||
+      (typeof getDiagSlots === 'function' ? getDiagSlots().entity : '') ||
+      ''
+  ).trim();
   if (/亚马逊|Amazon/i.test(t)) return 'shippingAmazon';
-  if (/国际站|阿里国际|Alibaba\.com/i.test(t)) return 'shippingAlibaba';
+  if (/国际站|阿里国际|Alibaba\.com/i.test(t)) {
+    // 境外主体：发货选项与其他平台一致（仓/自发货），不用一达通履约清单
+    if (isOverseasDiagEntity(entity)) return 'shipping';
+    // 大陆主体：自营/一达通/市场采购/便捷发货（无「其他」）
+    return 'shippingAlibaba';
+  }
   if (/SHEIN|希音/i.test(t)) return 'shippingShein';
   if (/速卖通|AliExpress/i.test(t)) return 'shippingAliExpress';
   if (/Temu|TEMU/i.test(t)) return 'shippingTemu';
@@ -1649,19 +1658,12 @@ function resolveDiagExportAskFromShipping(shipping, platform) {
         note: '该履约方式通常凭报关单收汇，出口已记为「正式报关出口（0110/9710）」。',
       };
     }
+    // 国际站「便捷发货」→ 问发给海外客户（小包选项）
     if (/便捷发货/.test(ship)) {
       return {
         kind: 'ask',
         question: '您的货物是通过什么出口方式发给海外客户的？',
         optionsKey: 'exportModeConsumer',
-      };
-    }
-    // 国际站第三步选「其他」→ 问出口，给全量选项
-    if (isIntlStation && /^(其他|其它)$/.test(ship)) {
-      return {
-        kind: 'ask',
-        question: '您的货物是通过什么出口方式发给海外客户的？',
-        optionsKey: 'exportModeIntlOther',
       };
     }
   }
@@ -1823,10 +1825,11 @@ function detectDiagnosisReportPath(slots) {
   if (/^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product)) {
     return 'D';
   }
-  // Path X: 仅国际站已知履约（自营/一达通/市场采购/便捷发货）；发货「其他」按出口方式再判 A/B
+  // Path X: 国际站 + 大陆主体 + 已知履约；境外主体仓/自发货按 A/B/C
   if (
     /一达通/.test(shipping) ||
     (/阿里国际站|国际站|Alibaba\.com/i.test(platform) &&
+      isMainlandDiagEntity(s.entity) &&
       /自营出口|市场采购出口|便捷发货出口/.test(shipping))
   ) {
     return 'X';
@@ -1912,8 +1915,13 @@ function resolveDiagnosisReportPath(report, slots) {
   const s = filledCount >= 3 ? raw : hydrateDiagSlotsFromReport(report, raw);
   let path = detectDiagnosisReportPath(s);
   const blob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''}`;
-  // Hard override: Agent already wrote 国际站/一达通 → never treat as A (would inject 0110+HK)
-  if (path === 'A' && /一达通|阿里国际站/.test(blob)) {
+  // Hard override: Agent already wrote 一达通/国际站履约 → never treat as A (would inject 0110+HK)
+  // Do NOT force X merely because intro mentions「阿里国际站」(境外主体走仓/自发货时应为 A/B/C)
+  if (
+    path === 'A' &&
+    (/一达通/.test(blob) ||
+      (/自营出口|便捷发货出口|市场采购出口/.test(blob) && /国际站|一达通|阿里/.test(blob)))
+  ) {
     path = 'X';
   }
   return { path, slots: s };
@@ -1963,6 +1971,10 @@ function planIntroConflictsWithSlots(intro, slots) {
 
 function isMainlandDiagEntity(entity) {
   return /中国大陆公司|中国个人|个体户/.test(String(entity || ''));
+}
+
+function isOverseasDiagEntity(entity) {
+  return /中国香港公司|外籍个人|其他境外公司|香港公司/.test(String(entity || ''));
 }
 
 function hasDiagSpecialInvoice(invoice) {
@@ -2520,10 +2532,14 @@ function ensureDiagnosisReportArchitectures(report, slots) {
   const { path, slots: s } = resolveDiagnosisReportPath(report, rawSlots);
   let next = report;
 
-  // Never inject path-A 0110/HK architectures for 国际站/一达通 reports
+  // Never inject path-A 0110/HK architectures for 一达通/国际站履约 reports
   // (even if slots mis-detect as A — Agent JSON is already correct).
+  // 仅「一达通/自营/便捷发货/市场采购」等履约痕迹才强制 X；勿因正文出现平台名「阿里国际站」就把境外主体仓发货改成 X。
   const reportBlob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''} ${JSON.stringify(report?.plan?.overview || [])}`;
-  const isIntlStationReport = /一达通|阿里国际站/.test(reportBlob) || path === 'X';
+  const looksLikeIntlFulfillment =
+    /一达通/.test(reportBlob) ||
+    (/自营出口|便捷发货出口|市场采购出口/.test(reportBlob) && /国际站|一达通|阿里/.test(reportBlob));
+  const isIntlStationReport = looksLikeIntlFulfillment || path === 'X';
   const effectivePath = isIntlStationReport && path === 'A' ? 'X' : path;
 
   const mandatory = buildMandatoryPlanDetails(s, effectivePath);
@@ -3139,7 +3155,22 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
   const platform = String(platformLabel || getDiagSlots().platform || '').trim();
   const stepHints = {
     2: '请执行第二步：只提问「2. 您平台店铺的注册主体是哪一种？（可在下方点选）」；不要在正文罗列主体选项，官网会显示按钮。',
-    3: '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；不要在正文罗列选项，官网会按平台显示按钮。',
+    3: (() => {
+      const entity = String(getDiagSlots().entity || '').trim();
+      if (/国际站|阿里国际|Alibaba\.com/i.test(platform) && isOverseasDiagEntity(entity)) {
+        return (
+          '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；' +
+          '国际站+境外主体时官网选项为发货到平台海外仓/国内仓、自发货国内直发/海外仓（与其他平台相同），不要问一达通履约选项。'
+        );
+      }
+      if (/国际站|阿里国际|Alibaba\.com/i.test(platform)) {
+        return (
+          '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；' +
+          '国际站+大陆主体选项为自营出口/一达通3+N或2+N/市场采购出口/便捷发货出口，**不要**加「其他」。'
+        );
+      }
+      return '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；不要在正文罗列选项，官网会按平台显示按钮。';
+    })(),
     4: (() => {
       const branch = resolveDiagExportAskFromShipping(
         getDiagSlots().shipping,
@@ -3185,7 +3216,10 @@ function diagQuickReplySetForStep(step, platformLabel) {
     case 2:
       return 'entity';
     case 3:
-      return shippingQuickReplySetForPlatform(platformLabel);
+      return shippingQuickReplySetForPlatform(
+        platformLabel,
+        typeof getDiagSlots === 'function' ? getDiagSlots().entity : ''
+      );
     case 4:
       return exportModeQuickReplySetForShipping(
         typeof getDiagSlots === 'function' ? getDiagSlots().shipping : '',
@@ -3207,17 +3241,9 @@ function isVagueDiagnosisAnswer(text, step) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (/^(不清楚|不知道|暂不清楚|不太清楚|不确定)$/.test(t)) return true;
-  // 3=发货其他（非国际站才追问澄清；国际站「其他」进入第四步全量出口选项）
-  // 4=出口其他, 6=产品类别其他（主体已改为「其他境外公司」完整选项，不再视为模糊）
+  // 3=发货其他, 4=出口其他, 6=产品类别其他（主体「其他境外公司」为完整选项，不算模糊）
   if (/^(其他|其它|其他发货方式|其他（不在以上分类）)$/.test(t)) {
-    if (step === 3) {
-      const plat = String(
-        (typeof getDiagSlots === 'function' && getDiagSlots().platform) || ''
-      );
-      if (/阿里国际站|国际站|Alibaba\.com/i.test(plat)) return false;
-      return true;
-    }
-    return step === 4 || step === 6;
+    return step === 3 || step === 4 || step === 6;
   }
   return false;
 }
