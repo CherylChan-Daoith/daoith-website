@@ -1906,14 +1906,20 @@ function buildMandatoryPlanDetails(slots, path) {
     } else {
       const invoice = String(s.invoice || '');
       let invoiceTip = '';
-      if (hasDiagNoInvoice(invoice)) {
+      if (/部分专票\s*\+\s*部分无票|部分无票/.test(invoice) && /专票/.test(invoice)) {
         invoiceTip =
-          '当前较难取得进项发票时，合规税负往往偏高，宜优先评估市场采购出口等与无票更匹配的履约/出口安排，并梳理可取得专票的供应商。';
+          '档案为「部分专票+部分无票」：无票部分进项缺失，须逐家梳理；无票货源宜评估市场采购出口等安排，专票部分单独核算退税条件。';
+      } else if (/部分专票\s*\+\s*部分普票/.test(invoice)) {
+        invoiceTip =
+          '档案为「部分专票+部分普票」：普票通常无法支撑退税（亦非无票），须逐家梳理供应商、争取对可退税货物改开专票；禁止改写成无票采购。';
+      } else if (hasDiagNoInvoice(invoice)) {
+        invoiceTip =
+          '档案为无法提供发票/无票：合规税负往往偏高，宜优先评估市场采购出口等与无票更匹配的履约/出口安排，并梳理可取得专票的供应商。';
       } else if (/普通发票|普票/.test(invoice) && !hasDiagSpecialInvoice(invoice)) {
         invoiceTip =
-          '目前主要为增值税普通发票，通常无法支撑退税，须重点梳理供应商发票、争取改开专票。';
-      } else if (/部分专票|部分普票|部分无票/.test(invoice)) {
-        invoiceTip = '存在专票不全或混用情形，须逐家梳理供应商开票，普票/无票部分无法按专票退税。';
+          '档案为增值税普通发票（不是无票）：通常无法支撑退税，须重点梳理供应商发票、争取改开专票。';
+      } else if (hasDiagSpecialInvoice(invoice) && !/部分/.test(invoice)) {
+        invoiceTip = '档案已有专票条件时，侧重核对专票与报关、收汇资料齐套，勿写成无票或普票口径。';
       }
       rows.push({
         title: '国际站正式报关履约与纳税申报',
@@ -2173,6 +2179,91 @@ function stripPathDBleedFromPathXReport(report, slots) {
   return next;
 }
 
+/** Scrub report body when it contradicts archive invoice / product labels. */
+function scrubArchiveSlotBleedFromReport(report, slots) {
+  if (!report || typeof report !== 'object') return report;
+  const s = slots && typeof slots === 'object' ? slots : {};
+  const invoice = String(s.invoice || '');
+  const product = String(s.productCategory || '');
+  if (!invoice && !product) return report;
+
+  const archiveHasNoInvoice = hasDiagNoInvoice(invoice) || /部分无票/.test(invoice);
+  const archiveIsPartialGeneral =
+    /部分专票\s*\+\s*部分普票/.test(invoice) ||
+    (/普票/.test(invoice) && !archiveHasNoInvoice && /部分/.test(invoice));
+  const archiveIsGeneralOnly =
+    /普通发票|普票/.test(invoice) && !hasDiagSpecialInvoice(invoice) && !archiveHasNoInvoice;
+  const forbidNoInvoiceWording = (archiveIsPartialGeneral || archiveIsGeneralOnly) && !archiveHasNoInvoice;
+  const forbidZeroRebateWording =
+    /普货|商检/.test(product) && !/^0退税率/.test(product) && !/暂未获得授权/.test(product);
+
+  const scrubText = (text) => {
+    let t = String(text || '');
+    if (!t) return t;
+    if (forbidNoInvoiceWording) {
+      // Common LLM mix-up: 部分普票 → 部分无票
+      t = t.replace(/部分专票\s*\+\s*部分无票/g, invoice.includes('部分普票') ? '部分专票+部分普票' : invoice || '部分专票+部分普票');
+      t = t.replace(/部分无票采购/g, '部分普票采购');
+      t = t.replace(/部分无票/g, '部分普票');
+      t = t.replace(/无票采购导致进项缺失/g, '普票无法支撑退税');
+      t = t.replace(/供应商发票为部分专票\s*\+\s*部分无票/g, `供应商发票为${invoice || '部分专票+部分普票'}`);
+      t = t.replace(/无票部分无法抵扣进项税额[^。；\n]*/g, '普票通常无法支撑出口退税，须争取改开专票');
+      t = t.replace(/无票采购成本在企业所得税前扣除也可能受限[^。；\n]*[。；]?/g, '');
+      t = t.replace(/进一步加重进项缺失[^。；\n]*[。；]?/g, (m) => (/无票/.test(m) ? '' : m));
+      // Remaining standalone 无票 claims when archive has 普票 only
+      t = t.replace(/([^「『]*)无票(?![\u4e00-\u9fff]*普票)/g, (full, pre) => {
+        if (/普票|专票/.test(pre.slice(-6))) return `${pre}普票`;
+        return `${pre}普票`;
+      });
+    }
+    if (forbidZeroRebateWording) {
+      t = scrubSpecialGoodsFlagBleedText(t);
+      t = t.replace(/属于\s*0\s*退税率[^。；\n]*[。；]?/g, '');
+      t = t.replace(/产品属于0退税率[^。；\n]*[。；]?/g, '');
+    }
+    return t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
+  };
+
+  const mapItems = (items) =>
+    (Array.isArray(items) ? items : [])
+      .map((it) => {
+        if (typeof it === 'string') {
+          const cleaned = scrubText(it);
+          return cleaned && cleaned.length >= 4 ? cleaned : null;
+        }
+        if (it && typeof it === 'object') {
+          const title = scrubText(String(it.title || '')) || String(it.title || '');
+          const body = scrubText(String(it.body || it.text || ''));
+          if (!body || body.length < 8) return null;
+          // Drop titles that still claim 无票 when archive has no 无票
+          if (forbidNoInvoiceWording && /无票/.test(title) && !/普票/.test(title)) {
+            return { ...it, title: title.replace(/无票/g, '普票') || '供应商发票梳理', body };
+          }
+          return { ...it, title, body };
+        }
+        return it;
+      })
+      .filter(Boolean);
+
+  const next = {
+    ...report,
+    risk: { ...(report.risk || {}) },
+    plan: { ...(report.plan || {}) },
+  };
+  if (next.risk.summary) next.risk.summary = scrubText(next.risk.summary) || next.risk.summary;
+  next.risk.stages = (Array.isArray(next.risk.stages) ? next.risk.stages : []).map((st) => ({
+    ...st,
+    items: mapItems(st.items),
+  }));
+  next.plan.intro = scrubText(next.plan.intro || '') || next.plan.intro;
+  next.plan.overview = (Array.isArray(next.plan.overview) ? next.plan.overview : []).map((st) => ({
+    ...st,
+    items: mapItems(st.items),
+  }));
+  next.plan.details = mapItems(next.plan.details);
+  return next;
+}
+
 function ensureDiagnosisReportArchitectures(report, slots) {
   if (!report || typeof report !== 'object') return report;
   const rawSlots = slots && typeof slots === 'object' ? slots : getDiagSlots();
@@ -2213,6 +2304,8 @@ function ensureDiagnosisReportArchitectures(report, slots) {
   if (!/^0退税率/.test(String(s.productCategory || ''))) {
     next = stripPathDBleedFromPathXReport(next, s);
   }
+  // 发票/产品等档案字段与正文冲突时纠偏（如 部分普票 被写成 部分无票）
+  next = scrubArchiveSlotBleedFromReport(next, s);
   return next;
 }
 
@@ -2307,6 +2400,26 @@ function diagnosisReportConflictsWithSlots(report, slots) {
     return true;
   }
 
+  // Invoice archive vs report: 部分普票 rewritten as 部分无票 / 无票采购
+  const invoice = String(s.invoice || '').trim();
+  if (invoice) {
+    const invKey = compactDiagnosisText(invoice);
+    const reportClaimsNoInvoice = /部分无票|无票采购|无票进项|无法提供发票/.test(blob);
+    const archiveHasNoInvoice = /无票|无法提供/.test(invKey);
+    if (/部分普票/.test(invKey) && !/无票/.test(invKey) && /部分无票|无票采购/.test(blob)) {
+      return true;
+    }
+    if (!archiveHasNoInvoice && /普票/.test(invKey) && reportClaimsNoInvoice && !/普票/.test(blob)) {
+      return true;
+    }
+  }
+
+  // Product: 普货 vs 0退税率
+  const product = String(s.productCategory || '').trim();
+  if (/普货/.test(product) && !/^0退税率/.test(product) && /属于0退税率|产品属于0退税率|特殊商品标识|标识\s*[12]/.test(blob)) {
+    return true;
+  }
+
   return false;
 }
 
@@ -2341,6 +2454,22 @@ function formatDiagSlotsForApi(slots) {
       `【硬约束·销售额】年销售额必须写「${revenue}」。禁止改用其它档位（例如档案是「500万以下」时禁止写「500-2000万」）。销售额分层建议仅在档案达到对应门槛时才写。\n`;
   }
   const reportPath = detectDiagnosisReportPath(s);
+  const invoice = String(s.invoice || '未填写').trim();
+  const product = String(s.productCategory || '未填写').trim();
+  const entity = String(s.entity || '未填写').trim();
+  hard +=
+    '【硬约束·档案锁定】下列字段必须与档案逐字一致，禁止改写或串成其它选项：\n' +
+    `- 平台「${platform}」；主体「${entity}」；发货「${shipping}」；出口「${exportMode}」；\n` +
+    `- 供应商发票「${invoice}」；产品「${product}」；销售额「${revenue}」。\n` +
+    (invoice.includes('部分普票') && !invoice.includes('无票')
+      ? '发票为「部分专票+部分普票」时：只写普票无法退税/争取改专票，**禁止**写成「部分无票」「无票采购」「无票进项缺失」。\n'
+      : '') +
+    (invoice.includes('普票') && !/无票|无法提供/.test(invoice)
+      ? '档案含普票、不含无票时，禁止把普票叙述成无票。\n'
+      : '') +
+    (/普货/.test(product) && !/^0退税率/.test(product)
+      ? '产品为普货可退税时，禁止写成0退税率，禁止写特殊商品标识/标识1/标识2。\n'
+      : '');
   hard += `【内部路径】report_path=${reportPath}（调用工具时必须传入同名字段；禁止对用户说出路径字母）。\n`;
   if (reportPath === 'A') {
     if (isDiagRebateEligibleProduct(s.productCategory) && hasDiagSpecialInvoice(s.invoice)) {
