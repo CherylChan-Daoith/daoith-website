@@ -1723,9 +1723,21 @@ function detectDiagnosisReportPath(slots) {
   return 'A';
 }
 
-/** When diag slots are empty/stale, recover platform/shipping from Agent JSON (processFlow/intro). */
+/** When diag slots are mostly empty, recover missing fields from Agent JSON — never overwrite UI archive. */
 function hydrateDiagSlotsFromReport(report, slots) {
   const s = { ...(slots && typeof slots === 'object' ? slots : {}) };
+  const filledCount = [
+    'platform',
+    'entity',
+    'shipping',
+    'exportMode',
+    'invoice',
+    'productCategory',
+    'revenue',
+  ].filter((k) => String(s[k] || '').trim()).length;
+  // Wizard archive is authoritative once most fields are set; report body may still carry prior-case bleed.
+  if (filledCount >= 4) return s;
+
   const blob = [
     report?.risk?.processFlow,
     report?.plan?.intro,
@@ -1735,10 +1747,10 @@ function hydrateDiagSlotsFromReport(report, slots) {
     .map((x) => String(x || ''))
     .join('\n');
 
-  if (!s.platform) {
-    if (/阿里国际站/.test(blob)) s.platform = '阿里国际站';
+  if (!String(s.platform || '').trim() && /阿里国际站/.test(blob)) {
+    s.platform = '阿里国际站';
   }
-  if (!s.shipping || !/一达通|自营出口|市场采购|便捷发货/.test(String(s.shipping))) {
+  if (!String(s.shipping || '').trim()) {
     if (/一达通代理出口\s*[（(]?3\s*\+\s*N/.test(blob) || /一达通代理出口3\+N/.test(blob)) {
       s.shipping = '一达通代理出口3+N';
     } else if (/一达通代理出口\s*[（(]?2\s*\+\s*N/.test(blob) || /一达通代理出口2\+N/.test(blob)) {
@@ -1753,19 +1765,71 @@ function hydrateDiagSlotsFromReport(report, slots) {
       s.shipping = '市场采购出口';
     }
   }
-  if (!s.entity && /中国大陆公司/.test(blob)) s.entity = '中国大陆公司';
+  if (!String(s.entity || '').trim() && /中国大陆公司/.test(blob)) {
+    s.entity = '中国大陆公司';
+  }
   return s;
 }
 
 function resolveDiagnosisReportPath(report, slots) {
-  const hydrated = hydrateDiagSlotsFromReport(report, slots);
-  let path = detectDiagnosisReportPath(hydrated);
+  const raw = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const filledCount = [
+    'platform',
+    'entity',
+    'shipping',
+    'invoice',
+    'productCategory',
+  ].filter((k) => String(raw[k] || '').trim()).length;
+  const s = filledCount >= 3 ? raw : hydrateDiagSlotsFromReport(report, raw);
+  let path = detectDiagnosisReportPath(s);
   const blob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''}`;
   // Hard override: Agent already wrote 国际站/一达通 → never treat as A (would inject 0110+HK)
   if (path === 'A' && /一达通|阿里国际站/.test(blob)) {
     path = 'X';
   }
-  return { path, slots: hydrated };
+  return { path, slots: s };
+}
+
+/** Canonical plan.intro from current UI archive (prevents prior-case platform/product bleed). */
+function buildPlanIntroFromSlots(slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const platform = String(s.platform || '').trim() || '当前平台';
+  const shipping = String(s.shipping || '').trim();
+  const product = String(s.productCategory || '').trim() || '当前产品';
+  const invoice = String(s.invoice || '').trim();
+  const bits = [platform];
+  if (shipping) bits.push(shipping);
+  if (invoice && invoice !== '未填写') bits.push(invoice);
+  bits.push(product);
+  return `您属于${bits.join('+')}场景，核心合规路径如下：`;
+}
+
+function planIntroConflictsWithSlots(intro, slots) {
+  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
+  const platform = String(s.platform || '').trim();
+  const product = String(s.productCategory || '').trim();
+  const t = compactDiagnosisText(intro);
+  if (!t) return true;
+  if (platform) {
+    const platKey = compactDiagnosisText(platform);
+    const platformInIntro =
+      t.includes(platKey) || (platKey.length >= 4 && t.includes(platKey.slice(0, 4)));
+    if (!platformInIntro) {
+      const otherPlatform = DIAG_KNOWN_PLATFORM_TOKENS.some((token) => {
+        const tok = compactDiagnosisText(token);
+        if (!tok || platKey.includes(tok) || tok.includes(platKey.slice(0, Math.min(4, platKey.length)))) {
+          return false;
+        }
+        return t.includes(tok);
+      });
+      if (otherPlatform) return true;
+    }
+  }
+  if (/^0退税率/.test(product) && /普货|能正常报关出口和退税/.test(intro)) return true;
+  if (/普货|商检/.test(product) && !/^0退税率/.test(product) && /0\s*退税率|产品为0退税率|产品属于0退税率/.test(intro)) {
+    return true;
+  }
+  return false;
 }
 
 function isMainlandDiagEntity(entity) {
@@ -2200,14 +2264,33 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
   const forbidNoInvoiceWording = (archiveIsPartialGeneral || archiveIsGeneralOnly) && !archiveHasNoInvoice;
   const forbidZeroRebateWording =
     /普货|商检/.test(product) && !/^0退税率/.test(product) && !/暂未获得授权/.test(product);
+  const forbidGeneralGoodsWording =
+    /^0退税率/.test(product) || /暂未获得授权/.test(product);
   const productShortLabel = /商检/.test(product)
     ? '涉检产品'
     : /普货/.test(product)
       ? '普货（可正常报关出口和退税）'
       : product || '当前产品';
+  const platform = String(s.platform || '').trim();
+  const platKey = compactDiagnosisText(platform);
+
+  const scrubForeignPlatform = (text) => {
+    let t = String(text || '');
+    if (!t || !platform) return t;
+    DIAG_KNOWN_PLATFORM_TOKENS.forEach((token) => {
+      const tok = compactDiagnosisText(token);
+      if (!tok || platKey.includes(tok) || tok.includes(platKey.slice(0, Math.min(4, platKey.length)))) {
+        return;
+      }
+      if (t.includes(token)) {
+        t = t.split(token).join(platform);
+      }
+    });
+    return t;
+  };
 
   const scrubText = (text) => {
-    let t = String(text || '');
+    let t = scrubForeignPlatform(String(text || ''));
     if (!t) return t;
     if (forbidNoInvoiceWording) {
       // Common LLM mix-up: 部分普票 → 部分无票
@@ -2234,6 +2317,16 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
       t = t.replace(/为\s*0\s*退税率/g, `为${productShortLabel}`);
       t = t.replace(/\+\s*产品为\s*0\s*退税率/g, `+ ${productShortLabel}`);
       t = t.replace(/0退税率产品/g, productShortLabel);
+    }
+    if (forbidGeneralGoodsWording) {
+      t = scrubSpecialGoodsFlagBleedText(t);
+      const prodLabel = product || '0退税率产品';
+      t = t.replace(/普货[，,、\s]*能正常报关出口和退税/g, prodLabel);
+      t = t.replace(/产品为普货[，,、\s]*能正常报关出口和退税/g, `产品为${prodLabel}`);
+      t = t.replace(/产品为普货/g, `产品为${prodLabel}`);
+      t = t.replace(/属于普货[，,、\s]*能正常报关出口和退税/g, `属于${prodLabel}`);
+      t = t.replace(/能正常报关出口和退税/g, '须按档案产品类别评估退免税');
+      t = t.replace(/可申请出口退免税|可退税|优先推退税/g, '须先按0退税率或授权口径评估');
     }
     return t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
   };
@@ -2272,17 +2365,15 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
     ...st,
     items: mapItems(st.items),
   }));
-  // Never fall back to original intro if it still bleeds 0退税率 for 商检/普货
-  if (next.plan.intro) {
-    let cleanedIntro = scrubText(next.plan.intro);
-    if (
-      forbidZeroRebateWording &&
-      /0\s*退税率|特殊商品标识|标识\s*[12]/.test(String(cleanedIntro || next.plan.intro))
-    ) {
-      const shipping = String(s.shipping || '').trim() || '当前发货方式';
-      const platform = String(s.platform || '').trim() || '当前平台';
-      cleanedIntro = `您属于${platform}${shipping} + ${productShortLabel}场景，核心合规路径如下：`;
-    }
+  // Intro always locked to current UI archive when platform/product are known
+  if (String(s.platform || '').trim() || String(s.productCategory || '').trim()) {
+    const cleanedIntro = scrubText(next.plan.intro || '');
+    next.plan.intro =
+      cleanedIntro && !planIntroConflictsWithSlots(cleanedIntro, s)
+        ? cleanedIntro
+        : buildPlanIntroFromSlots(s);
+  } else if (next.plan.intro) {
+    const cleanedIntro = scrubText(next.plan.intro);
     if (cleanedIntro) next.plan.intro = cleanedIntro;
   }
   next.plan.overview = (Array.isArray(next.plan.overview) ? next.plan.overview : []).map((st) => ({
@@ -2295,6 +2386,7 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
 
 function ensureDiagnosisReportArchitectures(report, slots) {
   if (!report || typeof report !== 'object') return report;
+  // Always post-process against UI wizard slots — never let report body rewrite the archive.
   const rawSlots = slots && typeof slots === 'object' ? slots : getDiagSlots();
   const { path, slots: s } = resolveDiagnosisReportPath(report, rawSlots);
   let next = report;
@@ -2363,6 +2455,10 @@ const DIAG_KNOWN_PLATFORM_TOKENS = [
   'Shopee',
   'SHEIN',
   '美客多',
+  'Mercado Libre',
+  'Shopify',
+  'Shopify独立站',
+  '独立站',
   'Walmart',
   'eBay',
   'Lazada',
@@ -2450,6 +2546,17 @@ function diagnosisReportConflictsWithSlots(report, slots) {
     !/^0退税率/.test(product) &&
     /属于0退税率|产品属于0退税率|产品为0退税率|为0退税率|特殊商品标识|标识\s*[12]/.test(blob)
   ) {
+    return true;
+  }
+  if (
+    /^0退税率/.test(product) &&
+    /普货[，,、\s]*能正常报关出口和退税|产品为普货|属于普货|能正常报关出口和退税/.test(blob)
+  ) {
+    return true;
+  }
+
+  // Intro mentions a different platform than archive
+  if (platform && planIntroConflictsWithSlots(String(report?.plan?.intro || ''), s)) {
     return true;
   }
 
@@ -3405,6 +3512,8 @@ function initAiChatbot() {
   const showWelcome = () => {
     // Welcome always restarts mode choice — clear stale diagnosis step chips from prior sessions
     resetUiWizard();
+    // Drop bound Dify conversation so the next diagnosis cannot inherit a prior case
+    resetConversation();
 
     // Rich welcome card — controlled HTML only
     const greetEl = document.createElement('div');
