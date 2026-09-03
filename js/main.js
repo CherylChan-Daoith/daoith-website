@@ -2077,7 +2077,18 @@ function stripForbiddenArchitecturesForPath(report, path, slots) {
   return next;
 }
 
-/** Path X must never inherit Path D「0退税率」boilerplate when archive is 普货/涉检. */
+/** Path-D-only jargon that must not appear for 普货/涉检 reports. */
+function looksLikeSpecialGoodsFlagBleed(text) {
+  const t = String(text || '');
+  if (!t) return false;
+  return (
+    /特殊商品标识/.test(t) ||
+    /标识\s*[12]/.test(t) ||
+    /出口免税（标识|视同内销（标识/.test(t) ||
+    /标识1产品|标识2产品/.test(t)
+  );
+}
+
 function looksLikePathDZeroRebateBleed(text) {
   const t = String(text || '');
   if (!t) return false;
@@ -2090,16 +2101,27 @@ function looksLikePathDZeroRebateBleed(text) {
   ) {
     return true;
   }
+  if (looksLikeSpecialGoodsFlagBleed(t)) return true;
   return false;
+}
+
+/** Remove 标识1/2 / 特殊商品标识 clauses; keep remaining 普货-合规 sentences. */
+function scrubSpecialGoodsFlagBleedText(text) {
+  let t = String(text || '');
+  if (!looksLikeSpecialGoodsFlagBleed(t) && !looksLikePathDZeroRebateBleed(t)) return t;
+  t = t.replace(
+    /[^。；\n]*(?:特殊商品标识|标识\s*[12]|出口免税（标识2）|视同内销（标识1）|标识1产品|标识2产品|按路径\s*D|产品属于0退税率)[^。；\n]*[。；]?/g,
+    ''
+  );
+  t = t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
+  return t;
 }
 
 function stripPathDBleedFromPathXReport(report, slots) {
   if (!report || typeof report !== 'object') return report;
   const product = String(slots?.productCategory || '');
-  const isZeroOrAuth =
-    /^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product);
-  // Only strip when archive product is NOT path-D type
-  if (isZeroOrAuth) return report;
+  // 标识1/2 only for 0退税率; strip for any non-0-rebate archive product
+  if (/^0退税率/.test(product)) return report;
 
   const next = {
     ...report,
@@ -2107,22 +2129,32 @@ function stripPathDBleedFromPathXReport(report, slots) {
     plan: { ...(report.plan || {}) },
   };
 
-  if (looksLikePathDZeroRebateBleed(next.risk.summary)) {
+  if (looksLikePathDZeroRebateBleed(next.risk.summary) || looksLikeSpecialGoodsFlagBleed(next.risk.summary)) {
+    const cleaned = scrubSpecialGoodsFlagBleedText(next.risk.summary);
     next.risk.summary =
-      '当前最大瓶颈是阿里国际站「便捷发货」等履约下难取得正式报关单、存在视同内销与资金提现合规风险，同时须梳理供应商发票以支撑退免税或控税负。';
+      cleaned && cleaned.length >= 20
+        ? cleaned
+        : '当前最大瓶颈是阿里国际站「便捷发货」等履约下难取得正式报关单、存在视同内销与资金提现合规风险，同时须梳理供应商发票以支撑退免税或控税负。';
   }
 
   const scrubItems = (items) =>
     (Array.isArray(items) ? items : [])
       .map((it) => {
         if (typeof it === 'string') {
-          return looksLikePathDZeroRebateBleed(it) ? null : it;
+          if (!looksLikePathDZeroRebateBleed(it) && !looksLikeSpecialGoodsFlagBleed(it)) return it;
+          const cleaned = scrubSpecialGoodsFlagBleedText(it);
+          return cleaned && cleaned.length >= 8 ? cleaned : null;
         }
         if (it && typeof it === 'object') {
           const title = String(it.title || '');
           const body = String(it.body || it.text || '');
-          if (looksLikePathDZeroRebateBleed(`${title}\n${body}`)) return null;
-          return it;
+          const blob = `${title}\n${body}`;
+          if (!looksLikePathDZeroRebateBleed(blob) && !looksLikeSpecialGoodsFlagBleed(blob)) return it;
+          const nextTitle = scrubSpecialGoodsFlagBleedText(title) || title;
+          const nextBody = scrubSpecialGoodsFlagBleedText(body);
+          if (!nextBody || nextBody.length < 12) return null;
+          if (looksLikeSpecialGoodsFlagBleed(`${nextTitle}\n${nextBody}`)) return null;
+          return { ...it, title: nextTitle, body: nextBody };
         }
         return it;
       })
@@ -2177,7 +2209,8 @@ function ensureDiagnosisReportArchitectures(report, slots) {
   next = ensureDiagnosisReportOverview(next, s, effectivePath);
   // Always strip forbidden HK/0110 items for 国际站/一达通 (and C/D/X)
   next = stripForbiddenArchitecturesForPath(next, effectivePath, s);
-  if (effectivePath === 'X') {
+  // 标识1/2 only for 0退税率；非 0 退税档案（含路径 X 普货）一律剥离
+  if (!/^0退税率/.test(String(s.productCategory || ''))) {
     next = stripPathDBleedFromPathXReport(next, s);
   }
   return next;
@@ -2337,9 +2370,9 @@ function formatDiagSlotsForApi(slots) {
       '禁止写入「境外/香港公司销售给店铺公司」「香港公司销售给店铺公司」「平台信息报送与主体一致性」下的采购再销售链路；禁止建议更换香港公司作为店铺主体。' +
       '安全型（自营/一达通/市场采购）details title 须用「国际站正式报关履约与纳税申报」：侧重合规申报纳税与供应商发票风险（无票宜评估市场采购出口，普票无法退税须梳理专票）。' +
       '**仅一达通3+N**可默认生产型企业并须写外购视同自产（不满足则免税不可退税）；自营出口、一达通2+N、市场采购等**不得**默认生产型企业——仅当用户确认为生产型且有外购时才写视同自产。' +
-      '高危型（便捷发货）：瓶颈写未报关/视同内销（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
+      '高危型（便捷发货）：瓶颈写未报关/一般视同内销风险（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
       '按档案产品写1210/9610方案、物流成本评估，及「若无法正式报关则咨询专家重估」强制句；' +
-      'risk.summary 与 stages 须与档案产品类别一致（例如普货可退税），禁止改写为其它产品类别口径。\n';
+      'risk.summary 与 stages 须与档案产品类别一致（例如普货可退税）；未报关只写一般视同内销，禁止改写为其它产品类别口径。\n';
   }
   hard +=
     `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
