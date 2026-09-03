@@ -911,8 +911,8 @@ function normalizeDiagAskHint(text) {
     `$1请问您的发货方式是以下哪一种？${DIAG_PICK_HINT}`
   );
   t = t.replace(
-    /(^\s*(?:\*\*)?4\.\s*)您目前货物的出口方式是怎么样的[？?][^\n]*/gm,
-    `$1您目前货物的出口方式是怎么样的？${DIAG_PICK_HINT}`
+    /(^\s*(?:\*\*)?4\.\s*)(您目前货物的出口方式是怎么样的|您的货物是通过什么出口方式发到亚马逊FBA的|您的货物是通过什么出口方式发到海外仓的|您的货物是通过什么出口方式发给海外消费者的|您的货物是通过什么出口方式发给海外客户的|您的货物是通过什么出口方式出口的)[？?][^\n]*/gm,
+    `$1$2？${DIAG_PICK_HINT}`
   );
   t = t.replace(
     /(^\s*(?:\*\*)?5\.\s*)您目前供应商[^？?\n]*[？?][^\n]*/gm,
@@ -1255,6 +1255,7 @@ const DIAG_QUICK_REPLY_SETS = {
     '一达通代理出口2+N',
     '市场采购出口',
     '便捷发货出口',
+    '其他',
   ],
   shippingShein: [
     '供货 SHEIN（国内仓）',
@@ -1309,7 +1310,9 @@ const DIAG_QUICK_REPLY_SETS = {
     '部分专票+部分普票',
     '部分专票+部分无票',
   ],
+  /** Fallback / legacy full list — step 4 uses warehouse or consumer subset by Q3. */
   exportMode: [
+    '正式报关出口（0110/9710/9810/1039）',
     '正式报关出口（0110/9710）',
     '正式报关出口（9810）',
     '小包快递出口（9610/1210）',
@@ -1317,6 +1320,25 @@ const DIAG_QUICK_REPLY_SETS = {
     '市场采购出口（1039）',
     '委托货代出口',
     '由平台安排出口',
+    '其他',
+  ],
+  /** Q4 when Q3 is FBA / 海外仓 / 保税仓等 */
+  exportModeWarehouse: [
+    '正式报关出口（0110/9710/9810/1039）',
+    '委托货代出口',
+  ],
+  /** Q4 when Q3 is 国内直发 / 国际站便捷发货 */
+  exportModeConsumer: [
+    '小包快递出口（9610/1210）',
+    '小包快递出口（未报关）',
+    '其他',
+  ],
+  /** Q4 when Q3 is 国际站「其他」发货 — 全量出口选项 */
+  exportModeIntlOther: [
+    '正式报关出口（0110/9710/9810/1039）',
+    '委托货代出口',
+    '小包快递出口（9610/1210）',
+    '小包快递出口（未报关）',
     '其他',
   ],
   productCategory: [
@@ -1443,13 +1465,20 @@ function detectDiagQuickReplySet(botText) {
   ) {
     return 'invoice';
   }
-  // Step-4 出口方式 — avoid matching step-2 Alibaba options that end with「…出口」
+  // Step-4 出口方式 — wording varies by Q3 shipping（发到海外仓 / 发给海外消费者 / FBA）
   if (
-    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|正式报关|一般贸易|委托货代|小包快递|市场采购|未报关|0110|9610|9710|9810|1039|1210|报关方式|由平台安排出口)/.test(
+    /(目前.*出口方式|货物的出口方式|出口方式是怎么样|通过什么出口方式|发到亚马逊FBA|发到海外仓|发给海外消费者|正式报关|一般贸易|委托货代|小包快递|市场采购|未报关|0110|9610|9710|9810|1039|1210|报关方式|由平台安排出口)/.test(
       t
     ) &&
     !/(发货方式|一达通|便捷发货出口|自营出口)/.test(t)
   ) {
+    // Prefer warehouse vs consumer chip set when ask text is specific
+    if (/发给海外客户|发给海外消费者|小包快递/.test(t) && !/发到海外仓|发到亚马逊FBA|委托货代|正式报关/.test(t)) {
+      return 'exportModeConsumer';
+    }
+    if (/发到海外仓|发到亚马逊FBA|委托货代|正式报关/.test(t)) {
+      return 'exportModeWarehouse';
+    }
     return 'exportMode';
   }
   if (/(销售额|营收|年销售|大概多少)/.test(t)) return 'revenue';
@@ -1584,8 +1613,106 @@ function localDiagnosisShippingAsk(platformLabel) {
   return '3. 请问您的发货方式是以下哪一种？（可在下方点选）';
 }
 
-function localDiagnosisExportAsk() {
-  return '4. 您目前货物的出口方式是怎么样的？（可在下方点选）';
+/**
+ * Q4 问句/选项/跳步 — 按问题3发货方式分支（见 Desktop「问题4修改.xlsx」）。
+ * @returns {{ kind:'skip', exportMode:string, note:string } | { kind:'ask', question:string, optionsKey:string }}
+ */
+function resolveDiagExportAskFromShipping(shipping, platform) {
+  const ship = String(shipping || '').trim();
+  const plat = String(platform || '').trim();
+
+  // 平台国内仓 → 跳过，记「由平台安排出口」
+  if (isPlatformDomesticWarehouseShipping(ship)) {
+    return {
+      kind: 'skip',
+      exportMode: '由平台安排出口',
+      note: '该情形通常由平台统一安排出口，已记为「由平台安排出口」。',
+    };
+  }
+
+  // 阿里国际站履约（Q3 选项本身含出口含义）
+  const isIntlStation = /阿里国际站|国际站|Alibaba\.com/i.test(plat);
+  const intlLike =
+    isIntlStation || /一达通|自营出口|市场采购出口|便捷发货出口/.test(ship);
+  if (intlLike) {
+    if (/市场采购出口/.test(ship)) {
+      return {
+        kind: 'skip',
+        exportMode: '市场采购出口（1039）',
+        note: '发货为市场采购出口，出口已记为「市场采购出口（1039）」。',
+      };
+    }
+    if (/自营出口|一达通/.test(ship)) {
+      return {
+        kind: 'skip',
+        exportMode: '正式报关出口（0110/9710）',
+        note: '该履约方式通常凭报关单收汇，出口已记为「正式报关出口（0110/9710）」。',
+      };
+    }
+    if (/便捷发货/.test(ship)) {
+      return {
+        kind: 'ask',
+        question: '您的货物是通过什么出口方式发给海外客户的？',
+        optionsKey: 'exportModeConsumer',
+      };
+    }
+    // 国际站第三步选「其他」→ 问出口，给全量选项
+    if (isIntlStation && /^(其他|其它)$/.test(ship)) {
+      return {
+        kind: 'ask',
+        question: '您的货物是通过什么出口方式发给海外客户的？',
+        optionsKey: 'exportModeIntlOther',
+      };
+    }
+  }
+
+  // 国内直发 / POP 国内直发 → 问发给海外消费者
+  if (/国内直发|POP（国内直发）/.test(ship)) {
+    return {
+      kind: 'ask',
+      question: '您的货物是通过什么出口方式发给海外消费者的？',
+      optionsKey: 'exportModeConsumer',
+    };
+  }
+
+  // 亚马逊 FBA
+  if (/亚马逊\s*FBA|^FBA$|FBA\b/.test(ship)) {
+    return {
+      kind: 'ask',
+      question: '您的货物是通过什么出口方式发到亚马逊FBA的？',
+      optionsKey: 'exportModeWarehouse',
+    };
+  }
+
+  // 海外仓 / 保税仓 / 平台海外仓
+  if (/海外仓|FBL|保税仓|发货到平台海外仓/.test(ship)) {
+    return {
+      kind: 'ask',
+      question: '您的货物是通过什么出口方式发到海外仓的？',
+      optionsKey: 'exportModeWarehouse',
+    };
+  }
+
+  return {
+    kind: 'ask',
+    question: '您的货物是通过什么出口方式出口的？',
+    optionsKey: 'exportModeWarehouse',
+  };
+}
+
+function localDiagnosisExportAsk(shipping, platform) {
+  const branch = resolveDiagExportAskFromShipping(
+    shipping || getDiagSlots().shipping,
+    platform || getDiagSlots().platform
+  );
+  const q =
+    branch.kind === 'ask' ? branch.question : '您目前货物的出口方式是怎么样的？';
+  return `4. ${q}（可在下方点选）`;
+}
+
+function exportModeQuickReplySetForShipping(shipping, platform) {
+  const branch = resolveDiagExportAskFromShipping(shipping, platform);
+  return branch.kind === 'ask' ? branch.optionsKey : 'exportModeWarehouse';
 }
 
 function localDiagnosisInvoiceAsk(preface) {
@@ -1612,6 +1739,11 @@ function isPlatformDomesticWarehouseShipping(text) {
   return /(全托管（国内仓）|半托管（国内仓）|发货到平台国内仓|平台国内仓|供货\s*SHEIN（国内仓）|平台商家·发国内仓)/.test(
     t
   );
+}
+
+/** True when Q3 shipping implies Q4 can be skipped (auto-fill exportMode). */
+function shouldSkipDiagExportStep(shipping, platform) {
+  return resolveDiagExportAskFromShipping(shipping, platform).kind === 'skip';
 }
 
 const DIAG_SLOTS_KEY = 'daoith_diagnosis_ui_slots';
@@ -1650,11 +1782,9 @@ const DIAG_SLOT_LABELS = {
 
 function resolveDiagExportMode(slots) {
   const s = slots && typeof slots === 'object' ? slots : {};
-  return (
-    s.exportMode ||
-    (isPlatformDomesticWarehouseShipping(s.shipping) ? '由平台安排出口' : '') ||
-    ''
-  );
+  if (String(s.exportMode || '').trim()) return String(s.exportMode).trim();
+  const branch = resolveDiagExportAskFromShipping(s.shipping, s.platform);
+  return branch.kind === 'skip' ? branch.exportMode : '';
 }
 
 function formatDiagSlotsSnapshot(slots) {
@@ -1693,12 +1823,11 @@ function detectDiagnosisReportPath(slots) {
   if (/^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product)) {
     return 'D';
   }
-  // Path X: 阿里国际站 / 一达通履约（优先于 A/B/C；产品 D 已在上方拦截）
-  // 一达通仅国际站提供——发货含一达通即 X，避免 platform 槽位空时误判 A 并灌入 0110+香港
+  // Path X: 仅国际站已知履约（自营/一达通/市场采购/便捷发货）；发货「其他」按出口方式再判 A/B
   if (
-    /阿里国际站|国际站|Alibaba\.com/i.test(platform) ||
     /一达通/.test(shipping) ||
-    (/自营出口|市场采购出口|便捷发货出口/.test(shipping) && /国际站|一达通/.test(`${platform} ${shipping}`))
+    (/阿里国际站|国际站|Alibaba\.com/i.test(platform) &&
+      /自营出口|市场采购出口|便捷发货出口/.test(shipping))
   ) {
     return 'X';
   }
@@ -2780,7 +2909,11 @@ function extractDiagnosisFactOverrides(text) {
   else if (/海外仓/.test(t)) out.shipping = '自发货（海外仓发货）';
   else if (/国内直发|自发货（国内直发）/.test(t)) out.shipping = '自发货（国内直发）';
 
-  if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
+  if (/9810/.test(t) && /正式报关/.test(t) && !/0110|9710|1039/.test(t)) {
+    out.exportMode = '正式报关出口（9810）';
+  } else if (/正式报关出口（0110\/9710\/9810\/1039）|0110\/9710\/9810\/1039/.test(t)) {
+    out.exportMode = '正式报关出口（0110/9710/9810/1039）';
+  } else if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
   else if (/1039|市场采购/.test(t)) out.exportMode = '市场采购出口（1039）';
   else if (/未报关/.test(t)) out.exportMode = '小包快递出口（未报关）';
   else if (/9610|1210|小包快递/.test(t)) out.exportMode = '小包快递出口（9610/1210）';
@@ -3007,7 +3140,19 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
   const stepHints = {
     2: '请执行第二步：只提问「2. 您平台店铺的注册主体是哪一种？（可在下方点选）」；不要在正文罗列主体选项，官网会显示按钮。',
     3: '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；不要在正文罗列选项，官网会按平台显示按钮。',
-    4: '请执行第四步：只提问「4. 您目前货物的出口方式是怎么样的？（可在下方点选）」；不要在正文列出选项。若发货为平台国内仓类，可直接记为「由平台安排出口」并进入第五步。',
+    4: (() => {
+      const branch = resolveDiagExportAskFromShipping(
+        getDiagSlots().shipping,
+        platform
+      );
+      if (branch.kind === 'skip') {
+        return `请跳过第四步：出口已记为「${branch.exportMode}」，直接提问第五步发票；不要再问出口方式。`;
+      }
+      return (
+        `请执行第四步：只提问「4. ${branch.question}（可在下方点选）」；不要在正文列出选项。` +
+        `本步选项仅限官网按钮（勿罗列其它出口方式）。`
+      );
+    })(),
     5: '请执行第五步：只提问「5. 您目前供应商发票情况如何？（可在下方点选）」；不要在正文罗列专票/普票等选项。',
     6: '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
     7: '请执行第七步：只提问「7. 您目前年销售额约多少人民币？（可在下方点选）」；不要在正文罗列选项。',
@@ -3042,7 +3187,10 @@ function diagQuickReplySetForStep(step, platformLabel) {
     case 3:
       return shippingQuickReplySetForPlatform(platformLabel);
     case 4:
-      return 'exportMode';
+      return exportModeQuickReplySetForShipping(
+        typeof getDiagSlots === 'function' ? getDiagSlots().shipping : '',
+        platformLabel
+      );
     case 5:
       return 'invoice';
     case 6:
@@ -3059,9 +3207,17 @@ function isVagueDiagnosisAnswer(text, step) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (/^(不清楚|不知道|暂不清楚|不太清楚|不确定)$/.test(t)) return true;
-  // 3=发货其他, 4=出口其他, 6=产品类别其他（主体已改为「其他境外公司」完整选项，不再视为模糊）
+  // 3=发货其他（非国际站才追问澄清；国际站「其他」进入第四步全量出口选项）
+  // 4=出口其他, 6=产品类别其他（主体已改为「其他境外公司」完整选项，不再视为模糊）
   if (/^(其他|其它|其他发货方式|其他（不在以上分类）)$/.test(t)) {
-    return step === 3 || step === 4 || step === 6;
+    if (step === 3) {
+      const plat = String(
+        (typeof getDiagSlots === 'function' && getDiagSlots().platform) || ''
+      );
+      if (/阿里国际站|国际站|Alibaba\.com/i.test(plat)) return false;
+      return true;
+    }
+    return step === 4 || step === 6;
   }
   return false;
 }
@@ -3148,6 +3304,9 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
     platform: 1,
     entity: 2,
     exportMode: 4,
+    exportModeWarehouse: 4,
+    exportModeConsumer: 4,
+    exportModeIntlOther: 4,
     invoice: 5,
     productCategory: 6,
     revenue: 7,
@@ -3162,9 +3321,20 @@ function resolveDiagQuickReplySet(botText, uiMode, uiStep, platformLabel) {
     detected === 'entity' ||
     detected === 'invoice' ||
     detected === 'exportMode' ||
+    detected === 'exportModeWarehouse' ||
+    detected === 'exportModeConsumer' ||
+    detected === 'exportModeIntlOther' ||
     detected === 'productCategory' ||
     detected === 'revenue'
   ) {
+    if (
+      (detected === 'exportMode' || detected === 'exportModeConsumer') &&
+      step === 4 &&
+      stepKey &&
+      /^exportMode/.test(stepKey)
+    ) {
+      return stepKey;
+    }
     return detected;
   }
 
@@ -3329,8 +3499,9 @@ function initAiChatbot() {
       setUiWizard('diagnosis', 3, getUiPlatform());
     } else if (step === 3) {
       setDiagSlot('shipping', t);
-      if (isPlatformDomesticWarehouseShipping(t)) {
-        setDiagSlot('exportMode', '由平台安排出口');
+      const exportBranch = resolveDiagExportAskFromShipping(t, getUiPlatform());
+      if (exportBranch.kind === 'skip') {
+        setDiagSlot('exportMode', exportBranch.exportMode);
       }
       setUiWizard('diagnosis', 4, getUiPlatform());
     } else if (step === 4) {
@@ -3461,6 +3632,9 @@ function initAiChatbot() {
       setKey === 'platform' ||
       setKey === 'entity' ||
       setKey === 'exportMode' ||
+      setKey === 'exportModeWarehouse' ||
+      setKey === 'exportModeConsumer' ||
+      setKey === 'exportModeIntlOther' ||
       setKey === 'invoice' ||
       setKey === 'productCategory' ||
       setKey === 'revenue' ||
@@ -3738,54 +3912,50 @@ function initAiChatbot() {
       return;
     }
 
-    // Fast path: 平台国内仓发货 → 自动记「由平台安排出口」，跳到第五步发票
-    if (
-      prevMode === 'diagnosis' &&
-      prevStep === 3 &&
-      getUiStep() === 4 &&
-      isPlatformDomesticWarehouseShipping(text)
-    ) {
-      setUiWizard('diagnosis', 5, getUiPlatform());
-      setDiagSlot('shipping', String(text).trim());
-      setDiagSlot('exportMode', '由平台安排出口');
-      const note =
-        `好的，已记录发货方式为「${String(text).trim()}」。` +
-        `该情形通常由平台统一安排出口，已记为「由平台安排出口」。`;
-      const localAsk = localDiagnosisInvoiceAsk(note);
-      appendBubble(localAsk, 'bot');
-      showQuickReplies(localAsk);
-
-      const prevWarm = diagnosisWarmPromise;
-      const { difyChatEndpoint } = getDifyConfig();
-      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
-      diagnosisWarmPromise = (async () => {
-        try {
-          if (prevWarm) await prevWarm;
-          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
-          const query =
-            buildDiagnosisApiQuery(text, 'diagnosis', 5, getUiPlatform()) +
-            '发货为平台国内仓类，出口已记为「由平台安排出口」，请直接问第五步发票，不要再问第四步，后续报告必须采信该出口方式。';
-          const result = await callDify({
-            endpoint,
-            query,
-            inputs: {},
-            conversationId: convId,
-            returnMeta: true,
-          });
-          if (result?.conversationId) persistConversationId(result.conversationId, true);
-          return result;
-        } catch (err) {
-          console.warn('[diagnosis] auto platform-export sync failed', err);
-          return null;
-        }
-      })();
-      return;
-    }
-
-    // Fast path: after shipping → step-4 出口方式
+    // Fast path: Q3 发货后 — 按分支跳过 Q4 或追问定制出口问句
     if (prevMode === 'diagnosis' && prevStep === 3 && getUiStep() === 4) {
+      const shipping = String(text || '').trim();
       const platform = getUiPlatform();
-      const localAsk = localDiagnosisExportAsk();
+      const branch = resolveDiagExportAskFromShipping(shipping, platform);
+      setDiagSlot('shipping', shipping);
+
+      if (branch.kind === 'skip') {
+        setUiWizard('diagnosis', 5, platform);
+        setDiagSlot('exportMode', branch.exportMode);
+        const note =
+          `好的，已记录发货方式为「${shipping}」。` + String(branch.note || '');
+        const localAsk = localDiagnosisInvoiceAsk(note);
+        appendBubble(localAsk, 'bot');
+        showQuickReplies(localAsk);
+
+        const prevWarm = diagnosisWarmPromise;
+        const { difyChatEndpoint } = getDifyConfig();
+        const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+        diagnosisWarmPromise = (async () => {
+          try {
+            if (prevWarm) await prevWarm;
+            const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+            const query =
+              buildDiagnosisApiQuery(text, 'diagnosis', 5, platform) +
+              `发货为「${shipping}」，出口已记为「${branch.exportMode}」，请直接问第五步发票，不要再问第四步，后续报告必须采信该出口方式。`;
+            const result = await callDify({
+              endpoint,
+              query,
+              inputs: {},
+              conversationId: convId,
+              returnMeta: true,
+            });
+            if (result?.conversationId) persistConversationId(result.conversationId, true);
+            return result;
+          } catch (err) {
+            console.warn('[diagnosis] auto export skip sync failed', err);
+            return null;
+          }
+        })();
+        return;
+      }
+
+      const localAsk = localDiagnosisExportAsk(shipping, platform);
       appendBubble(`好的，已记录发货方式。\n\n${localAsk}`, 'bot');
       showQuickReplies(localAsk);
 
@@ -3796,7 +3966,9 @@ function initAiChatbot() {
         try {
           if (prevWarm) await prevWarm;
           const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
-          const query = buildDiagnosisApiQuery(text, 'diagnosis', 4, platform);
+          const query =
+            buildDiagnosisApiQuery(text, 'diagnosis', 4, platform) +
+            `第四步必须只问：「4. ${branch.question}（可在下方点选）」；选项由官网按发货方式展示，勿罗列其它出口方式。`;
           const result = await callDify({
             endpoint,
             query,
