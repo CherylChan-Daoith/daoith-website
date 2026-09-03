@@ -2098,7 +2098,11 @@ function looksLikeSpecialGoodsFlagBleed(text) {
 function looksLikePathDZeroRebateBleed(text) {
   const t = String(text || '');
   if (!t) return false;
-  if (/属于\s*0\s*退税率|产品属于0退税率|0退税率产品需要|按路径\s*D|按路径D口径/.test(t)) {
+  if (
+    /属于\s*0\s*退税率|产品属于0退税率|产品为\s*0\s*退税率|为\s*0\s*退税率|0退税率产品需要|按路径\s*D|按路径D口径/.test(
+      t
+    )
+  ) {
     return true;
   }
   if (
@@ -2116,7 +2120,7 @@ function scrubSpecialGoodsFlagBleedText(text) {
   let t = String(text || '');
   if (!looksLikeSpecialGoodsFlagBleed(t) && !looksLikePathDZeroRebateBleed(t)) return t;
   t = t.replace(
-    /[^。；\n]*(?:特殊商品标识|标识\s*[12]|出口免税（标识2）|视同内销（标识1）|标识1产品|标识2产品|按路径\s*D|产品属于0退税率)[^。；\n]*[。；]?/g,
+    /[^。；\n]*(?:特殊商品标识|标识\s*[12]|出口免税（标识2）|视同内销（标识1）|标识1产品|标识2产品|按路径\s*D|产品属于0退税率|产品为\s*0\s*退税率)[^。；\n]*[。；]?/g,
     ''
   );
   t = t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
@@ -2196,6 +2200,11 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
   const forbidNoInvoiceWording = (archiveIsPartialGeneral || archiveIsGeneralOnly) && !archiveHasNoInvoice;
   const forbidZeroRebateWording =
     /普货|商检/.test(product) && !/^0退税率/.test(product) && !/暂未获得授权/.test(product);
+  const productShortLabel = /商检/.test(product)
+    ? '涉检产品'
+    : /普货/.test(product)
+      ? '普货（可正常报关出口和退税）'
+      : product || '当前产品';
 
   const scrubText = (text) => {
     let t = String(text || '');
@@ -2218,8 +2227,13 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
     }
     if (forbidZeroRebateWording) {
       t = scrubSpecialGoodsFlagBleedText(t);
-      t = t.replace(/属于\s*0\s*退税率[^。；\n]*[。；]?/g, '');
-      t = t.replace(/产品属于0退税率[^。；\n]*[。；]?/g, '');
+      // LLM often writes「产品为0退税率」not「产品属于0退税率」
+      t = t.replace(/产品属于\s*0\s*退税率/g, productShortLabel);
+      t = t.replace(/产品为\s*0\s*退税率/g, productShortLabel);
+      t = t.replace(/属于\s*0\s*退税率/g, `属${productShortLabel}`);
+      t = t.replace(/为\s*0\s*退税率/g, `为${productShortLabel}`);
+      t = t.replace(/\+\s*产品为\s*0\s*退税率/g, `+ ${productShortLabel}`);
+      t = t.replace(/0退税率产品/g, productShortLabel);
     }
     return t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
   };
@@ -2250,12 +2264,27 @@ function scrubArchiveSlotBleedFromReport(report, slots) {
     risk: { ...(report.risk || {}) },
     plan: { ...(report.plan || {}) },
   };
-  if (next.risk.summary) next.risk.summary = scrubText(next.risk.summary) || next.risk.summary;
+  if (next.risk.summary) {
+    const cleanedSummary = scrubText(next.risk.summary);
+    next.risk.summary = cleanedSummary || next.risk.summary;
+  }
   next.risk.stages = (Array.isArray(next.risk.stages) ? next.risk.stages : []).map((st) => ({
     ...st,
     items: mapItems(st.items),
   }));
-  next.plan.intro = scrubText(next.plan.intro || '') || next.plan.intro;
+  // Never fall back to original intro if it still bleeds 0退税率 for 商检/普货
+  if (next.plan.intro) {
+    let cleanedIntro = scrubText(next.plan.intro);
+    if (
+      forbidZeroRebateWording &&
+      /0\s*退税率|特殊商品标识|标识\s*[12]/.test(String(cleanedIntro || next.plan.intro))
+    ) {
+      const shipping = String(s.shipping || '').trim() || '当前发货方式';
+      const platform = String(s.platform || '').trim() || '当前平台';
+      cleanedIntro = `您属于${platform}${shipping} + ${productShortLabel}场景，核心合规路径如下：`;
+    }
+    if (cleanedIntro) next.plan.intro = cleanedIntro;
+  }
   next.plan.overview = (Array.isArray(next.plan.overview) ? next.plan.overview : []).map((st) => ({
     ...st,
     items: mapItems(st.items),
@@ -2414,9 +2443,13 @@ function diagnosisReportConflictsWithSlots(report, slots) {
     }
   }
 
-  // Product: 普货 vs 0退税率
+  // Product: 普货/涉检 vs 0退税率（含「产品为0退税率」变体）
   const product = String(s.productCategory || '').trim();
-  if (/普货/.test(product) && !/^0退税率/.test(product) && /属于0退税率|产品属于0退税率|特殊商品标识|标识\s*[12]/.test(blob)) {
+  if (
+    /普货|商检/.test(product) &&
+    !/^0退税率/.test(product) &&
+    /属于0退税率|产品属于0退税率|产品为0退税率|为0退税率|特殊商品标识|标识\s*[12]/.test(blob)
+  ) {
     return true;
   }
 
@@ -2467,8 +2500,8 @@ function formatDiagSlotsForApi(slots) {
     (invoice.includes('普票') && !/无票|无法提供/.test(invoice)
       ? '档案含普票、不含无票时，禁止把普票叙述成无票。\n'
       : '') +
-    (/普货/.test(product) && !/^0退税率/.test(product)
-      ? '产品为普货可退税时，禁止写成0退税率，禁止写特殊商品标识/标识1/标识2。\n'
+    (/普货|商检/.test(product) && !/^0退税率/.test(product)
+      ? '产品为普货可退税或涉检时，禁止写成0退税率（含「产品为0退税率」），禁止写特殊商品标识/标识1/标识2。\n'
       : '');
   hard += `【内部路径】report_path=${reportPath}（调用工具时必须传入同名字段；禁止对用户说出路径字母）。\n`;
   if (reportPath === 'A') {
