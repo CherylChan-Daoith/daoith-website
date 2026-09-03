@@ -1875,16 +1875,8 @@ function buildMandatoryPlanDetails(slots, path) {
     const productionLike = /一达通代理出口\s*[（(]?3\s*\+\s*N|一达通代理出口3\+N|一达通.*3\s*\+\s*N/.test(
       shipping
     );
-    const pathDProduct =
-      /^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product);
     if (convenient) {
-      if (pathDProduct) {
-        rows.push({
-          title: '无法退免税产品的税负控制',
-          body:
-            '阿里国际站便捷发货且产品为0退税率或海关备案商标暂未授权时，不宜以1210/9610创造退税条件；应先按特殊商品标识区分出口免税或视同内销口径，控制税负，复杂情形建议专家1v1。',
-        });
-      } else if (/商检/.test(product)) {
+      if (/商检/.test(product)) {
         rows.push({
           title: '1210出口备货至保税区',
           body:
@@ -2014,13 +2006,8 @@ function ensureDiagnosisReportOverview(report, slots, path) {
     const shippingX = String(s.shipping || '');
     const s02 = ensureStage('02', '报关出口环节');
     if (/便捷发货/.test(shippingX)) {
-      const productX = String(s.productCategory || '');
-      if (/^0退税率|商标.*暂未获得授权|暂未获得授权/.test(productX)) {
-        pushUnique(s02, '按无法退免税口径控税负');
-      } else {
-        pushUnique(s02, '评估1210/9610正式报关替代便捷发货');
-        pushUnique(s02, '测算可走1210/9610的物流成本');
-      }
+      pushUnique(s02, '评估1210/9610正式报关替代便捷发货');
+      pushUnique(s02, '测算可走1210/9610的物流成本');
     } else {
       pushUnique(s02, '凭报关单收汇并合规申报纳税');
       pushUnique(s02, '梳理供应商发票与退税资格');
@@ -2090,6 +2077,70 @@ function stripForbiddenArchitecturesForPath(report, path, slots) {
   return next;
 }
 
+/** Path X must never inherit Path D「0退税率」boilerplate when archive is 普货/涉检. */
+function looksLikePathDZeroRebateBleed(text) {
+  const t = String(text || '');
+  if (!t) return false;
+  if (/属于\s*0\s*退税率|产品属于0退税率|0退税率产品需要|按路径\s*D|按路径D口径/.test(t)) {
+    return true;
+  }
+  if (
+    /0退税率产品须?先?(?:核实|核对|查看)?特殊商品标识/.test(t) ||
+    (/特殊商品标识/.test(t) && /贵重金属|珠宝玉石|钢材|铝材|玻璃|木材/.test(t) && /0\s*退税/.test(t))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function stripPathDBleedFromPathXReport(report, slots) {
+  if (!report || typeof report !== 'object') return report;
+  const product = String(slots?.productCategory || '');
+  const isZeroOrAuth =
+    /^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product);
+  // Only strip when archive product is NOT path-D type
+  if (isZeroOrAuth) return report;
+
+  const next = {
+    ...report,
+    risk: { ...(report.risk || {}) },
+    plan: { ...(report.plan || {}) },
+  };
+
+  if (looksLikePathDZeroRebateBleed(next.risk.summary)) {
+    next.risk.summary =
+      '当前最大瓶颈是阿里国际站「便捷发货」等履约下难取得正式报关单、存在视同内销与资金提现合规风险，同时须梳理供应商发票以支撑退免税或控税负。';
+  }
+
+  const scrubItems = (items) =>
+    (Array.isArray(items) ? items : [])
+      .map((it) => {
+        if (typeof it === 'string') {
+          return looksLikePathDZeroRebateBleed(it) ? null : it;
+        }
+        if (it && typeof it === 'object') {
+          const title = String(it.title || '');
+          const body = String(it.body || it.text || '');
+          if (looksLikePathDZeroRebateBleed(`${title}\n${body}`)) return null;
+          return it;
+        }
+        return it;
+      })
+      .filter(Boolean);
+
+  next.risk.stages = (Array.isArray(next.risk.stages) ? next.risk.stages : []).map((st) => ({
+    ...st,
+    items: scrubItems(st.items),
+  }));
+  next.plan.overview = (Array.isArray(next.plan.overview) ? next.plan.overview : []).map((st) => ({
+    ...st,
+    items: scrubItems(st.items),
+  }));
+  next.plan.details = scrubItems(next.plan.details);
+
+  return next;
+}
+
 function ensureDiagnosisReportArchitectures(report, slots) {
   if (!report || typeof report !== 'object') return report;
   const rawSlots = slots && typeof slots === 'object' ? slots : getDiagSlots();
@@ -2125,7 +2176,11 @@ function ensureDiagnosisReportArchitectures(report, slots) {
 
   next = ensureDiagnosisReportOverview(next, s, effectivePath);
   // Always strip forbidden HK/0110 items for 国际站/一达通 (and C/D/X)
-  return stripForbiddenArchitecturesForPath(next, effectivePath, s);
+  next = stripForbiddenArchitecturesForPath(next, effectivePath, s);
+  if (effectivePath === 'X') {
+    next = stripPathDBleedFromPathXReport(next, s);
+  }
+  return next;
 }
 
 function isGenericDiagnosisProcessFlow(text) {
@@ -2274,14 +2329,17 @@ function formatDiagSlotsForApi(slots) {
     hard +=
       '【硬约束·架构】路径D：按特殊商品标识写免税或视同内销口径；禁止硬套 0110/1039 退税境外/香港架构为首选。\n';
   } else if (reportPath === 'X') {
+    // Path X hard constraints must NOT mention 0退税率 / 路径D at all —
+    // even as "禁止" examples; Agent copies this block into diagnosis_archive for Workflow.
     hard +=
       '【硬约束·路径X·国际站】report_path 必须为 X，禁止改判为 A。' +
       '禁止写入「搭建0110出口+境外/香港公司」「搭建1039出口+境外/香港公司」「0110出口+境外/香港公司」「1039出口+境外/香港公司」「0110出口+香港公司」「1039出口+香港公司」；' +
       '禁止写入「境外/香港公司销售给店铺公司」「香港公司销售给店铺公司」「平台信息报送与主体一致性」下的采购再销售链路；禁止建议更换香港公司作为店铺主体。' +
       '安全型（自营/一达通/市场采购）details title 须用「国际站正式报关履约与纳税申报」：侧重合规申报纳税与供应商发票风险（无票宜评估市场采购出口，普票无法退税须梳理专票）。' +
       '**仅一达通3+N**可默认生产型企业并须写外购视同自产（不满足则免税不可退税）；自营出口、一达通2+N、市场采购等**不得**默认生产型企业——仅当用户确认为生产型且有外购时才写视同自产。' +
-      '高危型（便捷发货）：须写未报关/视同内销（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
-      '若产品为0退税率或商标未授权，按路径D口径写、禁止1210/9610；其余普货/涉检才写1210/9610、物流成本评估及「若无法正式报关则咨询专家重估」强制句。\n';
+      '高危型（便捷发货）：瓶颈写未报关/视同内销（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
+      '按档案产品写1210/9610方案、物流成本评估，及「若无法正式报关则咨询专家重估」强制句；' +
+      'risk.summary 与 stages 须与档案产品类别一致（例如普货可退税），禁止改写为其它产品类别口径。\n';
   }
   hard +=
     `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
@@ -2303,8 +2361,10 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
     'risk.processFlow 必须按本轮档案逐字串成：供应商发票 → 店铺主体 → 出口方式 → 发货方式 → 平台 → 境外消费者。' +
     `请先按档案判定 report_path（官网预判为 ${reportPath}` +
     (reportPath === 'X'
-      ? '；平台为阿里国际站或发货含一达通时**必须传 X，禁止因正式报关/专票改判为 A**'
-      : '；若与规则冲突以你按发货+出口+产品重判为准；**非阿里国际站禁止传 X**') +
+      ? '；平台为阿里国际站时**必须传 X，禁止因正式报关/专票改判为 A**'
+      : reportPath === 'D'
+        ? '；产品无法退免税时**必须传 D**；禁止传 X'
+        : '；若与规则冲突以你按发货+出口+产品重判为准；**非阿里国际站禁止传 X**') +
     '；禁止对用户说出路径字母），' +
     '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（A/B/C/D/X）；' +
     '工具成功后，你的回复**正文第一行起必须是完整 JSON**（可包在 ```json 代码块；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
