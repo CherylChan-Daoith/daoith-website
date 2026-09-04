@@ -1155,9 +1155,30 @@ ul {
   opacity: 0.85;
 }
 
+/* First generation: fill panel and keep logo/title vertically centered.
+   After prior entries exist: stay compact at the bottom. */
 #resultItems .result-working-block {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   margin-top: 8px;
+}
+
+#resultItems .result-working-block .result-working {
+  flex: 1;
+  width: 100%;
+}
+
+#resultItems:has(.result-entry) .result-working-block {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+#resultItems:has(.result-entry) .result-working-block .result-working {
+  flex: 0 0 auto;
+  min-height: auto;
+  padding: 16px 12px;
 }
 
 .diag-services-section {
