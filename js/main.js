@@ -6577,6 +6577,21 @@ function normalizeDiagnosisReportJson(obj) {
         '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。'
     ).trim(),
   };
+  // Same as markdown path: never leave hollow 【行动建议】/【注意事项】 headers
+  if (!normalized.actions.length) {
+    normalized.actions = buildFallbackActionAdvice(getDiagSlots())
+      .replace(/^【行动建议】\s*/, '')
+      .split('\n')
+      .map((line) => line.replace(/^\s*\d+[.、．)]\s*/, '').trim())
+      .filter(Boolean);
+  }
+  if (!normalized.notes.length) {
+    normalized.notes = buildFallbackNotes(getDiagSlots())
+      .replace(/^【注意事项】\s*/, '')
+      .split('\n')
+      .map((line) => line.replace(/^\s*[-*•]\s*/, '').trim())
+      .filter(Boolean);
+  }
   return ensureDiagnosisReportArchitectures(normalized, getDiagSlots());
 }
 
@@ -7236,6 +7251,7 @@ function sanitizeDiagnosisPlanText(text) {
   }
 
   t = stripKnowledgeBaseDisclaimers(t);
+  t = stripInternalTaxonomyLeaks(t);
 
   return t;
 }
