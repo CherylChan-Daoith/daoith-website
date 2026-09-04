@@ -3781,9 +3781,17 @@ function initAiChatbot() {
 
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
-        setBotBubble(typing, aluminumReply);
-        showQuickReplies(aluminumReply);
-        maybeShowServiceRecsAfterAnswer(aluminumReply);
+        if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
+          publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
+          typing.classList.add('is-plan-status');
+          typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+          clearQuickReplies();
+          maybeShowServiceRecsAfterAnswer(aluminumReply);
+        } else {
+          setBotBubble(typing, aluminumReply);
+          showQuickReplies(aluminumReply);
+          maybeShowServiceRecsAfterAnswer(aluminumReply);
+        }
         return;
       }
 
@@ -3791,6 +3799,7 @@ function initAiChatbot() {
       const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
 
       let streamingPlan = false;
+      let streamingLongQa = false;
       let loginPromptedForPlan = shouldGeneratePlanNow && !loggedIn;
       let planCountedThisTurn = false;
       const beginPlanRouting = () => {
@@ -3819,13 +3828,21 @@ function initAiChatbot() {
       };
       if (forcePlanWhileThinking) beginPlanRouting();
 
+      const beginLongQaRouting = () => {
+        if (streamingLongQa) return;
+        streamingLongQa = true;
+        // No logo animation for Q&A — only point user to the plan panel
+        typing.classList.add('is-plan-status');
+        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+      };
+
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
         const cleaned = sanitizeAiAnswer(partial);
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
-          else if (!typing.classList.contains('is-rich')) {
+          else if (!typing.classList.contains('is-rich') && !streamingLongQa) {
             typing.textContent = thinkingStatusMsg;
           }
           return;
@@ -3833,7 +3850,7 @@ function initAiChatbot() {
         const clean = prepareDiagnosisPlanMarkdown(stripDiagnosisIntroBoilerplate(cleaned));
         if (!clean) {
           if (forcePlanWhileThinking) beginPlanRouting();
-          else if (!typing.classList.contains('is-rich')) {
+          else if (!typing.classList.contains('is-rich') && !streamingLongQa) {
             typing.textContent = thinkingStatusMsg;
           }
           return;
@@ -3850,7 +3867,12 @@ function initAiChatbot() {
           beginPlanRouting();
           return;
         }
-        // Follow-up / Mode B Q&A: stream into the left chat bubble
+        // Long / structured Q&A → plan panel (update one draft; no animation)
+        if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(clean)) {
+          beginLongQaRouting();
+          publishDiagnosisPlanToResultPanel(clean, { kind: 'qa', replaceLatest: true });
+          return;
+        }
         setBotBubble(typing, clean);
         scrollDiagChatToBottom();
       };
@@ -4142,6 +4164,13 @@ function initAiChatbot() {
             : `${planDoneMsg}。请先微信登录以保存方案并继续`;
           clearQuickReplies();
         }
+      } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
+        beginLongQaRouting();
+        publishDiagnosisPlanToResultPanel(answer, { kind: 'qa', replaceLatest: true });
+        typing.classList.add('is-plan-status');
+        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+        clearQuickReplies();
+        maybeShowServiceRecsAfterAnswer(answer);
       } else {
         setBotBubble(typing, answer);
         showQuickReplies(answer);
@@ -4731,9 +4760,16 @@ function shouldRouteDiagnosisToPlanPanel(text) {
   return false;
 }
 
-/** Q&A / follow-up answers stay in the left chat (no right-panel routing). */
-function shouldRouteLongAnswerToPlanPanel(_text) {
-  return false;
+/** Long / structured Q&A → right plan panel (no diagnosis animation). */
+function shouldRouteLongAnswerToPlanPanel(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (looksLikeLocalGenericHelp(t) || looksLikeDiagnosisPlanScaffold(t)) return false;
+  // Diagnosis wizard Q&A must stay in the left chat
+  if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
+  // Structured Mode B answers (结论/依据) read better in the plan panel
+  if (/\*\*结论\*\*|^\s*结论\s*[:：]|\*\*依据\*\*/m.test(t) && t.length >= 80) return true;
+  return t.length > 100;
 }
 
 const DIAG_PLAN_STATUS_MSG = '道一合规助手正在为您生成专属合规方案，请查看右侧方案生成区';
@@ -4741,6 +4777,8 @@ const DIAG_PLAN_DONE_MSG = '道一合规助手已为您生成专属合规方案�
 const DIAG_PLAN_UPDATE_STATUS_MSG =
   '道一合规助手正在对照上一轮诊断审视变化并更新方案，请查看右侧方案生成区';
 const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
+const QA_LONG_ANSWER_CHAT_TIP =
+  '由于内容较多，道一合规助手已将回复展示在右侧方案生成区，请查看。';
 const DIAG_PLAN_LIMIT = 3;
 const DIAG_PLAN_LIMIT_MSG =
   '您诊断的次数较多，如果您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
@@ -5223,15 +5261,12 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
   );
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
-  // Q&A must stay in the left chat — never mount into the plan panel
-  if (kind === 'qa') return;
-
   const jsonReport =
     options.jsonReport ||
     (kind === 'diagnosis' ? extractDiagnosisReportJson(cleanRaw) : null);
   const isFirstEntry = !items.querySelector('.result-entry');
   const timeLabel = formatResultEntryTime();
-  const kindLabel = '诊断方案';
+  const kindLabel = kind === 'qa' ? '问答回复' : '诊断方案';
   const metaHtml =
     `<p class="result-entry-meta">` +
     `<span class="result-entry-kind">${escapeHtml(kindLabel)}</span>` +
@@ -5240,18 +5275,20 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
 
   const mountEntry = (innerHtml) => {
     purgeInlineServiceMatchTips(items);
-    // Same-turn updates can replace the last diagnosis entry (avoid stacking stream drafts)
     let entry = null;
     if (options.replaceLatest) {
-      const drafts = items.querySelectorAll('.result-entry-diagnosis');
+      const drafts = items.querySelectorAll(`.result-entry-${kind}`);
       entry = drafts.length ? drafts[drafts.length - 1] : null;
     }
     const showGreeting =
-      isFirstEntry || Boolean(entry?.querySelector?.('.result-greeting'));
+      kind === 'diagnosis' &&
+      (isFirstEntry || Boolean(entry?.querySelector?.('.result-greeting')));
     if (!entry) {
       entry = document.createElement('article');
-      entry.className = 'result-entry result-entry-diagnosis';
+      entry.className = `result-entry result-entry-${kind}`;
       items.appendChild(entry);
+    } else {
+      entry.className = `result-entry result-entry-${kind}`;
     }
     entry.innerHTML =
       `<div class="result-body">` +
@@ -5332,7 +5369,6 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   if (kind === 'diagnosis') setResultServiceTipVisible(true);
 
   if (serviceHost) {
-    // Full diagnosis plans get recommendations; Q&A stays in chat
     showDiagnosisServiceRecs(clean, {
       lead:
         kind === 'qa'
