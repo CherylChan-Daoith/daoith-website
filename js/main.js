@@ -6726,22 +6726,26 @@ function renderDiagnosisReportJson(obj) {
   }
 
   html += `<h5 class="result-section-title">【行动建议】</h5>`;
-  html += `<ol class="result-list-actions-flat">`;
-  report.actions.forEach((a, i) => {
-    html +=
-      `<li>` +
-      `<span class="result-action-num" aria-hidden="true">${i + 1}.</span>` +
-      `<span class="result-action-body">${formatInline(String(a))}</span>` +
-      `</li>`;
-  });
-  html += `</ol>`;
+  if (report.actions?.length) {
+    html += `<ol class="result-list-actions-flat">`;
+    report.actions.forEach((a, i) => {
+      html +=
+        `<li>` +
+        `<span class="result-action-num" aria-hidden="true">${i + 1}.</span>` +
+        `<span class="result-action-body">${formatInline(String(a))}</span>` +
+        `</li>`;
+    });
+    html += `</ol>`;
+  }
 
   html += `<h5 class="result-section-title">【注意事项】</h5>`;
-  html += `<ul class="result-list result-list-l2">`;
-  report.notes.forEach((n) => {
-    html += `<li>${formatInline(String(n))}</li>`;
-  });
-  html += `</ul>`;
+  if (report.notes?.length) {
+    html += `<ul class="result-list result-list-l2">`;
+    report.notes.forEach((n) => {
+      html += `<li>${formatInline(String(n))}</li>`;
+    });
+    html += `</ul>`;
+  }
 
   if (report.closing) {
     html += `<p class="result-paragraph">${formatInline(report.closing)}</p>`;
