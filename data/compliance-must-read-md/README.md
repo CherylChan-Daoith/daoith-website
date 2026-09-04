@@ -46,14 +46,14 @@ python scripts/dify_upload_md.py --dir data/compliance-must-read-md \
   --files 00-必须知道的知识点.md \
   --separator $'\n##' --max-tokens 4000 --chunk-overlap 0 --replace
 
-# 路径全文（整篇；可按需改 --files 只传当前要更新的一篇）
+# 路径全文（Dify 自定义分段 max_tokens 上限 4000，勿用 8000）
 python scripts/dify_upload_md.py --dir data/compliance-must-read-md \
   --dataset-id 5038c599-48c6-4b90-ab62-b41cf7b59cb8 \
   --files 30-路径Y-非中国店-必读.md 31-路径D-产品无法退税-必读.md \
     32-路径X-特殊平台-必读.md 33-路径Z-已合规出口-必读.md \
     34-路径C-平台安排出口-必读.md 35-路径B-自发货小包-必读.md \
     36-路径A-备货海外仓-必读.md \
-  --separator "<<<DOC_END>>>" --max-tokens 8000 --chunk-overlap 0 --replace
+  --separator $'\n##' --max-tokens 4000 --chunk-overlap 0 --replace
 ```
 
-检索：知识库 `top_k` 建议足够大，且对路径篇优先整篇召回；出报告时先读 `15`，再只采信当前 `report_path` 对应的 30–36 一篇。
+检索：路径节点用精确文件名 query + Top K 8～12，尽量召回该篇全部 `##` 分段；出报告时采信当前 `report_path` 对应的 30–36。
