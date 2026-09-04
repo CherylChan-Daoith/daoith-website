@@ -3874,7 +3874,10 @@ function initAiChatbot() {
         // Long / structured Q&A → plan panel (update one draft; no animation)
         if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(clean)) {
           beginLongQaRouting();
-          publishDiagnosisPlanToResultPanel(clean, { kind: 'qa', replaceLatest: true });
+          publishDiagnosisPlanToResultPanel(clean, {
+            kind: 'qa',
+            replaceDraft: true,
+          });
           return;
         }
         setBotBubble(typing, clean);
