@@ -3703,12 +3703,6 @@ function initAiChatbot() {
 
     busy = true;
 
-    const typing = document.createElement('div');
-    typing.className = 'ai-chatbot-bubble is-bot';
-    typing.textContent = '正在检索和思考…';
-    messages.appendChild(typing);
-    scrollDiagChatToBottom();
-
     // Q7 answered → immediately show plan-generating status + right-panel working scene
     const shouldGeneratePlanNow =
       prevMode === 'diagnosis' && prevStep === 7 && getUiStep() >= 8;
@@ -3717,8 +3711,24 @@ function initAiChatbot() {
       !looksLikeDiagnosisFactQuestion(text) &&
       (followUpChanges.length > 0 || looksLikeDiagnosisScenarioRestate(text));
     const forcePlanWhileThinking = shouldGeneratePlanNow || expectFollowUpPlan;
+    // 「正在诊断」仅用于专属合规诊断问诊（第1～7步）；追问/直答一律「正在检索和思考」
+    const isDiagnosisWizardTurn =
+      prevMode === 'diagnosis' &&
+      !isPostReportFollowUp &&
+      prevStep >= 1 &&
+      prevStep <= 7;
+    const thinkingStatusMsg = isDiagnosisWizardTurn
+      ? '正在诊断…'
+      : '正在检索和思考…';
     const planBusyMsg = isPostReportFollowUp ? DIAG_PLAN_UPDATE_STATUS_MSG : DIAG_PLAN_STATUS_MSG;
     const planDoneMsg = isPostReportFollowUp ? DIAG_PLAN_UPDATE_DONE_MSG : DIAG_PLAN_DONE_MSG;
+
+    const typing = document.createElement('div');
+    typing.className = 'ai-chatbot-bubble is-bot';
+    typing.textContent = thinkingStatusMsg;
+    messages.appendChild(typing);
+    scrollDiagChatToBottom();
+
     if (shouldGeneratePlanNow || expectFollowUpPlan) {
       showResultWorking();
       typing.classList.add('is-plan-status');
