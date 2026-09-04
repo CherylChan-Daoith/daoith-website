@@ -3826,7 +3826,7 @@ function initAiChatbot() {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
           else if (!typing.classList.contains('is-rich')) {
-            typing.textContent = '正在检索和思考…';
+            typing.textContent = thinkingStatusMsg;
           }
           return;
         }
@@ -3834,7 +3834,7 @@ function initAiChatbot() {
         if (!clean) {
           if (forcePlanWhileThinking) beginPlanRouting();
           else if (!typing.classList.contains('is-rich')) {
-            typing.textContent = '正在检索和思考…';
+            typing.textContent = thinkingStatusMsg;
           }
           return;
         }
@@ -3880,7 +3880,9 @@ function initAiChatbot() {
         const msg = String(firstErr?.message || '');
         // Streaming/CORS失败时回退 blocking
         if (/无法连接|Failed to fetch|NetworkError/i.test(msg)) {
-          typing.textContent = '正在诊断…';
+          typing.textContent = forcePlanWhileThinking
+            ? planBusyMsg
+            : thinkingStatusMsg;
           result = await callDify({
             endpoint,
             query: apiQuery,
@@ -3891,7 +3893,9 @@ function initAiChatbot() {
         } else if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
           conversationId = '';
           persistConversationId(sessionId, false);
-          typing.textContent = '正在诊断…';
+          typing.textContent = forcePlanWhileThinking
+            ? planBusyMsg
+            : thinkingStatusMsg;
           result = await callChat('');
         } else {
           throw firstErr;
