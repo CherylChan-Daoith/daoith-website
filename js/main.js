@@ -4173,7 +4173,7 @@ function initAiChatbot() {
         }
       } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
         beginLongQaRouting();
-        publishDiagnosisPlanToResultPanel(answer, { kind: 'qa', replaceLatest: true });
+        publishDiagnosisPlanToResultPanel(answer, { kind: 'qa', replaceLatest: true, finalize: true });
         typing.classList.add('is-plan-status');
         typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
         clearQuickReplies();
