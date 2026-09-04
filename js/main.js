@@ -2464,10 +2464,10 @@ function looksLikeDiagnosisFactQuestion(text) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (/[？?]/.test(t)) return true;
-  if (/(?:吗|么)\s*$/.test(t)) return true;
-  if (/^(?:能不能|可不可以|是否可以|是否能|能否|可以(?:走|用|做)|我能|我想问|请问)/.test(t)) {
-    return true;
-  }
+  if (/(?:吗|么|呢)\s*$/.test(t)) return true;
+  // Mid-sentence questions: 「速卖通是不是可以…」「有没有9610清单」
+  if (/是不是|是否|有没有|能不能|可不可以|可否|能否|可以吗/.test(t)) return true;
+  if (/^(?:我能|我想问|请问|想问一下|帮我看|帮我确认)/.test(t)) return true;
   if (/(?:能不能|可不可以|是否可以|是否能|能否).{0,12}(?:走|用|做|改|切换)/.test(t)) return true;
   return false;
 }
@@ -3704,7 +3704,7 @@ function initAiChatbot() {
 
     const typing = document.createElement('div');
     typing.className = 'ai-chatbot-bubble is-bot';
-    typing.textContent = '正在诊断…';
+    typing.textContent = '正在检索和思考…';
     messages.appendChild(typing);
     scrollDiagChatToBottom();
 
@@ -3770,16 +3770,9 @@ function initAiChatbot() {
 
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
-        if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
-          publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
-          typing.classList.add('is-plan-status');
-          typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
-          clearQuickReplies();
-        } else {
-          setBotBubble(typing, aluminumReply);
-          showQuickReplies(aluminumReply);
-          maybeShowServiceRecsAfterAnswer(aluminumReply);
-        }
+        setBotBubble(typing, aluminumReply);
+        showQuickReplies(aluminumReply);
+        maybeShowServiceRecsAfterAnswer(aluminumReply);
         return;
       }
 
@@ -3787,7 +3780,6 @@ function initAiChatbot() {
       const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
 
       let streamingPlan = false;
-      let streamingLongQa = false;
       let loginPromptedForPlan = shouldGeneratePlanNow && !loggedIn;
       let planCountedThisTurn = false;
       const beginPlanRouting = () => {
@@ -3816,55 +3808,38 @@ function initAiChatbot() {
       };
       if (forcePlanWhileThinking) beginPlanRouting();
 
-      const beginLongQaRouting = () => {
-        if (streamingLongQa) return;
-        streamingLongQa = true;
-        typing.classList.add('is-plan-status');
-        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
-      };
-
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
         const cleaned = sanitizeAiAnswer(partial);
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
-          if (forcePlanWhileThinking) {
-            beginPlanRouting();
+          if (forcePlanWhileThinking) beginPlanRouting();
+          else if (!typing.classList.contains('is-rich')) {
+            typing.textContent = '正在检索和思考…';
           }
           return;
         }
         const clean = prepareDiagnosisPlanMarkdown(stripDiagnosisIntroBoilerplate(cleaned));
         if (!clean) {
           if (forcePlanWhileThinking) beginPlanRouting();
+          else if (!typing.classList.contains('is-rich')) {
+            typing.textContent = '正在检索和思考…';
+          }
           return;
         }
-        // Keep the working logo until the full report is ready — do not paint half-written plans
-        if (
-          streamingPlan ||
-          forcePlanWhileThinking ||
-          shouldRouteDiagnosisToPlanPanel(clean) ||
-          /【核心风险诊断】|【合规方案】/.test(clean) ||
-          (/"version"\s*:\s*1/.test(cleaned) && /"risk"\s*:/.test(cleaned)) ||
-          /"report_json"\s*:/.test(cleaned)
-        ) {
+        // Diagnosis report turns: keep working logo until the full report is ready
+        if (forcePlanWhileThinking || streamingPlan) {
+          if (
+            /(让我检索|知识库返回|属于路径[ABC]|需要检索的知识库|诊断档案)/.test(clean) &&
+            !/(【核心风险诊断】|【合规方案】)/.test(clean)
+          ) {
+            beginPlanRouting();
+            return;
+          }
           beginPlanRouting();
           return;
         }
-        // Mid-report CoT that slipped past sanitize: still never show in chat
-        if (
-          forcePlanWhileThinking &&
-          /(让我检索|知识库返回|属于路径[ABC]|需要检索的知识库|诊断档案)/.test(clean) &&
-          !/(【核心风险诊断】|【合规方案】)/.test(clean)
-        ) {
-          beginPlanRouting();
-          return;
-        }
-        // Specific Q&A (and other non-plan replies) longer than 100 chars → right panel
-        if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(clean)) {
-          beginLongQaRouting();
-          publishDiagnosisPlanToResultPanel(clean, { kind: 'qa' });
-          return;
-        }
+        // Follow-up / Mode B Q&A: stream into the left chat bubble
         setBotBubble(typing, clean);
         scrollDiagChatToBottom();
       };
@@ -4094,7 +4069,7 @@ function initAiChatbot() {
         }
       }
 
-      if (streamingPlan || shouldRouteDiagnosisToPlanPanel(answer)) {
+      if (streamingPlan || forcePlanWhileThinking) {
         beginPlanRouting();
         // Prefer sanitized answer; also try raw API text + tool observation JSON
         const jsonReport = pickJsonReport(answer, result);
@@ -4152,12 +4127,6 @@ function initAiChatbot() {
             : `${planDoneMsg}。请先微信登录以保存方案并继续`;
           clearQuickReplies();
         }
-      } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
-        beginLongQaRouting();
-        publishDiagnosisPlanToResultPanel(answer, { kind: 'qa' });
-        typing.classList.add('is-plan-status');
-        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
-        clearQuickReplies();
       } else {
         setBotBubble(typing, answer);
         showQuickReplies(answer);
@@ -4235,9 +4204,13 @@ function resetResultPlanPanel() {
   const working = document.getElementById('resultWorking');
   const serviceHost = document.getElementById('diagServiceRecs');
   if (working) working.remove();
-  if (items) items.innerHTML = '';
+  if (items) {
+    items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
+    items.innerHTML = '';
+  }
   if (content) content.classList.remove('active');
   if (placeholder) placeholder.style.display = '';
+  setResultServiceTipVisible(false);
   if (serviceHost) {
     serviceHost.innerHTML = '';
     serviceHost.hidden = true;
@@ -4743,14 +4716,9 @@ function shouldRouteDiagnosisToPlanPanel(text) {
   return false;
 }
 
-/** Mode B / general replies longer than 100 characters → right panel. */
-function shouldRouteLongAnswerToPlanPanel(text) {
-  const t = String(text || '').trim();
-  if (!t) return false;
-  if (looksLikeLocalGenericHelp(t) || looksLikeDiagnosisPlanScaffold(t)) return false;
-  // Diagnosis wizard Q&A must stay in the left chat
-  if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
-  return t.length > 100;
+/** Q&A / follow-up answers stay in the left chat (no right-panel routing). */
+function shouldRouteLongAnswerToPlanPanel(_text) {
+  return false;
 }
 
 const DIAG_PLAN_STATUS_MSG = '道一合规助手正在为您生成专属合规方案，请查看右侧方案生成区';
@@ -4758,8 +4726,6 @@ const DIAG_PLAN_DONE_MSG = '道一合规助手已为您生成专属合规方案�
 const DIAG_PLAN_UPDATE_STATUS_MSG =
   '道一合规助手正在对照上一轮诊断审视变化并更新方案，请查看右侧方案生成区';
 const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
-const QA_LONG_ANSWER_CHAT_TIP =
-  '由于内容较多，道一合规助手已将回复展示在右侧方案生成区，请查看。';
 const DIAG_PLAN_LIMIT = 3;
 const DIAG_PLAN_LIMIT_MSG =
   '您诊断的次数较多，如果您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
@@ -5070,8 +5036,13 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
 const DIAG_SERVICE_MATCH_TIP =
   '道一合规小助手已为您匹配最相关的服务，请在本页面下方进行选择。';
 
-function buildServiceMatchTipHtml() {
-  return `<p class="result-service-match-tip">${escapeHtml(DIAG_SERVICE_MATCH_TIP)}</p>`;
+function setResultServiceTipVisible(visible) {
+  const tip = document.getElementById('resultServiceTip');
+  if (!tip) return;
+  tip.hidden = !visible;
+  if (visible && !tip.textContent.trim()) {
+    tip.textContent = DIAG_SERVICE_MATCH_TIP;
+  }
 }
 
 /** Soft copy guard for the right-hand compliance plan panel (deterrent only). */
@@ -5251,14 +5222,13 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     const fromChat = `以下方案由左侧<strong>道一合规助手</strong>生成：`;
     const archiveHtml = buildDiagnosisArchiveConfirmHtml();
     const changeHtml = buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges());
-    const tipHtml = buildServiceMatchTipHtml();
     mountEntry(
       `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
         archiveHtml +
         changeHtml +
-        body +
-        tipHtml
+        body
     );
+    setResultServiceTipVisible(true);
     if (serviceHost) {
       showDiagnosisServiceRecs(clean, {
         lead: '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
@@ -5293,17 +5263,16 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
-  const tipHtml = buildServiceMatchTipHtml();
   mountEntry(
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
       archiveHtml +
       changeHtml +
-      body +
-      tipHtml
+      body
   );
+  if (kind === 'diagnosis') setResultServiceTipVisible(true);
 
   if (serviceHost) {
-    // Full diagnosis plans and Mode B / long Q&A answers both get recommendations
+    // Full diagnosis plans get recommendations; Q&A stays in chat
     showDiagnosisServiceRecs(clean, {
       lead:
         kind === 'qa'

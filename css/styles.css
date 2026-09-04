@@ -1207,13 +1207,21 @@ ul {
 }
 
 .result-service-match-tip {
-  margin: 20px 0 4px;
-  padding-top: 14px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 4;
+  margin: 0;
+  padding: 12px 18px 16px;
   border-top: 1px solid rgba(34, 81, 255, 0.12);
+  background: #fff;
   font-size: 0.92rem;
   font-weight: 700;
   color: #2251ff;
   line-height: 1.5;
+}
+
+.result-service-match-tip[hidden] {
+  display: none !important;
 }
 
 .diag-chat .ai-chatbot-bubble.is-welcome {
