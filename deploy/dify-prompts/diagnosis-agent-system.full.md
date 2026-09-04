@@ -1,5 +1,7 @@
 # 道一财税合规诊断助手 — 系统提示词（完整归档版）
 
+> **已过时**：路径体系与线上口径以 `diagnosis-agent-system.md` 为准（Y/D/X/Z/C/B/A）；本 full 文件勿再当生产提示词。
+>
 > 历史归档（Agent 曾自行写报告的完整版）。线上分工：
 > - Agent：`diagnosis-agent-system.md`（问诊 / 模式 B / 追问分流完整保留；第八步只调工具）
 > - Workflow LLM：`diagnosis-report-workflow-prompt.md`（仅报告撰写：硬约束、架构速查、路径 A/B/C/D、JSON 输出）

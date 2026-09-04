@@ -1814,44 +1814,68 @@ function buildDiagnosisProcessFlowFromSlots(slots) {
   return `${invoice} → ${entity} → ${exportMode} → ${shipping} → ${platform} → 境外消费者`;
 }
 
-/** Internal path A/B/C/D from diagnosis slots (matches Workflow 路径判定). */
+/** Alias — structured processFlow from archive slots. */
+function buildProcessFlowFromSlots(slots) {
+  return buildDiagnosisProcessFlowFromSlots(slots);
+}
+
+/** 可退免税：普货可退税，或涉检且非 0 退税 / 未授权。 */
+function isDiagRebateOrInspectionProduct(product) {
+  const p = String(product || '');
+  if (/^0退税率/.test(p) || /暂未获得授权/.test(p)) return false;
+  return isDiagRebateEligibleProduct(p) || /商检/.test(p);
+}
+
+/** Internal path Y/D/X/Z/C/B/A from diagnosis slots (matches Workflow 路径判定；命中即停). */
 function detectDiagnosisReportPath(slots) {
   const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
   const platform = String(s.platform || '');
   const shipping = String(s.shipping || '');
   const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
   const product = String(s.productCategory || '');
+  const mainland = isMainlandDiagEntity(s.entity);
+  const rebateOk = isDiagRebateOrInspectionProduct(product);
 
+  // 1 Y — 境外 / 非中国店主体
+  if (isOverseasDiagEntity(s.entity)) return 'Y';
+
+  // 2 D — 0 退税率或商标暂未获得授权
   if (/^0退税率/.test(product) || /商标.*暂未获得授权|暂未获得授权/.test(product)) {
     return 'D';
   }
-  // Path X: 国际站 + 大陆主体 + 已知履约；境外主体仓/自发货按 A/B/C
+
+  // 3 X — 大陆主体 + 可退免税 + 一达通，或国际站+自营/市场采购/便捷发货
   if (
-    /一达通/.test(shipping) ||
-    (/阿里国际站|国际站|Alibaba\.com/i.test(platform) &&
-      isMainlandDiagEntity(s.entity) &&
-      /自营出口|市场采购出口|便捷发货出口/.test(shipping))
+    mainland &&
+    rebateOk &&
+    (/一达通/.test(shipping) ||
+      (/阿里国际站|国际站|Alibaba\.com/i.test(platform) &&
+        /自营出口|市场采购出口|便捷发货出口/.test(shipping)))
   ) {
     return 'X';
   }
+
+  // 4 Z — 大陆 + 可退免税 + 已正式报关 / 已报关小包（不含「未报关」）
+  if (
+    mainland &&
+    rebateOk &&
+    (/正式报关|0110|9710|9810|1039/.test(exportMode) ||
+      (/小包快递出口（9610\/1210）|9610|1210/.test(exportMode) && !/未报关/.test(exportMode)))
+  ) {
+    return 'Z';
+  }
+
+  // 5 C — 平台国内仓 / 由平台安排出口
   if (isPlatformDomesticWarehouseShipping(shipping) || /由平台安排出口/.test(exportMode)) {
     return 'C';
   }
-  if (
-    /小包快递出口|9610|1210|未报关/.test(exportMode) ||
-    (/国内直发|POP（国内直发）|自发货（国内直发）|便捷发货/.test(shipping) &&
-      /9610|1210|小包|未报关/.test(`${exportMode}${shipping}`))
-  ) {
+
+  // 6 B — 小包未报关
+  if (/未报关/.test(exportMode)) {
     return 'B';
   }
-  if (
-    /亚马逊\s*FBA|FBA|FBL|Shopee海外仓|海外仓发货|半托管（海外仓）|POP（海外仓|自发货（海外仓|发货到平台海外仓|供货\s*SHEIN（保税仓）/.test(
-      shipping
-    ) ||
-    /正式报关|9810|1039|委托货代|市场采购|9710|0110/.test(exportMode)
-  ) {
-    return 'A';
-  }
+
+  // 7 A — 委托货代 / 其他 / 海外仓兜底
   return 'A';
 }
 
@@ -1974,604 +1998,44 @@ function isMainlandDiagEntity(entity) {
 }
 
 function isOverseasDiagEntity(entity) {
-  return /中国香港公司|外籍个人|其他境外公司|香港公司/.test(String(entity || ''));
+  return /中国香港公司|外籍个人|其他境外公司|南美洲本土公司|东南亚本土公司|香港公司/.test(
+    String(entity || '')
+  );
 }
 
 function hasDiagSpecialInvoice(invoice) {
   return /专用发票|专票|增值税专票/.test(String(invoice || ''));
 }
 
-function hasDiagNoInvoice(invoice) {
-  return /无法提供|无票|不能提供/.test(String(invoice || ''));
-}
-
 function isDiagRebateEligibleProduct(product) {
   return /^普货/.test(String(product || '')) || /能正常报关出口和退税/.test(String(product || ''));
 }
 
-function planDetailsText(details) {
-  return (Array.isArray(details) ? details : [])
-    .map((d) => `${d?.title || ''} ${d?.body || ''}`)
-    .join('\n');
-}
-
-function planDetailsAlreadyCovers(details, title) {
-  const blob = planDetailsText(details);
-  if ((Array.isArray(details) ? details : []).some((d) => String(d?.title || '').includes(title))) {
-    return true;
-  }
-  if (title.includes('0110出口+香港公司') || title.includes('0110出口+境外/香港公司')) {
-    return /0110出口\s*\+\s*(境外\/)?香港|0110.*(?:境外\/)?香港公司|(?:境外\/)?香港公司.*0110/.test(blob);
-  }
-  if (title.includes('1039出口+香港公司') || title.includes('1039出口+境外/香港公司')) {
-    return /1039出口\s*\+\s*(境外\/)?香港|1039.*(?:境外\/)?香港公司/.test(blob);
-  }
-  if (title.includes('1210出口备货至保税区')) {
-    return /1210出口备货|1210.*保税|保税.*1210/.test(blob);
-  }
-  if (title.includes('1210保税区一日游或9610')) {
-    return /1210.*一日游|9610跨境电商零售|9610.*1210/.test(blob);
-  }
-  if (title.includes('平台信息报送')) {
-    return /信息报送|采购后再销售|店铺主体.*不一致|香港公司.*店铺公司/.test(blob);
-  }
-  if (title.includes('国际站正式报关履约')) {
-    return /国际站|一达通|视同自产|正式报关履约|合规申报纳税/.test(blob);
-  }
-  return false;
-}
-
-/** Mandatory plan.details rows when Workflow LLM omits named architectures. */
-function buildMandatoryPlanDetails(slots, path) {
-  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
-  const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
-  const entity = String(s.entity || '');
-  const invoice = String(s.invoice || '');
-  const product = String(s.productCategory || '');
-  const freightForwarder = /委托货代|买单/.test(exportMode);
-  const rows = [];
-
-  if (path === 'A') {
-    if (isDiagRebateEligibleProduct(product) && hasDiagSpecialInvoice(invoice)) {
-      rows.push({
-        title: '0110出口+境外/香港公司',
-        body:
-          '建议搭建「0110出口+境外/香港公司」合规架构：国内供应商 → 进出口公司 → 境外/香港公司 → 店铺公司 → 境外消费者。' +
-          '进出口公司以自有抬头 0110 一般贸易报关出口给境外/香港公司（境外/香港公司为报关单境外买家）；供应商增值税专用发票开给进出口公司，满足条件后可申请出口退免税。' +
-          (freightForwarder
-            ? '当前为委托货代出口（买单出口），须以自有抬头 0110 替代货代抬头报关，否则难以支撑退免税且存在三流不一致风险。'
-            : '') +
-          '关联公司之间须注意转让定价，勿将大部分利润留存于无实质经营的境外/香港公司。',
-      });
-    } else if (hasDiagNoInvoice(invoice)) {
-      rows.push({
-        title: '1039出口+境外/香港公司',
-        body:
-          '无票货源可评估「1039出口+境外/香港公司」：国内供应商 → 个体户 → 境外/香港公司 → 店铺公司 → 境外消费者。' +
-          '个体户在市场采购区（常建议东莞/义乌）以 1039 出口给境外/香港公司，可享无票免征增值税与个税核定；' +
-          '如需享受核定征收，单个个体户连续12个月销售额一般不超过500万，须合理安排规模；查账征收没有销售额限制但需注意税负。须核禁限类、知识产权备案及商检要求。',
-      });
-    }
-    if (isMainlandDiagEntity(entity)) {
-      rows.push({
-        title: '平台信息报送与主体一致性',
-        body:
-          '依据《互联网平台企业信息报送规定》，平台会向税务机关推送店铺身份与交易信息；税务机关一般要求店铺公司作为平台销售收入与所得税申报主体，收入口径为平台订单销售额（不是回款，不得扣除平台费用）。' +
-          '架构落地后须核对境外销售主体（如香港公司）与平台店铺主体是否一致；不一致时须增加「境外公司从出口主体采购后再销售给店铺公司」链路（出口主体 → 境外公司 → 店铺公司），使平台报送与店铺申报匹配。各地税局审核要点有差异，搭建前可咨询专家。',
-      });
-    }
-  } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
-    rows.push({
-      title: '1210出口备货至保税区',
-      body:
-        '非定制类普货可优先评估「1210出口备货至保税区」：国内供应商 → 进出口公司 → 备货保税区（货主香港公司）→ 店铺公司 → 境外消费者。' +
-        '先以 0110 报关进保税区给香港公司，再按平台订单 1210 一件代发离境，争取取得报关单后申报退税。' +
-        '转为1210/9610会改变物流链路，须测算物流成本与退税收益。',
-    });
-  } else if (path === 'B') {
-    rows.push({
-      title: '1210保税区一日游或9610跨境电商零售出口',
-      body:
-        '定制类普货可通过「1210保税区一日游或9610跨境电商零售出口」：国内供应商 → 进出口公司（常即店铺公司）→ 境外消费者，订单驱动 1210/9610 报关，取得清单或报关单后申请退免税（以实际通关及税务机关要求为准）。',
-    });
-  } else if (path === 'X') {
-    const shipping = String(s.shipping || '');
-    const convenient = /便捷发货/.test(shipping);
-    const productionLike = /一达通代理出口\s*[（(]?3\s*\+\s*N|一达通代理出口3\+N|一达通.*3\s*\+\s*N/.test(
-      shipping
-    );
-    if (convenient) {
-      if (/商检/.test(product)) {
-        rows.push({
-          title: '1210出口备货至保税区',
-          body:
-            '阿里国际站「便捷发货」多为小包未报关，报关费高、难退税，存在视同内销风险（销售额超过约500万可能按13%补缴增值税），且资金常提现至个人账户。' +
-            '涉检商品宜走「1210出口备货至保税仓」一件代发，争取0110/1210报关单；1210一日游或9610商检成本通常过高。' +
-            '须评估可走1210/9610的物流商及费用；若评估后仍无法正式报关，建议咨询财税专家重估业务模式。',
-        });
-      } else if (isDiagRebateEligibleProduct(product)) {
-        rows.push({
-          title: '1210出口备货至保税区',
-          body:
-            '阿里国际站「便捷发货」多为小包未报关。非定制普货可评估「1210出口备货至保税仓」一件代发，争取0110或1210报关单退税；定制类普货可评估「1210保税区一日游或9610跨境电商零售出口」。' +
-            '改造会改变物流链路并可能增本，须重点评估物流商与费用；若不能通过1210/9610正式报关，建议咨询财税专家重估业务模式。',
-        });
-        rows.push({
-          title: '1210保税区一日游或9610跨境电商零售出口',
-          body:
-            '若产品为定制类普货，可通过「1210保税区一日游或9610跨境电商零售出口」获取报关清单/报关单后申请退免税；涉检商品一般不优先此路径。',
-        });
-      } else {
-        rows.push({
-          title: '1210保税区一日游或9610跨境电商零售出口',
-          body:
-            '阿里国际站便捷发货场景下，可通过1210/9610分送集报降低报关费并争取退免税单据；须测算物流成本。若无法落地正式报关，建议咨询财税专家重估业务模式。',
-        });
-      }
-    } else {
-      const invoice = String(s.invoice || '');
-      let invoiceTip = '';
-      if (/部分专票\s*\+\s*部分无票|部分无票/.test(invoice) && /专票/.test(invoice)) {
-        invoiceTip =
-          '档案为「部分专票+部分无票」：无票部分进项缺失，须逐家梳理；无票货源宜评估市场采购出口等安排，专票部分单独核算退税条件。';
-      } else if (/部分专票\s*\+\s*部分普票/.test(invoice)) {
-        invoiceTip =
-          '档案为「部分专票+部分普票」：普票通常无法支撑退税（亦非无票），须逐家梳理供应商、争取对可退税货物改开专票；禁止改写成无票采购。';
-      } else if (hasDiagNoInvoice(invoice)) {
-        invoiceTip =
-          '档案为无法提供发票/无票：合规税负往往偏高，宜优先评估市场采购出口等与无票更匹配的履约/出口安排，并梳理可取得专票的供应商。';
-      } else if (/普通发票|普票/.test(invoice) && !hasDiagSpecialInvoice(invoice)) {
-        invoiceTip =
-          '档案为增值税普通发票（不是无票）：通常无法支撑退税，须重点梳理供应商发票、争取改开专票。';
-      } else if (hasDiagSpecialInvoice(invoice) && !/部分/.test(invoice)) {
-        invoiceTip = '档案已有专票条件时，侧重核对专票与报关、收汇资料齐套，勿写成无票或普票口径。';
-      }
-      rows.push({
-        title: '国际站正式报关履约与纳税申报',
-        body:
-          '您已选择自营出口、一达通代理出口或市场采购出口等需凭报关单收汇的履约方式，具备正式报关条件；方案侧重依法合规申报纳税、核对退免税资料齐套，而非从零改造出口通道。' +
-          invoiceTip +
-          (productionLike
-            ? '一达通3+N仅合作生产型企业，默认您为生产型企业：若存在外购，须判断是否满足视同自产；不满足则不能退税、仅可按免税处理。'
-            : /自营出口|一达通代理出口\s*[（(]?2\s*\+\s*N|一达通代理出口2\+N|2\+N/.test(shipping)
-              ? '自营出口或一达通2+N等不默认您为生产型企业：仅当确认为生产型企业且存在外购成品时，才须判断视同自产（不满足则免税不可退税）；贸易型企业按免退税口径，勿套用生产型视同自产默认。'
-              : ''),
-      });
-    }
-  }
-
-  return rows;
-}
-
-function overviewItemsAlreadyCover(items, needle) {
-  const list = Array.isArray(items) ? items : [];
-  const n = String(needle || '');
-  return list.some((it) => {
-    const t = String(it || '');
-    if (n.includes('0110') && /0110/.test(t) && /香港/.test(t)) return true;
-    if (n.includes('1039') && /1039/.test(t) && /香港/.test(t)) return true;
-    if (n.includes('1210') && /1210|9610/.test(t)) return true;
-    if (n.includes('香港公司销售') && /香港/.test(t) && /店铺/.test(t) && /销售|采购/.test(t)) {
-      return true;
-    }
-    if (n.includes('订单销售额') && /订单销售额|平台订单/.test(t)) return true;
-    if (n.includes('自有抬头') && /自有抬头|0110/.test(t) && /货代|买单|替代/.test(t)) return true;
-    return t.includes(n) || n.includes(t);
-  });
-}
-
-function ensureDiagnosisReportOverview(report, slots, path) {
-  if (!report?.plan) return report;
-  const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
-  const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '');
-  const invoice = String(s.invoice || '');
-  const product = String(s.productCategory || '');
-  const freightForwarder = /委托货代|买单/.test(exportMode);
-
-  const overview = Array.isArray(report.plan.overview)
-    ? report.plan.overview.map((st) => ({
-        ...st,
-        items: Array.isArray(st.items) ? st.items.slice() : [],
-      }))
-    : [];
-
-  const ensureStage = (num, title) => {
-    let stage = overview.find((st) => String(st.num) === num || String(st.num) === num.replace(/^0/, ''));
-    if (!stage) {
-      stage = { num, title, items: [] };
-      overview.push(stage);
-    }
-    if (!stage.title) stage.title = title;
-    if (!Array.isArray(stage.items)) stage.items = [];
-    return stage;
-  };
-
-  const pushUnique = (stage, item) => {
-    if (!item || overviewItemsAlreadyCover(stage.items, item)) return;
-    // Drop known-wrong generic export tips that contradict 0110+HK
-    stage.items = stage.items.filter(
-      (it) => !/报关抬头回归店铺公司|取得代理证明/.test(String(it || ''))
-    );
-    stage.items.push(item);
-  };
-
-  if (path === 'A') {
-    const s02 = ensureStage('02', '报关出口环节');
-    if (isDiagRebateEligibleProduct(product) && hasDiagSpecialInvoice(invoice)) {
-      pushUnique(s02, '搭建0110出口+境外/香港公司');
-    } else if (hasDiagNoInvoice(invoice)) {
-      pushUnique(s02, '搭建1039出口+境外/香港公司');
-    }
-    if (freightForwarder) {
-      pushUnique(s02, '自有抬头0110替代委托货代');
-    }
-    if (isMainlandDiagEntity(s.entity)) {
-      const s03 = ensureStage('03', '境外销售环节');
-      pushUnique(s03, '境外/香港公司销售给店铺公司（主体不一致时）');
-      pushUnique(s03, '按平台订单销售额确认收入');
-    }
-  } else if (path === 'B' && isDiagRebateEligibleProduct(product)) {
-    const s02 = ensureStage('02', '报关出口环节');
-    pushUnique(s02, '搭建1210出口备货至保税区');
-  } else if (path === 'X') {
-    const shippingX = String(s.shipping || '');
-    const s02 = ensureStage('02', '报关出口环节');
-    if (/便捷发货/.test(shippingX)) {
-      pushUnique(s02, '评估1210/9610正式报关替代便捷发货');
-      pushUnique(s02, '测算可走1210/9610的物流成本');
-    } else {
-      pushUnique(s02, '凭报关单收汇并合规申报纳税');
-      pushUnique(s02, '梳理供应商发票与退税资格');
-      if (/一达通代理出口\s*[（(]?3\s*\+\s*N|一达通代理出口3\+N|一达通.*3\s*\+\s*N/.test(shippingX)) {
-        pushUnique(s02, '外购货物核视同自产条件');
-      }
-    }
-  }
-
-  // Keep 01/02/03 order
-  const order = { '01': 1, '1': 1, '02': 2, '2': 2, '03': 3, '3': 3 };
-  overview.sort((a, b) => (order[String(a.num)] || 9) - (order[String(b.num)] || 9));
-
-  return {
-    ...report,
-    plan: {
-      ...report.plan,
-      overview,
-    },
-  };
-}
-
-function isForbiddenHkResaleOr0110Item(text) {
-  const t = String(text || '');
-  if (!t) return false;
-  if (/搭建\s*0110\s*出口\s*\+?\s*(境外\/)?香港|0110出口\s*\+\s*(境外\/)?香港公司/.test(t)) return true;
-  if (/搭建\s*1039\s*出口\s*\+?\s*(境外\/)?香港|1039出口\s*\+\s*(境外\/)?香港公司/.test(t)) return true;
-  if (/(?:境外\/)?香港公司销售给店铺|采购后再销售给店铺|出口主体\s*→\s*(?:境外\/)?香港公司\s*→\s*店铺|出口主体\s*→\s*境外公司\s*→\s*店铺/.test(t)) {
-    return true;
-  }
-  if (/平台信息报送与主体一致性/.test(t) && /香港|采购再销售|店铺公司/.test(t)) return true;
-  return false;
-}
-
-/** Always strip 0110/1039+HK and HK→shop resale for C/D/X and any 国际站/一达通 report. */
-function shouldStripForbiddenHkArchitectures(report, path, slots) {
-  if (/^[CDX]$/.test(String(path || ''))) return true;
-  const s = slots && typeof slots === 'object' ? slots : {};
-  if (/一达通|阿里国际站|国际站/.test(`${s.platform || ''} ${s.shipping || ''}`)) return true;
-  const blob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''} ${JSON.stringify(report?.plan?.overview || [])} ${JSON.stringify(report?.plan?.details || [])}`;
-  if (/一达通|阿里国际站/.test(blob)) return true;
-  return false;
-}
-
-function stripForbiddenArchitecturesForPath(report, path, slots) {
-  if (!report?.plan || !shouldStripForbiddenHkArchitectures(report, path, slots)) return report;
-  const next = {
-    ...report,
-    plan: { ...(report.plan || {}) },
-  };
-  if (Array.isArray(next.plan.overview)) {
-    next.plan.overview = next.plan.overview.map((st) => ({
-      ...st,
-      items: (Array.isArray(st.items) ? st.items : []).filter((it) => !isForbiddenHkResaleOr0110Item(it)),
-    }));
-  }
-  if (Array.isArray(next.plan.details)) {
-    next.plan.details = next.plan.details.filter((d) => {
-      const title = String(d?.title || '');
-      const body = String(d?.body || '');
-      if (/^0110出口\s*\+\s*香港|^1039出口\s*\+\s*香港/.test(title)) return false;
-      if (/平台信息报送与主体一致性/.test(title)) return false;
-      if (isForbiddenHkResaleOr0110Item(`${title} ${body}`)) return false;
-      return true;
-    });
-  }
-  return next;
-}
-
-/** Path-D-only jargon that must not appear for 普货/涉检 reports. */
-function looksLikeSpecialGoodsFlagBleed(text) {
-  const t = String(text || '');
-  if (!t) return false;
-  return (
-    /特殊商品标识/.test(t) ||
-    /标识\s*[12]/.test(t) ||
-    /出口免税（标识|视同内销（标识/.test(t) ||
-    /标识1产品|标识2产品/.test(t)
-  );
-}
-
-function looksLikePathDZeroRebateBleed(text) {
-  const t = String(text || '');
-  if (!t) return false;
-  if (
-    /属于\s*0\s*退税率|产品属于0退税率|产品为\s*0\s*退税率|为\s*0\s*退税率|0退税率产品需要|按路径\s*D|按路径D口径/.test(
-      t
-    )
-  ) {
-    return true;
-  }
-  if (
-    /0退税率产品须?先?(?:核实|核对|查看)?特殊商品标识/.test(t) ||
-    (/特殊商品标识/.test(t) && /贵重金属|珠宝玉石|钢材|铝材|玻璃|木材/.test(t) && /0\s*退税/.test(t))
-  ) {
-    return true;
-  }
-  if (looksLikeSpecialGoodsFlagBleed(t)) return true;
-  return false;
-}
-
-/** Remove 标识1/2 / 特殊商品标识 clauses; keep remaining 普货-合规 sentences. */
-function scrubSpecialGoodsFlagBleedText(text) {
-  let t = String(text || '');
-  if (!looksLikeSpecialGoodsFlagBleed(t) && !looksLikePathDZeroRebateBleed(t)) return t;
-  t = t.replace(
-    /[^。；\n]*(?:特殊商品标识|标识\s*[12]|出口免税（标识2）|视同内销（标识1）|标识1产品|标识2产品|按路径\s*D|产品属于0退税率|产品为\s*0\s*退税率)[^。；\n]*[。；]?/g,
-    ''
-  );
-  t = t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
-  return t;
-}
-
-function stripPathDBleedFromPathXReport(report, slots) {
-  if (!report || typeof report !== 'object') return report;
-  const product = String(slots?.productCategory || '');
-  // 标识1/2 only for 0退税率; strip for any non-0-rebate archive product
-  if (/^0退税率/.test(product)) return report;
-
-  const next = {
-    ...report,
-    risk: { ...(report.risk || {}) },
-    plan: { ...(report.plan || {}) },
-  };
-
-  if (looksLikePathDZeroRebateBleed(next.risk.summary) || looksLikeSpecialGoodsFlagBleed(next.risk.summary)) {
-    const cleaned = scrubSpecialGoodsFlagBleedText(next.risk.summary);
-    next.risk.summary =
-      cleaned && cleaned.length >= 20
-        ? cleaned
-        : '当前最大瓶颈是阿里国际站「便捷发货」等履约下难取得正式报关单、存在视同内销与资金提现合规风险，同时须梳理供应商发票以支撑退免税或控税负。';
-  }
-
-  const scrubItems = (items) =>
-    (Array.isArray(items) ? items : [])
-      .map((it) => {
-        if (typeof it === 'string') {
-          if (!looksLikePathDZeroRebateBleed(it) && !looksLikeSpecialGoodsFlagBleed(it)) return it;
-          const cleaned = scrubSpecialGoodsFlagBleedText(it);
-          return cleaned && cleaned.length >= 8 ? cleaned : null;
-        }
-        if (it && typeof it === 'object') {
-          const title = String(it.title || '');
-          const body = String(it.body || it.text || '');
-          const blob = `${title}\n${body}`;
-          if (!looksLikePathDZeroRebateBleed(blob) && !looksLikeSpecialGoodsFlagBleed(blob)) return it;
-          const nextTitle = scrubSpecialGoodsFlagBleedText(title) || title;
-          const nextBody = scrubSpecialGoodsFlagBleedText(body);
-          if (!nextBody || nextBody.length < 12) return null;
-          if (looksLikeSpecialGoodsFlagBleed(`${nextTitle}\n${nextBody}`)) return null;
-          return { ...it, title: nextTitle, body: nextBody };
-        }
-        return it;
-      })
-      .filter(Boolean);
-
-  next.risk.stages = (Array.isArray(next.risk.stages) ? next.risk.stages : []).map((st) => ({
-    ...st,
-    items: scrubItems(st.items),
-  }));
-  next.plan.overview = (Array.isArray(next.plan.overview) ? next.plan.overview : []).map((st) => ({
-    ...st,
-    items: scrubItems(st.items),
-  }));
-  next.plan.details = scrubItems(next.plan.details);
-
-  return next;
-}
-
-/** Scrub report body when it contradicts archive invoice / product labels. */
-function scrubArchiveSlotBleedFromReport(report, slots) {
-  if (!report || typeof report !== 'object') return report;
-  const s = slots && typeof slots === 'object' ? slots : {};
-  const invoice = String(s.invoice || '');
-  const product = String(s.productCategory || '');
-  if (!invoice && !product) return report;
-
-  const archiveHasNoInvoice = hasDiagNoInvoice(invoice) || /部分无票/.test(invoice);
-  const archiveIsPartialGeneral =
-    /部分专票\s*\+\s*部分普票/.test(invoice) ||
-    (/普票/.test(invoice) && !archiveHasNoInvoice && /部分/.test(invoice));
-  const archiveIsGeneralOnly =
-    /普通发票|普票/.test(invoice) && !hasDiagSpecialInvoice(invoice) && !archiveHasNoInvoice;
-  const forbidNoInvoiceWording = (archiveIsPartialGeneral || archiveIsGeneralOnly) && !archiveHasNoInvoice;
-  const forbidZeroRebateWording =
-    /普货|商检/.test(product) && !/^0退税率/.test(product) && !/暂未获得授权/.test(product);
-  const forbidGeneralGoodsWording =
-    /^0退税率/.test(product) || /暂未获得授权/.test(product);
-  const productShortLabel = /商检/.test(product)
-    ? '涉检产品'
-    : /普货/.test(product)
-      ? '普货（可正常报关出口和退税）'
-      : product || '当前产品';
-  const platform = String(s.platform || '').trim();
-  const platKey = compactDiagnosisText(platform);
-
-  const scrubForeignPlatform = (text) => {
-    let t = String(text || '');
-    if (!t || !platform) return t;
-    DIAG_KNOWN_PLATFORM_TOKENS.forEach((token) => {
-      const tok = compactDiagnosisText(token);
-      if (!tok || platKey.includes(tok) || tok.includes(platKey.slice(0, Math.min(4, platKey.length)))) {
-        return;
-      }
-      if (t.includes(token)) {
-        t = t.split(token).join(platform);
-      }
-    });
-    return t;
-  };
-
-  const scrubText = (text) => {
-    let t = scrubForeignPlatform(String(text || ''));
-    if (!t) return t;
-    if (forbidNoInvoiceWording) {
-      // Common LLM mix-up: 部分普票 → 部分无票
-      t = t.replace(/部分专票\s*\+\s*部分无票/g, invoice.includes('部分普票') ? '部分专票+部分普票' : invoice || '部分专票+部分普票');
-      t = t.replace(/部分无票采购/g, '部分普票采购');
-      t = t.replace(/部分无票/g, '部分普票');
-      t = t.replace(/无票采购导致进项缺失/g, '普票无法支撑退税');
-      t = t.replace(/供应商发票为部分专票\s*\+\s*部分无票/g, `供应商发票为${invoice || '部分专票+部分普票'}`);
-      t = t.replace(/无票部分无法抵扣进项税额[^。；\n]*/g, '普票通常无法支撑出口退税，须争取改开专票');
-      t = t.replace(/无票采购成本在企业所得税前扣除也可能受限[^。；\n]*[。；]?/g, '');
-      t = t.replace(/进一步加重进项缺失[^。；\n]*[。；]?/g, (m) => (/无票/.test(m) ? '' : m));
-      // Remaining standalone 无票 claims when archive has 普票 only
-      t = t.replace(/([^「『]*)无票(?![\u4e00-\u9fff]*普票)/g, (full, pre) => {
-        if (/普票|专票/.test(pre.slice(-6))) return `${pre}普票`;
-        return `${pre}普票`;
-      });
-    }
-    if (forbidZeroRebateWording) {
-      t = scrubSpecialGoodsFlagBleedText(t);
-      // LLM often writes「产品为0退税率」not「产品属于0退税率」
-      t = t.replace(/产品属于\s*0\s*退税率/g, productShortLabel);
-      t = t.replace(/产品为\s*0\s*退税率/g, productShortLabel);
-      t = t.replace(/属于\s*0\s*退税率/g, `属${productShortLabel}`);
-      t = t.replace(/为\s*0\s*退税率/g, `为${productShortLabel}`);
-      t = t.replace(/\+\s*产品为\s*0\s*退税率/g, `+ ${productShortLabel}`);
-      t = t.replace(/0退税率产品/g, productShortLabel);
-    }
-    if (forbidGeneralGoodsWording) {
-      t = scrubSpecialGoodsFlagBleedText(t);
-      const prodLabel = product || '0退税率产品';
-      t = t.replace(/普货[，,、\s]*能正常报关出口和退税/g, prodLabel);
-      t = t.replace(/产品为普货[，,、\s]*能正常报关出口和退税/g, `产品为${prodLabel}`);
-      t = t.replace(/产品为普货/g, `产品为${prodLabel}`);
-      t = t.replace(/属于普货[，,、\s]*能正常报关出口和退税/g, `属于${prodLabel}`);
-      t = t.replace(/能正常报关出口和退税/g, '须按档案产品类别评估退免税');
-      t = t.replace(/可申请出口退免税|可退税|优先推退税/g, '须先按0退税率或授权口径评估');
-    }
-    return t.replace(/[，、；\s]{2,}/g, '；').replace(/^[，、；。\s]+|[，、；。\s]+$/g, '').trim();
-  };
-
-  const mapItems = (items) =>
-    (Array.isArray(items) ? items : [])
-      .map((it) => {
-        if (typeof it === 'string') {
-          const cleaned = scrubText(it);
-          return cleaned && cleaned.length >= 4 ? cleaned : null;
-        }
-        if (it && typeof it === 'object') {
-          const title = scrubText(String(it.title || '')) || String(it.title || '');
-          const body = scrubText(String(it.body || it.text || ''));
-          if (!body || body.length < 8) return null;
-          // Drop titles that still claim 无票 when archive has no 无票
-          if (forbidNoInvoiceWording && /无票/.test(title) && !/普票/.test(title)) {
-            return { ...it, title: title.replace(/无票/g, '普票') || '供应商发票梳理', body };
-          }
-          return { ...it, title, body };
-        }
-        return it;
-      })
-      .filter(Boolean);
-
-  const next = {
-    ...report,
-    risk: { ...(report.risk || {}) },
-    plan: { ...(report.plan || {}) },
-  };
-  if (next.risk.summary) {
-    const cleanedSummary = scrubText(next.risk.summary);
-    next.risk.summary = cleanedSummary || next.risk.summary;
-  }
-  next.risk.stages = (Array.isArray(next.risk.stages) ? next.risk.stages : []).map((st) => ({
-    ...st,
-    items: mapItems(st.items),
-  }));
-  // Intro always locked to current UI archive when platform/product are known
-  if (String(s.platform || '').trim() || String(s.productCategory || '').trim()) {
-    const cleanedIntro = scrubText(next.plan.intro || '');
-    next.plan.intro =
-      cleanedIntro && !planIntroConflictsWithSlots(cleanedIntro, s)
-        ? cleanedIntro
-        : buildPlanIntroFromSlots(s);
-  } else if (next.plan.intro) {
-    const cleanedIntro = scrubText(next.plan.intro);
-    if (cleanedIntro) next.plan.intro = cleanedIntro;
-  }
-  next.plan.overview = (Array.isArray(next.plan.overview) ? next.plan.overview : []).map((st) => ({
-    ...st,
-    items: mapItems(st.items),
-  }));
-  next.plan.details = mapItems(next.plan.details);
-  return next;
-}
+/** Writing points live in KB 30–36; frontend no longer injects/scrubs path architectures. */
 
 function ensureDiagnosisReportArchitectures(report, slots) {
   if (!report || typeof report !== 'object') return report;
-  // Always post-process against UI wizard slots — never let report body rewrite the archive.
+  // Structured consistency only — path writing owned by KB 30–36.
   const rawSlots = slots && typeof slots === 'object' ? slots : getDiagSlots();
-  const { path, slots: s } = resolveDiagnosisReportPath(report, rawSlots);
-  let next = report;
+  const { slots: s } = resolveDiagnosisReportPath(report, rawSlots);
+  let next = {
+    ...report,
+    risk: { ...(report.risk || {}) },
+    plan: { ...(report.plan || {}) },
+  };
 
-  // Never inject path-A 0110/HK architectures for 一达通/国际站履约 reports
-  // (even if slots mis-detect as A — Agent JSON is already correct).
-  // 仅「一达通/自营/便捷发货/市场采购」等履约痕迹才强制 X；勿因正文出现平台名「阿里国际站」就把境外主体仓发货改成 X。
-  const reportBlob = `${report?.risk?.processFlow || ''} ${report?.plan?.intro || ''} ${JSON.stringify(report?.plan?.overview || [])}`;
-  const looksLikeIntlFulfillment =
-    /一达通/.test(reportBlob) ||
-    (/自营出口|便捷发货出口|市场采购出口/.test(reportBlob) && /国际站|一达通|阿里/.test(reportBlob));
-  const isIntlStationReport = looksLikeIntlFulfillment || path === 'X';
-  const effectivePath = isIntlStationReport && path === 'A' ? 'X' : path;
-
-  const mandatory = buildMandatoryPlanDetails(s, effectivePath);
-  if (mandatory.length) {
-    const details = Array.isArray(next.plan?.details) ? next.plan.details.slice() : [];
-    let changed = false;
-    mandatory.forEach((item) => {
-      if (!planDetailsAlreadyCovers(details, item.title)) {
-        details.unshift(item);
-        changed = true;
-      }
-    });
-    if (changed) {
-      next = {
-        ...next,
-        plan: {
-          ...(next.plan || {}),
-          details,
-        },
-      };
-    }
+  if (planIntroConflictsWithSlots(next.plan.intro, s)) {
+    next.plan.intro = buildPlanIntroFromSlots(s);
   }
 
-  next = ensureDiagnosisReportOverview(next, s, effectivePath);
-  // Always strip forbidden HK/0110 items for 国际站/一达通 (and C/D/X)
-  next = stripForbiddenArchitecturesForPath(next, effectivePath, s);
-  // 标识1/2 only for 0退税率；非 0 退税档案（含路径 X 普货）一律剥离
-  if (!/^0退税率/.test(String(s.productCategory || ''))) {
-    next = stripPathDBleedFromPathXReport(next, s);
+  const flow = String(next.risk.processFlow || '');
+  if (
+    isGenericDiagnosisProcessFlow(flow) ||
+    (String(s.platform || '').trim() && diagnosisReportConflictsWithSlots(next, s))
+  ) {
+    next.risk.processFlow = buildProcessFlowFromSlots(s);
   }
-  // 发票/产品等档案字段与正文冲突时纠偏（如 部分普票 被写成 部分无票）
-  next = scrubArchiveSlotBleedFromReport(next, s);
+
   return next;
 }
 
@@ -2636,19 +2100,18 @@ function diagnosisReportConflictsWithSlots(report, slots) {
   const platKey = compactDiagnosisText(platform);
   const flowKey = compactDiagnosisText(flow);
 
-  if (platKey && flowKey) {
-    const platformInFlow =
-      flowKey.includes(platKey) ||
-      (platKey.length >= 4 && flowKey.includes(platKey.slice(0, 4)));
-    if (!platformInFlow) {
-      const otherPlatform = DIAG_KNOWN_PLATFORM_TOKENS.some((token) => {
-        const tok = compactDiagnosisText(token);
-        if (!tok || platKey.includes(tok) || tok.includes(platKey.slice(0, Math.min(4, platKey.length)))) {
-          return false;
-        }
-        return flowKey.includes(tok) || blob.includes(tok);
-      });
-      if (otherPlatform) return true;
+  // Any other known platform token in the report body = prior-case bleed
+  if (platKey) {
+    const otherPlatform = DIAG_KNOWN_PLATFORM_TOKENS.some((token) => {
+      const tok = compactDiagnosisText(token);
+      if (!tok || platKey.includes(tok) || tok.includes(platKey.slice(0, Math.min(4, platKey.length)))) {
+        return false;
+      }
+      return flowKey.includes(tok) || blob.includes(tok);
+    });
+    if (otherPlatform) return true;
+    if (/Mercado\s*Libre/i.test(String(report?.plan?.intro || '') + flow) && !/美客多|Mercado/i.test(platform)) {
+      return true;
     }
   }
 
@@ -2659,22 +2122,11 @@ function diagnosisReportConflictsWithSlots(report, slots) {
     return true;
   }
 
-  // Slots are not 国际站 but report body is clearly 阿里国际站
-  if (
-    platform &&
-    !/阿里国际站|国际站/.test(platform) &&
-    /阿里国际站/.test(blob) &&
-    !blob.includes(platKey) &&
-    !(platKey.length >= 4 && blob.includes(platKey.slice(0, 4)))
-  ) {
-    return true;
-  }
-
-  // Invoice archive vs report: 部分普票 rewritten as 部分无票 / 无票采购
+  // Invoice: archive is full 专票 / 普票 but report claims 无票
   const invoice = String(s.invoice || '').trim();
   if (invoice) {
     const invKey = compactDiagnosisText(invoice);
-    const reportClaimsNoInvoice = /部分无票|无票采购|无票进项|无法提供发票/.test(blob);
+    const reportClaimsNoInvoice = /部分无票|无票采购|无票进项|无法提供发票|专票与无票并存|搭建1039/.test(blob);
     const archiveHasNoInvoice = /无票|无法提供/.test(invKey);
     if (/部分普票/.test(invKey) && !/无票/.test(invKey) && /部分无票|无票采购/.test(blob)) {
       return true;
@@ -2682,9 +2134,17 @@ function diagnosisReportConflictsWithSlots(report, slots) {
     if (!archiveHasNoInvoice && /普票/.test(invKey) && reportClaimsNoInvoice && !/普票/.test(blob)) {
       return true;
     }
+    if (
+      hasDiagSpecialInvoice(invoice) &&
+      !/部分/.test(invoice) &&
+      !archiveHasNoInvoice &&
+      /部分无票|无票采购|专票与无票并存|无票部分|1039出口\+香港公司（无票/.test(blob)
+    ) {
+      return true;
+    }
   }
 
-  // Product: 普货/涉检 vs 0退税率（含「产品为0退税率」变体）
+  // Product mismatches
   const product = String(s.productCategory || '').trim();
   if (
     /普货|商检/.test(product) &&
@@ -2696,6 +2156,25 @@ function diagnosisReportConflictsWithSlots(report, slots) {
   if (
     /^0退税率/.test(product) &&
     /普货[，,、\s]*能正常报关出口和退税|产品为普货|属于普货|能正常报关出口和退税/.test(blob)
+  ) {
+    return true;
+  }
+  if (/商检/.test(product) && !/^普货/.test(product) && /产品为普货|普货[，,、\s]*能正常报关/.test(blob)) {
+    return true;
+  }
+
+  // Revenue bracket bleed
+  const revenue = String(s.revenue || '').trim();
+  if (revenue) {
+    const brackets = ['500万以下', '500-2000万', '2000-5000万', '5000万-1亿', '1-4亿', '4-10亿', '10亿以上'];
+    const wrongBracket = brackets.some((b) => b !== revenue && blob.includes(compactDiagnosisText(b)));
+    if (wrongBracket && !blob.includes(compactDiagnosisText(revenue))) return true;
+  }
+
+  // Path X must not contain Path A 0110/1039+HK architectures
+  if (
+    detectDiagnosisReportPath(s) === 'X' &&
+    /0110出口\s*\+\s*(境外\/)?香港|1039出口\s*\+\s*(境外\/)?香港|搭建0110|搭建1039/.test(blob)
   ) {
     return true;
   }
@@ -2752,42 +2231,16 @@ function formatDiagSlotsForApi(slots) {
     (invoice.includes('普票') && !/无票|无法提供/.test(invoice)
       ? '档案含普票、不含无票时，禁止把普票叙述成无票。\n'
       : '') +
+    (hasDiagSpecialInvoice(invoice) && !/部分/.test(invoice) && !/无票|无法提供/.test(invoice)
+      ? '发票为「能提供增值税专用发票」时：禁止写成「部分无票」「专票与无票并存」「搭建1039（无票部分）」。\n'
+      : '') +
     (/普货|商检/.test(product) && !/^0退税率/.test(product)
       ? '产品为普货可退税或涉检时，禁止写成0退税率（含「产品为0退税率」），禁止写特殊商品标识/标识1/标识2。\n'
+      : '') +
+    (/商检/.test(product) && !/^普货/.test(product)
+      ? '产品为涉检时，禁止改写成「普货，能正常报关出口和退税」。\n'
       : '');
-  hard += `【内部路径】report_path=${reportPath}（调用工具时必须传入同名字段；禁止对用户说出路径字母）。\n`;
-  if (reportPath === 'A') {
-    if (isDiagRebateEligibleProduct(s.productCategory) && hasDiagSpecialInvoice(s.invoice)) {
-      hard +=
-        '【硬约束·架构】plan.details 必须含 title「0110出口+境外/香港公司」及全链路（供应商→进出口公司→境外/香港公司→店铺公司→境外消费者）；' +
-        '委托货代/买单出口须写以自有抬头0110替代货代报关。\n';
-    } else if (hasDiagNoInvoice(s.invoice)) {
-      hard += '【硬约束·架构】plan.details 必须含 title「1039出口+境外/香港公司」及全链路。\n';
-    }
-    if (isMainlandDiagEntity(s.entity)) {
-      hard +=
-        '【硬约束·报送】大陆店铺主体：risk.stages 03 须写平台信息报送风险；plan.details 须写「平台信息报送与主体一致性」及境外公司采购后再销售给店铺公司链路。\n';
-    }
-  } else if (reportPath === 'B' && isDiagRebateEligibleProduct(s.productCategory)) {
-    hard += '【硬约束·架构】plan.details 必须含 title「1210出口备货至保税区」及 0110进区+1210离境说明。\n';
-  } else if (reportPath === 'C') {
-    hard += '【硬约束·架构】路径C禁止写「0110出口+境外/香港公司」「1039出口+境外/香港公司」及采购再销售链路。\n';
-  } else if (reportPath === 'D') {
-    hard +=
-      '【硬约束·架构】路径D：按特殊商品标识写免税或视同内销口径；禁止硬套 0110/1039 退税境外/香港架构为首选。\n';
-  } else if (reportPath === 'X') {
-    // Path X hard constraints must NOT mention 0退税率 / 路径D at all —
-    // even as "禁止" examples; Agent copies this block into diagnosis_archive for Workflow.
-    hard +=
-      '【硬约束·路径X·国际站】report_path 必须为 X，禁止改判为 A。' +
-      '禁止写入「搭建0110出口+境外/香港公司」「搭建1039出口+境外/香港公司」「0110出口+境外/香港公司」「1039出口+境外/香港公司」「0110出口+香港公司」「1039出口+香港公司」；' +
-      '禁止写入「境外/香港公司销售给店铺公司」「香港公司销售给店铺公司」「平台信息报送与主体一致性」下的采购再销售链路；禁止建议更换香港公司作为店铺主体。' +
-      '安全型（自营/一达通/市场采购）details title 须用「国际站正式报关履约与纳税申报」：侧重合规申报纳税与供应商发票风险（无票宜评估市场采购出口，普票无法退税须梳理专票）。' +
-      '**仅一达通3+N**可默认生产型企业并须写外购视同自产（不满足则免税不可退税）；自营出口、一达通2+N、市场采购等**不得**默认生产型企业——仅当用户确认为生产型且有外购时才写视同自产。' +
-      '高危型（便捷发货）：瓶颈写未报关/一般视同内销风险（尤其销售额>500万可能按13%补增值税）与个人账户结汇风险；' +
-      '按档案产品写1210/9610方案、物流成本评估，及「若无法正式报关则咨询专家重估」强制句；' +
-      'risk.summary 与 stages 须与档案产品类别一致（例如普货可退税）；未报关只写一般视同内销，禁止改写为其它产品类别口径。\n';
-  }
+  hard += `【内部路径】report_path=${reportPath}（调用工具时必须传入同名字段；禁止对用户说出路径字母；允许字母 Y/D/X/Z/C/B/A）。\n`;
   hard +=
     `【硬约束·样本】知识库方案样本仅供结构参考；禁止照抄样本里的示例平台/发货/出口/发票/销售额。` +
     `本单业务画像必须以档案为准：${platform} / ${shipping} / ${exportMode} / ${revenue}。`;
@@ -2796,30 +2249,41 @@ function formatDiagSlotsForApi(slots) {
 
 /** Dedicated query when generating the first full diagnosis report (step 7 → 8). */
 function buildDiagnosisPlanApiQuery(userText, options = {}) {
-  const archive = formatDiagSlotsForApi();
+  const slots = getDiagSlots();
+  const archive = formatDiagSlotsForApi(slots);
   const reply = String(userText || '').trim();
   const retry = Boolean(options.retry);
-  const reportPath = detectDiagnosisReportPath(getDiagSlots());
+  const reportPath = detectDiagnosisReportPath(slots);
+  const snap = formatDiagSlotsSnapshot(slots);
+  const pathHint =
+    reportPath === 'X'
+      ? '；大陆主体国际站履约时**必须传 X，禁止改判为 A**'
+      : reportPath === 'D'
+        ? '；产品无法退免税时**必须传 D**'
+        : reportPath === 'Y'
+          ? '；境外/非中国店主体时**必须传 Y**'
+          : reportPath === 'Z'
+            ? '；已正式报关/已报关小包时**必须传 Z**，禁止套未报关改造口径'
+            : '；若与规则冲突以你按主体+发货+出口+产品重判为准；非大陆国际站履约禁止传 X'
   return (
     (retry
-      ? '【重试·强制】上一轮未返回可用 version=1 JSON，或 JSON 与本轮【诊断档案】不一致（疑似沿用旧会话档案）。'
+      ? '【重试·强制】上一轮 JSON 与本轮【诊断档案】不一致（疑似套用旧会话/样本）。禁止再用历史案例；必须按下方档案重写。'
       : '【专属合规诊断·生成报告】第1-7步已齐。') +
     '【铁律·本轮档案】只采信下方【诊断档案】；禁止沿用对话历史中上一轮平台/主体/发货/出口/发票；' +
+    '禁止把档案改写成其它未出现在本档案中的平台。' +
+    '调用工具时：`diagnosis_archive` 必须**原样粘贴**下方从「销售平台：」到年销售额的七行档案（可含硬约束段），禁止凭记忆重写；`report_path` 必须与官网预判一致除非档案明显不符。' +
     'risk.processFlow 必须按本轮档案逐字串成：供应商发票 → 店铺主体 → 出口方式 → 发货方式 → 平台 → 境外消费者。' +
     `请先按档案判定 report_path（官网预判为 ${reportPath}` +
-    (reportPath === 'X'
-      ? '；平台为阿里国际站时**必须传 X，禁止因正式报关/专票改判为 A**'
-      : reportPath === 'D'
-        ? '；产品无法退免税时**必须传 D**；禁止传 X'
-        : '；若与规则冲突以你按发货+出口+产品重判为准；**非阿里国际站禁止传 X**') +
+    pathHint +
     '；禁止对用户说出路径字母），' +
-    '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（A/B/C/D/X）；' +
+    '然后**立即调用**工具 `generate_diagnosis_report`，传入下方【诊断档案】以及参数 `report_path`（Y/D/X/Z/C/B/A）；' +
     '工具成功后，你的回复**正文第一行起必须是完整 JSON**（可包在 ```json 代码块；version 必须为 1，含 risk.processFlow、risk.stages 的 01/02/03、plan.overview、plan.details、actions、notes）。' +
     '可在 JSON 代码块前后各加至多一句：「报告已生成，请查看右侧方案区。」' +
     '禁止输出思考过程/检索过程/工具调用旁白；禁止自行写 Markdown 四章；禁止只回复「请看右侧」而不输出 JSON；禁止再提问；禁止为定路径去检索知识库。\n' +
     `${archive}\n` +
+    `【档案指纹·须出现在 processFlow/intro】\n${snap}\n` +
     (reply ? `【用户本轮最后答复】${reply}\n` : '') +
-    '【铁律】档案字段必须与 JSON 内容一致；不得照抄方案样本示例数据；不得混入历史会话中的其它平台案例。' +
+    '【铁律】JSON 中平台/主体/发货/出口/发票/产品/销售额必须与上表逐字一致；不得照抄方案样本示例数据；不得混入历史会话中的其它平台案例。' +
     '若工具调用失败：只输出一句「报告生成失败，请稍后重试」，不要写任何【核心风险诊断】Markdown。'
   );
 }

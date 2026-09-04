@@ -16,21 +16,21 @@ alwaysApply: true
 ## 必查清单（改提示词后逐项过）
 
 1. **`js/main.js` → `formatDiagSlotsForApi` / `buildDiagnosisPlanApiQuery`**
-   - 各路径（尤其 A/B/C/D/X）硬约束是否与最新提示词一致
-   - 路径 X 硬约束**不要**出现「按路径D」「0退税率按D写」等会污染档案的句子（连「禁止写…」举例也尽量避免把对立路径写进 X 档案）
-   - **`【硬约束·档案锁定】`**：七字段（平台/主体/发货/出口/发票/产品/销售额）须逐字锁定；尤其禁止「部分普票→部分无票」「普货→0退税率/标识1/2」
-2. **`detectDiagnosisReportPath` / Path X 注入与剥离**
-   - 路径判定顺序：先 D（0退税/未授权）→ 非 D 且国际站 → X
-   - `buildMandatoryPlanDetails` / overview 补全 / `scrubArchiveSlotBleedFromReport` 是否仍注入或放任与档案冲突的文案
+   - 只保留档案七字段锁定 + `report_path` 字母；**不要**在档案里堆路径撰写长文（细则在知识库 `30–36`）
+   - 路径字母全集：`Y / D / X / Z / C / B / A`
+   - **`【硬约束·档案锁定】`**：七字段须逐字锁定；尤其禁止「部分普票→部分无票」「普货→0退税率/标识1/2」
+2. **`detectDiagnosisReportPath`**
+   - 判定顺序（命中即停）：**Y → D → X → Z → C → B → A**
+   - 前端后处理只做**结构化一致性**（平台/发票/产品/销售额是否对得上槽位；intro/processFlow 纠偏），**禁止**术语黑名单战争与路径架构注入
 3. **`index.html` 的 `main.js?v=`**
    - 有前端改动则 bump cache，并提醒部署/硬刷新
-4. **知识库必读篇（如 `15-出报告硬约束与路径要点.md`）**
-   - 与提示词冲突时一并改，并按需重新上传 Dify 数据集
+4. **知识库必读篇**
+   - `15` 短硬约束 + 决策树；撰写细则在对应 `30–36-路径*-必读`；与提示词冲突时一并改，并按需重新上传 Dify 数据集
 5. **上线提醒**
-   - 提示词改完后：粘贴并发布 Dify Agent / Workflow；前端改动需 push 后等 Vercel 生效
+   - 提示词改完后：粘贴并发布 Dify Agent / Workflow；前端改动需 push 后等 Vercel 生效；清掉诊断报告相关 Annotation Reply
 
 ## 改完自检问句
 
 - 若 Agent 把本轮 `diagnosis_archive` 原样交给 Workflow，Workflow 是否仍可能读到已废弃的路径串写指令？
-- 官网预判的 `report_path` 与提示词判定顺序是否一致？
-- 业务流程已按档案纠正后，risk/plan 正文里的发票/产品标签是否仍可能与档案冲突？
+- 官网预判的 `report_path` 与提示词判定顺序是否一致（含 Y/Z）？
+- 业务流程已按档案纠正后，平台/发票/产品标签是否仍可能与档案冲突？
