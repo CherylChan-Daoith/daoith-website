@@ -2483,6 +2483,42 @@ function looksLikeDiagnosisFactQuestion(text) {
   return false;
 }
 
+/** User is complaining the right-hand plan is incomplete / not visible — re-show, don't ask Agent. */
+function looksLikePlanDisplayComplaint(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  return /(?:方案|报告|右侧|方案区).{0,16}(?:没|未|不).{0,8}(?:显示|展示|完整|全)|(?:没|未|不).{0,8}(?:显示|展示).{0,10}(?:全|完整)|重新(?:显示|展示)(?:一下)?(?:方案|报告)?|方案区(?:是空的|空白|没有|空的)|只看到(?:一半|标题|空)/.test(
+    t
+  );
+}
+
+function cacheLastDiagnosisReport(payload) {
+  try {
+    if (!payload) return;
+    window.__daoithLastDiagnosisReport = payload;
+  } catch {
+    /* ignore */
+  }
+}
+
+function getLastCachedDiagnosisReport() {
+  try {
+    return window.__daoithLastDiagnosisReport || null;
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeRawDiagnosisJsonDump(text) {
+  const t = String(text || '').trim();
+  return (
+    /"version"\s*:\s*1/.test(t) &&
+    /"risk"\s*:/.test(t) &&
+    /"plan"\s*:/.test(t) &&
+    (t.startsWith('{') || /```json/i.test(t) || /"processFlow"\s*:/.test(t))
+  );
+}
+
 /**
  * Pull diagnosis-slot overrides from a free-text follow-up.
  * Conservative: only set a field when the wording is explicit (not a question).
@@ -3739,6 +3775,37 @@ function initAiChatbot() {
     messages.appendChild(typing);
     scrollDiagChatToBottom();
 
+    // 「方案没显示全」→ 本地重新渲染上一份方案，禁止再打 Agent 刷出原始 JSON
+    if (isPostReportFollowUp && looksLikePlanDisplayComplaint(text)) {
+      typing.classList.add('is-plan-status');
+      typing.textContent = '正在为您重新展示完整方案…';
+      const cached = getLastCachedDiagnosisReport();
+      if (cached?.jsonReport && isDiagnosisReportJsonReady(cached.jsonReport)) {
+        publishDiagnosisPlanToResultPanel(JSON.stringify(cached.jsonReport), {
+          kind: 'diagnosis',
+          jsonReport: cached.jsonReport,
+          replaceLatest: true,
+          finalize: true,
+          refreshDiagnosis: true,
+        });
+        typing.textContent = '已为您重新展示完整方案，请查看右侧方案生成区';
+      } else if (cached?.markdown) {
+        publishDiagnosisPlanToResultPanel(cached.markdown, {
+          kind: 'diagnosis',
+          replaceLatest: true,
+          finalize: true,
+          refreshDiagnosis: true,
+        });
+        typing.textContent = '已为您重新展示完整方案，请查看右侧方案生成区';
+      } else {
+        typing.textContent =
+          '暂时找不到上一份方案缓存。请向上滚动右侧方案区查看，或点击「新建对话」后重新生成。';
+      }
+      busy = false;
+      scrollDiagChatToBottom();
+      return;
+    }
+
     if (shouldGeneratePlanNow || expectFollowUpPlan) {
       showResultWorking();
       typing.classList.add('is-plan-status');
@@ -3879,11 +3946,36 @@ function initAiChatbot() {
         }
         // Long / structured Q&A → plan panel (update one draft; no animation)
         if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(clean)) {
+          const midJson = extractDiagnosisReportJson(clean);
+          if (midJson && isDiagnosisReportJsonReady(midJson)) {
+            // Agent re-emitted report JSON — never dump as Q&A text
+            publishDiagnosisPlanToResultPanel(clean, {
+              kind: 'diagnosis',
+              jsonReport: midJson,
+              replaceLatest: true,
+              refreshDiagnosis: true,
+            });
+            typing.classList.add('is-plan-status');
+            typing.textContent = DIAG_PLAN_DONE_MSG;
+            return;
+          }
+          if (looksLikeRawDiagnosisJsonDump(clean) || looksLikeIncompleteAgentDraft(clean)) {
+            // Incomplete JSON / CoT stream — keep thinking status, don't paint drafts
+            typing.classList.add('is-plan-status');
+            typing.textContent = thinkingStatusMsg;
+            return;
+          }
           beginLongQaRouting();
           publishDiagnosisPlanToResultPanel(clean, {
             kind: 'qa',
-            replaceDraft: true,
+            replaceLatest: true,
           });
+          return;
+        }
+        if (looksLikeIncompleteAgentDraft(clean)) {
+          if (!typing.classList.contains('is-rich') && !streamingLongQa) {
+            typing.textContent = thinkingStatusMsg;
+          }
           return;
         }
         setBotBubble(typing, clean);
@@ -4133,6 +4225,7 @@ function initAiChatbot() {
             bumpDiagnosisPlanCount();
           }
           persistDiagnosisReport(JSON.stringify(jsonReport));
+          cacheLastDiagnosisReport({ jsonReport });
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
           typing.textContent = loggedInNow
@@ -4170,6 +4263,10 @@ function initAiChatbot() {
             bumpDiagnosisPlanCount();
           }
           persistDiagnosisReport(answer);
+          cacheLastDiagnosisReport({
+            jsonReport: extractDiagnosisReportJson(answer),
+            markdown: answer,
+          });
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
           typing.textContent = loggedInNow
@@ -4178,12 +4275,36 @@ function initAiChatbot() {
           clearQuickReplies();
         }
       } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
-        beginLongQaRouting();
-        publishDiagnosisPlanToResultPanel(answer, { kind: 'qa', replaceLatest: true, finalize: true });
-        typing.classList.add('is-plan-status');
-        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
-        clearQuickReplies();
-        maybeShowServiceRecsAfterAnswer(answer);
+        const qaJson = pickJsonReport(answer, result);
+        if (qaJson && isDiagnosisReportJsonReady(qaJson)) {
+          publishDiagnosisPlanToResultPanel(answer || JSON.stringify(qaJson), {
+            kind: 'diagnosis',
+            jsonReport: qaJson,
+            replaceLatest: true,
+            finalize: true,
+            refreshDiagnosis: true,
+          });
+          cacheLastDiagnosisReport({ jsonReport: qaJson });
+          typing.classList.add('is-plan-status');
+          typing.textContent = '已更新右侧方案生成区，请查看完整方案';
+          clearQuickReplies();
+        } else if (looksLikeRawDiagnosisJsonDump(answer)) {
+          typing.classList.add('is-plan-status');
+          typing.textContent =
+            '方案已生成但展示异常。请再说一次「方案没显示全」，或点击「新建对话」后重试。';
+          clearQuickReplies();
+        } else {
+          beginLongQaRouting();
+          publishDiagnosisPlanToResultPanel(answer, {
+            kind: 'qa',
+            replaceLatest: true,
+            finalize: true,
+          });
+          typing.classList.add('is-plan-status');
+          typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+          clearQuickReplies();
+          maybeShowServiceRecsAfterAnswer(answer);
+        }
       } else {
         setBotBubble(typing, answer);
         showQuickReplies(answer);
@@ -4778,11 +4899,36 @@ function shouldRouteLongAnswerToPlanPanel(text) {
   const t = String(text || '').trim();
   if (!t) return false;
   if (looksLikeLocalGenericHelp(t) || looksLikeDiagnosisPlanScaffold(t)) return false;
+  if (looksLikeIncompleteAgentDraft(t)) return false;
   // Diagnosis wizard Q&A must stay in the left chat
   if (isDiagnosisWizardCollecting() || looksLikeDiagnosisWizardAsk(t)) return false;
   // Structured Mode B answers (结论/依据) read better in the plan panel
   if (/\*\*结论\*\*|^\s*结论\s*[:：]|\*\*依据\*\*/m.test(t) && t.length >= 80) return true;
   return t.length > 100;
+}
+
+/** Mid-stream CoT / retrieval narration — keep status text, don't paint as replies. */
+function looksLikeIncompleteAgentDraft(text) {
+  const t = String(text || '').trim();
+  if (!t) return true;
+  if (/<\s*(?:think|thinking|reason|reasoning)\b/i.test(t)) return true;
+  if (looksLikeEnglishPromptMeta(t)) return true;
+  if (
+    /思考过程|正在检索|知识库返回|需要检索的知识库|Action\s*:|Observation\s*:|Let me |Wait,\s*I need|Hmm,?\s*actually/i.test(
+      t
+    ) &&
+    !/\*\*结论\*\*|^\s*结论\s*[:：]|【核心风险诊断】|【合规方案】/m.test(t)
+  ) {
+    return true;
+  }
+  if (
+    /^(?:我先|让我|首先|接下来|现在|用户|根据).{0,48}(?:思考|检索|分析|调用|回顾|确认)/.test(t) &&
+    !/\*\*结论\*\*|【核心风险诊断】|【合规方案】/.test(t) &&
+    t.length < 900
+  ) {
+    return true;
+  }
+  return false;
 }
 
 const DIAG_PLAN_STATUS_MSG = '道一合规助手正在为您生成专属合规方案，请查看右侧方案生成区';
@@ -5265,6 +5411,11 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const serviceHost = document.getElementById('diagServiceRecs');
   if (!items || !content) return;
 
+  // Compat: older call sites used replaceDraft; publisher only honors replaceLatest
+  const replaceLatest = Boolean(options.replaceLatest || options.replaceDraft);
+  const finalize = Boolean(options.finalize);
+  const refreshDiagnosis = Boolean(options.refreshDiagnosis);
+
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
   items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
@@ -5273,10 +5424,16 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const cleanRaw = stripServiceMatchTip(
     stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
   );
-  const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
-  const jsonReport =
-    options.jsonReport ||
-    (kind === 'diagnosis' ? extractDiagnosisReportJson(cleanRaw) : null);
+  // Always prefer structured report JSON — never dump raw braces as「问答回复」
+  let kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
+  let jsonReport =
+    options.jsonReport || extractDiagnosisReportJson(cleanRaw) || null;
+  if (jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
+    kind = 'diagnosis';
+  } else if (kind === 'qa' && looksLikeRawDiagnosisJsonDump(cleanRaw)) {
+    // Incomplete / unusable JSON dump — do not paint raw text into the panel
+    return;
+  }
   const isFirstEntry = !items.querySelector('.result-entry');
   const timeLabel = formatResultEntryTime();
   const kindLabel = kind === 'qa' ? '问答回复' : '诊断方案';
@@ -5290,8 +5447,12 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     purgeInlineServiceMatchTips(items);
     // Only replace the in-flight draft for this turn — never overwrite prior finished replies
     let entry = null;
-    if (options.replaceLatest) {
+    if (replaceLatest) {
       entry = items.querySelector(`.result-entry-${kind}.is-draft`);
+    }
+    if (!entry && refreshDiagnosis && kind === 'diagnosis') {
+      const all = items.querySelectorAll('.result-entry-diagnosis');
+      entry = all.length ? all[all.length - 1] : null;
     }
     const showGreeting =
       kind === 'diagnosis' &&
@@ -5303,7 +5464,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     } else {
       entry.className = `result-entry result-entry-${kind}`;
     }
-    if (options.replaceLatest && !options.finalize) {
+    if (replaceLatest && !finalize && !refreshDiagnosis) {
       entry.classList.add('is-draft');
     } else {
       entry.classList.remove('is-draft');
@@ -5343,8 +5504,9 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
         changeHtml +
         body
     );
+    cacheLastDiagnosisReport({ jsonReport, markdown: clean });
     setResultServiceTipVisible(true);
-    if (serviceHost) {
+    if (serviceHost && !(replaceLatest && !finalize)) {
       showDiagnosisServiceRecs(clean, {
         lead: '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
       });
@@ -5386,7 +5548,8 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   );
   if (kind === 'diagnosis') setResultServiceTipVisible(true);
 
-  if (serviceHost) {
+  // Don't spam service cards on every stream token — only when the entry is finalized
+  if (serviceHost && !(replaceLatest && !finalize)) {
     showDiagnosisServiceRecs(clean, {
       lead:
         kind === 'qa'
