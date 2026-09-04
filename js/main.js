@@ -5282,10 +5282,10 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
 
   const mountEntry = (innerHtml) => {
     purgeInlineServiceMatchTips(items);
+    // Only replace the in-flight draft for this turn — never overwrite prior finished replies
     let entry = null;
     if (options.replaceLatest) {
-      const drafts = items.querySelectorAll(`.result-entry-${kind}`);
-      entry = drafts.length ? drafts[drafts.length - 1] : null;
+      entry = items.querySelector(`.result-entry-${kind}.is-draft`);
     }
     const showGreeting =
       kind === 'diagnosis' &&
@@ -5296,6 +5296,11 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       items.appendChild(entry);
     } else {
       entry.className = `result-entry result-entry-${kind}`;
+    }
+    if (options.replaceLatest && !options.finalize) {
+      entry.classList.add('is-draft');
+    } else {
+      entry.classList.remove('is-draft');
     }
     entry.innerHTML =
       `<div class="result-body">` +
