@@ -826,10 +826,130 @@ function stripDiagnosisIntroBoilerplate(text) {
 
 /** Mode B / follow-up Q&A: force bold section labels for display. */
 function emphasizeQaSectionLabels(text) {
-  return String(text || '').replace(
-    /(^|\n)[ \t]*(?:\*\*)?(结论|依据|缺关键信息|边界说明)(?:\*\*)?[ \t]*[:：]/gm,
-    '$1**$2**：'
+  return String(text || '')
+    // `- **依据：**` → `**依据**：`
+    .replace(
+      /(^|\n)[ \t]*[-*•]\s*\*\*(结论|依据|缺关键信息|边界说明|操作提示)\s*[:：]?\*\*[ \t]*/gm,
+      '$1**$2**：'
+    )
+    .replace(
+      /(^|\n)[ \t]*[-*•]\s*(结论|依据|缺关键信息|边界说明|操作提示)\s*[:：]\s*/gm,
+      '$1**$2**：'
+    )
+    // **结论：**（冒号包进加粗）→ **结论**：
+    .replace(
+      /(^|\n)[ \t]*\*\*(结论|依据|缺关键信息|边界说明|操作提示)\s*[:：]\*\*[ \t]*/gm,
+      '$1**$2**：'
+    )
+    .replace(
+      /(^|\n)[ \t]*(?:\*\*)?(结论|依据|缺关键信息|边界说明|操作提示)(?:\*\*)?[ \t]*[:：]/gm,
+      '$1**$2**：'
+    );
+}
+
+/**
+ * Normalize Mode B / follow-up answers: clear 结论/依据 labels + nest 情形 sub-points.
+ * Fixes common LLM flat-list mess (hollow bullets for every line).
+ */
+function normalizeQaAnswerMarkdown(text) {
+  let t = emphasizeQaSectionLabels(String(text || '').trim());
+  if (!t) return t;
+
+  // Put 结论 / 依据 on their own structural lines when glued to body
+  t = t.replace(
+    /(^|\n)\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*/g,
+    '\n\n**$2**：'
   );
+
+  const lines = t.split('\n');
+  const out = [];
+  let underQingxing = false;
+  let situationIndex = 0;
+
+  for (let raw of lines) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      out.push('');
+      continue;
+    }
+
+    // Bare 结论/依据 line → keep as label (renderer turns into subtitle)
+    const labelOnly = trimmed.match(
+      /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*$/
+    );
+    if (labelOnly) {
+      underQingxing = false;
+      out.push(`**${labelOnly[1]}**：`);
+      continue;
+    }
+
+    // 结论：body on same line → split label + paragraph
+    const labelBody = trimmed.match(
+      /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*(.+)$/
+    );
+    if (labelBody) {
+      underQingxing = false;
+      out.push(`**${labelBody[1]}**：`);
+      out.push(labelBody[2]);
+      continue;
+    }
+
+    const asBullet = trimmed.replace(/^[-*•]\s+/, '');
+    const qingxingMatch = asBullet.match(
+      /^\*\*情形\s*([一二三四五六七八九十\d]+)[：:．.\s]*([^*]*?)\*\*\s*[:：]?\s*(.*)$/
+    ) || asBullet.match(/^情形\s*([一二三四五六七八九十\d]+)[：:．.\s]+(.+)$/);
+    const isOpsTip =
+      /^\*\*操作提示/.test(asBullet) ||
+      /^操作提示/.test(asBullet.replace(/\*/g, '')) ||
+      /^\*\*补充/.test(asBullet);
+
+    if (qingxingMatch) {
+      underQingxing = true;
+      situationIndex += 1;
+      const num = qingxingMatch[1];
+      const titleTail = String(qingxingMatch[2] || '')
+        .replace(/[（(]\s*须同时满足[^）)]*[）)]/g, '')
+        .trim();
+      const rest = String(qingxingMatch[3] || '').trim();
+      const title = titleTail ? `情形${num}：${titleTail}` : `情形${num}`;
+      out.push(`${situationIndex}. **${title}**`);
+      if (rest) out.push(`  - ${rest}`);
+      continue;
+    }
+
+    if (isOpsTip) {
+      underQingxing = false;
+      const rest = asBullet
+        .replace(/^\*\*操作提示\*\*\s*[:：]?\s*/, '')
+        .replace(/^操作提示\s*[:：]\s*/, '')
+        .trim();
+      out.push('**操作提示**：');
+      if (rest) out.push(rest);
+      continue;
+    }
+
+    // Continuation under 情形：force 2-space nest (even if model emitted top-level -)
+    if (underQingxing && /^[-*•]\s+/.test(trimmed)) {
+      out.push(`  - ${asBullet}`);
+      continue;
+    }
+    // Orphan plain lines that look like sub-conditions of 情形
+    if (
+      underQingxing &&
+      !/^[-*•]/.test(trimmed) &&
+      !/^\*\*/.test(trimmed) &&
+      !/^\d+[.)、．]/.test(trimmed) &&
+      trimmed.length < 160
+    ) {
+      out.push(`  - ${trimmed}`);
+      continue;
+    }
+
+    if (/^\*\*(结论|依据|操作提示)/.test(trimmed)) underQingxing = false;
+    out.push(raw);
+  }
+
+  return emphasizeQaSectionLabels(out.join('\n').replace(/\n{3,}/g, '\n\n').trim());
 }
 
 /** If answer discusses 9810 but omits uncertainty tip, append the hard reminder. */
@@ -1091,6 +1211,9 @@ function emphasizeDiagStepQuestion(text) {
 
 function renderChatBubbleHtml(text) {
   let md = enhanceChatMarkdown(sanitizeAiAnswer(emphasizeDiagStepQuestion(text)));
+  if (/\*\*结论\*\*|^\s*结论\s*[:：]|^\s*\*\*依据\*\*/m.test(md)) {
+    md = normalizeQaAnswerMarkdown(md);
+  }
   // Keep「1. 问题？」as prose in chat (avoid ordered-list rendering)
   md = md.replace(/(^|\n)(\*\*)?(\d+)\.(?=\s)/gm, '$1$2@@N$3@@');
   let html = renderAIPlanHtml(md);
@@ -5104,7 +5227,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
 
   const clean =
     kind === 'qa'
-      ? ensure9810UncertaintyTip(emphasizeQaSectionLabels(cleanRaw))
+      ? ensure9810UncertaintyTip(normalizeQaAnswerMarkdown(cleanRaw))
       : prepareDiagnosisPlanMarkdown(cleanRaw);
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
@@ -7415,6 +7538,22 @@ function renderAIPlanHtml(text) {
     if (/道一合规小助手/.test(line)) continue;
     if (/请您提供|请提供以下信息|请提供具体信息/.test(line)) continue;
     if (/通用框架|在您提供信息前|由于您尚未提供/.test(line)) continue;
+
+    // Mode B Q&A labels → subtitle (guarantees bold 「结论／依据」)
+    const qaLabelPlain = line.replace(/\*/g, '').replace(/^[-*•]\s+/, '').trim();
+    const qaLabelMatch = qaLabelPlain.match(
+      /^(结论|依据|缺关键信息|边界说明|操作提示)[:：]\s*(.*)$/
+    );
+    if (qaLabelMatch) {
+      closeList();
+      resetPlanLayout();
+      html += `<h5 class="result-section-subtitle">${escapeHtml(qaLabelMatch[1])}：</h5>`;
+      const rest = String(qaLabelMatch[2] || '').trim();
+      if (rest) {
+        html += `<p class="result-paragraph">${formatInline(rest)}</p>`;
+      }
+      continue;
+    }
 
     // Sub-labels「业务流程／主要风险」never render as bullets (even if model wrote `- **…**`)
     const subLabelPlain = line
