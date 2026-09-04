@@ -1234,23 +1234,28 @@ function renderChatBubbleHtml(text) {
 
 function stripKnowledgeBaseDisclaimers(text) {
   let t = String(text || '');
-  // Principle: never expose "we don't have this in KB / retrieval missed" to end users
-  t = t.replace(
-    /[（(]\s*知识库[^）)]{0,80}[）)]\s*[:：]?/g,
-    ''
-  );
-  t = t.replace(
-    /[^。；！？\n]*知识库[^。；！？\n]*(?:无|没有|未|空|不足|缺|限)[^。；！？\n]*[。；！？]?\s*/g,
-    ''
-  );
-  t = t.replace(
-    /[^。；！？\n]*(?:未在知识库|知识库返回为空|检索未命中|资料库未|我的知识有限)[^。；！？\n]*[。；！？]?\s*/g,
-    ''
-  );
+  // Any user-visible "知识库…" framing (miss, cite, or meta) — never show the word
+  t = t.replace(/[（(]\s*知识库[^）)]{0,120}[）)]\s*[:：]?/g, '');
+  t = t.replace(/[^。；！？\n]*知识库[^。；！？\n]*[。；！？]?\s*/g, '');
   t = t.replace(/(?:由于|因)?AI和知识库具有一定的局限性[^。]*[。]?/g, '');
-  t = t.replace(/(?:由于|因)?知识库(?:具有一定的局限性|存在局限性)[^。]*[。]?/g, '');
   t = t.replace(/(?:^|\n)\s*[-*•]\s*\*\*\s*[:：]/gm, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** Strip internal path / scheme labels that must never reach end users. */
+function stripInternalTaxonomyLeaks(text) {
+  let t = String(text || '');
+  // 「C2 方案口径：」「路径C口径」「【路径C】」「按路径 B」
+  t = t.replace(
+    /(?:^|[\s，,、：:])(?:按|依据|参照|根据)?\s*(?:路径\s*)?[YDXZCBAy dxzcba]\d?\s*(?:方案)?口径\s*[:：]?\s*/g,
+    ''
+  );
+  t = t.replace(/(?:^|[\s，,、])(?:按|依据|参照|根据)?\s*路径\s*[YDXZCBA]\d?\s*[:：]?\s*/gi, ' ');
+  t = t.replace(/[【\[]\s*路径\s*[YDXZCBA]\d?\s*[】\]]/gi, '');
+  t = t.replace(/\bC\d\s*方案(?:口径)?\s*[:：]?\s*/g, '');
+  t = t.replace(/\breport_path\s*[=：:]\s*[YDXZCBA]\b/gi, '');
+  t = t.replace(/诊断档案(?:七字段|字段)?/g, '您已确认的业务信息');
+  return t.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function isKnowledgeMissRefusal(text) {
