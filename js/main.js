@@ -1216,6 +1216,7 @@ function emphasizeDiagStepQuestion(text) {
 
 function renderChatBubbleHtml(text) {
   let md = enhanceChatMarkdown(sanitizeAiAnswer(emphasizeDiagStepQuestion(text)));
+  md = stripServiceMatchTip(md);
   if (/\*\*结论\*\*|^\s*结论\s*[:：]|^\s*\*\*依据\*\*/m.test(md)) {
     md = normalizeQaAnswerMarkdown(md);
   }
@@ -5036,13 +5037,41 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
 const DIAG_SERVICE_MATCH_TIP =
   '道一合规小助手已为您匹配最相关的服务，请在本页面下方进行选择。';
 
+/** Remove tip copy from answer bodies (must only live in #resultServiceTip). */
+function stripServiceMatchTip(text) {
+  return String(text || '')
+    .replace(
+      /道一合规小助手已为您匹配最相关的服务[，,]?\s*请在本页面下方进行选择。?/g,
+      ''
+    )
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function purgeInlineServiceMatchTips(root) {
+  const scope = root || document.getElementById('resultItems');
+  if (!scope) return;
+  scope.querySelectorAll('.result-service-match-tip').forEach((el) => el.remove());
+  // Plain-text leftovers from older builds that baked the tip into markdown HTML
+  scope.querySelectorAll('p, div, span, li').forEach((el) => {
+    const t = String(el.textContent || '').trim();
+    if (t === DIAG_SERVICE_MATCH_TIP || /^道一合规小助手已为您匹配最相关的服务/.test(t)) {
+      el.remove();
+    }
+  });
+}
+
 function setResultServiceTipVisible(visible) {
   const tip = document.getElementById('resultServiceTip');
+  const panel = document.getElementById('resultPanel');
   if (!tip) return;
-  tip.hidden = !visible;
-  if (visible && !tip.textContent.trim()) {
-    tip.textContent = DIAG_SERVICE_MATCH_TIP;
+  purgeInlineServiceMatchTips();
+  // Keep tip as the last child of the plan panel (pinned bottom, never inside entries)
+  if (visible && panel && tip.parentElement === panel) {
+    panel.appendChild(tip);
   }
+  tip.hidden = !visible;
+  if (visible) tip.textContent = DIAG_SERVICE_MATCH_TIP;
 }
 
 /** Soft copy guard for the right-hand compliance plan panel (deterrent only). */
@@ -5174,15 +5203,21 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
   items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
+  purgeInlineServiceMatchTips(items);
 
-  const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
+  const cleanRaw = stripServiceMatchTip(
+    stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
+  );
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
+  // Q&A must stay in the left chat — never mount into the plan panel
+  if (kind === 'qa') return;
+
   const jsonReport =
     options.jsonReport ||
     (kind === 'diagnosis' ? extractDiagnosisReportJson(cleanRaw) : null);
   const isFirstEntry = !items.querySelector('.result-entry');
   const timeLabel = formatResultEntryTime();
-  const kindLabel = kind === 'qa' ? '问答回复' : '诊断方案';
+  const kindLabel = '诊断方案';
   const metaHtml =
     `<p class="result-entry-meta">` +
     `<span class="result-entry-kind">${escapeHtml(kindLabel)}</span>` +
@@ -5190,17 +5225,28 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     `</p>`;
 
   const mountEntry = (innerHtml) => {
-    const entry = document.createElement('article');
-    entry.className = `result-entry result-entry-${kind}`;
+    purgeInlineServiceMatchTips(items);
+    // Same-turn updates can replace the last diagnosis entry (avoid stacking stream drafts)
+    let entry = null;
+    if (options.replaceLatest) {
+      const drafts = items.querySelectorAll('.result-entry-diagnosis');
+      entry = drafts.length ? drafts[drafts.length - 1] : null;
+    }
+    const showGreeting =
+      isFirstEntry || Boolean(entry?.querySelector?.('.result-greeting'));
+    if (!entry) {
+      entry = document.createElement('article');
+      entry.className = 'result-entry result-entry-diagnosis';
+      items.appendChild(entry);
+    }
     entry.innerHTML =
       `<div class="result-body">` +
-      (isFirstEntry
+      (showGreeting
         ? `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>`
         : '') +
       metaHtml +
       innerHtml +
       `</div>`;
-    items.appendChild(entry);
     try {
       entry.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch {
@@ -5684,7 +5730,14 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
       if (delta && typeof data.thought === 'string' && data.thought === delta) return;
       if (delta) {
         tryCaptureReportJson(delta);
-        answer += delta;
+        // Some Agent builds send cumulative `answer` instead of token deltas
+        if (answer && delta.startsWith(answer) && delta.length >= answer.length) {
+          answer = delta;
+        } else if (answer && answer.endsWith(delta)) {
+          /* duplicate chunk — ignore */
+        } else {
+          answer += delta;
+        }
         emit(false);
       }
       return;

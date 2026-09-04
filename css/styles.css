@@ -1210,7 +1210,7 @@ ul {
   flex-shrink: 0;
   position: relative;
   z-index: 4;
-  margin: 0;
+  margin: auto 0 0;
   padding: 12px 18px 16px;
   border-top: 1px solid rgba(34, 81, 255, 0.12);
   background: #fff;
@@ -1221,6 +1221,11 @@ ul {
 }
 
 .result-service-match-tip[hidden] {
+  display: none !important;
+}
+
+/* Never show the tip inside scrolled answer cards */
+#resultItems .result-service-match-tip {
   display: none !important;
 }
 
