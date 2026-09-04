@@ -1119,6 +1119,47 @@ ul {
   overflow: visible;
 }
 
+#resultItems .result-entry {
+  flex: 0 0 auto;
+  margin: 0 0 18px;
+  padding: 0 0 18px;
+  border-bottom: 1px solid rgba(18, 48, 176, 0.12);
+}
+
+#resultItems .result-entry:last-of-type {
+  border-bottom: none;
+  margin-bottom: 8px;
+  padding-bottom: 0;
+}
+
+#resultItems .result-entry-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  color: #5a6a9a;
+}
+
+#resultItems .result-entry-kind {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(34, 81, 255, 0.08);
+  color: #1230b0;
+  font-weight: 600;
+}
+
+#resultItems .result-entry-time {
+  opacity: 0.85;
+}
+
+#resultItems .result-working-block {
+  flex: 0 0 auto;
+  margin-top: 8px;
+}
+
 .diag-services-section {
   margin: 22px 0 10px;
   padding: 22px;

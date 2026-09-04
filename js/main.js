@@ -968,6 +968,11 @@ function enhanceChatMarkdown(text) {
   let t = emphasizeQaSectionLabels(String(text || '').trim());
   if (!t) return t;
 
+  // Mode B answers: normalize hierarchy before render
+  if (/\*\*结论\*\*|^\s*结论\s*[:：]|\*\*依据\*\*|情形[一二三]/.test(t)) {
+    return normalizeQaAnswerMarkdown(t);
+  }
+
   // 已有结构：只做标题行加粗，不拆句重写
   if (/^#{1,4}\s|^\s*[-*•]\s|^\s*\d+[.)、]\s|\*\*[^*\n]{2,}\*\*/m.test(t)) {
     t = t.replace(/^(【?[^】\n]{2,20}】?)[:：]\s*$/gm, '**$1**');
@@ -5161,15 +5166,30 @@ function showResultWorking() {
   if (!items || !content) return;
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
-  if (serviceHost) {
-    serviceHost.innerHTML = '';
-    serviceHost.hidden = true;
-  }
-  items.innerHTML = buildResultWorkingHtml();
+  // Keep prior entries; only refresh the bottom working indicator
+  items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
+  const working = document.createElement('div');
+  working.className = 'result-working-block';
+  working.innerHTML = buildResultWorkingHtml();
+  items.appendChild(working);
   try {
-    items.scrollTop = 0;
+    working.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch {
     /* ignore */
+  }
+}
+
+function formatResultEntryTime(d = new Date()) {
+  try {
+    return d.toLocaleString('zh-CN', {
+      month: 'numeric',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '';
   }
 }
 
@@ -5182,12 +5202,41 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
 
   if (placeholder) placeholder.style.display = 'none';
   content.classList.add('active');
+  items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
 
   const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
   const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
   const jsonReport =
     options.jsonReport ||
     (kind === 'diagnosis' ? extractDiagnosisReportJson(cleanRaw) : null);
+  const isFirstEntry = !items.querySelector('.result-entry');
+  const timeLabel = formatResultEntryTime();
+  const kindLabel = kind === 'qa' ? '问答回复' : '诊断方案';
+  const metaHtml =
+    `<p class="result-entry-meta">` +
+    `<span class="result-entry-kind">${escapeHtml(kindLabel)}</span>` +
+    (timeLabel ? `<span class="result-entry-time">${escapeHtml(timeLabel)}</span>` : '') +
+    `</p>`;
+
+  const mountEntry = (innerHtml) => {
+    const entry = document.createElement('article');
+    entry.className = `result-entry result-entry-${kind}`;
+    entry.innerHTML =
+      `<div class="result-body">` +
+      (isFirstEntry
+        ? `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>`
+        : '') +
+      metaHtml +
+      innerHtml +
+      `</div>`;
+    items.appendChild(entry);
+    try {
+      entry.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      /* ignore */
+    }
+    return entry;
+  };
 
   if (kind === 'diagnosis' && jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
     const clean = diagnosisReportJsonToMarkdown(jsonReport);
@@ -5203,24 +5252,17 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     const archiveHtml = buildDiagnosisArchiveConfirmHtml();
     const changeHtml = buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges());
     const tipHtml = buildServiceMatchTipHtml();
-    items.innerHTML =
-      `<div class="result-body result-body-scroll">` +
-      `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
+    mountEntry(
       `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
-      archiveHtml +
-      changeHtml +
-      body +
-      tipHtml +
-      `</div>`;
+        archiveHtml +
+        changeHtml +
+        body +
+        tipHtml
+    );
     if (serviceHost) {
       showDiagnosisServiceRecs(clean, {
         lead: '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
       });
-    }
-    try {
-      items.scrollTop = 0;
-    } catch {
-      /* ignore */
     }
     return;
   }
@@ -5252,15 +5294,13 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
   const tipHtml = buildServiceMatchTipHtml();
-  items.innerHTML =
-    `<div class="result-body result-body-scroll">` +
-    `<p class="result-paragraph result-greeting">${escapeHtml(SOLUTION_GREETING)}</p>` +
+  mountEntry(
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
-    archiveHtml +
-    changeHtml +
-    body +
-    tipHtml +
-    `</div>`;
+      archiveHtml +
+      changeHtml +
+      body +
+      tipHtml
+  );
 
   if (serviceHost) {
     // Full diagnosis plans and Mode B / long Q&A answers both get recommendations
@@ -5270,12 +5310,6 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
           ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
           : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
     });
-  }
-
-  try {
-    items.scrollTop = 0;
-  } catch {
-    /* ignore */
   }
 }
 
