@@ -792,6 +792,7 @@ function sanitizeAiAnswer(text) {
     .trim();
 
   t = stripKnowledgeBaseDisclaimers(t);
+  t = stripInternalTaxonomyLeaks(t);
 
   return t;
 }
@@ -1247,7 +1248,7 @@ function stripInternalTaxonomyLeaks(text) {
   let t = String(text || '');
   // 「C2 方案口径：」「路径C口径」「【路径C】」「按路径 B」
   t = t.replace(
-    /(?:^|[\s，,、：:])(?:按|依据|参照|根据)?\s*(?:路径\s*)?[YDXZCBAy dxzcba]\d?\s*(?:方案)?口径\s*[:：]?\s*/g,
+    /(?:^|[\s，,、：:])(?:按|依据|参照|根据)?\s*(?:路径\s*)?[YDXZCBAydxzcba]\d?\s*(?:方案)?口径\s*[:：]?\s*/g,
     ''
   );
   t = t.replace(/(?:^|[\s，,、])(?:按|依据|参照|根据)?\s*路径\s*[YDXZCBA]\d?\s*[:：]?\s*/gi, ' ');
