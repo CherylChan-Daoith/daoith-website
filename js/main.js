@@ -1386,10 +1386,9 @@ const DIAG_QUICK_REPLY_SETS = {
     '便捷发货出口',
   ],
   shippingShein: [
-    '供货 SHEIN（国内仓）',
-    '供货 SHEIN（保税仓）',
-    'SHEIN平台入驻商家（国内直发）',
-    'SHEIN平台入驻商家（海外仓发货）',
+    '供货SHEIN（国内仓）',
+    '入驻商家（国内直发）',
+    '入驻商家（海外仓）',
   ],
   shippingAliExpress: [
     '全托管（国内仓）',
@@ -1627,7 +1626,7 @@ function detectDiagQuickReplySet(botText) {
   }
   if (
     (/SHEIN|希音/.test(t) && /(供货|国内仓|保税仓|入驻)/.test(t) && !isPlatformQuestionText(t)) ||
-    /供货\s*SHEIN|SHEIN平台入驻/.test(t)
+    /供货\s*SHEIN|SHEIN平台入驻|入驻商家（国内直发）|入驻商家（海外仓）/.test(t)
   ) {
     return 'shippingShein';
   }
