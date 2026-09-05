@@ -849,8 +849,9 @@ function emphasizeQaSectionLabels(text) {
 }
 
 /**
- * Normalize Mode B / follow-up answers: clear 结论/依据 labels + nest 情形 sub-points.
- * Fixes common LLM flat-list mess (hollow bullets for every line).
+ * Normalize Mode B / follow-up answers: clear 结论/依据 labels +
+ * fold 总-分 (bold title + sub-bullets) into one paragraph per point:
+ * `**允许同类资料替代**：无法取得原备案单证的……`
  */
 function normalizeQaAnswerMarkdown(text) {
   let t = emphasizeQaSectionLabels(String(text || '').trim());
@@ -862,15 +863,61 @@ function normalizeQaAnswerMarkdown(text) {
     '\n\n**$2**：'
   );
 
+  const isSectionLabelLine = (s) =>
+    /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：/.test(s);
+
+  const stripBullet = (s) =>
+    String(s || '')
+      .trim()
+      .replace(/^[-*•]\s+/, '')
+      .replace(/^\d+[.)、．]\s+/, '')
+      .trim();
+
+  /** Bold-only short title (总), e.g. `- **允许同类资料替代**` or `1. **情形一：…**` */
+  const matchTitleOnly = (s) => {
+    const plain = stripBullet(s);
+    if (isSectionLabelLine(plain) || isSectionLabelLine(`${plain}`)) return null;
+    const m = plain.match(/^\*\*([^*]+)\*\*\s*[:：]?\s*$/);
+    if (!m) return null;
+    const title = m[1].trim().replace(/[:：]\s*$/, '');
+    if (!title || title.length > 48) return null;
+    if (/^(结论|依据|缺关键信息|边界说明|操作提示)$/.test(title)) return null;
+    return title;
+  };
+
+  /** `**标题**：正文` already on one line */
+  const matchTitleBody = (s) => {
+    const plain = stripBullet(s);
+    if (isSectionLabelLine(plain)) return null;
+    const m = plain.match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
+    if (!m) return null;
+    const title = m[1].trim();
+    if (!title || /^(结论|依据|缺关键信息|边界说明|操作提示)$/.test(title)) return null;
+    return { title, body: m[2].trim() };
+  };
+
+  const joinDetailParts = (parts) =>
+    parts
+      .map((p) =>
+        String(p || '')
+          .replace(/^\*\*([^*]+)\*\*\s*[:：]?\s*/, '$1')
+          .replace(/\s+/g, ' ')
+          .trim()
+      )
+      .filter(Boolean)
+      .join('；')
+      .replace(/；{2,}/g, '；')
+      .replace(/([。；!?？])；/g, '$1');
+
   const lines = t.split('\n');
   const out = [];
-  let underQingxing = false;
-  let situationIndex = 0;
+  let i = 0;
 
-  for (let raw of lines) {
-    const trimmed = raw.trim();
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
     if (!trimmed) {
       out.push('');
+      i += 1;
       continue;
     }
 
@@ -879,8 +926,8 @@ function normalizeQaAnswerMarkdown(text) {
       /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*$/
     );
     if (labelOnly) {
-      underQingxing = false;
       out.push(`**${labelOnly[1]}**：`);
+      i += 1;
       continue;
     }
 
@@ -889,65 +936,74 @@ function normalizeQaAnswerMarkdown(text) {
       /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*(.+)$/
     );
     if (labelBody) {
-      underQingxing = false;
       out.push(`**${labelBody[1]}**：`);
       out.push(labelBody[2]);
+      i += 1;
       continue;
     }
 
-    const asBullet = trimmed.replace(/^[-*•]\s+/, '');
-    const qingxingMatch = asBullet.match(
-      /^\*\*情形\s*([一二三四五六七八九十\d]+)[：:．.\s]*([^*]*?)\*\*\s*[:：]?\s*(.*)$/
-    ) || asBullet.match(/^情形\s*([一二三四五六七八九十\d]+)[：:．.\s]+(.+)$/);
     const isOpsTip =
-      /^\*\*操作提示/.test(asBullet) ||
-      /^操作提示/.test(asBullet.replace(/\*/g, '')) ||
-      /^\*\*补充/.test(asBullet);
-
-    if (qingxingMatch) {
-      underQingxing = true;
-      situationIndex += 1;
-      const num = qingxingMatch[1];
-      const titleTail = String(qingxingMatch[2] || '')
-        .replace(/[（(]\s*须同时满足[^）)]*[）)]/g, '')
-        .trim();
-      const rest = String(qingxingMatch[3] || '').trim();
-      const title = titleTail ? `情形${num}：${titleTail}` : `情形${num}`;
-      out.push(`${situationIndex}. **${title}**`);
-      if (rest) out.push(`  - ${rest}`);
-      continue;
-    }
-
+      /^\*\*操作提示/.test(stripBullet(trimmed)) ||
+      /^操作提示/.test(stripBullet(trimmed).replace(/\*/g, '')) ||
+      /^\*\*补充/.test(stripBullet(trimmed));
     if (isOpsTip) {
-      underQingxing = false;
-      const rest = asBullet
+      const rest = stripBullet(trimmed)
         .replace(/^\*\*操作提示\*\*\s*[:：]?\s*/, '')
         .replace(/^操作提示\s*[:：]\s*/, '')
         .trim();
       out.push('**操作提示**：');
       if (rest) out.push(rest);
+      i += 1;
       continue;
     }
 
-    // Continuation under 情形：force 2-space nest (even if model emitted top-level -)
-    if (underQingxing && /^[-*•]\s+/.test(trimmed)) {
-      out.push(`  - ${asBullet}`);
-      continue;
+    let title = matchTitleOnly(trimmed);
+    let bodyParts = [];
+    const titleBody = matchTitleBody(trimmed);
+    if (titleBody) {
+      title = titleBody.title;
+      if (titleBody.body) bodyParts.push(titleBody.body);
     }
-    // Orphan plain lines that look like sub-conditions of 情形
-    if (
-      underQingxing &&
-      !/^[-*•]/.test(trimmed) &&
-      !/^\*\*/.test(trimmed) &&
-      !/^\d+[.)、．]/.test(trimmed) &&
-      trimmed.length < 160
-    ) {
-      out.push(`  - ${trimmed}`);
+
+    if (title) {
+      let j = i + 1;
+      while (j < lines.length) {
+        const rawNext = lines[j];
+        const next = rawNext.trim();
+        if (!next) {
+          // Allow one blank inside a point; stop on double blank / next point
+          if (j + 1 < lines.length && !lines[j + 1].trim()) break;
+          j += 1;
+          continue;
+        }
+        const nextIsOps =
+          /^\*\*操作提示/.test(stripBullet(next)) ||
+          /^操作提示/.test(stripBullet(next).replace(/\*/g, '')) ||
+          /^\*\*补充/.test(stripBullet(next));
+        if (isSectionLabelLine(next) || nextIsOps) break;
+        if (matchTitleOnly(next) || matchTitleBody(next)) break;
+        if (
+          /^[-*•]\s+/.test(next) ||
+          /^\s{1,}[-*•]\s+/.test(rawNext) ||
+          (!/^\d+[.)、．]/.test(next) &&
+            !/^\*\*/.test(next) &&
+            next.length < 220)
+        ) {
+          bodyParts.push(stripBullet(next));
+          j += 1;
+          continue;
+        }
+        break;
+      }
+      const body = joinDetailParts(bodyParts);
+      out.push(body ? `**${title}**：${body}` : `**${title}**：`);
+      out.push('');
+      i = j;
       continue;
     }
 
-    if (/^\*\*(结论|依据|操作提示)/.test(trimmed)) underQingxing = false;
-    out.push(raw);
+    out.push(trimmed);
+    i += 1;
   }
 
   return emphasizeQaSectionLabels(out.join('\n').replace(/\n{3,}/g, '\n\n').trim());
@@ -2667,7 +2723,7 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
-    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据**（标签加粗）；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
+    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据**（标签加粗）；依据内总-分要点写成「**标题**：正文」一段，不要标题下再挂子 bullet；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。'
   );
