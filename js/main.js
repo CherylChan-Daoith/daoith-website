@@ -849,13 +849,20 @@ function emphasizeQaSectionLabels(text) {
 }
 
 /**
- * Normalize Mode B / follow-up answers: clear 结论/依据 labels +
- * fold 总-分 (bold title + sub-bullets) into one paragraph per point:
- * `**允许同类资料替代**：无法取得原备案单证的……`
+ * Normalize Mode B / follow-up answers:
+ * - Fold 总-分 into `**标题**：正文`
+ * - Emit flat same-level solid bullets under 依据 (`- **标题**：正文`)
+ * - Merge bare「操作提示」+ following body into one bullet
  */
 function normalizeQaAnswerMarkdown(text) {
   let t = emphasizeQaSectionLabels(String(text || '').trim());
   if (!t) return t;
+
+  // Flatten any indented bullets first (prevents ○ nested lists)
+  t = t
+    .split('\n')
+    .map((ln) => ln.replace(/^[ \t]+([-*•]|\d+[.)、．])\s+/, '$1 ').replace(/^[ \t]+/, ''))
+    .join('\n');
 
   // Put 结论 / 依据 on their own structural lines when glued to body
   t = t.replace(
@@ -873,15 +880,20 @@ function normalizeQaAnswerMarkdown(text) {
       .replace(/^\d+[.)、．]\s+/, '')
       .trim();
 
-  /** Bold-only short title (总), e.g. `- **允许同类资料替代**` or `1. **情形一：…**` */
+  const isOpsTipLine = (s) => {
+    const plain = stripBullet(s).replace(/\*/g, '').trim();
+    return /^(操作提示|补充说明|补充)\s*[:：]?/.test(plain);
+  };
+
+  /** Bold-only short title (总), e.g. `- **允许同类资料替代**` */
   const matchTitleOnly = (s) => {
     const plain = stripBullet(s);
-    if (isSectionLabelLine(plain) || isSectionLabelLine(`${plain}`)) return null;
+    if (isSectionLabelLine(plain)) return null;
     const m = plain.match(/^\*\*([^*]+)\*\*\s*[:：]?\s*$/);
     if (!m) return null;
     const title = m[1].trim().replace(/[:：]\s*$/, '');
     if (!title || title.length > 48) return null;
-    if (/^(结论|依据|缺关键信息|边界说明|操作提示)$/.test(title)) return null;
+    if (/^(结论|依据|缺关键信息|边界说明|操作提示|补充说明|补充)$/.test(title)) return null;
     return title;
   };
 
@@ -892,7 +904,9 @@ function normalizeQaAnswerMarkdown(text) {
     const m = plain.match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
     if (!m) return null;
     const title = m[1].trim();
-    if (!title || /^(结论|依据|缺关键信息|边界说明|操作提示)$/.test(title)) return null;
+    if (!title || /^(结论|依据|缺关键信息|边界说明|操作提示|补充说明|补充)$/.test(title)) {
+      return null;
+    }
     return { title, body: m[2].trim() };
   };
 
@@ -909,6 +923,12 @@ function normalizeQaAnswerMarkdown(text) {
       .replace(/；{2,}/g, '；')
       .replace(/([。；!?？])；/g, '$1');
 
+  const pushPoint = (arr, title, body) => {
+    const b = String(body || '').trim();
+    arr.push(b ? `- **${title}**：${b}` : `- **${title}**：`);
+    arr.push('');
+  };
+
   const lines = t.split('\n');
   const out = [];
   let i = 0;
@@ -923,7 +943,7 @@ function normalizeQaAnswerMarkdown(text) {
 
     // Bare 结论/依据 line → keep as label (renderer turns into subtitle)
     const labelOnly = trimmed.match(
-      /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*$/
+      /^\*\*(结论|依据|缺关键信息|边界说明)\*\*：\s*$/
     );
     if (labelOnly) {
       out.push(`**${labelOnly[1]}**：`);
@@ -933,7 +953,7 @@ function normalizeQaAnswerMarkdown(text) {
 
     // 结论：body on same line → split label + paragraph
     const labelBody = trimmed.match(
-      /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*(.+)$/
+      /^\*\*(结论|依据|缺关键信息|边界说明)\*\*：\s*(.+)$/
     );
     if (labelBody) {
       out.push(`**${labelBody[1]}**：`);
@@ -942,18 +962,30 @@ function normalizeQaAnswerMarkdown(text) {
       continue;
     }
 
-    const isOpsTip =
-      /^\*\*操作提示/.test(stripBullet(trimmed)) ||
-      /^操作提示/.test(stripBullet(trimmed).replace(/\*/g, '')) ||
-      /^\*\*补充/.test(stripBullet(trimmed));
-    if (isOpsTip) {
-      const rest = stripBullet(trimmed)
+    // 「操作提示」+ 后续正文 → 同一条实心 bullet
+    if (isOpsTipLine(trimmed)) {
+      let rest = stripBullet(trimmed)
         .replace(/^\*\*操作提示\*\*\s*[:：]?\s*/, '')
-        .replace(/^操作提示\s*[:：]\s*/, '')
+        .replace(/^操作提示\s*[:：]?\s*/, '')
+        .replace(/^\*\*补充说明?\*\*\s*[:：]?\s*/, '')
+        .replace(/^补充说明?\s*[:：]?\s*/, '')
         .trim();
-      out.push('**操作提示**：');
-      if (rest) out.push(rest);
-      i += 1;
+      const bodyParts = rest ? [rest] : [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const next = lines[j].trim();
+        if (!next) {
+          if (j + 1 < lines.length && !lines[j + 1].trim()) break;
+          j += 1;
+          continue;
+        }
+        if (isSectionLabelLine(next) || isOpsTipLine(next)) break;
+        if (matchTitleOnly(next) || matchTitleBody(next)) break;
+        bodyParts.push(stripBullet(next));
+        j += 1;
+      }
+      pushPoint(out, '操作提示', joinDetailParts(bodyParts));
+      i = j;
       continue;
     }
 
@@ -968,26 +1000,19 @@ function normalizeQaAnswerMarkdown(text) {
     if (title) {
       let j = i + 1;
       while (j < lines.length) {
-        const rawNext = lines[j];
-        const next = rawNext.trim();
+        const next = lines[j].trim();
         if (!next) {
-          // Allow one blank inside a point; stop on double blank / next point
           if (j + 1 < lines.length && !lines[j + 1].trim()) break;
           j += 1;
           continue;
         }
-        const nextIsOps =
-          /^\*\*操作提示/.test(stripBullet(next)) ||
-          /^操作提示/.test(stripBullet(next).replace(/\*/g, '')) ||
-          /^\*\*补充/.test(stripBullet(next));
-        if (isSectionLabelLine(next) || nextIsOps) break;
+        if (isSectionLabelLine(next) || isOpsTipLine(next)) break;
         if (matchTitleOnly(next) || matchTitleBody(next)) break;
+        // Don't swallow a peer bullet that is already a full title：body point
+        if (/^[-*•]\s+\*\*[^*]+\*\*\s*[:：]/.test(next)) break;
         if (
           /^[-*•]\s+/.test(next) ||
-          /^\s{1,}[-*•]\s+/.test(rawNext) ||
-          (!/^\d+[.)、．]/.test(next) &&
-            !/^\*\*/.test(next) &&
-            next.length < 220)
+          (!/^\d+[.)、．]/.test(next) && !/^\*\*/.test(next) && next.length < 280)
         ) {
           bodyParts.push(stripBullet(next));
           j += 1;
@@ -995,10 +1020,16 @@ function normalizeQaAnswerMarkdown(text) {
         }
         break;
       }
-      const body = joinDetailParts(bodyParts);
-      out.push(body ? `**${title}**：${body}` : `**${title}**：`);
-      out.push('');
+      pushPoint(out, title, joinDetailParts(bodyParts));
       i = j;
+      continue;
+    }
+
+    // Plain bullet under 依据 → promote to flat solid bullet
+    if (/^[-*•]\s+/.test(trimmed)) {
+      out.push(`- ${stripBullet(trimmed)}`);
+      out.push('');
+      i += 1;
       continue;
     }
 
@@ -1007,6 +1038,18 @@ function normalizeQaAnswerMarkdown(text) {
   }
 
   return emphasizeQaSectionLabels(out.join('\n').replace(/\n{3,}/g, '\n\n').trim());
+}
+
+/** QA answers must stay flat (same-level ●); do not auto-nest under bold parents. */
+function flattenQaAnswerBullets(text) {
+  return String(text || '')
+    .split('\n')
+    .map((ln) => {
+      const m = ln.match(/^[ \t]+([-*•])\s+(.*)$/);
+      if (m) return `- ${m[2]}`;
+      return ln;
+    })
+    .join('\n');
 }
 
 /** If answer discusses 9810 but omits uncertainty tip, append the hard reminder. */
@@ -2723,7 +2766,7 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
-    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据**（标签加粗）；依据内总-分要点写成「**标题**：正文」一段，不要标题下再挂子 bullet；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
+    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据**（标签加粗）；依据内全部同一级实心 `- **标题**：正文`，操作提示与正文写在同一条；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。'
   );
@@ -7718,15 +7761,20 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const lines = nestCustomAfterNonCustomPeers(
-    nestPlanNumberedHierarchy(
-      nestPlanBulletHierarchy(
-        structureAnnotationPlainText(
-          convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(text))
-        )
-      )
-    )
-  ).split('\n');
+  const rawText = String(text || '');
+  const isQaAnswer = /\*\*(结论|依据)\*\*|^\s*(结论|依据)\s*[:：]/m.test(rawText);
+  let prepared = structureAnnotationPlainText(
+    convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText))
+  );
+  if (isQaAnswer) {
+    // Mode B / follow-up Q&A: keep every bullet at the same solid ● level
+    prepared = flattenQaAnswerBullets(prepared);
+  } else {
+    prepared = nestCustomAfterNonCustomPeers(
+      nestPlanNumberedHierarchy(nestPlanBulletHierarchy(prepared))
+    );
+  }
+  const lines = prepared.split('\n');
   let html = '';
   let listMode = null; // 'flow' | 'ol' | 'ul' | null
   let nestedUl = false;
@@ -8080,7 +8128,8 @@ function renderAIPlanHtml(text) {
     if (orderedMatch || bulletMatch) {
       let content = (orderedMatch ? orderedMatch[1] : bulletMatch[1]) || '';
       content = stripLeadingListIndex(content);
-      const depth = listInfo ? listInfo.depth : 0;
+      // Q&A 依据列表：强制同一实心 ● 层级，忽略模型缩进
+      const depth = isQaAnswer ? 0 : listInfo ? listInfo.depth : 0;
       const looksLikeFlowStep =
         (flowMode || sectionKind === 'flow') &&
         content.length <= 36 &&
