@@ -894,12 +894,12 @@ function normalizeQaAnswerMarkdown(text) {
 
   // Put 结论 / 依据 on their own structural lines when glued to body
   t = t.replace(
-    /(^|\n)\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：\s*/g,
+    /(^|\n)\*\*(结论|依据|缺关键信息|边界说明)\*\*：\s*/g,
     '\n\n**$2**：'
   );
 
   const isSectionLabelLine = (s) =>
-    /^\*\*(结论|依据|缺关键信息|边界说明|操作提示)\*\*：/.test(s);
+    /^\*\*(结论|依据|缺关键信息|边界说明)\*\*：/.test(s);
 
   const stripBullet = (s) =>
     String(s || '')
