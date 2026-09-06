@@ -848,6 +848,25 @@ function emphasizeQaSectionLabels(text) {
     );
 }
 
+/** Agent often writes `**标题：**正文` (colon inside bold) — normalize to `**标题**：正文`. */
+function normalizeColonInsideBoldTitles(text) {
+  return String(text || '').replace(
+    /\*\*([^*\n]{1,48}?)[:：]\*\*\s*/g,
+    '**$1**：'
+  );
+}
+
+/** Loose detect Mode B / follow-up Q&A answers. */
+function looksLikeQaAnswerMarkdown(text) {
+  const t = String(text || '');
+  return (
+    /\*\*\s*(结论|依据)\s*[:：]?\s*\*\*/.test(t) ||
+    /\*\*(结论|依据)\*\*/.test(t) ||
+    /^\s*(结论|依据)\s*[:：]/m.test(t) ||
+    /\*\*操作提示\*\*/.test(t)
+  );
+}
+
 /**
  * Normalize Mode B / follow-up answers:
  * - Fold 总-分 into `**标题**：正文`
@@ -855,7 +874,9 @@ function emphasizeQaSectionLabels(text) {
  * - Merge bare「操作提示」+ following body into one bullet
  */
 function normalizeQaAnswerMarkdown(text) {
-  let t = emphasizeQaSectionLabels(String(text || '').trim());
+  let t = emphasizeQaSectionLabels(
+    normalizeColonInsideBoldTitles(String(text || '').trim())
+  );
   if (!t) return t;
 
   // Flatten any indented bullets first (prevents ○ nested lists)
@@ -1042,14 +1063,31 @@ function normalizeQaAnswerMarkdown(text) {
 
 /** QA answers must stay flat (same-level ●); do not auto-nest under bold parents. */
 function flattenQaAnswerBullets(text) {
-  return String(text || '')
-    .split('\n')
-    .map((ln) => {
-      const m = ln.match(/^[ \t]+([-*•])\s+(.*)$/);
-      if (m) return `- ${m[2]}`;
-      return ln;
-    })
-    .join('\n');
+  const lines = String(text || '').split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    let ln = lines[i];
+    const indented = ln.match(/^[ \t]+([-*•])\s+(.*)$/);
+    if (indented) ln = `- ${indented[2]}`;
+    // Collapse `- - **title**` / `• - **title**` leftovers
+    ln = ln.replace(/^([ \t]*[-*•]\s+)+/, (m) => (/^\s*$/.test(m) ? m : '- '));
+    const trimmed = ln.trim();
+    // Merge bare 操作提示 with next line that is only a colon-body
+    const opsOnly = /^[-*•]\s+\*\*操作提示\*\*\s*[:：]?\s*$/.test(trimmed) ||
+      /^\*\*操作提示\*\*\s*[:：]?\s*$/.test(trimmed) ||
+      /^[-*•]\s+操作提示\s*[:：]?\s*$/.test(trimmed);
+    if (opsOnly && i + 1 < lines.length) {
+      let next = lines[i + 1].trim().replace(/^[ \t]+[-*•]\s+/, '').replace(/^[-*•]\s+/, '');
+      if (/^[:：]/.test(next) || (next && !/^\*\*/.test(next) && !/^[-*•]/.test(next))) {
+        const body = next.replace(/^[:：]\s*/, '');
+        out.push(`- **操作提示**：${body}`);
+        i += 1;
+        continue;
+      }
+    }
+    out.push(ln);
+  }
+  return out.join('\n');
 }
 
 /** If answer discusses 9810 but omits uncertainty tip, append the hard reminder. */
@@ -6567,7 +6605,12 @@ function formatRiskOrBulletContent(content) {
 }
 
 function matchBoldKvContent(content) {
-  return String(content || '').match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
+  const s = String(content || '').trim();
+  // `**标题**：正文` or Agent's `**标题：**正文` (colon inside bold)
+  return (
+    s.match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/) ||
+    s.match(/^\*\*([^*]+?)[:：]\*\*\s*(.+)$/)
+  );
 }
 
 /** Split a 合规方案 bullet into card title + body (legacy; plan now uses detail rows). */
@@ -7762,16 +7805,18 @@ function buildLocalSolutionMarkdown(ctx) {
 
 function renderAIPlanHtml(text) {
   const rawText = String(text || '');
-  const isQaAnswer = /\*\*(结论|依据)\*\*|^\s*(结论|依据)\s*[:：]/m.test(rawText);
-  let prepared = structureAnnotationPlainText(
-    convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText))
-  );
+  const isQaAnswer = looksLikeQaAnswerMarkdown(rawText);
+  let prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
   if (isQaAnswer) {
-    // Mode B / follow-up Q&A: keep every bullet at the same solid ● level
-    prepared = flattenQaAnswerBullets(prepared);
+    // Mode B / follow-up: normalize again at render-time, never auto-nest
+    prepared = flattenQaAnswerBullets(
+      normalizeQaAnswerMarkdown(normalizeColonInsideBoldTitles(prepared))
+    );
   } else {
     prepared = nestCustomAfterNonCustomPeers(
-      nestPlanNumberedHierarchy(nestPlanBulletHierarchy(prepared))
+      nestPlanNumberedHierarchy(
+        nestPlanBulletHierarchy(structureAnnotationPlainText(prepared))
+      )
     );
   }
   const lines = prepared.split('\n');
