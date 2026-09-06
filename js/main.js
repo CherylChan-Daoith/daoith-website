@@ -825,25 +825,26 @@ function stripDiagnosisIntroBoilerplate(text) {
     .trim();
 }
 
-/** Mode B / follow-up Q&A: force bold section labels for display. */
+/** Mode B / follow-up Q&A: force bold section labels for display.
+ *  仅规范化「结论/依据」等章节标签；「操作提示」一律当普通要点，禁止提成小标题。
+ */
 function emphasizeQaSectionLabels(text) {
   return String(text || '')
-    // `- **依据：**` → `**依据**：`
+    // `- **依据：**` / `**依据：**` → `**依据**：`（保留冒号后正文）
     .replace(
-      /(^|\n)[ \t]*[-*•]\s*\*\*(结论|依据|缺关键信息|边界说明|操作提示)\s*[:：]?\*\*[ \t]*/gm,
+      /(^|\n)[ \t]*[-*•]\s*\*\*(结论|依据|缺关键信息|边界说明)\s*[:：]?\*\*[ \t]*/gm,
       '$1**$2**：'
     )
     .replace(
-      /(^|\n)[ \t]*[-*•]\s*(结论|依据|缺关键信息|边界说明|操作提示)\s*[:：]\s*/gm,
-      '$1**$2**：'
-    )
-    // **结论：**（冒号包进加粗）→ **结论**：
-    .replace(
-      /(^|\n)[ \t]*\*\*(结论|依据|缺关键信息|边界说明|操作提示)\s*[:：]\*\*[ \t]*/gm,
+      /(^|\n)[ \t]*[-*•]\s*(结论|依据|缺关键信息|边界说明)\s*[:：]\s*/gm,
       '$1**$2**：'
     )
     .replace(
-      /(^|\n)[ \t]*(?:\*\*)?(结论|依据|缺关键信息|边界说明|操作提示)(?:\*\*)?[ \t]*[:：]/gm,
+      /(^|\n)[ \t]*\*\*(结论|依据|缺关键信息|边界说明)\s*[:：]\*\*[ \t]*/gm,
+      '$1**$2**：'
+    )
+    .replace(
+      /(^|\n)[ \t]*(?:\*\*)?(结论|依据|缺关键信息|边界说明)(?:\*\*)?[ \t]*[:：][ \t]*/gm,
       '$1**$2**：'
     );
 }
@@ -855,6 +856,12 @@ function normalizeColonInsideBoldTitles(text) {
     '**$1**：'
   );
 }
+
+/** Strip leftover leading colons (avoids 「操作提示」下出现 ：：：). */
+function stripLeadingColons(text) {
+  return String(text || '').replace(/^[\s:：]+/, '').trim();
+}
+
 
 /** Loose detect Mode B / follow-up Q&A answers. */
 function looksLikeQaAnswerMarkdown(text) {
@@ -945,7 +952,7 @@ function normalizeQaAnswerMarkdown(text) {
       .replace(/([。；!?？])；/g, '$1');
 
   const pushPoint = (arr, title, body) => {
-    const b = String(body || '').trim();
+    const b = stripLeadingColons(body);
     arr.push(b ? `- **${title}**：${b}` : `- **${title}**：`);
     arr.push('');
   };
@@ -1005,7 +1012,7 @@ function normalizeQaAnswerMarkdown(text) {
         bodyParts.push(stripBullet(next));
         j += 1;
       }
-      pushPoint(out, '操作提示', joinDetailParts(bodyParts));
+      pushPoint(out, '操作提示', stripLeadingColons(joinDetailParts(bodyParts)));
       i = j;
       continue;
     }
@@ -1079,7 +1086,8 @@ function flattenQaAnswerBullets(text) {
     if (opsOnly && i + 1 < lines.length) {
       let next = lines[i + 1].trim().replace(/^[ \t]+[-*•]\s+/, '').replace(/^[-*•]\s+/, '');
       if (/^[:：]/.test(next) || (next && !/^\*\*/.test(next) && !/^[-*•]/.test(next))) {
-        const body = next.replace(/^[:：]\s*/, '');
+        const body = stripLeadingColons(next);
+        if (!body) { out.push(ln); continue; }
         out.push(`- **操作提示**：${body}`);
         i += 1;
         continue;
@@ -5520,8 +5528,9 @@ function showResultWorking() {
   working.className = 'result-working-block';
   working.innerHTML = buildResultWorkingHtml();
   items.appendChild(working);
+  // Keep page scroll fixed — only adjust the result panel scroller
   try {
-    working.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    items.scrollTop = items.scrollHeight;
   } catch {
     /* ignore */
   }
@@ -5614,8 +5623,11 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       metaHtml +
       innerHtml +
       `</div>`;
+    // Keep page scroll fixed — only adjust the result panel scroller
     try {
-      entry.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const scroller = items;
+      const top = Math.max(0, entry.offsetTop - 8);
+      scroller.scrollTop = top;
     } catch {
       /* ignore */
     }
@@ -7997,14 +8009,39 @@ function renderAIPlanHtml(text) {
 
     // Mode B Q&A labels → subtitle (guarantees bold 「结论／依据」)
     const qaLabelPlain = line.replace(/\*/g, '').replace(/^[-*•]\s+/, '').trim();
+    // 「操作提示」永不渲染为章节小标题（避免标题/正文拆行与 ：：：）
+    const opsAsLabel = qaLabelPlain.match(/^操作提示[:：]?\s*(.*)$/);
+    if (opsAsLabel) {
+      let rest = stripLeadingColons(opsAsLabel[1] || '');
+      if (!rest) {
+        // consume next non-empty source line as body
+        // find index of rawLine in lines
+        const idx = lines.indexOf(rawLine);
+        for (let k = idx + 1; k < lines.length; k += 1) {
+          const nxt = String(lines[k] || '').trim();
+          if (!nxt) continue;
+          rest = stripLeadingColons(
+            nxt.replace(/^[-*•]\s+/, '').replace(/^\*\*操作提示\*\*\s*[:：]?\s*/, '')
+          );
+          lines[k] = '';
+          break;
+        }
+      }
+      closeList();
+      openList('ul');
+      html += `<li><strong class="result-em">操作提示</strong>：${formatInline(rest || '')}</li>`;
+      liOpen = true;
+      continue;
+    }
+
     const qaLabelMatch = qaLabelPlain.match(
-      /^(结论|依据|缺关键信息|边界说明|操作提示)[:：]\s*(.*)$/
+      /^(结论|依据|缺关键信息|边界说明)[:：]\s*(.*)$/
     );
     if (qaLabelMatch) {
       closeList();
       resetPlanLayout();
       html += `<h5 class="result-section-subtitle">${escapeHtml(qaLabelMatch[1])}：</h5>`;
-      const rest = String(qaLabelMatch[2] || '').trim();
+      const rest = stripLeadingColons(qaLabelMatch[2] || '');
       if (rest) {
         html += `<p class="result-paragraph">${formatInline(rest)}</p>`;
       }
