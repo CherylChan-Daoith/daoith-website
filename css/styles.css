@@ -8058,6 +8058,25 @@ body.modal-open {
     flex-direction: column;
   }
 
+  #heroJourney {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  #heroJourney .process-card {
+    padding: 12px 8px;
+  }
+
+  #heroJourney .process-card h4 {
+    font-size: 0.8rem;
+  }
+
+  #heroJourney .process-card .process-desc {
+    font-size: 0.68rem;
+    line-height: 1.4;
+  }
+
   .process-arrow {
     transform: rotate(90deg);
   }
