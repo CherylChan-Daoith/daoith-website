@@ -242,7 +242,7 @@ window.DAOITH_I18N_EN = {
     '#heroJourney .process-card[data-step="3"] h4': { text: 'Compliance Delivery' },
     '#heroJourney .process-card[data-step="3"] .process-desc': {
       html: true,
-      text: 'Bookkeeping / rebates / registration<br>Turn the plan into action',
+      text: 'Bookkeeping / rebates / registration<br>Smart-matched delivery services',
     },
     '#heroJourney .process-card[data-step="4"] h4': { text: 'AI + Expert Care' },
     '#heroJourney .process-card[data-step="4"] .process-desc': {
