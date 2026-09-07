@@ -479,15 +479,6 @@ ul {
   margin: 0 0 40px;
 }
 
-.hub-hero .hero-subtitle {
-  margin-bottom: 40px;
-}
-
-.hub-hero .process-flow {
-  margin-bottom: 40px;
-  background: transparent;
-}
-
 #heroJourney .process-card,
 #hubJourney .process-card {
   --hero-border-angle: 0deg;
@@ -5732,7 +5723,9 @@ body.modal-open {
   margin-bottom: 40px;
 }
 
+.hub-hero #hubJourney,
 .hub-hero .process-flow {
+  margin-top: 0;
   margin-bottom: 40px;
   background: transparent;
 }
@@ -8190,6 +8183,8 @@ body.modal-open {
 
   #hubJourney {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
   }
 
   #heroJourney .process-card,
