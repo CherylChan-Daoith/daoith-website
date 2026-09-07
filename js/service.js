@@ -194,19 +194,22 @@
     if (loadingEl) loadingEl.remove();
 
     viewEl.innerHTML = `
-      <header class="article-view-header">
-        <span class="article-view-tag">${escapeHtml(catLabel)}</span>
-        <h1 class="article-view-title">${escapeHtml(title)}</h1>
-        <p class="article-view-lead">${escapeHtml(desc)}</p>
-        <div class="service-detail-price">
-          ${escapeHtml(service.priceLabel)} <span>${escapeHtml(unit)}</span>
+      <header class="service-product-hero">
+        <span class="service-product-badge">${escapeHtml(catLabel)}</span>
+        <h1 class="service-product-title">${escapeHtml(title)}</h1>
+        <p class="service-product-lead">${escapeHtml(desc)}</p>
+        <div class="service-product-bar">
+          <div class="service-product-price">
+            <strong>${escapeHtml(service.priceLabel)}</strong>
+            <span>${escapeHtml(unit)}</span>
+          </div>
+          <div class="service-product-actions">
+            <a href="/#services" class="btn btn-outline btn-sm">${backLabel.replace(/^←\s*/, '')}</a>
+            <button type="button" class="btn btn-primary btn-sm" data-action="add" data-service-id="${escapeHtml(service.id)}">${detailBtn}</button>
+          </div>
         </div>
       </header>
-      <div class="article-view-body">${renderBlocks(details)}</div>
-      <footer class="article-view-footer service-detail-actions">
-        <a href="/#services" class="btn btn-outline btn-sm">${backLabel.replace(/^←\s*/, '')}</a>
-        <button type="button" class="btn btn-primary btn-sm" data-action="add" data-service-id="${escapeHtml(service.id)}">${detailBtn}</button>
-      </footer>
+      <div class="article-view-body service-product-body">${renderBlocks(details)}</div>
     `;
 
     window.DAOITH_CART?.bindAddButtons(viewEl);

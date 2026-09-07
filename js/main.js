@@ -282,9 +282,112 @@ function initNavDropdown() {
   });
 }
 
-/* Hero process cards are direct links — no expand panel */
+/* Hero showcase — Intuit-style tabs with auto-rotate */
 function initHeroFeatures() {
-  /* no-op: #heroJourney cards navigate via href */
+  const root = document.getElementById('heroShowcase');
+  if (!root || root.dataset.bound === '1') return;
+
+  const tabs = Array.from(root.querySelectorAll('.hero-tab'));
+  const panels = Array.from(root.querySelectorAll('.hero-panel'));
+  if (!tabs.length || tabs.length !== panels.length) return;
+
+  root.dataset.bound = '1';
+  const ROTATE_MS = 5500;
+  root.style.setProperty('--hero-rotate-ms', `${ROTATE_MS}ms`);
+
+  let index = Math.max(0, tabs.findIndex((t) => t.classList.contains('is-active')));
+  let timer = null;
+  let paused = false;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const setActive = (next, { restart = true } = {}) => {
+    index = ((next % tabs.length) + tabs.length) % tabs.length;
+    tabs.forEach((tab, i) => {
+      const on = i === index;
+      tab.classList.toggle('is-active', on);
+      tab.classList.toggle('is-playing', false);
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+      const bar = tab.querySelector('.hero-tab-progress i');
+      if (bar) {
+        bar.style.animation = 'none';
+        void bar.offsetWidth;
+        bar.style.animation = '';
+        bar.style.width = '';
+      }
+    });
+    panels.forEach((panel, i) => {
+      const on = i === index;
+      panel.classList.toggle('is-active', on);
+      if (on) panel.removeAttribute('hidden');
+      else panel.setAttribute('hidden', '');
+    });
+    if (restart) startRotate();
+  };
+
+  const clearRotate = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    tabs.forEach((tab) => tab.classList.remove('is-playing'));
+  };
+
+  const startRotate = () => {
+    clearRotate();
+    if (paused || reduceMotion || document.hidden) return;
+    const active = tabs[index];
+    if (active) active.classList.add('is-playing');
+    timer = window.setTimeout(() => setActive(index + 1), ROTATE_MS);
+  };
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => setActive(i));
+    tab.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        setActive(index + 1);
+        tabs[index]?.focus();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setActive(index - 1);
+        tabs[index]?.focus();
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        setActive(0);
+        tabs[0]?.focus();
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        setActive(tabs.length - 1);
+        tabs[tabs.length - 1]?.focus();
+      }
+    });
+  });
+
+  root.addEventListener('mouseenter', () => {
+    paused = true;
+    clearRotate();
+  });
+  root.addEventListener('mouseleave', () => {
+    paused = false;
+    startRotate();
+  });
+  root.addEventListener('focusin', () => {
+    paused = true;
+    clearRotate();
+  });
+  root.addEventListener('focusout', (e) => {
+    if (root.contains(e.relatedTarget)) return;
+    paused = false;
+    startRotate();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) clearRotate();
+    else if (!paused) startRotate();
+  });
+
+  setActive(index, { restart: true });
 }
 
 /* Paginated lists */
@@ -8958,9 +9061,7 @@ function initTaxCalculator() {
   });
 }
 
-/* Services marketplace — render from DAOITH_SERVICES */
-const SERVICES_PREVIEW_COUNT = 6;
-
+/* Services marketplace — Infini-style product sections + cards */
 function escapeServiceHtml(text) {
   return String(text || '')
     .replace(/&/g, '&amp;')
@@ -8993,12 +9094,17 @@ function initServicesMarketplace() {
   ];
   const services = window.DAOITH_SERVICES || [];
   let activeFilter = 'all';
-  let expanded = false;
 
   function categoryLabel(cat) {
     const locale = window.DAOITH_getLocale?.() || 'zh';
     if (locale === 'en') return cat.en || cat.label;
     return cat.label;
+  }
+
+  function categoryBlurb(cat) {
+    const locale = window.DAOITH_getLocale?.() || 'zh';
+    if (locale === 'en') return cat.blurbEn || cat.blurb || '';
+    return cat.blurb || '';
   }
 
   function filteredServices() {
@@ -9019,61 +9125,73 @@ function initServicesMarketplace() {
     filtersEl.querySelectorAll('.filter-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         activeFilter = btn.dataset.filter || 'all';
-        expanded = activeFilter !== 'all';
         renderFilters();
         renderCards();
       });
     });
   }
 
-  function renderCards() {
-    const locale = window.DAOITH_getLocale?.() || 'zh';
-    const detailLabel = locale === 'en' ? 'Service details' : '服务详情';
-    const cartLabel = locale === 'en' ? 'Add to inquiry list' : '加入询价单';
-    const list = filteredServices();
-    const limit = activeFilter === 'all' && !expanded ? SERVICES_PREVIEW_COUNT : list.length;
-    const visible = list.slice(0, limit);
-
-    grid.innerHTML = visible
-      .map((raw) => {
-        const s = getLocalizedService(raw);
-        const cat = categories.find((c) => c.id === raw.category);
-        const tag = cat && cat.id !== 'all' ? categoryLabel(cat) : '';
-        return `
-      <div class="service-card" data-category="${escapeServiceHtml(s.category)}" data-service-id="${escapeServiceHtml(s.id)}">
-        ${tag ? `<span class="service-card-tag">${escapeServiceHtml(tag)}</span>` : ''}
-        <h4>${escapeServiceHtml(s.title)}</h4>
-        <p>${escapeServiceHtml(s.desc)}</p>
-        <div class="service-price">${escapeServiceHtml(s.priceLabel)} <span>${escapeServiceHtml(s.unit)}</span></div>
-        <div class="service-card-actions">
-          <a class="btn btn-outline btn-sm" href="/service.html?id=${encodeURIComponent(s.id)}" data-action="detail">${escapeServiceHtml(detailLabel)}</a>
-          <button type="button" class="btn btn-primary btn-sm" data-action="add" data-service-id="${escapeServiceHtml(s.id)}">${escapeServiceHtml(cartLabel)}</button>
+  function renderProductCard(raw, locale, detailLabel, cartLabel, showTag) {
+    const s = getLocalizedService(raw);
+    const cat = categories.find((c) => c.id === raw.category);
+    const tag = showTag && cat && cat.id !== 'all' ? categoryLabel(cat) : '';
+    const href = `/service.html?id=${encodeURIComponent(s.id)}`;
+    return `
+      <article class="service-card" data-category="${escapeServiceHtml(s.category)}" data-service-id="${escapeServiceHtml(s.id)}">
+        <a class="service-card-main" href="${href}" data-action="detail">
+          <div class="service-card-top">
+            <h4>${escapeServiceHtml(s.title)}</h4>
+            ${tag ? `<span class="service-card-tag">${escapeServiceHtml(tag)}</span>` : ''}
+          </div>
+          <p class="service-card-desc">${escapeServiceHtml(s.desc)}</p>
+          <div class="service-card-meta">
+            <span class="service-card-price">${escapeServiceHtml(s.priceLabel)}</span>
+            <span class="service-card-unit">${escapeServiceHtml(s.unit)}</span>
+          </div>
+        </a>
+        <div class="service-card-footer">
+          <a class="service-card-foot-link" href="${href}" data-action="detail">${escapeServiceHtml(detailLabel)}</a>
+          <button type="button" class="service-card-foot-btn" data-action="add" data-service-id="${escapeServiceHtml(s.id)}">${escapeServiceHtml(cartLabel)}</button>
         </div>
-      </div>`;
-      })
-      .join('');
-
-    if (moreBtn) {
-      const needMore = activeFilter === 'all' && list.length > SERVICES_PREVIEW_COUNT;
-      moreBtn.hidden = !needMore;
-      moreBtn.dataset.expanded = expanded ? 'true' : 'false';
-      moreBtn.dataset.total = String(list.length);
-      if (needMore) {
-        moreBtn.textContent = expanded
-          ? window.DAOITH_t('services.collapse')
-          : window.DAOITH_t('services.showAll').replace('{n}', String(list.length));
-      }
-    }
-
-    window.DAOITH_CART?.bindAddButtons?.(grid);
+      </article>`;
   }
 
-  if (moreBtn) {
-    moreBtn.addEventListener('click', () => {
-      if (activeFilter !== 'all') return;
-      expanded = !expanded;
-      renderCards();
-    });
+  function renderCards() {
+    const locale = window.DAOITH_getLocale?.() || 'zh';
+    const detailLabel = locale === 'en' ? 'Learn more' : '了解详情';
+    const cartLabel = locale === 'en' ? 'Add to inquiry' : '加入询价单';
+    const list = filteredServices();
+    const sectionCats = categories.filter((c) => c.id !== 'all');
+
+    if (activeFilter === 'all') {
+      grid.className = 'services-catalog';
+      grid.innerHTML = sectionCats
+        .map((cat) => {
+          const items = list.filter((s) => s.category === cat.id);
+          if (!items.length) return '';
+          const blurb = categoryBlurb(cat);
+          return `
+            <section class="service-group" data-category="${escapeServiceHtml(cat.id)}">
+              <header class="service-group-header">
+                <h3>${escapeServiceHtml(categoryLabel(cat))}</h3>
+                ${blurb ? `<p>${escapeServiceHtml(blurb)}</p>` : ''}
+              </header>
+              <div class="services-grid">
+                ${items.map((raw) => renderProductCard(raw, locale, detailLabel, cartLabel, false)).join('')}
+              </div>
+            </section>`;
+        })
+        .join('');
+    } else {
+      grid.className = 'services-grid';
+      grid.innerHTML = list
+        .map((raw) => renderProductCard(raw, locale, detailLabel, cartLabel, true))
+        .join('');
+    }
+
+    if (moreBtn) moreBtn.hidden = true;
+
+    window.DAOITH_CART?.bindAddButtons?.(grid);
   }
 
   renderFilters();

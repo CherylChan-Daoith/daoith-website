@@ -112,12 +112,48 @@
 
   window.DAOITH_SERVICE_CATEGORIES = [
     { id: 'all', label: '全部', en: 'All' },
-    { id: 'consult', label: '财税咨询', en: 'Advisory' },
-    { id: 'agency', label: '财税代理', en: 'Agency' },
-    { id: 'export', label: '出口合规', en: 'Export' },
-    { id: 'rebate', label: '出口退税', en: 'Rebate' },
-    { id: 'hongkong', label: '香港公司', en: 'Hong Kong' },
-    { id: 'bundle', label: '组合服务', en: 'Bundles' },
+    {
+      id: 'consult',
+      label: '财税咨询',
+      en: 'Advisory',
+      blurb: '一对一诊断、合规体检与全年陪跑',
+      blurbEn: '1-on-1 advisory, diagnosis, and annual coaching',
+    },
+    {
+      id: 'agency',
+      label: '财税代理',
+      en: 'Agency',
+      blurb: '合规代账、公司设立与个体户核定',
+      blurbEn: 'Bookkeeping, incorporation, and sole-trader setup',
+    },
+    {
+      id: 'export',
+      label: '出口合规',
+      en: 'Export',
+      blurb: '1039 市场采购出口与进出口权办理',
+      blurbEn: '1039 market-procurement export and trade licenses',
+    },
+    {
+      id: 'rebate',
+      label: '出口退税',
+      en: 'Rebate',
+      blurb: '首单核查辅导与常态化退税代办',
+      blurbEn: 'First-time rebate coaching and ongoing filing',
+    },
+    {
+      id: 'hongkong',
+      label: '香港公司',
+      en: 'Hong Kong',
+      blurb: '注册、年审与持牌核数审计报税',
+      blurbEn: 'Incorporation, annual return, and HKICPA audit',
+    },
+    {
+      id: 'bundle',
+      label: '组合服务',
+      en: 'Bundles',
+      blurb: '0110／1039 与香港公司模块化全托管',
+      blurbEn: 'Modular 0110 / 1039 + Hong Kong compliance packs',
+    },
   ];
 
   window.DAOITH_SERVICES = [
