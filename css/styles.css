@@ -443,20 +443,61 @@ ul {
 }
 
 #heroJourney {
-  gap: 0;
-  align-items: flex-start;
+  gap: 16px;
+  align-items: stretch;
+  border-top: none;
+  border-bottom: none;
+  padding: 8px 0 0;
+  margin-bottom: 8px;
 }
 
 #heroJourney .process-card {
-  flex: 1 1 160px;
-  min-width: 150px;
-  max-width: 220px;
-  padding: 8px 16px;
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: none;
+  padding: 22px 18px;
+  text-decoration: none;
+  color: inherit;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  box-shadow: none;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
 }
 
 #heroJourney .process-card h4 {
   font-size: 1rem;
   margin-bottom: 0;
+  color: inherit;
+}
+
+#heroJourney .process-card .process-step {
+  color: var(--accent);
+  transition: color var(--transition);
+}
+
+#heroJourney .process-card .process-desc {
+  color: var(--text-muted);
+  max-width: none;
+  transition: color var(--transition);
+}
+
+#heroJourney .process-card:hover,
+#heroJourney .process-card:focus-visible {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  outline: none;
+  transform: translateY(-2px);
+}
+
+#heroJourney .process-card:hover .process-step,
+#heroJourney .process-card:focus-visible .process-step,
+#heroJourney .process-card:hover .process-desc,
+#heroJourney .process-card:focus-visible .process-desc,
+#heroJourney .process-card:hover h4,
+#heroJourney .process-card:focus-visible h4 {
+  color: #fff;
 }
 
 .process-card h4 {

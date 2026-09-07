@@ -258,40 +258,9 @@ function initNavDropdown() {
   });
 }
 
-/* Hero process cards reveal feature blocks */
+/* Hero process cards are direct links — no expand panel */
 function initHeroFeatures() {
-  const grid = document.getElementById('heroFeatures');
-  const cards = document.querySelectorAll('#heroJourney .process-card[data-step]');
-  if (!grid || !cards.length) return;
-
-  function revealStep(step) {
-    const feature = grid.querySelector(`.feature-card[data-step="${step}"]`);
-    if (!feature) return;
-
-    grid.classList.remove('is-collapsed');
-    feature.classList.remove('is-hidden');
-
-    cards.forEach((card) => {
-      card.classList.toggle('is-active', card.dataset.step === step);
-    });
-
-    if (feature.classList.contains('is-hidden') === false) {
-      feature.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }
-
-  cards.forEach((card) => {
-    const step = card.dataset.step;
-    const activate = () => revealStep(step);
-
-    card.addEventListener('click', activate);
-    card.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        activate();
-      }
-    });
-  });
+  /* no-op: #heroJourney cards navigate via href */
 }
 
 /* Paginated lists */

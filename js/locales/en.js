@@ -231,9 +231,9 @@ window.DAOITH_I18N_EN = {
     '.hero-actions .btn-outline': { text: 'Latest Policies' },
     '#heroJourney .process-card[data-step="1"] h4': { text: 'AI Diagnosis' },
     '#heroJourney .process-card[data-step="1"] .process-desc': {
-      text: 'Get an initial compliance plan in 3 minutes — covering 80% of common cases.',
+      text: 'Deeply fused with expert experience — covering 80% of common cases.',
     },
-    '#heroJourney .process-card[data-step="2"] h4': { text: '1:1 Expert Review' },
+    '#heroJourney .process-card[data-step="2"] h4': { text: '1:1 Tax Expert Review' },
     '#heroJourney .process-card[data-step="2"] .process-desc': {
       text: 'Experts review the remaining 20% complex cases and finalize a workable setup.',
     },
@@ -243,22 +243,6 @@ window.DAOITH_I18N_EN = {
     },
     '#heroJourney .process-card[data-step="4"] h4': { text: 'AI + Expert Care' },
     '#heroJourney .process-card[data-step="4"] .process-desc': {
-      text: 'Ongoing AI support plus a professional team — delivery you can rely on.',
-    },
-    '#heroFeatures .feature-card[data-step="1"] h4': { text: 'AI Diagnosis' },
-    '#heroFeatures .feature-card[data-step="1"] p': {
-      text: 'Get an initial compliance plan in 3 minutes — covering 80% of common cases.',
-    },
-    '#heroFeatures .feature-card[data-step="2"] h4': { text: '1:1 Expert Review' },
-    '#heroFeatures .feature-card[data-step="2"] p': {
-      text: 'Experts review the remaining 20% complex cases and finalize a workable setup.',
-    },
-    '#heroFeatures .feature-card[data-step="3"] h4': { text: 'Compliance Delivery' },
-    '#heroFeatures .feature-card[data-step="3"] p': {
-      text: 'Bookkeeping, export rebates, and registration — turn the plan into action.',
-    },
-    '#heroFeatures .feature-card[data-step="4"] h4': { text: 'AI + Expert Care' },
-    '#heroFeatures .feature-card[data-step="4"] p': {
       text: 'Ongoing AI support plus a professional team — delivery you can rely on.',
     },
     '#ai-solution .section-header h2': { text: 'AI Compliance Plan Generator' },
