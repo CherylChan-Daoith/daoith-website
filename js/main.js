@@ -5298,7 +5298,7 @@ function pickDiagnosisServiceIds(text) {
       add('domestic-arch-1039-hk');
       add('domestic-1039-sole');
     } else if (/9810/.test(exportMode) || (/9810/.test(t) && /退税|海外仓|陪跑|不确定/.test(t))) {
-      add('domestic-rebate-9810');
+      add('domestic-rebate-first');
       if (mentions0110Hk || /香港公司|0110出口\s*\+?\s*香港/.test(t)) add('domestic-arch-0110-hk');
     } else {
       add('domestic-arch-0110-hk');
@@ -5306,7 +5306,7 @@ function pickDiagnosisServiceIds(text) {
   }
 
   if (isParcelExport || /1210|9610|保税|一日游|分送集报/.test(t)) {
-    add('domestic-rebate-1210-9610');
+    add('domestic-rebate-first');
   }
 
   if (isDomesticWh) {
@@ -5315,7 +5315,7 @@ function pickDiagnosisServiceIds(text) {
       /速卖通|AliExpress|阿里|SHEIN|菜鸟|全托管|半托管/.test(platform + shipping + t) ||
       /9610|报关清单|退免税|免税/.test(t)
     ) {
-      add('domestic-rebate-1210-9610');
+      add('domestic-rebate-first');
     }
     add('domestic-compliance-bookkeeping');
   }
@@ -5324,25 +5324,23 @@ function pickDiagnosisServiceIds(text) {
   if (mentions1039Hk) add('domestic-arch-1039-hk');
   if (/1039|市场采购/.test(exportMode + t) && (noInvoice || /个体户|核定/.test(t + entity))) {
     add('domestic-1039-sole');
+    add('domestic-1039-export');
     add('domestic-arch-1039-hk');
   }
 
   // ——— 通用配套 ———
   if (wantsRebateHelp) add('domestic-rebate');
-  if (/VAT|Oss|IOSS|增值税注册|远程销售|欧盟.*税/.test(t)) add('overseas-vat');
-  if (/销售税|Sales\s*Tax|Wayfair|经济关联/.test(t)) add('overseas-us-sales-tax');
-  if (/ODI|境外投资|境外直接/.test(t)) add('overseas-odi');
   if (/香港公司|香港主体|香港审计|双层架构|0110出口\s*\+?\s*香港|1039出口\s*\+?\s*香港/.test(t)) {
     add('hk-company');
   }
-  if (/记账|账务|做账|汇算清缴|账册/.test(t)) add('domestic-bookkeeping');
+  if (/记账|账务|做账|汇算清缴|账册|代账/.test(t)) add('domestic-compliance-bookkeeping');
   if (/合规体检|全面诊断|架构诊断|风险排查/.test(t)) add('domestic-diagnosis');
   if (/全年陪跑|持续跟进|常年顾问|财税合规陪跑/.test(t)) add('consult-annual');
 
   // 若除专家外仍无套餐：按出口方式兜底
   if (ids.length <= 1) {
-    if (/9810/.test(exportMode)) add('domestic-rebate-9810');
-    else if (/9610|1210|小包/.test(exportMode)) add('domestic-rebate-1210-9610');
+    if (/9810/.test(exportMode)) add('domestic-rebate-first');
+    else if (/9610|1210|小包/.test(exportMode)) add('domestic-rebate-first');
     else if (/1039|市场采购/.test(exportMode)) add('domestic-arch-1039-hk');
     else if (/0110|9710|正式报关/.test(exportMode) || isOverseasWh) add('domestic-arch-0110-hk');
     else if (isDomesticWh) add('domestic-compliance-bookkeeping');
@@ -8997,20 +8995,9 @@ function initServicesMarketplace() {
   let activeFilter = 'all';
   let expanded = false;
 
-  const enCategoryLabels = {
-    all: 'All',
-    consult: 'Advisory',
-    mainland: 'Mainland China',
-    hongkong: 'Hong Kong',
-    asia: 'Asia',
-    europe: 'Europe',
-    americas: 'Americas',
-    'africa-oceania': 'Africa & Oceania',
-  };
-
   function categoryLabel(cat) {
     const locale = window.DAOITH_getLocale?.() || 'zh';
-    if (locale === 'en') return enCategoryLabels[cat.id] || cat.label;
+    if (locale === 'en') return cat.en || cat.label;
     return cat.label;
   }
 
@@ -9050,8 +9037,11 @@ function initServicesMarketplace() {
     grid.innerHTML = visible
       .map((raw) => {
         const s = getLocalizedService(raw);
+        const cat = categories.find((c) => c.id === raw.category);
+        const tag = cat && cat.id !== 'all' ? categoryLabel(cat) : '';
         return `
       <div class="service-card" data-category="${escapeServiceHtml(s.category)}" data-service-id="${escapeServiceHtml(s.id)}">
+        ${tag ? `<span class="service-card-tag">${escapeServiceHtml(tag)}</span>` : ''}
         <h4>${escapeServiceHtml(s.title)}</h4>
         <p>${escapeServiceHtml(s.desc)}</p>
         <div class="service-price">${escapeServiceHtml(s.priceLabel)} <span>${escapeServiceHtml(s.unit)}</span></div>

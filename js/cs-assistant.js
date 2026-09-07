@@ -9,37 +9,21 @@
   const MAX_MESSAGES = 40;
 
   const SERVICE_INDEX = [
-    { id: 'consult-1v1', title: '专家1v1财税咨询', en: 'Expert 1-on-1 advisory', keys: '1v1 专家 咨询 顾问 consult' },
+    { id: 'consult-1v1', title: '专家1v1咨询', en: 'Expert 1-on-1 advisory', keys: '1v1 专家 咨询 顾问 consult' },
+    { id: 'domestic-diagnosis', title: '跨境电商财税合规诊断', en: 'Cross-border tax diagnosis', keys: '人工诊断 合规评估 诊断报告 体检' },
     { id: 'consult-annual', title: '财税合规陪跑', en: 'Compliance coaching', keys: '陪跑 全年 顾问年' },
-    { id: 'consult-tp', title: '转让定价文档编制', en: 'Transfer pricing documentation', keys: '转让定价 tp transfer' },
-    { id: 'domestic-diagnosis', title: '跨境电商税务合规诊断', en: 'Cross-border tax diagnosis', keys: '人工诊断 合规评估 诊断报告' },
-    { id: 'domestic-setup', title: '公司注册与资质办理', en: 'Company setup & licenses', keys: '内地公司 营业执照 进出口权 海关备案' },
-    { id: 'domestic-bookkeeping', title: '代理记账报税', en: 'Bookkeeping & filing', keys: '记账 报税 账务' },
-    { id: 'domestic-compliance-bookkeeping', title: '合规代账全托管', en: 'Full-service bookkeeping', keys: '全托管 代账' },
-    { id: 'domestic-rebate-1210-9610', title: '1210/9610出口退税首单陪跑服务', en: '1210/9610 rebate coaching', keys: '9610 1210 小包退税 跨境直邮' },
-    { id: 'domestic-rebate-9810', title: '9810出口退税首单陪跑服务', en: '9810 rebate coaching', keys: '9810 海外仓退税' },
-    { id: 'domestic-1039-sole', title: '1039市场采购个体户服务', en: '1039 sole trader', keys: '1039 市场采购 个体户' },
-    { id: 'domestic-arch-0110-hk', title: '「0110出口+香港公司」合规架构全托管', en: '0110 + HK structure', keys: '0110 一般贸易 香港架构' },
-    { id: 'domestic-arch-1039-hk', title: '「1039出口+香港公司」合规架构全托管', en: '1039 + HK structure', keys: '1039架构 香港公司架构' },
-    { id: 'domestic-rebate', title: '出口退税代办', en: 'Export rebate agency', keys: '出口退税 退税代办 退税' },
-    { id: 'domestic-hte', title: '高新技术企业认定', en: 'High-tech enterprise', keys: '高新 高新技术' },
-    { id: 'domestic-offshore-vat-exemption', title: '离岸服务增值税免征备案', en: 'Offshore VAT exemption', keys: '离岸 免征备案' },
-    { id: 'overseas-odi', title: 'ODI境外投资备案', en: 'ODI filing', keys: 'odi 境外投资 对外投资' },
+    { id: 'domestic-compliance-bookkeeping', title: '合规代账', en: 'Compliance bookkeeping', keys: '代账 记账 报税 账务 全托管' },
+    { id: 'domestic-setup', title: '公司注册服务', en: 'Company incorporation', keys: '内地公司 营业执照 公司设立 注册公司' },
+    { id: 'domestic-1039-sole', title: '个体户注册核定及税务申报', en: 'Sole trader setup & deemed collection', keys: '个体户 核定 1039主体' },
+    { id: 'domestic-1039-export', title: '1039市场采购出口', en: '1039 market procurement export', keys: '1039 市场采购 无票出口' },
+    { id: 'domestic-trade-license', title: '进出口权办理', en: 'Import/export license', keys: '进出口权 海关备案 电子口岸' },
+    { id: 'domestic-rebate-first', title: '首单退税辅导', en: 'First-time rebate coaching', keys: '首单退税 9610 1210 9810 核查' },
+    { id: 'domestic-rebate', title: '代理退税申报', en: 'Rebate filing agency', keys: '出口退税 退税代办 退税申报' },
     { id: 'hk-company', title: '香港公司注册', en: 'Hong Kong company setup', keys: '香港公司 注册香港 hk company hongkong' },
-    { id: 'hk-audit-tax', title: '香港审计与利得税申报', en: 'HK audit & profits tax', keys: '香港审计 利得税' },
-    { id: 'hk-salary-tax', title: '香港薪俸税／个人所得税申报', en: 'HK salaries tax', keys: '薪俸税 香港个税' },
-    { id: 'hk-identity', title: '香港身份办理辅导', en: 'HK identity advisory', keys: '香港身份 优才 高才' },
-    { id: 'asia-sg-company', title: '新加坡公司注册与GST', en: 'Singapore company & GST', keys: '新加坡 gst singapore' },
-    { id: 'asia-jp-tax', title: '日本消费税／法人税合规', en: 'Japan consumption tax', keys: '日本 消费税 jct' },
-    { id: 'asia-sea-tax', title: '东南亚电商税务合规', en: 'Southeast Asia tax', keys: '东南亚 泰国 越南 印尼 马来' },
-    { id: 'overseas-vat', title: '欧洲VAT注册申报', en: 'EU VAT registration', keys: '欧洲 vat 英国 德国 法国 意大利 西班牙 eu uk' },
-    { id: 'europe-epr', title: '欧洲EPR／包装法合规', en: 'EU EPR / packaging', keys: 'epr 包装法 weee' },
-    { id: 'overseas-us-sales-tax', title: '美国销售税合规', en: 'US sales tax', keys: '美国 销售税 sales tax amazon 加州 wayfair' },
-    { id: 'namerica-ca-tax', title: '加拿大GST／HST合规', en: 'Canada GST/HST', keys: '加拿大 gst hst canada' },
-    { id: 'namerica-mx-tax', title: '墨西哥税务合规', en: 'Mexico tax', keys: '墨西哥 rfc' },
-    { id: 'samerica-br-tax', title: '巴西电商税务合规', en: 'Brazil tax', keys: '巴西 brazil' },
-    { id: 'oceania-au-gst', title: '澳大利亚GST合规', en: 'Australia GST', keys: '澳洲 澳大利亚 gst au' },
-    { id: 'oceania-nz-gst', title: '新西兰GST合规', en: 'New Zealand GST', keys: '新西兰 nz' },
+    { id: 'hk-annual', title: '香港公司年审', en: 'Hong Kong annual return', keys: '香港年审 nar1 商业登记' },
+    { id: 'hk-audit-tax', title: '香港公司审计报税', en: 'HK audit & profits tax', keys: '香港审计 利得税 核数' },
+    { id: 'domestic-arch-0110-hk', title: '0110出口退税＋香港公司合规全托管', en: '0110 rebate + HK bundle', keys: '0110 一般贸易 香港架构' },
+    { id: 'domestic-arch-1039-hk', title: '1039出口免税＋香港公司合规全托管', en: '1039 exemption + HK bundle', keys: '1039架构 香港公司架构' },
   ];
 
   const COPY = {
@@ -63,7 +47,7 @@
       goAi: '打开 AI合规助手',
       taxRedirect:
         '合规细节请交给「AI解决方案」或预约专家，我这边不深入解答税务法规。点击下方即可开始诊断。',
-      serviceAsk: '已为您打开「财税服务」。请告诉我您需要哪方面的服务，例如香港公司注册、出口退税、欧洲VAT等。',
+      serviceAsk: '已为您打开「财税服务」。请告诉我您需要哪方面的服务，例如香港公司注册、出口退税、合规代账等。',
       confirmQuote: '是，去提交',
       quoteCartAsk: '购物车里已有：{list}。是否提交目前这些服务的询价？',
       quoteCartEmpty:
@@ -143,7 +127,7 @@
       taxRedirect:
         'For tax rules, please use AI Compliance or book an expert — I will not go into regulations here.',
       serviceAsk:
-        'Opened Tax Services. Tell me what you need — e.g. HK company setup, export rebate, or EU VAT.',
+        'Opened Tax Services. Tell me what you need — e.g. HK company setup, export rebate, or bookkeeping.',
       confirmQuote: 'Yes, submit',
       quoteCartAsk: 'Your cart has: {list}. Submit an inquiry for these services now?',
       quoteCartEmpty:

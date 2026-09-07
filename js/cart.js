@@ -63,7 +63,7 @@
         id: service.id,
         title: service.title,
         priceValue: service.priceValue,
-        priceLabel: service.price,
+        priceLabel: service.priceLabel,
         unit: service.unit,
         qty: addQty,
       });

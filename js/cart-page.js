@@ -70,16 +70,25 @@
     emptyEl?.classList.add('is-hidden');
     contentEl?.classList.remove('is-hidden');
 
+    function unitPriceText(item) {
+      return item.priceLabel || window.formatServicePrice(item.priceValue);
+    }
+
+    function subtotalText(item) {
+      const value = (Number(item.priceValue) || 0) * (Number(item.qty) || 0);
+      if (value <= 0 && item.priceLabel) return item.priceLabel;
+      return window.formatServicePrice(value);
+    }
+
     body.innerHTML = items.map((item) => {
       const title = enTitle(item.id, item.title);
-      const subtotal = (Number(item.priceValue) || 0) * (Number(item.qty) || 0);
       return `
         <tr data-id="${escapeHtml(item.id)}">
           <td>
             <a class="cart-item-title" href="/service.html?id=${encodeURIComponent(item.id)}">${escapeHtml(title)}</a>
             <div class="cart-item-unit">${escapeHtml(item.unit || '')}</div>
           </td>
-          <td>${escapeHtml(item.priceLabel || window.formatServicePrice(item.priceValue))}</td>
+          <td>${escapeHtml(unitPriceText(item))}</td>
           <td>
             <div class="cart-qty">
               <button type="button" class="cart-qty-btn" data-qty-delta="-1" aria-label="减少">−</button>
@@ -87,7 +96,7 @@
               <button type="button" class="cart-qty-btn" data-qty-delta="1" aria-label="增加">+</button>
             </div>
           </td>
-          <td>${window.formatServicePrice(subtotal)}</td>
+          <td>${escapeHtml(subtotalText(item))}</td>
           <td><button type="button" class="cart-remove" data-remove>${t('删除', 'Remove')}</button></td>
         </tr>
       `;

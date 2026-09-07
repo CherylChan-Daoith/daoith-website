@@ -116,6 +116,22 @@
       if (block.type === 'timeline' && Array.isArray(block.steps)) {
         return renderTimeline(block);
       }
+      if (block.type === 'highlights' && Array.isArray(block.items)) {
+        return `<ul class="service-highlights">${block.items
+          .map((item) => {
+            if (typeof item === 'string') {
+              return `<li>${escapeHtml(item)}</li>`;
+            }
+            const title = escapeHtml(item?.title || item?.text || '');
+            const text = item?.title && item?.text ? `<span>${escapeHtml(item.text)}</span>` : '';
+            return `<li><strong>${title}</strong>${text}</li>`;
+          })
+          .join('')}</ul>`;
+      }
+      if (block.type === 'audience' && block.text) {
+        const audienceLabel = (window.DAOITH_getLocale?.() || 'zh') === 'en' ? 'Best for' : '适合对象';
+        return `<p class="service-audience"><span>${audienceLabel}</span>${escapeHtml(block.text)}</p>`;
+      }
       if (block.type === 'faq' && Array.isArray(block.items)) {
         return `<div class="service-detail-faq">${block.items
           .map(
@@ -164,6 +180,10 @@
     const detailBtn = locale === 'en' ? 'Add to inquiry list' : '加入询价单';
     const backLabel = locale === 'en' ? '← Back to marketplace' : '← 返回财税服务市场';
     const details = (locale === 'en' && en?.details?.length) ? en.details : service.details;
+    const cat = (window.DAOITH_SERVICE_CATEGORIES || []).find((c) => c.id === service.category);
+    const catLabel = cat
+      ? (locale === 'en' ? cat.en || cat.label : cat.label)
+      : (locale === 'en' ? 'Service detail' : '服务详情');
 
     document.title = `${title} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询'}`;
     setMetaDescription(desc);
@@ -175,7 +195,7 @@
 
     viewEl.innerHTML = `
       <header class="article-view-header">
-        <span class="article-view-tag">${locale === 'en' ? 'Service detail' : '服务详情'}</span>
+        <span class="article-view-tag">${escapeHtml(catLabel)}</span>
         <h1 class="article-view-title">${escapeHtml(title)}</h1>
         <p class="article-view-lead">${escapeHtml(desc)}</p>
         <div class="service-detail-price">

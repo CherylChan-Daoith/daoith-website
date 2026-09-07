@@ -67,9 +67,14 @@ window.DAOITH_I18N_ZH = {
 window.DAOITH_enServiceBlocks = function enServiceBlocks({
   content,
   bullets,
+  audience,
+  highlights,
   pricing,
+  pricingTable,
+  pricingNote,
   process,
   timeline,
+  steps,
   faqs,
 }) {
   function padFaqs(list) {
@@ -89,15 +94,14 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
     return items;
   }
 
-  const steps = (Array.isArray(process) ? process : []).map((title, i, arr) => {
-    let time = 'As scheduled';
-    if (i === 0) time = 'Within 1–5 business days after kickoff';
-    else if (i === arr.length - 1) time = 'Final delivery';
-    else time = 'In progress';
-    return { title, time };
-  });
+  const resolvedSteps = Array.isArray(steps) && steps.length
+    ? steps.map((s) => ({ title: s.title || String(s), time: s.time || 'As scheduled' }))
+    : (Array.isArray(process) ? process : []).map((title, i, arr) => ({
+        title,
+        time: i === 0 ? 'After kickoff' : i === arr.length - 1 ? 'Final delivery' : 'In progress',
+      }));
 
-  const scope = bullets?.length ? bullets : steps.map((s) => s.title);
+  const scope = bullets?.length ? bullets : resolvedSteps.map((s) => s.title);
   const out = [];
   out.push({ type: 'h2', text: 'Service content' });
   if (content) out.push({ type: 'p', text: content });
@@ -109,32 +113,24 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
       rows: scope.map((b) => [[{ mark: 'ok', text: b }]]),
     });
   }
+  if (highlights?.length) out.push({ type: 'highlights', items: highlights });
+  if (audience) out.push({ type: 'audience', text: audience });
   out.push({ type: 'h2', text: 'Pricing' });
   if (pricing) out.push({ type: 'p', text: pricing });
-  out.push({ type: 'h2', text: 'Process' });
-  if (steps.length) out.push({ type: 'timeline', steps });
-  if (typeof timeline === 'string' && timeline) {
-    out.push({ type: 'p', text: `Overall timing: ${timeline}` });
-  }
-  if (steps.length) {
-    const note = typeof timeline === 'string' ? timeline.replace(/\.\s*$/, '') : '';
+  if (pricingTable?.headers && pricingTable?.rows) {
     out.push({
       type: 'table',
-      variant: 'deliver',
+      variant: 'pricing',
       firstColHeader: true,
-      headers: ['Workstream', 'Timing', 'Deliverables'],
-      rows: steps.map((s, i) => [
-        `${i + 1}. ${s.title}`,
-        s.time,
-        i === 0
-          ? 'Scope confirmation / document checklist'
-          : i === steps.length - 1
-            ? note
-              ? `Closing pack / final deliverables (${note})`
-              : 'Closing pack / final deliverables'
-            : 'Milestone confirmation and working papers',
-      ]),
+      headers: pricingTable.headers,
+      rows: pricingTable.rows,
     });
+  }
+  if (pricingNote) out.push({ type: 'p', text: pricingNote });
+  out.push({ type: 'h2', text: 'Process' });
+  if (resolvedSteps.length) out.push({ type: 'timeline', steps: resolvedSteps });
+  if (typeof timeline === 'string' && timeline) {
+    out.push({ type: 'p', text: `Overall timing: ${timeline}` });
   }
   out.push({ type: 'h2', text: 'FAQ' });
   out.push({ type: 'faq', items: padFaqs(faqs) });
@@ -394,16 +390,15 @@ window.DAOITH_I18N_EN = {
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {
-      text: 'Transparent pricing on all services; add to inquiry list for preferential quotes.',
+      text: 'Fifteen services with list prices, grouped by advisory, agency, export, rebate, Hong Kong, and bundles.',
     },
     '.filter-btn[data-filter="all"]': { text: 'All' },
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
-    '.filter-btn[data-filter="mainland"]': { text: 'Mainland China' },
+    '.filter-btn[data-filter="agency"]': { text: 'Agency' },
+    '.filter-btn[data-filter="export"]': { text: 'Export' },
+    '.filter-btn[data-filter="rebate"]': { text: 'Rebate' },
     '.filter-btn[data-filter="hongkong"]': { text: 'Hong Kong' },
-    '.filter-btn[data-filter="asia"]': { text: 'Asia' },
-    '.filter-btn[data-filter="europe"]': { text: 'Europe' },
-    '.filter-btn[data-filter="americas"]': { text: 'Americas' },
-    '.filter-btn[data-filter="africa-oceania"]': { text: 'Africa & Oceania' },
+    '.filter-btn[data-filter="bundle"]': { text: 'Bundles' },
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .hub-hero h1': { text: 'Service Hub' },
     '#hub .hub-hero .hero-subtitle': {
@@ -668,754 +663,431 @@ window.DAOITH_I18N_EN = {
     },
   ],
   services: [
-    { title: 'Expert 1-on-1 advisory', desc: 'In-depth consulting on structure, compliance diagnosis, and rebate optimization.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ hour' },
-    { title: 'Compliance coaching (annual)', desc: 'Year-round expert support across structure, accounting, rebates, and overseas tax.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
-    { title: 'Cross-border tax diagnosis', desc: 'Full compliance assessment with remediation report and export rebate review.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
-    { title: 'Bookkeeping & filing', desc: 'Bookkeeping, tax filing, and annual reconciliation for e-commerce businesses.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ month' },
-    { title: 'Export rebate agency', desc: 'Full 9810/9610 rebate filing including documentation and authority liaison.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
-    { title: 'Company setup & licenses', desc: 'Company registration, import/export rights, customs filing, and e-port setup.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
-    { title: 'EU VAT registration', desc: 'VAT registration and filing in UK, Germany, France, and other EU markets.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ country' },
-    { title: 'US sales tax compliance', desc: 'State sales tax registration, filing, and economic nexus advisory.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ state' },
-    { title: 'ODI filing agency', desc: 'End-to-end outbound investment filing (NDRC, commerce, SAFE).', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
-    { title: 'Offshore company setup', desc: 'Incorporation and secretarial services in HK, Singapore, US, BVI, etc.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
-    { title: 'Transfer pricing documentation', desc: 'Local file, master file, and contemporaneous documentation for related-party transactions.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
-    { title: 'High-tech enterprise qualification', desc: 'Application support including R&D expense aggregation and IP planning.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
+    { title: 'Expert 1-on-1 advisory', desc: 'One-on-one diagnosis covering structure, rebates, tax risk, and actionable next steps.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ hour' },
+    { title: 'Cross-border tax diagnosis', desc: 'Health check with interviews, document review, risk report, and remediation advice.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
+    { title: 'Compliance coaching', desc: 'Turn a compliance plan into a tracked execution calendar, with tax-authority support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
+    { title: 'Compliance bookkeeping', desc: 'Books, filings, risk alerts, health check, and annual AIC reporting support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
+    { title: 'Company incorporation', desc: 'Name check, filing, license, chops, and tax / social / bank onboarding guidance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
+    { title: 'Sole-trader setup & deemed collection', desc: 'Sole-trader registration, deemed-collection filing, and ongoing tax returns.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
+    { title: '1039 market-procurement export', desc: 'Product filing, dual-header customs, and compliant FX settlement under 1039.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' of declared value' },
+    { title: 'Import/export license', desc: 'Customs registration, e-port cards, and export rebate/exemption filing.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
+    { title: 'First-time rebate coaching', desc: 'First rebate audit pack: eligibility, site, staff, export and purchase documents.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
+    { title: 'Rebate filing agency', desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
+    { title: 'Hong Kong company setup', desc: 'Private company incorporation including government fees, first-year address and secretary.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
+    { title: 'Hong Kong annual return', desc: 'NAR1, BR renewal, secretary/address continuation, and SCR maintenance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
+    { title: 'Hong Kong audit & profits tax', desc: 'HKICPA audit report and profits-tax filing; dormant companies and catch-up audits supported.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
+    { title: '0110 rebate + HK compliance bundle', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 5% off from 3 modules' },
+    { title: '1039 exemption + HK compliance bundle', desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 5% off from 3 modules' },
   ],
   servicesCatalog: [
     {
       id: 'consult-1v1',
       title: 'Expert 1-on-1 advisory',
-      desc: 'In-depth consulting on structure, compliance diagnosis, and rebate optimization.',
+      desc: 'One-on-one diagnosis covering structure, rebates, tax risk, and actionable next steps.',
       unit: '/ hour',
       details: window.DAOITH_enServiceBlocks({
-        content: 'One-on-one advisory covering platform choice, store entity, fulfillment model, invoicing chain, and export rebate pathways with actionable recommendations.',
+        content: 'Senior cross-border tax specialists (15+ years) provide a 1-on-1 session. Shenzhen on-site available. Pre-read before the meeting; notes and next steps after.',
         bullets: [
-          'Business model and entity structure review',
-          'Export rebate / overseas tax boundary assessment',
-          'Priority risk list and action plan',
-          'Session notes on request',
+          'Risk identification and remediation priority',
+          'Cross-border / equity structure and cash-path design',
+          'Tax inquiries, risk tasks, and penalty response',
+          'Rebate pathway and documentation optimization',
+          'Bookkeeping advice for multi-platform and overseas-warehouse models',
         ],
-        pricing: 'From ¥2,999 / hour. Complex topics can be packaged by session. Government and third-party fees extra.',
-        process: [
-          'Share business background',
-          'Book expert slot and confirm agenda',
-          '1-on-1 consultation',
-          'Notes and follow-up recommendations',
-        ],
-        timeline: 'First session usually within 1–3 business days after booking; notes within 2 business days.',
+        highlights: ['Ex-Big-Four specialists', 'Actionable recommendations', 'Structure, rebate, and tax-risk coverage'],
+        audience: 'Founders and finance leads planning an overseas structure or facing cross-border tax issues.',
+        pricing: '¥2,999 / hour. Time under one hour is billed as one hour; overtime is billed pro rata. The signed engagement letter prevails.',
+        process: ['Inquiry / booking', 'Share background and agenda', 'Pre-read', 'Online or Shenzhen 1-on-1', 'Notes and next steps'],
         faqs: [
-          { q: 'What should I prepare?', a: 'Platform type, entity, fulfillment model, destination markets, HS codes, revenue range, and invoice status.' },
-          { q: 'Is this a formal legal opinion?', a: 'Default is oral diagnosis plus notes. Formal written opinions can be scoped separately.' },
-        ],
-      }),
-    },
-    {
-      id: 'consult-annual',
-      title: 'Compliance coaching (annual)',
-      desc: 'Year-round expert support across structure, accounting, rebates, and overseas tax.',
-      unit: '/ year',
-      details: window.DAOITH_enServiceBlocks({
-        content: 'Annual coaching with quarterly reviews, policy updates, and support through key filings.',
-        bullets: [
-          'Annual compliance calendar',
-          'Quarterly tax / operations reviews',
-          'Policy change briefings',
-          'Agreed expert sessions with notes',
-        ],
-        pricing: 'From ¥98,000 / year. Session counts and response levels follow the signed plan.',
-        process: [
-          'Discovery and scope confirmation',
-          'Sign annual agreement and set up channel',
-          'Publish compliance calendar',
-          'Quarterly reviews and key-node support',
-        ],
-        timeline: 'Baseline diagnosis and calendar draft within 5–10 business days after signing.',
-        faqs: [
-          { q: 'Does coaching include bookkeeping?', a: 'Coaching is advisory. Bookkeeping or rebate agency can be added as separate services.' },
-          { q: 'Can we expand mid-year?', a: 'Yes. Expanded scope is covered by a supplemental quote and agreement.' },
-        ],
-      }),
-    },
-    {
-      id: 'consult-tp',
-      title: 'Transfer pricing documentation',
-      desc: 'Local file, master file, and contemporaneous documentation for related-party transactions.',
-      unit: ' from',
-      details: window.DAOITH_enServiceBlocks({
-        content: 'Map related-party flows and prepare contemporaneous / local / master file documentation.',
-        bullets: [
-          'Related-party mapping and FAR analysis',
-          'Pricing method recommendation',
-          'Local / master / contemporaneous files',
-          'Optional annual updates',
-        ],
-        pricing: 'From ¥50,000, varying by complexity and document tier.',
-        process: [
-          'Collect org chart and transaction data',
-          'FAR analysis and method selection',
-          'Draft and internal review',
-          'Final delivery and walkthrough',
-        ],
-        timeline: 'Draft usually 15–30 business days after complete data.',
-        faqs: [
-          { q: 'Do small sellers need TP docs?', a: 'It depends on related-party volume and local thresholds. Start with an obligation check.' },
+          { q: 'What should I prepare?', a: 'Platform, entity, fulfillment/export model, invoices, main markets, and your core question.' },
+          { q: 'Is this a formal legal opinion?', a: 'Default is oral diagnosis plus notes. A written opinion can be scoped separately.' },
         ],
       }),
     },
     {
       id: 'domestic-diagnosis',
       title: 'Cross-border tax diagnosis',
-      desc: 'Full compliance assessment with remediation report and export rebate review.',
+      desc: 'Health check with interviews, document review, risk report, and remediation advice.',
       unit: '/ session',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Diagnose business model, documents, customs/rebate readiness, and entity structure; prioritize remediation actions.',
+        content: 'Cross-check operating model, documents, statements, and filings across invoice, tax, and accounting dimensions. Equity work is out of scope.',
         bullets: [
-          'Cash and operating flow mapping',
-          'Export rebate compliance review',
-          'Risk ranking and remediation roadmap',
-          'One report walkthrough meeting',
+          'Interviews and four-flow mapping',
+          'Contracts, platform data, customs docs, invoices, and bank trails',
+          'One-year financial review',
+          'VAT / CIT return checks and burden analysis',
+          'Risk report and remediation advice',
         ],
-        pricing: 'From ¥15,000 per engagement. Multi-entity or long history may add effort.',
-        process: [
-          'Questionnaire and document list',
-          'Interviews and sample testing',
-          'Issue diagnosis report',
-          'Walkthrough and priority confirmation',
-        ],
-        timeline: 'Report usually within 10–20 business days after complete documents.',
+        highlights: ['Built for e-commerce operating models', 'Three-dimension cross-check', 'Actionable remediation'],
+        audience: 'Amazon, AliExpress, Temu, TikTok Shop, and Shopee sellers, DTC brands, and firms preparing financing or tax self-reviews.',
+        pricing: '¥28,000 per engagement. Diagnosis fees may offset part of a later coaching contract.',
+        process: ['Scoping', 'Document list and collection', 'Interviews', 'Analysis', 'Report', 'Walkthrough'],
+        timeline: 'Usually 2–4 weeks, depending on document speed.',
         faqs: [
-          { q: 'Is the diagnosis an official ruling?', a: 'No. It is professional advisory for internal remediation, not an authority decision.' },
+          { q: 'Is the report an official ruling?', a: 'No. It is professional advice for internal remediation.' },
+          { q: 'Can we go straight to coaching?', a: 'If you already have a usable plan, yes. Otherwise start with diagnosis.' },
         ],
       }),
     },
     {
-      id: 'domestic-setup',
-      title: 'Company setup & licenses',
-      desc: 'Company registration, import/export rights, customs filing, and e-port setup.',
-      unit: ' from',
+      id: 'consult-annual',
+      title: 'Compliance coaching',
+      desc: 'Turn a compliance plan into a tracked execution calendar, with tax-authority support.',
+      unit: '/ year',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Company formation and core cross-border licenses (import/export, customs, e-port).',
+        content: 'Break an existing plan (or our diagnosis) into owners, deadlines, and reviews. We step in on tax notices, assessments, and interviews.',
         bullets: [
-          'Name check and company incorporation',
-          'Bank account onboarding guidance',
-          'Import/export, customs, and e-port filings',
-          'Tax registration handoff notes',
+          'Execution plan with owners and milestones',
+          'Calendar fitted to your operating rhythm',
+          'Monthly / quarterly reviews',
+          'Tax-authority notice and interview support',
+          'Day-to-day compliance Q&A and policy alerts',
         ],
-        pricing: 'From ¥5,000. Government fees, chops, rush, and cross-city work are extra.',
-        process: [
-          'Confirm company type and business scope',
-          'Prepare and submit formation packs',
-          'Complete AIC / tax registrations',
-          'Complete import/export and customs licenses',
-        ],
-        timeline: 'Formation often 5–15 business days; with trade licenses commonly 10–25 business days.',
+        highlights: ['Plans actually land', 'Regular course-correction', 'Rapid response on tax matters'],
+        audience: 'Teams with a plan to execute, rapid growth, prior tax notices, or no in-house compliance staff.',
+        pricing: '¥48,000 / year. Unlimited online contact, six on-site visits; major tax matters responded to as they arise.',
+        process: ['Handover', 'Breakdown', 'Confirm execution plan', 'Follow-up and reviews', 'Authority support', 'Stage acceptance'],
         faqs: [
-          { q: 'Can an individual hold import/export rights?', a: 'Usually rights sit with a company entity. Personal and company models differ—plan the entity first.' },
-        ],
-      }),
-    },
-    {
-      id: 'domestic-bookkeeping',
-      title: 'Bookkeeping & filing',
-      desc: 'Bookkeeping, tax filing, and annual reconciliation for e-commerce businesses.',
-      unit: '/ month',
-      details: window.DAOITH_enServiceBlocks({
-        content: 'Monthly bookkeeping and tax filings tailored to marketplace settlements and multi-currency flows.',
-        bullets: [
-          'Voucher processing and books',
-          'VAT and surtax filings',
-          'CIT prepaid and annual finalization support',
-          'Marketplace settlement and FX guidance',
-        ],
-        pricing: 'From ¥800 / month, varying with volume and complexity. Annual CIT finalization may be billed yearly.',
-        process: [
-          'Contract and opening-balance handover',
-          'Monthly document collection and posting',
-          'Pre-filing review and confirmation',
-          'File returns and share tax forms',
-        ],
-        timeline: 'Monthly close before filing deadlines; first setup often 5–15 business days.',
-        faqs: [
-          { q: 'Can we book purchases without invoices?', a: 'Yes, but it affects input VAT and rebate trails. We flag risks and recommend fixes.' },
+          { q: 'Does coaching include bookkeeping or rebate filing?', a: 'No. Add bookkeeping or rebate agency separately.' },
+          { q: 'We do not have a diagnosis yet.', a: 'Pair this with the diagnosis product first.' },
         ],
       }),
     },
     {
       id: 'domestic-compliance-bookkeeping',
-      title: 'Fully managed compliance bookkeeping',
-      desc: 'Digital full-service bookkeeping with risk screening, filings, management reporting, and optional export-rebate coordination.',
+      title: 'Compliance bookkeeping',
+      desc: 'Books, filings, risk alerts, health check, and annual AIC reporting support.',
       unit: '/ year from',
-      details: [
-        { type: 'h2', text: 'Service content' },
-        {
-          type: 'table',
-          variant: 'compare',
-          firstColHeader: true,
-          headers: ['Item', 'Fully managed compliance bookkeeping', 'Traditional bookkeeping', 'Highlights'],
-          rows: [
-            [
-              'Service team',
-              [
-                { mark: 'ok', text: '5+ years tax & finance experience' },
-                { mark: 'ok', text: 'Relatively stable staffing' },
-                { mark: 'ok', text: 'Junior accountant qualification or above' },
-                { mark: 'ok', text: 'Expert team oversight' },
-              ],
-              [
-                { mark: 'ok', text: 'Often fresh graduates or low experience' },
-                { mark: 'no', text: 'Low-price staffing lacks depth; mechanical work only' },
-              ],
-              [
-                '1) Higher professional capability',
-                '2) Earlier risk detection',
-                '3) Ability to handle complex tax issues',
-              ],
-            ],
-            [
-              'Real-business discovery',
-              [
-                { mark: 'ok', text: 'Understand the business model' },
-                { mark: 'ok', text: 'Analyze revenue, cost and expense structure' },
-                { mark: 'ok', text: 'Map four flows: cash, operations, documents, goods' },
-                { mark: 'ok', text: 'Map departments and key personnel' },
-              ],
-              [
-                { mark: 'ok', text: 'Collect invoices and bank statements only' },
-                { mark: 'no', text: 'Little grasp of real operations; hidden risks remain' },
-              ],
-              [
-                '1) From fragmented inputs to a full operating picture',
-                '2) Tax work grounded in business reality for legality and control',
-              ],
-            ],
-            [
-              'Tax & finance risk screen',
-              [
-                { mark: 'ok', text: 'Health-check report based on documents and interviews' },
-                { mark: 'ok', text: 'Tax-burden reasonableness (VAT, CIT, stamp duty, IIT, etc.)' },
-                { mark: 'ok', text: 'Core supplier risk (status, share, penalties)' },
-                { mark: 'ok', text: 'Invoice risk analysis' },
-                { mark: 'ok', text: 'Financial ratio and efficiency review' },
-                { mark: 'ok', text: 'Clear historical issues (e.g. long-term shareholder loans)' },
-              ],
-              [
-                { mark: 'ok', text: 'Simple answers to ad-hoc questions' },
-                { mark: 'no', text: 'No periodic review or early-warning mechanism' },
-                { mark: 'no', text: 'No expert loop for compliance issues' },
-                { mark: 'no', text: 'Risks stay in a black box until an audit' },
-              ],
-              [
-                'Scan taxes, suppliers, invoices and financials; warn early and propose fixes',
-              ],
-            ],
-            [
-              'Data handover & setup',
-              [
-                { text: 'Confirm internal processes and accounting methods' },
-                { mark: 'ok', text: 'Process-management recommendations' },
-                { mark: 'ok', text: 'Document collection and handover' },
-                { mark: 'ok', text: 'Opening-balance confirmation' },
-                { mark: 'ok', text: 'Historical books remediation' },
-              ],
-              [
-                { mark: 'ok', text: 'Simple file handover and data check' },
-                { mark: 'no', text: 'Little process advice or historical remediation guidance' },
-              ],
-              [
-                'Process-based finance advice with authentic, traceable records',
-              ],
-            ],
-            [
-              'Bookkeeping',
-              [
-                { mark: 'ok', text: 'Reconcile real online/offline transaction data' },
-                { mark: 'ok', text: 'Reconcile real cash flows (bank, third-party, personal)' },
-                { mark: 'ok', text: 'Invoice pack review and non-compliance analysis' },
-                { mark: 'ok', text: 'Track income/expense without invoices' },
-                { mark: 'ok', text: 'Apply laws, GAAP and industry norms for recognition methods' },
-              ],
-              [
-                { mark: 'ok', text: 'Mechanical booking from bank statements and invoices' },
-                { mark: 'no', text: 'Ignores real operations; books lack decision value' },
-                { mark: 'no', text: 'Ignores non-invoice items; data distorts under audit' },
-                { mark: 'no', text: 'Non-standard methods are hard to defend if reviewed' },
-              ],
-              [
-                '1) Full-view books that stand up to inspection',
-                '2) Reflect true operations so owners can adjust early',
-              ],
-            ],
-            [
-              'Tax filing',
-              [
-                { mark: 'ok', text: 'Routine filings: taxes, social security, annual CIT, AIC report' },
-                { mark: 'ok', text: 'Tax-burden reasonableness by tax type' },
-                { mark: 'ok', text: 'Compliant planning with pre-filing review and adjustments' },
-              ],
-              [
-                { mark: 'ok', text: 'Routine tax filing only' },
-                { mark: 'no', text: 'No tax-burden reasonableness analysis' },
-                { mark: 'no', text: 'No planning depth or capability' },
-              ],
-              [
-                '1) Compliance based on real books',
-                '2) Lawful tax-cost optimization',
-                '3) Peace of mind under inspection',
-              ],
-            ],
-            [
-              'Annual tax & finance review',
-              [
-                { mark: 'ok', text: 'Management analysis of profitability and balance-sheet efficiency' },
-                { mark: 'ok', text: 'Timely tax-issue alerts and compliance/burden trade-offs' },
-              ],
-              [
-                { mark: 'no', text: 'No financial analysis' },
-                { mark: 'no', text: 'No timely tax alerts' },
-              ],
-              [
-                '1) Data support for operating decisions',
-                '2) Adjust promptly with regulatory trends',
-              ],
-            ],
-            [
-              'Audit-ready documentation',
-              [
-                { text: 'Prepare inspection packs for four-flow consistency and business authenticity' },
-                { mark: 'ok', text: 'Guidance on books, contracts, invoices and supporting docs' },
-                { mark: 'ok', text: 'Sample review of four-flow evidence' },
-                { mark: 'ok', text: 'Support during tax inquiries and disputes' },
-              ],
-              [
-                { mark: 'ok', text: 'Keep only basic books and filings' },
-                { mark: 'no', text: 'No authenticity evidence chain' },
-                { mark: 'no', text: 'Little professional defense support in inspections' },
-              ],
-              [
-                '1) Ready documentation for easier inspections',
-                '2) Expert protection of lawful rights in disputes',
-              ],
-            ],
-          ],
-        },
-        { type: 'h2', text: 'Pricing' },
-        {
-          type: 'p',
-          text: 'Annual fee by annual sales tiers (every RMB 5 million). Without export rebate: 0.1% of sales, capped at ¥30,000. With export rebate: 0.2% of sales, capped at ¥60,000.',
-        },
-        {
-          type: 'table',
-          variant: 'pricing',
-          firstColHeader: true,
-          headers: ['Annual sales', 'Without export rebate (0.1%)', 'With export rebate (0.2%)'],
-          rows: [
-            ['Up to RMB 5m', '¥5,000', '¥10,000'],
-            ['RMB 5–10m', '¥10,000', '¥20,000'],
-            ['RMB 10–15m', '¥15,000', '¥30,000'],
-            ['RMB 15–20m', '¥20,000', '¥40,000'],
-            ['RMB 20–25m', '¥25,000', '¥50,000'],
-            ['RMB 25–30m', '¥30,000', '¥60,000'],
-            ['Above RMB 30m', '¥30,000 (cap)', '¥60,000 (cap)'],
-          ],
-        },
-        {
-          type: 'p',
-          text: 'Excludes government fees, tax-control devices, third-party audits, and rush window charges. Multi-entity or historical rebuild may be scoped separately.',
-        },
-        { type: 'h2', text: 'Process' },
-        {
-          type: 'timeline',
-          steps: [
-            { title: 'Understand the business', time: '1 week after payment' },
-            { title: 'Tax & finance risk screen', time: 'Before start or mid-year' },
-            { title: 'Data handover & setup', time: 'Within 1 month after payment' },
-            { title: 'Bookkeeping', time: 'Monthly' },
-            { title: 'Tax filing', time: 'Monthly / quarter-end' },
-            { title: 'Finance analysis', time: 'Quarterly' },
-            { title: 'Annual health-check report', time: 'Once a year' },
-            { title: 'Audit-ready archive check', time: 'Annually' },
-          ],
-        },
-        {
-          type: 'table',
-          variant: 'deliver',
-          firstColHeader: true,
-          headers: ['Workstream', 'Timing', 'Deliverables'],
-          rows: [
-            ['1. Business discovery', '1 week after payment', 'Interview outline & research report; process map'],
-            ['2. Risk screening', 'Before start or mid-year', 'Legacy risk assessment; remediation plan'],
-            ['3. Handover & setup', 'Within 1 month', 'Handover checklist; initialization confirmation'],
-            ['4. Compliance bookkeeping', 'Monthly', 'Vouchers, ledgers, monthly financial statements'],
-            ['5. Tax filings', 'Monthly / quarter-end', 'Tax returns; payment / clearance evidence'],
-            ['6. Analysis & review', 'Quarterly', 'Management accounting report; anomaly alerts'],
-            ['7. Annual health check', 'Once a year', 'CIT finalization report; annual compliance assessment'],
-            ['8. Archive readiness', 'Annually', 'Full electronic/paper archive pack; audit support file'],
-          ],
-        },
-        { type: 'h2', text: 'FAQ' },
-        {
-          type: 'faq',
-          items: [
-            {
-              q: 'How is this different from traditional bookkeeping?',
-              a: 'Traditional bookkeeping focuses on filing. This managed service adds digital capture, finer profitability views, proactive risk alerts, management reviews, and optional export-rebate coordination.',
-            },
-            {
-              q: 'We already have a bookkeeping firm—can we switch?',
-              a: 'Yes. After contracting we run handover, opening-balance checks, and a risk screen, then transition monthly books and filings. Historical rebuilds can be scoped separately.',
-            },
-            {
-              q: 'Should we choose the package with export rebate?',
-              a: 'Choose “with export rebate” if you need rebate filing coordination and document tracking. Choose “without” if you mainly need compliance bookkeeping, filings, and analysis.',
-            },
-            {
-              q: 'Does the fee include government charges or tax-control devices?',
-              a: 'No. The fee covers agreed bookkeeping, filing, and analysis deliverables. Government fees, devices, audits, and rush services are billed separately.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'domestic-rebate-1210-9610',
-      title: '1210/9610 first-claim rebate coaching',
-      desc: 'Hands-on coaching for the first 1210 bonded / 9610 retail-export rebate claim: eligibility, documents, filing, and tax-bureau follow-up.',
-      unit: '/ case',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Guide sellers through the first 1210 or 9610 export rebate (or exemption) cycle—from customs/list documents and input VAT invoices to filing and bureau responses.',
+        content: 'Monthly books and statutory filings. Exporters also get export-sale, freight, and rebate-related accounting as agreed.',
         bullets: [
-          'Eligibility and customs-model fit (1210 / 9610)',
-          'First-claim document pack coaching',
-          'Filing submission support',
-          'Tax-bureau supplement / interview support',
-          'Post-claim playbook for later batches',
+          'Voucher review, posting, and export-specific books',
+          'Monthly / quarterly statements',
+          'VAT, CIT, IIT, local taxes, and social-security filings',
+          'Export-rebate related filings where contracted',
+          'Archives, risk alerts, management notes, and AIC annual report support',
         ],
-        pricing: 'Fixed ¥5,000 per first-claim coaching engagement. Rebate amounts, customs brokerage, logistics, and government fees are excluded.',
-        process: [
-          'Discovery and path confirmation',
-          'Document checklist and gap closing',
-          'First-claim filing',
-          'Bureau response and close-out review',
-        ],
-        timeline: 'Kick-off usually within 3–5 business days after payment; filing often 5–10 business days after documents are complete.',
+        highlights: ['On-time statutory filings', 'Export books can sit with rebate work', 'Health check and AIC report included'],
+        audience: 'Start-ups, SMEs, e-commerce and trading companies without a full-time finance team.',
+        pricing: 'Annual fee by taxpayer type. General VAT taxpayers are priced by complexity, volume, and booking currency.',
+        pricingTable: {
+          headers: ['Taxpayer type', 'Annual fee', 'Notes'],
+          rows: [
+            ['Small-scale VAT payer', '¥5,000', 'Books, statements, filings, health check, AIC report'],
+            ['General VAT taxpayer', 'From ¥8,000', 'Priced by complexity and voucher volume'],
+            ['Nil return · small-scale', '¥2,000', 'No operations / no revenue'],
+            ['Nil return · general taxpayer', '¥3,600', 'No operations / no revenue'],
+          ],
+        },
+        process: ['Scoping', 'Handover', 'Monthly books', 'Filings', 'Reconciliation and archive', 'Periodic reviews'],
         faqs: [
-          {
-            q: '1210 vs 9610—which should I choose?',
-            a: 'Stockable, non-custom SKUs often fit 1210 bonded fulfillment; order-driven or custom goods more often use 9610 / same-day bonded routes. Final choice depends on clearance capacity and local tax practice.',
-          },
+          { q: 'Can we book purchases without invoices?', a: 'Yes, but it affects input VAT and rebate trails. We flag the risk.' },
+          { q: 'Can we switch from another bookkeeper?', a: 'Yes. We complete opening-balance handover, then take over monthly filings.' },
         ],
       }),
     },
     {
-      id: 'domestic-rebate-9810',
-      title: '9810 first-claim rebate coaching',
-      desc: 'Hands-on coaching for the first 9810 overseas-warehouse rebate claim, including sales/FX evidence and bureau liaison.',
+      id: 'domestic-setup',
+      title: 'Company incorporation',
+      desc: 'Name check, filing, license, chops, and tax / social / bank onboarding guidance.',
       unit: '/ case',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Help 9810 overseas-warehouse exporters align customs title, warehouse movements, overseas sales evidence, and FX proof for a first successful rebate filing.',
+        content: 'Mainland China limited-company formation: name check, filings, license collection, chops, plus tax, social-security, and bank-appointment guidance.',
         bullets: [
-          '9810 feasibility assessment',
-          'Title, warehouse, and sales-flow mapping',
-          'Sales / FX evidence coaching',
-          'First-claim filing and bureau follow-up',
+          'Name reservation',
+          'Information pack and application',
+          'License collection and chops',
+          'Tax registration guidance',
+          'Social-security / housing-fund and bank-appointment guidance',
         ],
-        pricing: 'Fixed ¥5,000 per first-claim coaching engagement. Third-party warehouse, freight, and government fees are excluded.',
-        process: [
-          'Model and local-practice discovery',
-          'Evidence pack completion',
-          'First-claim filing',
-          'Supplements and close-out review',
-        ],
-        timeline: 'Kick-off usually within 3–5 business days; filing often 5–15 business days after documents are complete.',
+        audience: 'New limited companies with 50 or fewer shareholders.',
+        pricing: 'Agency fee ¥500 per case. On-site dual recording for overseas individuals is extra.',
+        process: ['Name check', 'File application', 'Collect license', 'Chops', 'Tax registration', 'Social-security / housing fund'],
         faqs: [
-          {
-            q: 'Is a 9810 rebate guaranteed?',
-            a: 'No. Local evidence expectations vary. We prepare materials carefully but outcomes follow the tax authority. Where uncertainty is high, we may recommend a more stable 0110 + Hong Kong structure.',
-          },
+          { q: 'Does this include import/export rights?', a: 'No. Use “Import/export license” for customs, e-port, and rebate filing.' },
+          { q: 'What if the name is rejected?', a: 'Revise and refile. Prepare 3–5 alternatives to save time.' },
         ],
       }),
     },
     {
       id: 'domestic-1039-sole',
-      title: '1039 market-procurement sole-proprietor package',
-      desc: 'One-stop 1039 sole-proprietor setup: registration, assessed-collection application, bookkeeping, and tax filing.',
+      title: 'Sole-trader setup & deemed collection',
+      desc: 'Sole-trader registration, deemed-collection filing, and ongoing tax returns.',
       unit: ' from',
       details: window.DAOITH_enServiceBlocks({
-        content: 'For sellers using 1039 market procurement via a sole proprietorship: formation, assessed-collection filing, and first-year basic bookkeeping/tax returns.',
+        content: 'Online sole-trader registration, tax onboarding, and periodic deemed-collection (定额核定) filing, plus VAT and business-income returns.',
         bullets: [
-          '1039 suitability check',
-          'Sole-proprietor formation (typical market hubs)',
-          'Assessed-collection application support',
-          'First-year basic bookkeeping and filings',
+          'Name check (3–5 options)',
+          'AIC registration and chops (typically 3–5 business days)',
+          'e-Tax Bureau onboarding and invoice quotas',
+          'Deemed-collection application',
+          'Ongoing VAT / business-income filings and AIC annual report reminders',
         ],
-        pricing: '¥5,000 package including formation, assessed-collection application, and first-year basic books/filings. Government fees, banking, rush services, and Hong Kong architecture are extra.',
-        process: [
-          'Suitability and location advice',
-          'Sole-proprietor registration',
-          'Assessed-collection application',
-          'Books and periodic filings',
-        ],
-        timeline: 'Formation often 5–15 business days after documents are ready; assessed collection follows local timelines.',
+        audience: 'Operators short of cost invoices, cross-border sellers, and 1039 market-procurement principals.',
+        pricing: 'Dongguan reference pricing; other cities quoted case by case. Deemed collection generally applies when trailing-12-month sales stay within RMB 5 million.',
+        pricingTable: {
+          headers: ['Item', 'Fee'],
+          rows: [
+            ['Setup + deemed collection + filings (year 1)', '¥4,500'],
+            ['Address deposit (refundable on deregistration)', '¥1,000'],
+            ['Address annual fee', '¥3,000 / year'],
+            ['Year 2 (filings ¥3,000 + address ¥3,000)', '¥6,000'],
+          ],
+        },
+        process: ['Scoping', 'Name check', 'Registration', 'Tax onboarding', 'Deemed-collection filing', 'Ongoing maintenance'],
         faqs: [
-          {
-            q: 'Does this include customs brokerage?',
-            a: 'No. This package focuses on the entity, assessed collection, and books/tax. Customs and freight can be arranged separately.',
-          },
+          { q: 'Is there a sales cap?', a: 'Deemed collection typically watches the RMB 5 million trailing-12-month band. Above that, add entities or change structure.' },
+          { q: 'Does this include 1039 customs export?', a: 'No. Add “1039 market-procurement export” or the 1039 bundle.' },
         ],
       }),
     },
     {
-      id: 'domestic-arch-0110-hk',
-      title: '0110 export + Hong Kong fully managed architecture',
-      desc: 'Fully managed 0110 general-trade + Hong Kong hub: design, PRC/HK incorporation, books, filings, and tax-inspection support.',
-      unit: '/ year from',
+      id: 'domestic-1039-export',
+      title: '1039 market-procurement export',
+      desc: 'Product filing, dual-header customs, and compliant FX settlement under 1039.',
+      unit: ' of declared value',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Implement supplier → PRC exporter → Hong Kong company → store entity → overseas buyers under 0110, with incorporation, books/filings, and inspection readiness in one managed package.',
+        content: 'File goods on the market-procurement platform, export under dual-header customs, and settle FX via the agent’s corporate account into the sole trader’s RMB account.',
         bullets: [
-          'Architecture design and four-flow alignment',
-          'PRC and Hong Kong company formation',
-          'Books, filings, and rebate coordination (as scoped)',
-          'Documentation readiness and inspection support',
+          'Product filing and restricted-goods screening',
+          'Dual-header customs (USD 150,000 per declaration cap)',
+          'Major China ports; FCL / LCL / loose cargo',
+          'Compliant FX settlement, not limited to the USD 50,000 personal quota',
         ],
-        pricing: '¥15,000–¥38,000 per year by sales band. Government fees, HK audit/secretary fees, and banking charges are separate.',
-        process: [
-          'Discovery and architecture plan',
-          'PRC / Hong Kong formation',
-          'Books and tax initialization',
-          'Ongoing managed compliance',
-          'Inspection support as needed',
-        ],
-        timeline: 'Architecture plan in 1–2 weeks after payment; formation often 2–6 weeks depending on location.',
+        audience: 'Factories and traders without purchase invoices, SOHO exporters, and e-commerce sellers needing a clean collection path.',
+        pricing: 'Agency fee 0.4% of RMB declared value, RMB 100 minimum per shipment. Logistics, warehousing, inspection, and sole-trader setup are extra.',
+        pricingTable: {
+          headers: ['Item', 'Fee'],
+          rows: [
+            ['Export agency', '0.4% of declared value (min. ¥100)'],
+            ['Customs declaration base fee', '¥250 / form (extra pages billed; sundries at cost)'],
+            ['Logistics / warehouse / trucking / inspection', 'At cost'],
+          ],
+        },
+        process: ['Fit assessment', 'Product filing', 'Consolidation and customs', 'FX settlement'],
         faqs: [
-          {
-            q: 'Why route through Hong Kong?',
-            a: 'Exporting under 0110 to an overseas buyer (HKCo) helps align customs title with rebate eligibility before overseas resale. Transfer-pricing reasonableness still matters.',
-          },
+          { q: 'Can we export without a sole trader?', a: '1039 usually needs a market-zone sole trader. Add the sole-trader product.' },
+          { q: 'What goods are blocked?', a: 'Restricted chemicals, certain foods, and other banned lists. We pre-screen at filing.' },
         ],
       }),
     },
     {
-      id: 'domestic-arch-1039-hk',
-      title: '1039 export + Hong Kong fully managed architecture',
-      desc: 'Fully managed 1039 market procurement + Hong Kong hub: design, sole-proprietor & HK formation, books, filings, and inspection support.',
-      unit: '/ year from',
+      id: 'domestic-trade-license',
+      title: 'Import/export license',
+      desc: 'Customs registration, e-port cards, and export rebate/exemption filing.',
+      unit: '/ case',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Implement supplier → sole proprietor → Hong Kong company → store entity under 1039, with formation, assessed collection, books/filings, and inspection support.',
+        content: 'One pack for self-declaration and collection: business-scope check, customs consignee filing, China E-port cards, and export rebate/exemption filing for general VAT taxpayers.',
         bullets: [
-          '1039 suitability and quota planning',
-          'Sole-proprietor and Hong Kong formation',
-          'Books and filings under assessed collection',
-          'Inspection documentation support',
+          'Business-scope check (AIC change billed separately if needed)',
+          'Customs 10-digit code (about 1–3 business days)',
+          'E-port legal-person and operator cards (about 3–5 business days)',
+          'Export rebate/exemption filing and rebate bank account binding',
         ],
-        pricing: '¥15,000–¥38,000 per year by sales band. Government fees, HK statutory fees, and extra sole proprietors are separate.',
-        process: [
-          'Suitability and architecture plan',
-          'Sole-proprietor + Hong Kong formation',
-          'Assessed collection and books setup',
-          'Ongoing managed compliance',
-          'Inspection support as needed',
-        ],
-        timeline: 'Plan in 1–2 weeks after payment; formation often 2–6 weeks.',
+        audience: 'Domestic traders going self-operated, factories, e-commerce sellers, and firms leaving export agents.',
+        pricing: 'Full pack ¥2,000. Scope changes and sector licences (food, devices, chemicals) extra.',
+        process: ['Fit check', 'Documents', 'Scope change if needed', 'Customs', 'E-port', 'Rebate filing', 'Handover'],
+        timeline: 'About 5–10 business days with complete documents.',
         faqs: [
-          {
-            q: '0110+HK vs 1039+HK—how to choose?',
-            a: 'Prefer 1039+HK when special VAT invoices are hard to obtain and goods/quotas fit market procurement; prefer 0110+HK when invoices support formal rebate. Final choice depends on SKU, volume, and local practice.',
-          },
+          { q: 'Can we form the company and the licence together?', a: 'Yes. Incorporate first, then this pack — or inquire on the 0110 bundle.' },
+          { q: 'Do you guarantee first-pass approval?', a: 'We pre-check names, English fields, and chops. Final approval sits with the authorities.' },
+        ],
+      }),
+    },
+    {
+      id: 'domestic-rebate-first',
+      title: 'First-time rebate coaching',
+      desc: 'First rebate audit pack: eligibility, site, staff, export and purchase documents.',
+      unit: '/ case',
+      details: window.DAOITH_enServiceBlocks({
+        content: 'First rebate filings trigger a full authenticity review. We prepare eligibility, premises, staff, export, and purchase files, run a tax self-check, and file the first claim. Valid for one year.',
+        bullets: [
+          'Eligibility (general VAT taxpayer, customs code, rebate filing and account)',
+          'First-filing verification form and business narrative',
+          'Premises: lease/title, utilities, rent invoices, photos',
+          'Staff: social security, payroll, and bank payment trails',
+          'Export contracts, customs forms, transport, and FX evidence',
+          'Purchase contracts, input invoices, payments, and freight',
+          'VAT / CIT / stamp-duty self-check',
+        ],
+        audience: 'Manufacturers, traders, and e-commerce exporters filing their first rebate.',
+        pricing: '¥10,000 full pack, including document coaching, verification form, self-check, and agency filing.',
+        pricingNote: 'Multi-year catch-up, messy books, or repeated document swaps are quoted separately.',
+        process: ['Scoping', 'Eligibility', 'Document list', 'Pack preparation', 'Verification form', 'Self-check', 'Delivery', 'Rebate filing'],
+        faqs: [
+          { q: 'Do you guarantee the rebate is paid?', a: 'We make the file controllable. The tax bureau decides the outcome and timing.' },
+          { q: 'We already passed the first review.', a: 'Use “Rebate filing agency” for recurring claims.' },
         ],
       }),
     },
     {
       id: 'domestic-rebate',
-      title: 'Export rebate agency',
-      desc: 'Full 9810/9610 rebate filing including documentation and authority liaison.',
-      unit: '/ case',
+      title: 'Rebate filing agency',
+      desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.',
+      unit: '/ year from',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Prepare rebate packs, file claims, and support responses to tax authority queries.',
+        content: 'For exporters who already passed the first rebate review. Annual filing, document coaching, and rebate ledgers. Buy first-time coaching separately if you have not filed yet.',
         bullets: [
-          'Eligibility and model assessment',
-          'Document completeness check',
-          'Rebate filing agency',
-          'Supplement and authority liaison',
+          'Licence validity checks',
+          'Customs / export invoice / purchase invoice consistency',
+          'Declaration tables and system filing',
+          'Bureau queries, explanations, and payment matching',
+          'Ledgers, progress reports, and cycle alerts',
         ],
-        pricing: 'From ¥3,000 per case, or by batch / rebate amount. Complex cases scoped separately.',
-        process: [
-          'Assess rebate conditions and customs model',
-          'Collect and verify documents',
-          'Submit filing and track progress',
-          'Support supplements through completion',
-        ],
-        timeline: 'Filing submission often 5–15 business days after documents are complete; authority review is separate.',
+        audience: 'Regular exporters who want faster cash conversion and lower rebate risk.',
+        pricing: '0.1% of annual export value, minimum ¥5,000 / year, cap ¥30,000 / year.',
+        pricingNote: 'Catch-up years, sensitive-goods enquiries over four times a year, or Category IV rebate status are quoted separately.',
+        process: ['Scoping', 'Licence check', 'Handover', 'Document review', 'Filing', 'Follow-up', 'Payment matching', 'Archive'],
         faqs: [
-          { q: 'Can we claim without import/export rights?', a: 'Usually you need the right export qualifications and documents. Start with an eligibility check.' },
+          { q: 'Can we skip first-time coaching?', a: 'We recommend finishing first-time coaching first.' },
+          { q: 'Which year’s export value is used?', a: 'The contracted service year. Floor and cap are in the price table.' },
         ],
       }),
     },
     {
-      id: 'domestic-hte',
-      title: 'High-tech enterprise qualification',
-      desc: 'Application support including R&D expense aggregation and IP planning.',
+      id: 'hk-company',
+      title: 'Hong Kong company setup',
+      desc: 'Private company incorporation including government fees, first-year address and secretary.',
       unit: ' from',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Application coaching for high-tech enterprise qualification, including R&D expense and IP readiness.',
-        process: [
-          'Eligibility gap analysis',
-          'R&D expense and materials prep',
-          'Filing coaching and form review',
-          'Result follow-up and maintenance advice',
-        ],
-        timeline: 'Coaching usually 1–3 months; official review is separate.',
-        pricing: 'From ¥20,000. IP agency and audit fees are extra; approval is by authorities.',
-        faqs: [
-          { q: 'Can cross-border e-commerce firms apply?', a: 'If R&D activity and IP meet criteria, we can assess feasibility without industry labels.' },
-        ],
-      }),
-    },
-    {
-      id: 'domestic-offshore-vat-exemption',
-      title: 'Offshore service VAT exemption filing',
-      desc: 'Contract review, commerce-department contract filing, and tax-bureau VAT exemption filing for offshore outsourcing.',
-      unit: '/ case',
-      details: window.DAOITH_enServiceBlocks({
-        content:
-          'For firms providing ITO/BPO/KPO offshore outsourcing to overseas clients: contract compliance review, commerce-authority contract registration, and tax-bureau cross-border VAT exemption filing so eligible offshore service revenue can be reported as VAT-exempt.',
+        content: 'Hong Kong private company: name search, share structure, statutory filings, first-year registered address, and licensed company secretary. Deliverables include CI, BR, NNC1, and the green box.',
         bullets: [
-          'Eligibility and contract-fit assessment',
-          'Contract review and clause hardening',
-          'Commerce outsourcing-system registration and confirmation materials',
-          'Tax-bureau VAT exemption filing pack and submission coaching',
-          'Post-filing reporting notes (separate accounting; no special VAT invoices on exempt items)',
+          'Name search (Chinese / English)',
+          'Capital and director / shareholder plan',
+          'M&A, NNC1, and statutory filings',
+          'First-year address and TCSP-licensed secretary',
+          'Certificates, chops, share certificates, and statutory records',
         ],
-        pricing:
-          '¥2,500 per case (typically one contract batch through commerce + tax filing). Extra contracts, translation/notarization, or rush handling scoped separately. Outcomes depend on authorities.',
-        process: [
-          'Collect contracts and overseas-buyer materials; assess eligibility',
-          'Review / strengthen contract elements into a filing-ready pack',
-          'Complete commerce-system contract registration and obtain confirmation',
-          'Prepare exemption forms and file with the competent tax bureau',
-          'Hand over acknowledgements and ongoing filing notes',
-        ],
-        timeline:
-          'Often 1–3 weeks on the advisory side after documents are ready; commerce review and tax acceptance vary by locality.',
+        audience: 'Sellers needing a Hong Kong entity for collection, contracting, or holding.',
+        pricing: '¥5,000 including government fees, first-year address, and secretary. Renewals, banking, audit, and changes extra.',
+        process: ['Scoping', 'Name search', 'KYC documents', 'Draft and file', 'Certificate delivery', 'Bank / books / annual return handoff'],
+        timeline: 'Standard 5–7 business days; e-filing as fast as 1–2 days.',
         faqs: [
-          {
-            q: 'Is commerce filing required before tax exemption?',
-            a: 'For offshore outsourcing, practice usually requires commerce-system registration (e.g. contract information sheet) before tax-bureau exemption filing. Local checklists may differ.',
-          },
-          {
-            q: 'Does filing alone make revenue VAT-exempt?',
-            a: 'Filing is a prerequisite. You must still separately account for exempt sales, report correctly, and avoid issuing special VAT invoices on exempt items. Material contract changes usually need re-registration / notice.',
-          },
+          { q: 'Does registration include a bank account?', a: 'No. Banks run their own KYC. Approval is not guaranteed.' },
+          { q: 'Can one person be both director and shareholder?', a: 'Yes. One director and one shareholder, who may be the same person, aged 18+.' },
         ],
       }),
     },
     {
-      id: 'domestic-atsi',
-      title: 'Advanced technology service enterprise application',
-      desc: 'End-to-end ATSI qualification coaching: eligibility, dossier, filing follow-up, and CIT preference handover.',
-      unit: '/ case',
+      id: 'hk-annual',
+      title: 'Hong Kong annual return',
+      desc: 'NAR1, BR renewal, secretary/address continuation, and SCR maintenance.',
+      unit: '/ year',
       details: window.DAOITH_enServiceBlocks({
-        content:
-          'Coach applications for Advanced Technology Service Enterprise (ATSI) status. Qualified firms may enjoy 15% CIT and enhanced staff-training deduction rules. Covers eligibility gaps, MOFCOM outsourcing data filing, science/tech platform submission, multi-agency review support, and post-approval tax-bureau preference handover.',
+        content: 'Hong Kong companies must file NAR1 and renew the Business Registration Certificate within 42 days of the incorporation anniversary — no grace period. We also renew the secretary and address and maintain the Significant Controllers Register.',
         bullets: [
-          'Eligibility gap analysis (scope, staff mix, ATSI revenue share, offshore share)',
-          'Revenue / headcount evidence checklist',
-          'MOFCOM service-outsourcing system information and data filing support',
-          'National ATSI platform registration and dossier assembly',
-          'Support for provincial science/commerce/finance/tax/NDRC review supplements',
-          'Post-approval CIT preference handover with the tax bureau',
+          'NAR1 preparation and filing',
+          'BR renewal',
+          'Secretary and address continuation; mail handling',
+          'SCR maintenance',
+          'Late-filing remedy (quoted separately)',
         ],
-        pricing:
-          '¥50,000 per case. Special audits, translation/notarization, or rush/re-application scoped separately. Approval is by provincial authorities; not guaranteed.',
-        process: [
-          'Eligibility pre-check against national ATSI rules',
-          'Coach MOFCOM outsourcing-system enterprise data filing',
-          'Register and submit on the ATSI / local government platform',
-          'Track form review, expert review, publicity, and national filing',
-          'After approval, coach tax-bureau CIT preference procedures',
-        ],
-        timeline:
-          'Advisory work often 1–3 months; official collection and review windows follow provincial annual notices and may span quarters.',
+        audience: 'Every Hong Kong limited company, operating or dormant, including those needing bank-account continuity.',
+        pricing: '¥3,000 per year covering NAR1, BR, secretary, and address. Government fees follow the current gazette; changes and penalties extra.',
+        process: ['Reminder', 'Documents', 'Change filings if needed', 'NAR1 + BR', 'Submit', 'Deliver new BR'],
         faqs: [
-          {
-            q: 'What are the core ATSI conditions?',
-            a: 'Typically: in-scope advanced technology services; ≥50% staff with college+ education; ≥50% revenue from ATSI services; ≥35% revenue from offshore outsourcing. Follow local annual rules.',
-          },
-          {
-            q: 'Who decides? What does the tax bureau do?',
-            a: 'Provincial science authorities jointly review with commerce, finance, tax, and NDRC. The tax bureau mainly administers CIT preferences after recognition and supervises ongoing eligibility.',
-          },
+          { q: 'Do dormant companies still file?', a: 'Yes. Missing NAR1/BR can trigger penalties or striking-off.' },
+          { q: 'We already missed the deadline.', a: 'We can file a late remedy. Penalties are extra — act quickly to protect banking.' },
         ],
       }),
     },
     {
-      id: 'overseas-odi',
-      title: 'ODI filing agency',
-      desc: 'End-to-end outbound investment filing (NDRC, commerce, SAFE).',
-      unit: ' from',
+      id: 'hk-audit-tax',
+      title: 'Hong Kong audit & profits tax',
+      desc: 'HKICPA audit report and profits-tax filing; dormant companies and catch-up audits supported.',
+      unit: '/ year from',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Prepare ODI materials and coordinate NDRC, commerce, and SAFE process steps.',
+        content: 'Hong Kong companies must file an audit report with the profits-tax return. An HKICPA auditor signs the report; we prepare BIR51/BIR52. Dormant and catch-up audits are available.',
         bullets: [
-          'Investment structure and path advice',
-          'Document preparation and form review',
-          'Authority process management',
-          'Handoff notes for overseas setup / banking',
+          'Books from bank statements, contracts, and invoices',
+          'Balance sheet, P&L, and cash-flow statement',
+          'Audit sampling, confirmations, and controls review',
+          'Signed audit report',
+          'Profits-tax return and assessment follow-up',
+          'Dormant-company audit and nil filing',
         ],
-        pricing: 'From ¥30,000, varying by structure and approval complexity.',
-        process: [
-          'Confirm destination and shareholding',
-          'Prepare filing / approval packs',
-          'Submit and track each authority',
-          'Hand over closing document pack',
-        ],
-        timeline: 'Commonly 4–12 weeks after materials are ready.',
+        audience: 'All Hong Kong limited companies, including those needing bank, financing, or catch-up audits.',
+        pricing: 'Tiered by turnover. Trading vs e-commerce priced separately. Incomplete books and rush reports (3–5 days) extra.',
+        pricingTable: {
+          headers: ['Turnover band', 'Trading', 'E-commerce'],
+          rows: [
+            ['Dormant', '¥2,200 / year', '¥2,200 / year'],
+            ['Micro ≤ HK$6m', '≤¥4,000', '≤¥6,000'],
+            ['Small ≤ HK$20m', '≤¥6,600', '≤¥10,000'],
+            ['Medium ≤ HK$60m', '≤¥9,800', '≤¥14,800'],
+            ['Upper-medium ≤ HK$100m', '≤¥13,600', '≤¥20,500'],
+            ['Catch-up years', 'Quoted', 'Quoted'],
+          ],
+        },
+        process: ['Scoping', 'Collect CI/BR, bank statements, contracts', 'Books (2–3 weeks)', 'Audit (3–4 weeks)', 'Report (1–2 weeks)', 'Tax filing'],
         faqs: [
-          { q: 'Is ODI always required?', a: 'Direct outbound investment by China entities usually needs the relevant filings. Path design should come first.' },
+          { q: 'No activity — still audit?', a: 'Yes, or you risk a “false nil return”. Dormant companies can use a no-operations audit report.' },
+          { q: 'Why is e-commerce higher?', a: 'Inventory, multi-platform receipts, and mainland shop reconciling add volume.' },
         ],
       }),
     },
     {
-      id: 'overseas-vat',
-      title: 'EU VAT registration',
-      desc: 'VAT registration and filing in UK, Germany, France, and other EU markets.',
-      unit: '/ country',
+      id: 'domestic-arch-0110-hk',
+      title: '0110 rebate + HK compliance bundle',
+      desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.',
+      unit: '/ 5% off from 3 modules',
       details: window.DAOITH_enServiceBlocks({
-        content: 'VAT registration support and filing cycle setup, clarifying platform withholding vs seller duties.',
+        content: 'For sellers who can obtain special VAT invoices and whose goods qualify for rebate. Pick modules. Three or more modules receive 5% off.',
         bullets: [
-          'Registration obligation assessment',
-          'VAT number application coaching',
-          'Monthly / quarterly filing support',
-          'IOSS / platform withholding boundary notes',
+          '① Mainland company incorporation',
+          '② Import/export license',
+          '③ First-time rebate coaching',
+          '④ Rebate filing agency',
+          '⑤ Compliance bookkeeping',
+          '⑥ Hong Kong annual return',
+          '⑦ Hong Kong audit & profits tax',
         ],
-        pricing: 'From ¥3,500 per country. Ongoing filing can be annualized. Translation and authority fees extra.',
-        process: [
-          'Confirm sales countries and warehousing',
-          'Prepare registration packs',
-          'Submit and obtain VAT number',
-          'Set filing cadence and archives',
-        ],
-        timeline: 'Numbers often take 2–8 weeks after complete materials, depending on country.',
+        audience: 'Amazon / TikTok / SHEIN sellers with special VAT invoices and a need for a clean collection path.',
+        pricing: 'Priced by selected modules. Three or more modules: 5% off. Final quote from the advisor.',
+        pricingTable: {
+          headers: ['Reference pack', 'Modules', 'Notes'],
+          rows: [
+            ['Onshore + offshore compliance', '①②③⑤⑥⑦', 'Entity, rebate, books, HK maintenance'],
+            ['New exporter, mainland only', '①②③⑤', 'Incorporate through first rebate and books'],
+            ['Existing exporter', '④⑤', 'Recurring rebate + books'],
+            ['Hong Kong maintenance', '⑥⑦', 'Annual return + audit'],
+            ['First rebate', '②③', 'Licence + first-time coaching'],
+          ],
+        },
+        process: ['Confirm need', 'Select modules', 'Collect documents', 'Run modules in parallel', 'Milestone delivery'],
         faqs: [
-          { q: 'If we only use FBA, do we still need VAT?', a: 'Often yes, or you must track transactions not covered by platform withholding. Build a per-country checklist.' },
+          { q: 'We already have a mainland or HK company.', a: 'Skip those modules and inquire on the gap.' },
+          { q: '0110 vs 1039?', a: 'Choose 0110 if you have special VAT invoices. Choose 1039 if invoices are missing and goods fit market procurement.' },
         ],
       }),
     },
     {
-      id: 'overseas-us-sales-tax',
-      title: 'US sales tax compliance',
-      desc: 'State sales tax registration, filing, and economic nexus advisory.',
-      unit: '/ state',
+      id: 'domestic-arch-1039-hk',
+      title: '1039 exemption + HK compliance bundle',
+      desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.',
+      unit: '/ 5% off from 3 modules',
       details: window.DAOITH_enServiceBlocks({
-        content: 'Nexus assessment, state registration, and filing arrangements.',
-        process: [
-          'Nexus and marketplace collection review',
-          'Prepare state registration packs',
-          'Complete registration and filing frequency',
-          'First filing coaching and archives',
+        content: 'For sellers short of purchase invoices. A deemed-collection sole trader handles 1039 exports; a Hong Kong company can sit as the offshore contracting / collection entity. Three or more modules: 5% off.',
+        bullets: [
+          '① Sole-trader setup & deemed collection',
+          '② 1039 market-procurement export',
+          '③ Hong Kong annual return',
+          '④ Hong Kong audit & profits tax',
         ],
-        timeline: 'Assessment 3–7 business days; single-state registration often 1–4 weeks.',
-        pricing: 'From ¥5,000 per state; multi-state packages available.',
+        audience: 'E-commerce sellers, invoice-short traders, and small-lot exporters needing a clean collection path.',
+        pricing: 'Priced by selected modules. Three or more: 5% off. 1039 export agency (0.4% of declared value) is extra.',
+        pricingTable: {
+          headers: ['Reference pack', 'Modules', 'Notes'],
+          rows: [
+            ['Onshore + offshore compliance', '①②③④', 'Sole trader + 1039 + HK annual/audit'],
+            ['New exporter, mainland only', '①②', 'Entity + market-procurement export'],
+            ['Hong Kong maintenance', '③④', 'Annual return + audit'],
+          ],
+        },
+        process: ['Confirm need', 'Select modules', 'Collect documents', 'Run modules', 'Milestone delivery'],
         faqs: [
-          { q: 'Amazon already collects—do we still register?', a: 'Many states cover marketplace orders, but DTC, B2B, or uncovered sales may still require action.' },
+          { q: 'Is a Hong Kong company mandatory?', a: 'No. You can take ①② only and add Hong Kong later.' },
+          { q: 'One sole trader is not enough.', a: 'Near the RMB 5 million band, add another sole trader. Extra entities are billed separately.' },
         ],
       }),
     },
