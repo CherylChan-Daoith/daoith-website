@@ -71,7 +71,9 @@ function initHeader() {
 /* Active nav: section view switching (one page area at a time) */
 function initNavigation() {
   const viewSections = document.querySelectorAll('[data-view]');
-  const navLinks = document.querySelectorAll('.nav > a[href^="#"], .nav-dropdown-menu a[href^="#"]');
+  const navLinks = document.querySelectorAll(
+    '.nav > a[href^="#"], .nav-dropdown-menu a[href^="#"], .nav-dropdown-trigger[href^="#"]'
+  );
   const policyTrigger = document.querySelector('.nav-dropdown-trigger[data-nav-parent="policy"]');
   const policyIds = new Set(['policy', 'tax-systems', 'policy-expert', 'policy-tax', 'policy-platform']);
 
@@ -235,15 +237,37 @@ function initNavDropdown() {
     const trigger = dropdown.querySelector('.nav-dropdown-trigger');
     if (!trigger) return;
 
-    trigger.addEventListener('click', (e) => {
-      e.preventDefault();
-      const willOpen = !dropdown.classList.contains('open');
+    const closeOthers = () => {
       document.querySelectorAll('.nav-dropdown.open').forEach((d) => {
         if (d !== dropdown) {
           d.classList.remove('open');
           d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
         }
       });
+    };
+
+    // Hover opens submenu; click on trigger navigates when it is a hash link.
+    dropdown.addEventListener('mouseenter', () => {
+      closeOthers();
+      dropdown.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+    });
+    dropdown.addEventListener('mouseleave', () => {
+      dropdown.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    });
+
+    trigger.addEventListener('click', (e) => {
+      const href = trigger.getAttribute('href') || '';
+      if (href.startsWith('#')) {
+        // Navigate to the section; keep submenu available via hover.
+        dropdown.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+        return;
+      }
+      e.preventDefault();
+      const willOpen = !dropdown.classList.contains('open');
+      closeOthers();
       dropdown.classList.toggle('open', willOpen);
       trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
     });

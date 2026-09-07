@@ -167,6 +167,7 @@ ul {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  text-decoration: none;
 }
 
 .nav > a:hover,
@@ -454,9 +455,9 @@ ul {
   }
 }
 
-#heroJourney {
+#heroJourney,
+#hubJourney {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   align-items: stretch;
   border-top: none;
@@ -464,9 +465,19 @@ ul {
   padding: 8px 0 0;
   margin-bottom: 8px;
   flex-wrap: nowrap;
+  background: transparent;
 }
 
-#heroJourney .process-card {
+#heroJourney {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+#hubJourney {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+#heroJourney .process-card,
+#hubJourney .process-card {
   --hero-border-angle: 0deg;
   position: relative;
   isolation: isolate;
@@ -483,9 +494,13 @@ ul {
   box-shadow: 0 0 0 1px rgba(34, 81, 255, 0.04), 0 0 18px rgba(126, 182, 255, 0.18);
   transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
   overflow: visible;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
 }
 
-#heroJourney .process-card::before {
+#heroJourney .process-card::before,
+#hubJourney .process-card::before {
   content: '';
   position: absolute;
   inset: -1px;
@@ -513,7 +528,8 @@ ul {
   z-index: 0;
 }
 
-#heroJourney .process-card::after {
+#heroJourney .process-card::after,
+#hubJourney .process-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -523,24 +539,28 @@ ul {
   transition: background var(--transition);
 }
 
-#heroJourney .process-card > * {
+#heroJourney .process-card > *,
+#hubJourney .process-card > * {
   position: relative;
   z-index: 1;
 }
 
-#heroJourney .process-card h4 {
+#heroJourney .process-card h4,
+#hubJourney .process-card h4 {
   font-size: 0.95rem;
   margin-bottom: 0;
   color: inherit;
 }
 
-#heroJourney .process-card .process-step {
+#heroJourney .process-card .process-step,
+#hubJourney .process-card .process-step {
   color: var(--accent);
   margin-bottom: 8px;
   transition: color var(--transition);
 }
 
-#heroJourney .process-card .process-desc {
+#heroJourney .process-card .process-desc,
+#hubJourney .process-card .process-desc {
   color: var(--text-muted);
   max-width: none;
   margin-top: 6px;
@@ -551,7 +571,9 @@ ul {
 }
 
 #heroJourney .process-card:hover,
-#heroJourney .process-card:focus-visible {
+#heroJourney .process-card:focus-visible,
+#hubJourney .process-card:hover,
+#hubJourney .process-card:focus-visible {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
@@ -561,12 +583,16 @@ ul {
 }
 
 #heroJourney .process-card:hover::before,
-#heroJourney .process-card:focus-visible::before {
+#heroJourney .process-card:focus-visible::before,
+#hubJourney .process-card:hover::before,
+#hubJourney .process-card:focus-visible::before {
   opacity: 0;
 }
 
 #heroJourney .process-card:hover::after,
-#heroJourney .process-card:focus-visible::after {
+#heroJourney .process-card:focus-visible::after,
+#hubJourney .process-card:hover::after,
+#hubJourney .process-card:focus-visible::after {
   background: var(--accent);
 }
 
@@ -575,12 +601,19 @@ ul {
 #heroJourney .process-card:hover .process-desc,
 #heroJourney .process-card:focus-visible .process-desc,
 #heroJourney .process-card:hover h4,
-#heroJourney .process-card:focus-visible h4 {
+#heroJourney .process-card:focus-visible h4,
+#hubJourney .process-card:hover .process-step,
+#hubJourney .process-card:focus-visible .process-step,
+#hubJourney .process-card:hover .process-desc,
+#hubJourney .process-card:focus-visible .process-desc,
+#hubJourney .process-card:hover h4,
+#hubJourney .process-card:focus-visible h4 {
   color: #fff;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #heroJourney .process-card::before {
+  #heroJourney .process-card::before,
+  #hubJourney .process-card::before {
     animation: none;
     background: rgba(126, 182, 255, 0.65);
   }
@@ -5689,38 +5722,15 @@ body.modal-open {
 
 .hub-hero .process-flow {
   margin-bottom: 40px;
-  background: var(--white);
+  background: transparent;
 }
 
 .hub-hero .stats {
   margin-bottom: 28px;
 }
 
-#hubJourney .process-card,
-#hubJourney .process-card:hover,
-#hubJourney .process-card.is-active {
-  background: transparent;
-}
-
-#hubJourney .process-card {
-  opacity: 0.42;
-  transition: opacity 0.35s ease;
-}
-
-#hubJourney .process-card.is-on,
-#hubJourney.is-done .process-card {
-  opacity: 1;
-}
-
-#hubJourney .process-arrow {
-  opacity: 0.28;
-  transition: opacity 0.35s ease, color 0.35s ease;
-}
-
-#hubJourney .process-arrow.is-on,
-#hubJourney.is-done .process-arrow {
-  opacity: 1;
-  color: var(--ink);
+#hubJourney .process-card.is-on {
+  /* journey play hint — keep glow cards fully visible */
 }
 
 .hub-hero .hub-scroll-hint {
@@ -8135,21 +8145,32 @@ body.modal-open {
     flex-direction: column;
   }
 
-  #heroJourney {
+  #heroJourney,
+  #hubJourney {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
   }
 
-  #heroJourney .process-card {
+  #heroJourney {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  #hubJourney {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  #heroJourney .process-card,
+  #hubJourney .process-card {
     padding: 12px 8px;
   }
 
-  #heroJourney .process-card h4 {
+  #heroJourney .process-card h4,
+  #hubJourney .process-card h4 {
     font-size: 0.8rem;
   }
 
-  #heroJourney .process-card .process-desc {
+  #heroJourney .process-card .process-desc,
+  #hubJourney .process-card .process-desc {
     font-size: 0.68rem;
     line-height: 1.4;
   }
