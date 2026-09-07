@@ -442,6 +442,18 @@ ul {
   margin-right: auto;
 }
 
+@property --hero-border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes hero-border-travel {
+  to {
+    --hero-border-angle: 360deg;
+  }
+}
+
 #heroJourney {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -455,6 +467,9 @@ ul {
 }
 
 #heroJourney .process-card {
+  --hero-border-angle: 0deg;
+  position: relative;
+  isolation: isolate;
   flex: none;
   width: auto;
   min-width: 0;
@@ -463,10 +478,54 @@ ul {
   text-decoration: none;
   color: inherit;
   background: var(--white);
-  border: 1px solid var(--border-light);
+  border: 1px solid rgba(126, 182, 255, 0.55);
   border-radius: var(--radius);
-  box-shadow: none;
-  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
+  box-shadow: 0 0 0 1px rgba(34, 81, 255, 0.04), 0 0 18px rgba(126, 182, 255, 0.18);
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
+  overflow: visible;
+}
+
+#heroJourney .process-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: conic-gradient(
+    from var(--hero-border-angle),
+    rgba(126, 182, 255, 0.15) 0deg,
+    rgba(126, 182, 255, 0.15) 240deg,
+    rgba(190, 220, 255, 0.95) 280deg,
+    #2251ff 310deg,
+    rgba(190, 220, 255, 0.95) 340deg,
+    rgba(126, 182, 255, 0.15) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: hero-border-travel 3.2s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#heroJourney .process-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--white);
+  z-index: -1;
+  transition: background var(--transition);
+}
+
+#heroJourney .process-card > * {
+  position: relative;
+  z-index: 1;
 }
 
 #heroJourney .process-card h4 {
@@ -498,6 +557,17 @@ ul {
   color: #fff;
   outline: none;
   transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 81, 255, 0.28);
+}
+
+#heroJourney .process-card:hover::before,
+#heroJourney .process-card:focus-visible::before {
+  opacity: 0;
+}
+
+#heroJourney .process-card:hover::after,
+#heroJourney .process-card:focus-visible::after {
+  background: var(--accent);
 }
 
 #heroJourney .process-card:hover .process-step,
@@ -507,6 +577,13 @@ ul {
 #heroJourney .process-card:hover h4,
 #heroJourney .process-card:focus-visible h4 {
   color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #heroJourney .process-card::before {
+    animation: none;
+    background: rgba(126, 182, 255, 0.65);
+  }
 }
 
 .process-card h4 {
