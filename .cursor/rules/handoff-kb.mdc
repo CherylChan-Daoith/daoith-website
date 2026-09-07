@@ -1,0 +1,10 @@
+---
+description: 新 agent 先读本机知识库；收工「今天整理」按 Git 记全项目
+alwaysApply: true
+---
+
+# 接手与收工
+
+工程记忆在本机 `~/Projects/daoith-project-kb`，不在本仓库的 Git 历史里。新对话先读该库 `INDEX.md` 和本仓库 `AGENTS.md`。
+
+用户说「今天整理」：只读本仓库（及 `daoith-pm`）的 Git，只写知识库 Markdown。按当天全项目变更记，不限哪个聊天框。不要为了记笔记改本仓库代码，不要 commit / 上线 / 粘贴 Dify。
