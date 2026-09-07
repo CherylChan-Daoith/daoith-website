@@ -8196,6 +8196,14 @@ body.modal-open {
     line-height: 1.4;
   }
 
+  #hubJourney .process-card {
+    padding: 16px 10px;
+  }
+
+  #hubJourney .process-card .process-desc {
+    white-space: normal;
+  }
+
   .process-arrow {
     transform: rotate(90deg);
   }

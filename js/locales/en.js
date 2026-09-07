@@ -407,22 +407,19 @@ window.DAOITH_I18N_EN = {
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .hub-hero h1': { text: 'Service Hub' },
     '#hub .hub-hero .hero-subtitle': {
-      text: 'Manage inquiries, service orders, and delivery progress. WeChat notifications are only available in Inquiry management.',
+      text: 'Full-process AI-powered tracking — quality service you can trust.',
     },
     '#hubJourney [data-step="1"] h4': { text: 'Inquiries' },
     '#hubJourney [data-step="1"] .process-desc': {
-      html: true,
-      text: 'Submit an inquiry<br>and complete payment',
+      text: 'Submit an inquiry and complete payment',
     },
     '#hubJourney [data-step="2"] h4': { text: 'Service Orders' },
     '#hubJourney [data-step="2"] .process-desc': {
-      html: true,
-      text: 'After close-won<br>look up service orders',
+      text: 'Look up service orders after close-won',
     },
     '#hubJourney [data-step="3"] h4': { text: 'Progress Tracking' },
     '#hubJourney [data-step="3"] .process-desc': {
-      html: true,
-      text: 'Track delivery steps<br>and progress',
+      text: 'Track delivery milestones and progress',
     },
     '#hub .hub-hero .stats > div:nth-child(1) .stat-label': { text: 'Clients served' },
     '#hub .hub-hero .stats > div:nth-child(2) .stat-label': { text: 'Satisfaction' },
