@@ -261,7 +261,7 @@ function initNavDropdown() {
 /* Hero process cards reveal feature blocks */
 function initHeroFeatures() {
   const grid = document.getElementById('heroFeatures');
-  const cards = document.querySelectorAll('#hero .process-card[data-step]');
+  const cards = document.querySelectorAll('#heroJourney .process-card[data-step]');
   if (!grid || !cards.length) return;
 
   function revealStep(step) {

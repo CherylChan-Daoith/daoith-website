@@ -432,6 +432,33 @@ ul {
   margin-bottom: 12px;
 }
 
+.process-desc {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#heroJourney {
+  gap: 0;
+  align-items: flex-start;
+}
+
+#heroJourney .process-card {
+  flex: 1 1 160px;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 8px 16px;
+}
+
+#heroJourney .process-card h4 {
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
 .process-card h4 {
   font-family: var(--font-serif);
   font-size: 1.0625rem;
