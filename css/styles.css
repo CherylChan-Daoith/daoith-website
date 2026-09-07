@@ -452,10 +452,10 @@ ul {
 }
 
 #heroJourney .process-card {
-  flex: 1 1 180px;
-  min-width: 160px;
+  flex: 1 1 160px;
+  min-width: 140px;
   max-width: none;
-  padding: 22px 18px;
+  padding: 16px 14px;
   text-decoration: none;
   color: inherit;
   background: var(--white);
@@ -466,19 +466,24 @@ ul {
 }
 
 #heroJourney .process-card h4 {
-  font-size: 1rem;
+  font-size: 0.95rem;
   margin-bottom: 0;
   color: inherit;
 }
 
 #heroJourney .process-card .process-step {
   color: var(--accent);
+  margin-bottom: 8px;
   transition: color var(--transition);
 }
 
 #heroJourney .process-card .process-desc {
   color: var(--text-muted);
   max-width: none;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  min-height: 2.9em;
   transition: color var(--transition);
 }
 

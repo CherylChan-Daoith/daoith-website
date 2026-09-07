@@ -231,19 +231,23 @@ window.DAOITH_I18N_EN = {
     '.hero-actions .btn-outline': { text: 'Latest Policies' },
     '#heroJourney .process-card[data-step="1"] h4': { text: 'AI Diagnosis' },
     '#heroJourney .process-card[data-step="1"] .process-desc': {
-      text: 'Deeply fused with expert experience — covering 80% of common cases.',
+      html: true,
+      text: 'Deeply fused with expert experience<br>Covering 80% of common cases',
     },
     '#heroJourney .process-card[data-step="2"] h4': { text: '1:1 Tax Expert Review' },
     '#heroJourney .process-card[data-step="2"] .process-desc': {
-      text: 'Experts review the remaining 20% complex cases and finalize a workable setup.',
+      html: true,
+      text: 'Experts review the complex 20%<br>Finalize a workable setup',
     },
     '#heroJourney .process-card[data-step="3"] h4': { text: 'Compliance Delivery' },
     '#heroJourney .process-card[data-step="3"] .process-desc': {
-      text: 'Bookkeeping, export rebates, and registration — turn the plan into action.',
+      html: true,
+      text: 'Bookkeeping / rebates / registration<br>Turn the plan into action',
     },
     '#heroJourney .process-card[data-step="4"] h4': { text: 'AI + Expert Care' },
     '#heroJourney .process-card[data-step="4"] .process-desc': {
-      text: 'Ongoing AI support plus a professional team — delivery you can rely on.',
+      html: true,
+      text: 'Ongoing AI-enabled delivery<br>Service quality you can trust',
     },
     '#ai-solution .section-header h2': { text: 'AI Compliance Plan Generator' },
     '#ai-solution .section-header p': {
