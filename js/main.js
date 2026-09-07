@@ -2494,6 +2494,10 @@ function formatDiagSlotsForApi(slots) {
     hard +=
       `【硬约束·销售额】年销售额必须写「${revenue}」。禁止改用其它档位（例如档案是「500万以下」时禁止写「500-2000万」）。销售额分层建议仅在档案达到对应门槛时才写。\n`;
   }
+  if (revenue === '500万以下') {
+    hard +=
+      '【硬约束·纳税人/进项】只有一般纳税人可抵扣进项；「500万以下」默认小规模（除非用户已声明一般纳税人），禁止写「争取专票以抵扣进项」「补开专票降视同内销税负（进项抵扣）」；免税优先普票。超500万须按一般纳税人。\n';
+  }
   const reportPath = detectDiagnosisReportPath(s);
   const invoice = String(s.invoice || '未填写').trim();
   const product = String(s.productCategory || '未填写').trim();
