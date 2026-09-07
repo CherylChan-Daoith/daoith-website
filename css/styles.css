@@ -5729,6 +5729,27 @@ body.modal-open {
   margin-bottom: 28px;
 }
 
+#hubJourney .process-card {
+  padding: 28px 20px;
+}
+
+#hubJourney .process-card h4 {
+  font-size: 1.05rem;
+}
+
+#hubJourney .process-card .process-step {
+  margin-bottom: 10px;
+  font-size: 0.8125rem;
+}
+
+#hubJourney .process-card .process-desc {
+  min-height: 0;
+  margin-top: 10px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
 #hubJourney .process-card.is-on {
   /* journey play hint — keep glow cards fully visible */
 }
