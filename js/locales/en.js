@@ -424,9 +424,6 @@ window.DAOITH_I18N_EN = {
     '#hub .hub-hero .stats > div:nth-child(1) .stat-label': { text: 'Clients served' },
     '#hub .hub-hero .stats > div:nth-child(2) .stat-label': { text: 'Satisfaction' },
     '#hub .hub-hero .stats > div:nth-child(3) .stat-label': { text: 'Cities covered' },
-    '.hub-scroll-hint[data-hub-scroll="hub-inquiries"] span': { text: 'Click to view inquiries' },
-    '.hub-scroll-hint[data-hub-scroll="hub-orders"] span': { text: 'Click to view service orders' },
-    '.hub-scroll-hint[data-hub-scroll="hub-progress"] span': { text: 'Click to view service progress' },
     '.hub-notify-mini-label': { text: 'WeChat' },
     '#wechatBindTitle': { text: 'Bind WeChat notifications' },
     '#wechatBindLead': {
