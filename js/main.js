@@ -5324,19 +5324,28 @@ function stopDiagStatusTyping(el) {
   if (state?.timer) clearTimeout(state.timer);
   el.__diagStatusTyping = null;
   el.classList.remove('is-status-typing');
+  el.style.minWidth = '';
 }
 
 function startDiagStatusTyping(el, phrase, opts = {}) {
   if (!el) return;
   const full = String(phrase || '');
+  if (!full) {
+    stopDiagStatusTyping(el);
+    el.textContent = '';
+    return;
+  }
   stopDiagStatusTyping(el);
-  const charMs = opts.charMs ?? 110;
-  const holdMs = opts.holdMs ?? 720;
-  const gapMs = opts.gapMs ?? 260;
+  const charMs = opts.charMs ?? 100;
+  const holdMs = opts.holdMs ?? 900;
   const state = { phrase: full, timer: null, i: 0 };
   el.__diagStatusTyping = state;
   el.classList.add('is-status-typing');
-  el.textContent = '';
+  // Reserve width so the bubble never collapses to a caret-sized empty box.
+  el.style.minWidth = `${Math.max(full.length, 4)}em`;
+  // Start with the first character immediately — never show an empty bubble.
+  state.i = 1;
+  el.textContent = full.slice(0, 1);
 
   const schedule = (fn, ms) => {
     state.timer = setTimeout(fn, ms);
@@ -5350,14 +5359,15 @@ function startDiagStatusTyping(el, phrase, opts = {}) {
       schedule(tick, charMs);
       return;
     }
+    // Hold full phrase, then retype from the first character (no blank frame).
     schedule(() => {
       if (el.__diagStatusTyping !== state || !el.isConnected) return;
-      state.i = 0;
-      el.textContent = '';
-      schedule(tick, gapMs);
+      state.i = 1;
+      el.textContent = full.slice(0, 1);
+      schedule(tick, charMs);
     }, holdMs);
   };
-  tick();
+  schedule(tick, charMs);
 }
 
 function ensureDiagStatusTyping(el, phrase) {

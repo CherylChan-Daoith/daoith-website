@@ -1772,27 +1772,10 @@ ul {
     0 6px 18px rgba(34, 81, 255, 0.12);
 }
 
-.diag-chat .ai-chatbot-bubble.is-status-typing::after {
-  content: '';
-  display: inline-block;
-  width: 0.45em;
-  height: 1em;
-  margin-left: 0.12em;
-  vertical-align: -0.12em;
-  background: currentColor;
-  opacity: 0.45;
-  animation: diag-status-caret 0.85s steps(1) infinite;
-}
-
-@keyframes diag-status-caret {
-  0%,
-  49% {
-    opacity: 0.45;
-  }
-  50%,
-  100% {
-    opacity: 0;
-  }
+.diag-chat .ai-chatbot-bubble.is-status-typing {
+  color: #14213d;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .diag-chat .ai-chatbot-bubble.is-user {
