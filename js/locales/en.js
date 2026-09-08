@@ -270,9 +270,9 @@ window.DAOITH_I18N_EN = {
     '#heroPanel2 .hero-mock-tile:nth-child(1) b': { text: 'Compliance Bookkeeping' },
     '#heroPanel2 .hero-mock-tile:nth-child(1) span': { text: 'From ¥5,000 /yr' },
     '#heroPanel2 .hero-mock-tile:nth-child(2) b': { text: '0110 Export + HK Full Managed' },
-    '#heroPanel2 .hero-mock-tile:nth-child(2) span': { text: 'Modular · 5% off from 3 items' },
+    '#heroPanel2 .hero-mock-tile:nth-child(2) span': { text: 'Modular pricing, 10% off from 3 items' },
     '#heroPanel2 .hero-mock-tile:nth-child(3) b': { text: '1039 Export + HK Full Managed' },
-    '#heroPanel2 .hero-mock-tile:nth-child(3) span': { text: 'Modular · 5% off from 3 items' },
+    '#heroPanel2 .hero-mock-tile:nth-child(3) span': { text: 'Modular pricing, 10% off from 3 items' },
     '#heroPanel3 .hero-panel-copy h2': { text: 'AI + professional team, end to end' },
     '#heroPanel3 .hero-panel-copy > p:not(.hero-panel-kicker)': {
       text: 'Track milestones and status with AI-enabled delivery — service quality you can trust.',
@@ -721,8 +721,8 @@ window.DAOITH_I18N_EN = {
     { title: 'Hong Kong company setup', desc: 'Private company incorporation including government fees, first-year address and secretary.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Hong Kong annual return', desc: 'NAR1, BR renewal, secretary/address continuation, and SCR maintenance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
     { title: 'Hong Kong audit & profits tax', desc: 'HKICPA audit report and profits-tax filing; dormant companies and catch-up audits supported.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
-    { title: '0110 rebate + HK compliance bundle', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 5% off from 3 modules' },
-    { title: '1039 exemption + HK compliance bundle', desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 5% off from 3 modules' },
+    { title: '0110 rebate + HK compliance bundle', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
+    { title: '1039 exemption + HK compliance bundle', desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
   ],
   servicesCatalog: [
     {
@@ -1075,9 +1075,9 @@ window.DAOITH_I18N_EN = {
       id: 'domestic-arch-0110-hk',
       title: '0110 rebate + HK compliance bundle',
       desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.',
-      unit: '/ 5% off from 3 modules',
+      unit: '/ 10% off from 3 modules',
       details: window.DAOITH_enServiceBlocks({
-        content: 'For sellers who can obtain special VAT invoices and whose goods qualify for rebate. Pick modules. Three or more modules receive 5% off.',
+        content: 'For sellers who can obtain special VAT invoices and whose goods qualify for rebate. Pick modules. Three or more modules receive 10% off.',
         bullets: [
           '① Mainland company incorporation',
           '② Import/export license',
@@ -1088,7 +1088,7 @@ window.DAOITH_I18N_EN = {
           '⑦ Hong Kong audit & profits tax',
         ],
         audience: 'Amazon / TikTok / SHEIN sellers with special VAT invoices and a need for a clean collection path.',
-        pricing: 'Priced by selected modules. Three or more modules: 5% off. Final quote from the advisor.',
+        pricing: 'Priced by selected modules. Three or more modules: 10% off. Final quote from the advisor.',
         pricingTable: {
           headers: ['Reference pack', 'Modules', 'Notes'],
           rows: [
@@ -1110,9 +1110,9 @@ window.DAOITH_I18N_EN = {
       id: 'domestic-arch-1039-hk',
       title: '1039 exemption + HK compliance bundle',
       desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.',
-      unit: '/ 5% off from 3 modules',
+      unit: '/ 10% off from 3 modules',
       details: window.DAOITH_enServiceBlocks({
-        content: 'For sellers short of purchase invoices. A deemed-collection sole trader handles 1039 exports; a Hong Kong company can sit as the offshore contracting / collection entity. Three or more modules: 5% off.',
+        content: 'For sellers short of purchase invoices. A deemed-collection sole trader handles 1039 exports; a Hong Kong company can sit as the offshore contracting / collection entity. Three or more modules: 10% off.',
         bullets: [
           '① Sole-trader setup & deemed collection',
           '② 1039 market-procurement export',
@@ -1120,7 +1120,7 @@ window.DAOITH_I18N_EN = {
           '④ Hong Kong audit & profits tax',
         ],
         audience: 'E-commerce sellers, invoice-short traders, and small-lot exporters needing a clean collection path.',
-        pricing: 'Priced by selected modules. Three or more: 5% off. 1039 export agency (0.4% of declared value) is extra.',
+        pricing: 'Priced by selected modules. Three or more: 10% off. 1039 export agency (0.4% of declared value) is extra.',
         pricingTable: {
           headers: ['Reference pack', 'Modules', 'Notes'],
           rows: [
