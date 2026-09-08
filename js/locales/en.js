@@ -237,7 +237,7 @@ window.DAOITH_I18N_EN = {
     '#heroShowcase .hero-tab[data-index="1"] .hero-tab-sub': { text: 'Experts handle complex cases' },
     '#heroShowcase .hero-tab[data-index="2"] .hero-tab-title': { text: 'Compliance Delivery' },
     '#heroShowcase .hero-tab[data-index="2"] .hero-tab-sub': { text: 'Bookkeeping · rebates · filing' },
-    '#heroShowcase .hero-tab[data-index="3"] .hero-tab-title': { text: 'AI + Team Care' },
+    '#heroShowcase .hero-tab[data-index="3"] .hero-tab-title': { text: 'AI + Expert Care' },
     '#heroShowcase .hero-tab[data-index="3"] .hero-tab-sub': { text: 'Track progress end to end' },
     '#heroPanel0 .hero-panel-copy h2': { text: 'AI Diagnosis' },
     '#heroPanel0 .hero-panel-copy > p:not(.hero-panel-kicker)': {
