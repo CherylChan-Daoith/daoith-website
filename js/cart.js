@@ -41,7 +41,8 @@
 
   function getTotal() {
     return readCart().reduce((sum, item) => {
-      const price = Number(item.priceValue) || 0;
+      const priced = window.DAOITH_pricing?.repriceCartItem?.(item) || item;
+      const price = Number(priced.priceValue) || 0;
       const qty = Number(item.qty) || 0;
       return sum + price * qty;
     }, 0);
@@ -55,6 +56,10 @@
 
     const items = readCart();
     const addQty = Math.max(1, Number(qty) || 1);
+    let bundleSelection = overrides?.bundleSelection || null;
+    if (Array.isArray(bundleSelection) && window.DAOITH_pricing?.enrichModulePricing) {
+      bundleSelection = bundleSelection.map((m) => window.DAOITH_pricing.enrichModulePricing(m));
+    }
     const priceValue = overrides?.priceValue != null
       ? Number(overrides.priceValue) || 0
       : service.priceValue;
@@ -69,8 +74,9 @@
       existing.priceValue = priceValue;
       existing.priceLabel = priceLabel;
       if (title) existing.title = title;
+      if (bundleSelection) existing.bundleSelection = bundleSelection;
     } else {
-      items.push({
+      const row = {
         id: service.id,
         cartKey,
         title,
@@ -78,10 +84,13 @@
         priceLabel,
         unit,
         qty: addQty,
-        bundleSelection: overrides?.bundleSelection || null,
-      });
+        bundleSelection,
+        salesByScope: {},
+      };
+      const priced = window.DAOITH_pricing?.repriceCartItem?.(row) || row;
+      items.push(priced);
     }
-    writeCart(items);
+    writeCart(items.map((i) => window.DAOITH_pricing?.repriceCartItem?.(i) || i));
     return true;
   }
 
@@ -101,7 +110,22 @@
       return;
     }
     item.qty = next;
+    writeCart(items.map((i) => window.DAOITH_pricing?.repriceCartItem?.(i) || i));
+  }
+
+  function updateItem(cartKey, patch) {
+    const key = String(cartKey || '');
+    const items = readCart();
+    const item = items.find((i) => (i.cartKey || i.id) === key);
+    if (!item) return false;
+    Object.assign(item, patch || {});
+    if (patch?.salesByScope) {
+      item.salesByScope = { ...(item.salesByScope || {}), ...patch.salesByScope };
+    }
+    const priced = window.DAOITH_pricing?.repriceCartItem?.(item) || item;
+    Object.assign(item, priced);
     writeCart(items);
+    return true;
   }
 
   function clearCart() {
@@ -200,7 +224,20 @@
         if (ok) {
           updateCartBadge();
           const locale = window.DAOITH_getLocale?.() || 'zh';
-          showToast(locale === 'en' ? 'Added to inquiry list' : '已加入询价单');
+          const needsVol =
+            btn.dataset.needsVolume === '1' ||
+            (Array.isArray(overrides?.bundleSelection) &&
+              overrides.bundleSelection.some((m) => window.DAOITH_pricing?.isVolumeModule?.(m))) ||
+            !!window.DAOITH_VOLUME_RULES?.[id];
+          showToast(
+            locale === 'en'
+              ? needsVol
+                ? 'Added — enter sales in the cart to estimate fees'
+                : 'Added to inquiry list'
+              : needsVol
+                ? '已加入询价单，请在购物车填写销售额以计算费用'
+                : '已加入询价单'
+          );
         }
       });
     });
@@ -213,6 +250,7 @@
     addItem,
     removeItem,
     updateQty,
+    updateItem,
     clearCart,
     getQuotes,
     setQuotes,

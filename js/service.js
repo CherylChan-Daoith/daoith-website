@@ -164,8 +164,10 @@
 
   function calcBundle(bundle, selected) {
     const mods = (bundle?.modules || []).filter((_, i) => selected.has(i));
-    const fixed = mods.filter((m) => Number(m.priceValue) > 0);
-    const variable = mods.filter((m) => !(Number(m.priceValue) > 0));
+    const isVol = (m) =>
+      window.DAOITH_pricing?.isVolumeModule?.(m) || !(Number(m.priceValue) > 0);
+    const fixed = mods.filter((m) => !isVol(m));
+    const variable = mods.filter((m) => isVol(m));
     const subtotal = fixed.reduce((s, m) => s + (Number(m.priceValue) || 0), 0);
     const count = mods.length;
     const from = Number(bundle?.discountFrom) || 3;
@@ -327,11 +329,18 @@
           calc.count >= calc.from && calc.subtotal > 0 ? `／已享${100 - ratePct}折` : '／已选合计';
       }
       if (addBtn) {
-        addBtn.dataset.bundleSelection = JSON.stringify(
-          calc.mods.map((m) => ({ id: m.serviceId, label: m.label, priceValue: m.priceValue }))
+        const enriched = calc.mods.map((m) =>
+          window.DAOITH_pricing?.enrichModulePricing?.(m) || {
+            id: m.serviceId,
+            label: m.label,
+            priceValue: m.priceValue,
+            priceLabel: m.priceLabel,
+          }
         );
+        addBtn.dataset.bundleSelection = JSON.stringify(enriched);
         addBtn.dataset.priceValue = String(show);
         addBtn.dataset.priceLabel = hasVar && !calc.fixed.length ? '按量计价' : formatMoney(show);
+        addBtn.dataset.needsVolume = hasVar ? '1' : '0';
       }
     }
 

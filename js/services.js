@@ -824,10 +824,28 @@ SCR重要控制人登记册维护
             { label: `①出口公司设立`, serviceId: 'domestic-setup', priceValue: 500, priceLabel: `¥500` },
             { label: `②进出口权办理`, serviceId: 'domestic-trade-license', priceValue: 2000, priceLabel: `¥2,000` },
             { label: `③首单退税辅导`, serviceId: 'domestic-rebate-first', priceValue: 10000, priceLabel: `¥10,000` },
-            { label: `④代理退税申报`, serviceId: 'domestic-rebate', priceValue: 5000, priceLabel: `¥5,000起` },
+            {
+              label: `④代理退税申报`,
+              serviceId: 'domestic-rebate',
+              priceValue: 0,
+              priceLabel: `按出口额0.1%`,
+              pricingModel: 'percent',
+              volumeScope: 'mainland',
+              rate: 0.001,
+              minFee: 5000,
+              maxFee: 30000,
+            },
             { label: `⑤退税公司记账报税`, serviceId: 'domestic-compliance-bookkeeping', priceValue: 5000, priceLabel: `¥5,000起` },
             { label: `⑥香港公司年审`, serviceId: 'hk-annual', priceValue: 3000, priceLabel: `¥3,000` },
-            { label: `⑦香港公司审计报税`, serviceId: 'hk-audit-tax', priceValue: 2200, priceLabel: `¥2,200起` }
+            {
+              label: `⑦香港公司审计报税`,
+              serviceId: 'hk-audit-tax',
+              priceValue: 0,
+              priceLabel: `按营业额分级`,
+              pricingModel: 'tier',
+              volumeScope: 'hk',
+              tiers: 'hk-audit-ecom',
+            },
           ],
         },
       }),
@@ -868,9 +886,26 @@ SCR重要控制人登记册维护
           discountLabel: '3项及以上全托管可享受9折',
           modules: [
             { label: `①个体户注册核定及税务申报`, serviceId: 'domestic-1039-sole', priceValue: 4500, priceLabel: `¥4,500起` },
-            { label: `②1039市场采购出口`, serviceId: 'domestic-1039-export', priceValue: 0, priceLabel: `按报关金额0.4%` },
+            {
+              label: `②1039市场采购出口`,
+              serviceId: 'domestic-1039-export',
+              priceValue: 0,
+              priceLabel: `按报关金额0.4%`,
+              pricingModel: 'percent',
+              volumeScope: 'mainland',
+              rate: 0.004,
+              minFee: 0,
+            },
             { label: `③香港公司年审`, serviceId: 'hk-annual', priceValue: 3000, priceLabel: `¥3,000` },
-            { label: `④香港公司审计报税`, serviceId: 'hk-audit-tax', priceValue: 2200, priceLabel: `¥2,200起` }
+            {
+              label: `④香港公司审计报税`,
+              serviceId: 'hk-audit-tax',
+              priceValue: 0,
+              priceLabel: `按营业额分级`,
+              pricingModel: 'tier',
+              volumeScope: 'hk',
+              tiers: 'hk-audit-ecom',
+            },
           ],
         },
       }),
@@ -1743,5 +1778,177 @@ SCR重要控制人登记册维护
   window.formatServicePrice = function formatServicePrice(value) {
     const n = Number(value) || 0;
     return `¥${n.toLocaleString('zh-CN')}`;
+  };
+
+  /** Volume / tier pricing used by bundles + cart auto-calc */
+  const HK_AUDIT_ECOM_TIERS = [
+    { max: 0, fee: 2200, label: '无运营' },
+    { max: 6000000, fee: 6000, label: '微型(≤600万港币)' },
+    { max: 20000000, fee: 10000, label: '小型(≤2,000万港币)' },
+    { max: 60000000, fee: 14800, label: '中型(≤6,000万港币)' },
+    { max: 100000000, fee: 20500, label: '中大型(≤1亿港币)' },
+  ];
+
+  window.DAOITH_VOLUME_RULES = {
+    'domestic-1039-export': {
+      model: 'percent',
+      scope: 'mainland',
+      rate: 0.004,
+      minFee: 0,
+      metricLabel: { zh: '预计年报关金额（人民币）', en: 'Est. annual customs value (RMB)' },
+      hint: { zh: '按报关金额 0.4% 预估；实际按票结算，单票另有最低收费。', en: 'Estimate at 0.4% of customs value; actual billing is per shipment.' },
+    },
+    'domestic-rebate': {
+      model: 'percent',
+      scope: 'mainland',
+      rate: 0.001,
+      minFee: 5000,
+      maxFee: 30000,
+      metricLabel: { zh: '预计年度出口额（人民币）', en: 'Est. annual export value (RMB)' },
+      hint: { zh: '按年度出口额 0.1% 计，最低 ¥5,000 / 封顶 ¥30,000。', en: '0.1% of annual export value, min ¥5,000 / max ¥30,000.' },
+    },
+    'hk-audit-tax': {
+      model: 'tier',
+      scope: 'hk',
+      tiers: 'hk-audit-ecom',
+      metricLabel: { zh: '香港公司预计年营业额（港币）', en: 'Est. HK company annual turnover (HKD)' },
+      hint: { zh: '按电商档位预估审计报税费；填 0 视为无运营档。', en: 'E-commerce audit tier estimate; enter 0 for dormant.' },
+    },
+  };
+
+  function resolveTiers(key) {
+    if (key === 'hk-audit-ecom') return HK_AUDIT_ECOM_TIERS;
+    return Array.isArray(key) ? key : null;
+  }
+
+  function enrichModulePricing(mod) {
+    if (!mod) return null;
+    const rule = window.DAOITH_VOLUME_RULES[mod.serviceId || mod.id] || null;
+    const pricingModel =
+      mod.pricingModel ||
+      (rule?.model) ||
+      (Number(mod.priceValue) > 0 ? 'fixed' : 'percent');
+    const volumeScope = mod.volumeScope || rule?.scope || null;
+    return {
+      id: mod.serviceId || mod.id || '',
+      label: mod.label || '',
+      priceValue: Number(mod.priceValue) || 0,
+      priceLabel: mod.priceLabel || '',
+      pricingModel,
+      volumeScope,
+      rate: mod.rate != null ? Number(mod.rate) : rule?.rate,
+      minFee: mod.minFee != null ? Number(mod.minFee) : rule?.minFee,
+      maxFee: mod.maxFee != null ? Number(mod.maxFee) : rule?.maxFee,
+      tiers: mod.tiers || rule?.tiers || null,
+    };
+  }
+
+  function isVolumeModule(mod) {
+    const m = enrichModulePricing(mod);
+    return m && (m.pricingModel === 'percent' || m.pricingModel === 'tier');
+  }
+
+  function feeFromVolume(mod, salesByScope) {
+    const m = enrichModulePricing(mod);
+    if (!m || !isVolumeModule(m)) return { fee: Math.max(0, Number(m?.priceValue) || 0), pending: false };
+    const scope = m.volumeScope || 'mainland';
+    const raw = salesByScope?.[scope];
+    if (raw == null || raw === '') return { fee: 0, pending: true };
+    const amount = Math.max(0, Number(raw) || 0);
+
+    if (m.pricingModel === 'percent') {
+      let fee = Math.round(amount * (Number(m.rate) || 0));
+      if (m.minFee != null) fee = Math.max(fee, Number(m.minFee) || 0);
+      if (m.maxFee != null) fee = Math.min(fee, Number(m.maxFee) || fee);
+      return { fee, pending: false };
+    }
+
+    if (m.pricingModel === 'tier') {
+      const tiers = resolveTiers(m.tiers);
+      if (!tiers?.length) return { fee: 0, pending: true };
+      if (amount <= 0) return { fee: Number(tiers[0].fee) || 0, pending: false };
+      const hit = tiers.find((t, i) => i > 0 && amount <= Number(t.max)) || tiers[tiers.length - 1];
+      return { fee: Number(hit?.fee) || 0, pending: false };
+    }
+    return { fee: 0, pending: false };
+  }
+
+  function repriceCartItem(item) {
+    const salesByScope = item.salesByScope || {};
+    const mods = Array.isArray(item.bundleSelection) ? item.bundleSelection.map(enrichModulePricing) : null;
+    const service = window.getServiceById?.(item.id);
+
+    // Standalone volume-priced SKU (no bundle)
+    if (!mods?.length) {
+      const rule = window.DAOITH_VOLUME_RULES[item.id];
+      if (!rule) {
+        return {
+          ...item,
+          priceValue: Number(item.priceValue) || 0,
+          priceLabel: item.priceLabel || window.formatServicePrice(item.priceValue),
+          volumePending: false,
+        };
+      }
+      const { fee, pending } = feeFromVolume({ serviceId: item.id, pricingModel: rule.model, volumeScope: rule.scope }, salesByScope);
+      return {
+        ...item,
+        priceValue: pending ? 0 : fee,
+        priceLabel: pending ? (window.DAOITH_getLocale?.() === 'en' ? 'Enter sales to estimate' : '填写销售额后计算') : window.formatServicePrice(fee),
+        volumePending: pending,
+        volumeScopes: [rule.scope],
+      };
+    }
+
+    const fixed = mods.filter((m) => !isVolumeModule(m));
+    const variable = mods.filter((m) => isVolumeModule(m));
+    const fixedSub = fixed.reduce((s, m) => s + (Number(m.priceValue) || 0), 0);
+    const count = mods.length;
+    const bundle =
+      (service?.details || []).find((b) => b.type === 'bundle-picker')?.bundle || null;
+    const from = Number(bundle?.discountFrom) || 3;
+    const rate = Number(bundle?.discountRate) || 1;
+    const fixedDiscounted = count >= from && fixedSub > 0 ? Math.round(fixedSub * rate) : fixedSub;
+
+    let volumeSum = 0;
+    let pending = false;
+    const pricedMods = mods.map((m) => {
+      if (!isVolumeModule(m)) {
+        return { ...m, computedFee: Number(m.priceValue) || 0 };
+      }
+      const r = feeFromVolume(m, salesByScope);
+      if (r.pending) pending = true;
+      volumeSum += r.fee;
+      return { ...m, computedFee: r.fee, pending: r.pending };
+    });
+
+    const total = fixedDiscounted + volumeSum;
+    const scopes = [...new Set(variable.map((m) => m.volumeScope).filter(Boolean))];
+    let priceLabel = window.formatServicePrice(total);
+    if (pending && !fixedDiscounted && !volumeSum) {
+      priceLabel = window.DAOITH_getLocale?.() === 'en' ? 'Enter sales to estimate' : '填写销售额后计算';
+    } else if (pending) {
+      priceLabel = `${window.formatServicePrice(total)}+`;
+    }
+
+    return {
+      ...item,
+      bundleSelection: pricedMods,
+      priceValue: total,
+      priceLabel,
+      volumePending: pending,
+      volumeScopes: scopes,
+      fixedSubtotal: fixedDiscounted,
+      volumeSubtotal: volumeSum,
+    };
+  }
+
+  window.DAOITH_pricing = {
+    enrichModulePricing,
+    isVolumeModule,
+    feeFromVolume,
+    repriceCartItem,
+    volumeRule(serviceId) {
+      return window.DAOITH_VOLUME_RULES[serviceId] || null;
+    },
   };
 })();

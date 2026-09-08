@@ -56,9 +56,64 @@
     return `¥${(Number(value) || 0).toLocaleString('zh-CN')}`;
   }
 
+  function volumeScopesFor(item) {
+    const priced = window.DAOITH_pricing?.repriceCartItem?.(item) || item;
+    if (Array.isArray(priced.volumeScopes) && priced.volumeScopes.length) return priced.volumeScopes;
+    const mods = Array.isArray(item.bundleSelection) ? item.bundleSelection : [];
+    const scopes = new Set();
+    mods.forEach((m) => {
+      if (window.DAOITH_pricing?.isVolumeModule?.(m) && m.volumeScope) scopes.add(m.volumeScope);
+    });
+    const rule = window.DAOITH_VOLUME_RULES?.[item.id];
+    if (rule?.scope) scopes.add(rule.scope);
+    return [...scopes];
+  }
+
+  function salesFieldHtml(item, scope) {
+    const locale = window.DAOITH_getLocale?.() || 'zh';
+    const ruleFromMod = (Array.isArray(item.bundleSelection) ? item.bundleSelection : [])
+      .map((m) => window.DAOITH_pricing?.enrichModulePricing?.(m) || m)
+      .find((m) => m.volumeScope === scope);
+    const rule = window.DAOITH_VOLUME_RULES?.[ruleFromMod?.id || item.id] || window.DAOITH_VOLUME_RULES?.[item.id];
+    const label =
+      (locale === 'en' ? rule?.metricLabel?.en : rule?.metricLabel?.zh) ||
+      (scope === 'hk'
+        ? t('香港公司预计年营业额（港币）', 'Est. HK company annual turnover (HKD)')
+        : t('预计年度出口/报关金额（人民币）', 'Est. annual export / customs value (RMB)'));
+    const hint =
+      (locale === 'en' ? rule?.hint?.en : rule?.hint?.zh) ||
+      '';
+    const val = item.salesByScope?.[scope];
+    const display = val == null || val === '' ? '' : String(val);
+    return `
+      <label class="cart-sales-field">
+        <span class="cart-sales-label">${escapeHtml(label)}</span>
+        <input type="number" class="cart-sales-input" min="0" step="1" inputmode="decimal"
+          data-sales-scope="${escapeHtml(scope)}"
+          value="${escapeHtml(display)}"
+          placeholder="0">
+        ${hint ? `<span class="cart-sales-hint">${escapeHtml(hint)}</span>` : ''}
+      </label>`;
+  }
+
+  function modulesHtml(item) {
+    const mods = Array.isArray(item.bundleSelection) ? item.bundleSelection : [];
+    if (!mods.length) return '';
+    return `<ul class="cart-item-modules">${mods
+      .map((m) => {
+        const fee =
+          m.computedFee != null && !m.pending
+            ? formatMoney(m.computedFee)
+            : m.priceLabel || (Number(m.priceValue) > 0 ? formatMoney(m.priceValue) : t('待计', 'TBD'));
+        return `<li><span>${escapeHtml(m.label || m.id || '')}</span><em>${escapeHtml(fee)}</em></li>`;
+      })
+      .join('')}</ul>`;
+  }
+
   function renderCart() {
     applyStaticI18n();
-    const items = cartApi.getCart();
+    const rawItems = cartApi.getCart();
+    const items = rawItems.map((i) => window.DAOITH_pricing?.repriceCartItem?.(i) || i);
     const emptyEl = document.getElementById('cartEmpty');
     const contentEl = document.getElementById('cartContent');
     const body = document.getElementById('cartTableBody');
@@ -77,26 +132,30 @@
     emptyEl?.classList.add('is-hidden');
     contentEl?.classList.remove('is-hidden');
 
-    function unitPriceText(item) {
-      return item.priceLabel || formatMoney(item.priceValue);
-    }
-
-    function subtotalText(item) {
-      const value = (Number(item.priceValue) || 0) * (Number(item.qty) || 0);
-      if (value <= 0 && item.priceLabel) return item.priceLabel;
-      return formatMoney(value);
-    }
-
     body.innerHTML = items.map((item) => {
       const title = enTitle(item.id, item.title);
       const rowKey = item.cartKey || item.id;
+      const scopes = volumeScopesFor(item);
+      const salesBlock = scopes.length
+        ? `<div class="cart-sales-block">${scopes.map((s) => salesFieldHtml(item, s)).join('')}</div>`
+        : '';
+      const unitText = item.volumePending && !(Number(item.priceValue) > 0)
+        ? t('填写销售额后计算', 'Enter sales to estimate')
+        : item.priceLabel || formatMoney(item.priceValue);
+      const sub = (Number(item.priceValue) || 0) * (Number(item.qty) || 0);
+      const subText =
+        item.volumePending && sub <= 0
+          ? t('待计算', 'Pending')
+          : formatMoney(sub);
       return `
         <tr data-id="${escapeHtml(item.id)}" data-cart-key="${escapeHtml(rowKey)}">
           <td>
             <a class="cart-item-title" href="/service.html?id=${encodeURIComponent(item.id)}">${escapeHtml(title || item.id || '')}</a>
+            ${modulesHtml(item)}
+            ${salesBlock}
             <div class="cart-item-unit">${escapeHtml(item.unit || '')}</div>
           </td>
-          <td>${escapeHtml(unitPriceText(item))}</td>
+          <td>${escapeHtml(unitText)}</td>
           <td>
             <div class="cart-qty">
               <button type="button" class="cart-qty-btn" data-qty-delta="-1" aria-label="减少">−</button>
@@ -104,7 +163,7 @@
               <button type="button" class="cart-qty-btn" data-qty-delta="1" aria-label="增加">+</button>
             </div>
           </td>
-          <td>${escapeHtml(subtotalText(item))}</td>
+          <td>${escapeHtml(subText)}</td>
           <td><button type="button" class="cart-remove" data-remove>${t('删除', 'Remove')}</button></td>
         </tr>
       `;
@@ -149,11 +208,62 @@
   });
 
   document.getElementById('cartTableBody')?.addEventListener('change', (e) => {
-    if (!e.target.classList.contains('cart-qty-input')) return;
     const row = e.target.closest('tr[data-id]');
     if (!row) return;
-    cartApi.updateQty(row.dataset.cartKey || row.dataset.id, e.target.value);
-    renderCart();
+    const key = row.dataset.cartKey || row.dataset.id;
+    if (e.target.classList.contains('cart-qty-input')) {
+      cartApi.updateQty(key, e.target.value);
+      renderCart();
+      return;
+    }
+    if (e.target.classList.contains('cart-sales-input')) {
+      const scope = e.target.dataset.salesScope;
+      const raw = e.target.value;
+      const num = raw === '' ? null : Math.max(0, Number(raw) || 0);
+      cartApi.updateItem?.(key, { salesByScope: { [scope]: num } });
+      renderCart();
+    }
+  });
+
+  document.getElementById('cartTableBody')?.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('cart-sales-input')) return;
+    const row = e.target.closest('tr[data-id]');
+    if (!row) return;
+    const key = row.dataset.cartKey || row.dataset.id;
+    const scope = e.target.dataset.salesScope;
+    const raw = e.target.value;
+    const num = raw === '' ? null : Math.max(0, Number(raw) || 0);
+    cartApi.updateItem?.(key, { salesByScope: { [scope]: num } });
+    // Soft refresh totals without stealing focus: update price cells only
+    const priced = window.DAOITH_pricing?.repriceCartItem?.(
+      (cartApi.getCart() || []).find((i) => (i.cartKey || i.id) === key)
+    );
+    if (!priced) return;
+    const cells = row.querySelectorAll('td');
+    if (cells[1]) {
+      cells[1].textContent =
+        priced.volumePending && !(Number(priced.priceValue) > 0)
+          ? t('填写销售额后计算', 'Enter sales to estimate')
+          : priced.priceLabel || formatMoney(priced.priceValue);
+    }
+    if (cells[3]) {
+      const sub = (Number(priced.priceValue) || 0) * (Number(priced.qty) || 0);
+      cells[3].textContent =
+        priced.volumePending && sub <= 0 ? t('待计算', 'Pending') : formatMoney(sub);
+    }
+    const mods = row.querySelectorAll('.cart-item-modules li em');
+    if (Array.isArray(priced.bundleSelection) && mods.length) {
+      priced.bundleSelection.forEach((m, i) => {
+        if (!mods[i]) return;
+        mods[i].textContent =
+          m.computedFee != null && !m.pending
+            ? formatMoney(m.computedFee)
+            : m.priceLabel || (Number(m.priceValue) > 0 ? formatMoney(m.priceValue) : t('待计', 'TBD'));
+      });
+    }
+    const totalEl = document.getElementById('cartTotalValue');
+    if (totalEl) totalEl.textContent = formatMoney(cartApi.getTotal());
+    cartApi.updateCartBadge();
   });
 
   document.getElementById('openQuoteBtn')?.addEventListener('click', () => {
@@ -188,13 +298,21 @@
       return;
     }
 
-    const items = cartApi.getCart();
+    const items = (cartApi.getCart() || []).map((i) => window.DAOITH_pricing?.repriceCartItem?.(i) || i);
     const payload = {
       company,
       contact,
       phone,
       total: cartApi.getTotal(),
-      items: items.map((i) => ({ id: i.id, title: i.title, qty: i.qty, priceValue: i.priceValue })),
+      items: items.map((i) => ({
+        id: i.id,
+        title: i.title,
+        qty: i.qty,
+        priceValue: i.priceValue,
+        priceLabel: i.priceLabel,
+        salesByScope: i.salesByScope || {},
+        bundleSelection: i.bundleSelection || null,
+      })),
     };
 
     if (submitBtn) {
