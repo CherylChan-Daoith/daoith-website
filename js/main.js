@@ -2055,10 +2055,20 @@ function entityOptionsForPlatform(platformLabel) {
   return out;
 }
 
+/** User intends to start Mode A exclusive diagnosis (chip or short typed alias). */
+function wantsExclusiveDiagnosisStart(text) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  if (/开启专属合规诊断|重新诊断|换个模式|我要逐步诊断/.test(t)) return true;
+  // Allow bare「专属合规诊断」as the whole message (Agent replies often mention the phrase in prose)
+  if (/^专属合规诊断[。.!！]?$/.test(t)) return true;
+  return false;
+}
+
 /** Rewrite mode-select clicks into explicit instructions for the Agent API. */
 function normalizeDiagnosisModeQuery(text) {
   const t = String(text || '').trim();
-  if (/开启专属合规诊断/.test(t)) {
+  if (wantsExclusiveDiagnosisStart(t) && !/特定问题/.test(t)) {
     return (
       '【模式选择】用户选择：开启专属合规诊断。' +
       '请立即进入模式A专属合规诊断，执行第一步：只提问「1. 您在哪个电商平台上销售商品？（可在下方点选）」；不要在正文罗列平台名称，官网底部会显示按钮。' +
@@ -3472,7 +3482,7 @@ function initAiChatbot() {
   /** Track mode/step so diagnosis keeps clickable answer chips each turn. */
   const trackUserWizardAnswer = (text) => {
     const t = String(text || '').trim();
-    if (/开启专属合规诊断/.test(t)) {
+    if (wantsExclusiveDiagnosisStart(t)) {
       clearDiagSlots();
       resetResultPlanPanel();
       setUiWizard('diagnosis', 1, '');
@@ -3480,12 +3490,6 @@ function initAiChatbot() {
     }
     if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
       setUiWizard('qa', 0, '');
-      return;
-    }
-    if (/重新诊断|换个模式|我要逐步诊断/.test(t)) {
-      clearDiagSlots();
-      resetResultPlanPanel();
-      setUiWizard('diagnosis', 1, '');
       return;
     }
     if (getUiMode() !== 'diagnosis') return;
@@ -3613,15 +3617,34 @@ function initAiChatbot() {
     // 澄清追问：只让用户打字，不展示快捷选项
     if (looksLikeDiagnosisClarificationAsk(botText)) {
       const clarifyStep = inferClarificationStepFromBotText(botText);
-      if (getUiMode() === 'diagnosis' && clarifyStep >= 1 && clarifyStep <= 7) {
+      if (clarifyStep >= 1 && clarifyStep <= 7) {
         setUiWizard('diagnosis', clarifyStep, getUiPlatform());
       }
       clearQuickReplies();
       return;
     }
 
-    const uiMode = getUiMode();
-    const uiStep = getUiStep();
+    // Recover wizard state when the bot is clearly asking a step 1–7 slot question
+    // (e.g. user typed「专属合规诊断」without「开启」, localStorage was empty)
+    let uiMode = getUiMode();
+    let uiStep = getUiStep();
+    if (looksLikeDiagnosisWizardAsk(botText)) {
+      const inferred = inferDiagStepFromBotText(botText);
+      const step =
+        inferred >= 1 && inferred <= 7
+          ? inferred
+          : uiStep >= 1 && uiStep <= 7
+            ? uiStep
+            : 0;
+      if (step >= 1 && step <= 7) {
+        if (uiMode !== 'diagnosis' || uiStep < 1 || uiStep > 7 || uiStep !== step) {
+          setUiWizard('diagnosis', step, getUiPlatform());
+        }
+        uiMode = 'diagnosis';
+        uiStep = step;
+      }
+    }
+
     const setKey = resolveDiagQuickReplySet(botText, uiMode, uiStep, getUiPlatform());
     if (!setKey) {
       clearQuickReplies();
@@ -3731,8 +3754,7 @@ function initAiChatbot() {
 
     const loggedIn = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
     const returnToAi = `${window.location.pathname}${window.location.search}#ai-solution`;
-    const wantsExclusiveDiagnosis =
-      /开启专属合规诊断/.test(text) || /重新诊断|换个模式|我要逐步诊断/.test(text);
+    const wantsExclusiveDiagnosis = wantsExclusiveDiagnosisStart(text);
 
     // 专属合规诊断：选模式时即要求微信登录（不要等到出方案才拦）
     if (wantsExclusiveDiagnosis && !loggedIn) {
@@ -3781,8 +3803,9 @@ function initAiChatbot() {
 
     // Mode switch: always start a fresh Dify conversation (avoid stale上下文跑偏)
     const isModeSelect =
-      /开启专属合规诊断/.test(text) || /我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(text);
-    if (isModeSelect || wantsExclusiveDiagnosis) {
+      wantsExclusiveDiagnosis ||
+      /我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(text);
+    if (isModeSelect) {
       resetConversation();
     }
 
@@ -5297,16 +5320,17 @@ function showExpertConsultServiceRecs() {
 
 function showDiagnosisServiceRecs(markdown, options = {}) {
   const serviceHost = document.getElementById('diagServiceRecs');
-  if (!serviceHost) return;
+  if (!serviceHost) return '';
   const html = buildDiagnosisServiceRecsHtml(markdown, options);
   if (!html) {
     serviceHost.innerHTML = '';
     serviceHost.hidden = true;
-    return;
+    return '';
   }
   serviceHost.innerHTML = html;
   serviceHost.hidden = false;
   window.DAOITH_CART?.bindAddButtons?.(serviceHost);
+  return html;
 }
 
 /** After a substantive bot reply (not wizard slot prompts), always show service cards. */
@@ -5580,13 +5604,13 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
 }
 
 const DIAG_SERVICE_MATCH_TIP =
-  '道一合规小助手已为您匹配最相关的服务，请在本页面下方进行选择。';
+  '道一合规小助手已为您匹配最相关的服务，请查看本条回复下方的服务卡片（页面下方亦有同款推荐）。';
 
-/** Remove tip copy from answer bodies (must only live in #resultServiceTip). */
+/** Remove tip copy from answer bodies (must only live in #resultServiceTip / inline card block). */
 function stripServiceMatchTip(text) {
   return String(text || '')
     .replace(
-      /道一合规小助手已为您匹配最相关的服务[，,]?\s*请在本页面下方进行选择。?/g,
+      /道一合规小助手已为您匹配最相关的服务[，,]?\s*请(?:在本页面下方进行选择|查看本条回复下方的服务卡片)[^。\n]*。?/g,
       ''
     )
     .replace(/\n{3,}/g, '\n\n')
@@ -5778,7 +5802,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     (timeLabel ? `<span class="result-entry-time">${escapeHtml(timeLabel)}</span>` : '') +
     `</p>`;
 
-  const mountEntry = (innerHtml) => {
+  const mountEntry = (innerHtml, inlineServicesHtml = '') => {
     purgeInlineServiceMatchTips(items);
     // Only replace the in-flight draft for this turn — never overwrite prior finished replies
     let entry = null;
@@ -5811,7 +5835,13 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
         : '') +
       metaHtml +
       innerHtml +
+      (inlineServicesHtml
+        ? `<div class="result-inline-services">${inlineServicesHtml}</div>`
+        : '') +
       `</div>`;
+    if (inlineServicesHtml) {
+      window.DAOITH_CART?.bindAddButtons?.(entry);
+    }
     // Keep page scroll fixed — only adjust the result panel scroller
     try {
       const scroller = items;
@@ -5821,6 +5851,14 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       /* ignore */
     }
     return entry;
+  };
+
+  const attachServiceRecs = (sourceMarkdown, lead) => {
+    // Skip service spam while streaming draft tokens
+    if (replaceLatest && !finalize && !refreshDiagnosis) return '';
+    const html = showDiagnosisServiceRecs(sourceMarkdown, { lead });
+    if (html) setResultServiceTipVisible(true);
+    return html || '';
   };
 
   if (kind === 'diagnosis' && jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
@@ -5836,19 +5874,18 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     const fromChat = `以下方案由左侧<strong>道一合规助手</strong>生成：`;
     const archiveHtml = buildDiagnosisArchiveConfirmHtml();
     const changeHtml = buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges());
+    const servicesHtml = attachServiceRecs(
+      clean,
+      '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。'
+    );
     mountEntry(
       `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
         archiveHtml +
         changeHtml +
-        body
+        body,
+      servicesHtml
     );
     cacheLastDiagnosisReport({ jsonReport, markdown: clean });
-    setResultServiceTipVisible(true);
-    if (serviceHost && !(replaceLatest && !finalize)) {
-      showDiagnosisServiceRecs(clean, {
-        lead: '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
-      });
-    }
     return;
   }
 
@@ -5878,23 +5915,19 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
+  const servicesHtml = attachServiceRecs(
+    clean,
+    kind === 'qa'
+      ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
+      : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。'
+  );
   mountEntry(
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
       archiveHtml +
       changeHtml +
-      body
+      body,
+    servicesHtml
   );
-  if (kind === 'diagnosis') setResultServiceTipVisible(true);
-
-  // Don't spam service cards on every stream token — only when the entry is finalized
-  if (serviceHost && !(replaceLatest && !finalize)) {
-    showDiagnosisServiceRecs(clean, {
-      lead:
-        kind === 'qa'
-          ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
-          : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。',
-    });
-  }
 }
 
 /* Dify API (api.daoith.com) — no API keys in frontend */
