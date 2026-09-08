@@ -49,7 +49,23 @@ export default async function handler(req, res) {
 
   try {
     const tokenData = await exchangeWeChatCode(code);
-    const userInfo = await fetchWeChatUserInfo(tokenData.access_token, tokenData.openid);
+    let userInfo = {
+      openid: tokenData.openid,
+      unionid: tokenData.unionid || null,
+      nickname: '',
+      headimgurl: '',
+      country: '',
+      province: '',
+      city: '',
+    };
+    try {
+      userInfo = {
+        ...userInfo,
+        ...(await fetchWeChatUserInfo(tokenData.access_token, tokenData.openid)),
+      };
+    } catch (err) {
+      console.warn('[wechat] userinfo skipped:', err.message || err);
+    }
 
     const clientIp = extractClientIp(req);
     let region = {
@@ -57,28 +73,36 @@ export default async function handler(req, res) {
       province: userInfo.province || null,
       city: userInfo.city || null,
     };
-    // WeChat no longer returns reliable region; fill from login IP when possible
-    if (!region.province && !region.city) {
+    // 微信已不再返回可靠地区；用登录公网 IP 解析
+    if (clientIp && (!region.province || !region.city)) {
       const geo = await lookupIpRegion(clientIp);
       if (geo) {
         region = {
-          country: geo.country || region.country,
-          province: geo.province || null,
-          city: geo.city || null,
+          country: region.country || geo.country || null,
+          province: region.province || geo.province || null,
+          city: region.city || geo.city || null,
         };
       }
     }
+    if (!clientIp) {
+      console.warn('[wechat] login IP missing; region/IP will not sync to PM');
+    }
+
+    const profile = {
+      openid: userInfo.openid,
+      unionid: userInfo.unionid || tokenData.unionid || null,
+      nickname: userInfo.nickname || null,
+      avatarUrl: userInfo.headimgurl || null,
+      country: region.country,
+      province: region.province,
+      city: region.city,
+      lastLoginIp: clientIp,
+    };
 
     let user;
     if (hasDatabase()) {
       user = await upsertWeChatUser({
-        openid: userInfo.openid,
-        unionid: userInfo.unionid || tokenData.unionid || null,
-        nickname: userInfo.nickname || null,
-        avatarUrl: userInfo.headimgurl || null,
-        country: region.country,
-        province: region.province,
-        city: region.city,
+        ...profile,
         loginIp: clientIp,
         recordLogin: true,
       });
@@ -86,13 +110,8 @@ export default async function handler(req, res) {
     } else {
       // Stateless fallback when Vercel cannot reach internal Postgres
       user = {
-        id: userInfo.openid,
-        openid: userInfo.openid,
-        nickname: userInfo.nickname || null,
-        avatarUrl: userInfo.headimgurl || null,
-        country: region.country,
-        province: region.province,
-        city: region.city,
+        id: profile.openid,
+        ...profile,
         phone: null,
         lastLoginAt: new Date().toISOString(),
         loginCount: 1,

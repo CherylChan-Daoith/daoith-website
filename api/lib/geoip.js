@@ -116,33 +116,56 @@ function isPublicIp(ip) {
   return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(cleaned);
 }
 
+function headerLine(headers, names) {
+  if (!headers) return '';
+  for (const name of names) {
+    let value;
+    if (typeof headers.get === 'function') {
+      value = headers.get(name);
+    } else {
+      value = headers[name] || headers[name.toLowerCase()];
+    }
+    if (value == null || value === '') continue;
+    return Array.isArray(value) ? value.filter(Boolean).join(',') : String(value);
+  }
+  return '';
+}
+
+function normalizeCandidateIp(raw) {
+  let ip = String(raw || '').trim();
+  if (!ip || ip === 'unknown' || ip === 'null' || ip === 'undefined') return '';
+  ip = ip.replace(/^\[/, '').replace(/\]$/, '');
+  ip = ip.replace(/^::ffff:/i, '');
+  const v4port = ip.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  if (v4port) return v4port[1];
+  return ip;
+}
+
 export function extractClientIp(req) {
   const headers = req.headers || {};
   const candidates = [];
+  const forwarded = headerLine(headers, [
+    'x-vercel-forwarded-for',
+    'x-real-ip',
+    'x-forwarded-for',
+    'cf-connecting-ip',
+    'true-client-ip',
+    'x-client-ip',
+  ]);
 
-  const forwarded =
-    headers['x-forwarded-for'] ||
-    headers['X-Forwarded-For'] ||
-    headers['x-real-ip'] ||
-    headers['X-Real-IP'] ||
-    headers['cf-connecting-ip'] ||
-    headers['CF-Connecting-IP'] ||
+  for (const part of forwarded.split(',')) {
+    const ip = normalizeCandidateIp(part);
+    if (ip) candidates.push(ip);
+  }
+
+  const remote =
+    req.socket?.remoteAddress ||
+    req.connection?.remoteAddress ||
     '';
+  const remoteIp = normalizeCandidateIp(remote);
+  if (remoteIp) candidates.push(remoteIp);
 
-  if (typeof forwarded === 'string' && forwarded.trim()) {
-    for (const part of forwarded.split(',')) {
-      candidates.push(part.trim());
-    }
-  }
-
-  if (req.socket?.remoteAddress) {
-    candidates.push(req.socket.remoteAddress);
-  }
-
-  for (const raw of candidates) {
-    const ip = String(raw || '')
-      .replace(/^::ffff:/i, '')
-      .trim();
+  for (const ip of candidates) {
     if (isPublicIp(ip)) return ip;
   }
   return null;
@@ -234,6 +257,16 @@ async function lookupPconline(ip) {
   };
 }
 
+async function lookupIpWho(ip) {
+  const data = await fetchJson(`https://ipwho.is/${encodeURIComponent(ip)}`);
+  if (!data || data.success === false) return null;
+  return {
+    country: normalizeCountry(data.country),
+    province: normalizeProvince(data.region),
+    city: normalizeCity(data.city),
+  };
+}
+
 async function lookupIpApi(ip) {
   const data = await fetchJson(
     `http://ip-api.com/json/${encodeURIComponent(ip)}?lang=zh-CN&fields=status,message,country,regionName,city`,
@@ -259,8 +292,8 @@ async function lookupIpSb(ip) {
 export async function lookupIpRegion(ip) {
   if (!isPublicIp(ip)) return null;
 
-  // ip-api 返回 UTF-8 中文，最稳；pconline 需 GBK
-  const sources = [lookupIpApi, lookupPconline, lookupIpSb];
+  // ipwho / ip.sb 可从 Vercel 访问；pconline、ip-api 在国内更准
+  const sources = [lookupIpWho, lookupIpSb, lookupPconline, lookupIpApi];
   for (const fn of sources) {
     try {
       const hit = await fn(ip);
