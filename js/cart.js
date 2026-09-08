@@ -47,25 +47,38 @@
     }, 0);
   }
 
-  function addItem(serviceId, qty = 1) {
+  function addItem(serviceId, qty = 1, overrides = null) {
     const service = typeof window.getServiceById === 'function'
       ? window.getServiceById(serviceId)
       : null;
     if (!service) return false;
 
     const items = readCart();
-    const existing = items.find((i) => i.id === service.id);
     const addQty = Math.max(1, Number(qty) || 1);
+    const priceValue = overrides?.priceValue != null
+      ? Number(overrides.priceValue) || 0
+      : service.priceValue;
+    const priceLabel = overrides?.priceLabel || service.priceLabel;
+    const title = overrides?.title || service.title;
+    const unit = overrides?.unit != null ? overrides.unit : service.unit;
+    const selectionKey = overrides?.selectionKey || '';
+    const cartKey = selectionKey ? `${service.id}::${selectionKey}` : service.id;
+    const existing = items.find((i) => (i.cartKey || i.id) === cartKey);
     if (existing) {
       existing.qty = (Number(existing.qty) || 0) + addQty;
+      existing.priceValue = priceValue;
+      existing.priceLabel = priceLabel;
+      if (title) existing.title = title;
     } else {
       items.push({
         id: service.id,
-        title: service.title,
-        priceValue: service.priceValue,
-        priceLabel: service.priceLabel,
-        unit: service.unit,
+        cartKey,
+        title,
+        priceValue,
+        priceLabel,
+        unit,
         qty: addQty,
+        bundleSelection: overrides?.bundleSelection || null,
       });
     }
     writeCart(items);
@@ -156,7 +169,32 @@
         const id = btn.dataset.serviceId
           || btn.closest('[data-service-id]')?.dataset.serviceId;
         if (!id) return;
-        const ok = addItem(id, 1);
+        let overrides = null;
+        if (btn.dataset.priceLabel || btn.dataset.priceValue || btn.dataset.bundleSelection) {
+          let bundleSelection = null;
+          try {
+            bundleSelection = btn.dataset.bundleSelection
+              ? JSON.parse(btn.dataset.bundleSelection)
+              : null;
+          } catch {
+            bundleSelection = null;
+          }
+          const labels = Array.isArray(bundleSelection)
+            ? bundleSelection.map((m) => m.label).filter(Boolean)
+            : [];
+          const service = window.getServiceById?.(id);
+          overrides = {
+            priceValue: btn.dataset.priceValue,
+            priceLabel: btn.dataset.priceLabel,
+            title: labels.length && service
+              ? `${service.title}（${labels.join('、')}）`
+              : undefined,
+            unit: labels.length ? '' : undefined,
+            selectionKey: labels.length ? labels.join('|') : '',
+            bundleSelection,
+          };
+        }
+        const ok = addItem(id, 1, overrides);
         if (ok) {
           updateCartBadge();
           const locale = window.DAOITH_getLocale?.() || 'zh';

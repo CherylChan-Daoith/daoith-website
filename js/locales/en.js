@@ -435,7 +435,7 @@ window.DAOITH_I18N_EN = {
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {
-      text: 'Browse 15 compliance services by category. Open a product page for details, or add to inquiry for a preferential quote.',
+      text: 'Browse 16 compliance services by category. Open a product page for details, or add to inquiry for a preferential quote.',
     },
     '.filter-btn[data-filter="all"]': { text: 'All' },
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
@@ -445,10 +445,13 @@ window.DAOITH_I18N_EN = {
     '.filter-btn[data-filter="hongkong"]': { text: 'Hong Kong' },
     '.filter-btn[data-filter="bundle"]': { text: 'Bundles' },
     '#showMoreServices': { text: 'View all {n} services ↓' },
-    '#hub .hub-hero h1': { text: 'Service Hub' },
+    '#hub .hub-hero .hub-home-link': { text: 'Service Hub' },
     '#hub .hub-hero .hero-subtitle': {
       text: 'Full-process AI-powered tracking — quality service you can trust.',
     },
+    '.hub-subnav-link[data-hub-nav="inquiries"]': { text: 'Inquiries' },
+    '.hub-subnav-link[data-hub-nav="orders"]': { text: 'Service Orders' },
+    '.hub-subnav-link[data-hub-nav="progress"]': { text: 'Progress Tracking' },
     '#hubJourney [data-step="1"] h4': { text: 'Inquiries' },
     '#hubJourney [data-step="1"] .process-desc': {
       text: 'Submit an inquiry and complete payment',
@@ -711,6 +714,7 @@ window.DAOITH_I18N_EN = {
     { title: 'Expert 1-on-1 advisory', desc: 'One-on-one diagnosis covering structure, rebates, tax risk, and actionable next steps.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ hour' },
     { title: 'Cross-border tax diagnosis', desc: 'Health check with interviews, document review, risk report, and remediation advice.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
     { title: 'Compliance coaching', desc: 'Turn a compliance plan into a tracked execution calendar, with tax-authority support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
+    { title: 'AI finance ops coaching', desc: 'Survey first, then land AI in finance workflows with hands-on coaching until the team can run independently.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Compliance bookkeeping', desc: 'Books, filings, risk alerts, health check, and annual AIC reporting support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
     { title: 'Company incorporation', desc: 'Name check, filing, license, chops, and tax / social / bank onboarding guidance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: 'Sole-trader setup & deemed collection', desc: 'Sole-trader registration, deemed-collection filing, and ongoing tax returns.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
@@ -795,6 +799,46 @@ window.DAOITH_I18N_EN = {
         faqs: [
           { q: 'Does coaching include bookkeeping or rebate filing?', a: 'No. Add bookkeeping or rebate agency separately.' },
           { q: 'We do not have a diagnosis yet.', a: 'Pair this with the diagnosis product first.' },
+        ],
+      }),
+    },
+    {
+      id: 'consult-ai-finance-coach',
+      title: 'AI finance ops coaching',
+      desc: 'Survey first, then land AI in finance workflows with hands-on coaching until the team can run independently.',
+      unit: ' from',
+      details: window.DAOITH_enServiceBlocks({
+        content:
+          'For teams adopting AI in finance ops: we survey current state and goals, estimate a realistic delivery window, then design workflows, land tools, and coach the team until they can run independently.',
+        bullets: [
+          'Finance ops survey and goal alignment',
+          'Delivery-window assessment and staged plan',
+          'AI tool selection / setup and process redesign',
+          'Hands-on coaching on agreed scenarios (books, reconciliation, reporting, analysis, etc.)',
+          'Team enablement and playbooks for independent use after handover',
+        ],
+        highlights: ['Survey before pricing tier', 'Priced by delivery window', 'Coach until independent'],
+        audience: 'SMEs and growth companies that want AI in finance ops landed with advisory coaching—not just software purchase.',
+        pricing: 'Tiered after a survey of your realistic delivery window; the signed scope confirms the tier.',
+        pricingTable: {
+          headers: ['Delivery window', 'Fee', 'Notes'],
+          rows: [
+            ['Within 2 months', '¥60,000', 'Survey confirms agreed scope can land in 2 months'],
+            ['Within 4 months', '¥100,000', 'Survey confirms agreed scope can land in 4 months'],
+            ['Within 6 months', '¥150,000', 'Survey confirms agreed scope can land in 6 months'],
+          ],
+        },
+        pricingNote: 'Final tier follows the survey and mutually confirmed scope. Extensions caused by out-of-scope work or client-side delays are quoted separately.',
+        process: ['Scoping survey', 'Window assessment and tier confirmation', 'Kickoff', 'Process / tool landing and coaching', 'Stage acceptance', 'Handover'],
+        steps: [
+          { title: 'Survey', time: '1–2 weeks after kickoff' },
+          { title: 'Window & quote confirmation', time: 'After survey' },
+          { title: 'Coaching delivery', time: 'Confirmed 2 / 4 / 6-month window' },
+          { title: 'Acceptance & handover', time: 'End of delivery window' },
+        ],
+        faqs: [
+          { q: 'Why is the price set after a survey?', a: 'Finance maturity, data quality, and team bandwidth vary widely. The survey decides whether the 2 / 4 / 6-month tier (¥60k / ¥100k / ¥150k) applies.' },
+          { q: 'Does the fee include software licenses?', a: 'The fee covers advisory coaching and landing support. Third-party licenses, vendor implementation, and custom builds are usually separate and listed before signing.' },
         ],
       }),
     },

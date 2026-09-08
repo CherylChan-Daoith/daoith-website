@@ -1008,8 +1008,8 @@
       saveCsCtx();
       appendBubble(howOnly ? t('progressHow') : t('progressNeedLogin'), 'bot');
       renderChips(defaultChips());
-      requireAuth('cs_hub', '/#hub');
-      goAndScroll('#hub', 'hub-progress');
+      requireAuth('cs_hub', '/#hub-progress');
+      go('#hub-progress');
       return;
     }
 
@@ -1017,7 +1017,7 @@
       saveCsCtx();
       appendBubble(t('progressHow'), 'bot');
       renderChips(defaultChips());
-      goAndScroll('#hub', 'hub-progress');
+      go('#hub-progress');
       return;
     }
 
@@ -1058,7 +1058,7 @@
         const hint = q.replace(/我(买的|的)?|到什么进度了|进度|服务|负责人是谁|谁负责/g, '').trim() || q;
         setBotHtml(typing, formatBubble(t('progressMiss').replace('{q}', hint)));
         renderChips(defaultChips());
-        if (focus === 'full') goAndScroll('#hub', 'hub-progress');
+        if (focus === 'full') go('#hub-progress');
         return;
       }
 
@@ -1096,7 +1096,7 @@
           saveCsCtx();
           setBotHtml(typing, formatBubble(t('progressEmpty')));
           renderChips(defaultChips());
-          goAndScroll('#hub', 'hub-progress');
+          go('#hub-progress');
           return;
         }
         awaitingOrderNo = svcHits.length !== 1;
@@ -1112,13 +1112,13 @@
       saveCsCtx();
       setBotHtml(typing, formatBubble(body));
       renderChips(defaultChips());
-      if (focus === 'full') goAndScroll('#hub', 'hub-progress');
+      if (focus === 'full') go('#hub-progress');
     } catch {
       awaitingOrderNo = true;
       saveCsCtx();
       setBotHtml(typing, formatBubble(t('progressFail')));
       renderChips(defaultChips());
-      if (focus === 'full') goAndScroll('#hub', 'hub-progress');
+      if (focus === 'full') go('#hub-progress');
     } finally {
       busy = false;
     }

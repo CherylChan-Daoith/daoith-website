@@ -91,6 +91,9 @@ function initNavigation() {
     about: 'about',
     team: 'about',
     hub: 'hub',
+    'hub-inquiries': 'hub',
+    'hub-orders': 'hub',
+    'hub-progress': 'hub',
   };
 
   const viewToNavHref = {
@@ -105,6 +108,32 @@ function initNavigation() {
   function resolveView(hash) {
     const id = String(hash || '').replace(/^#/, '');
     return hashToView[id] || 'home';
+  }
+
+  function resolveHubPage(hash) {
+    const id = String(hash || '').replace(/^#/, '');
+    if (id === 'hub-inquiries') return 'inquiries';
+    if (id === 'hub-orders') return 'orders';
+    if (id === 'hub-progress') return 'progress';
+    return 'home';
+  }
+
+  function syncHubSubpage(hash) {
+    const hub = document.getElementById('hub');
+    if (!hub) return 'home';
+    const page = resolveHubPage(hash);
+    const prevPage = hub.dataset.hubPage || 'home';
+    hub.dataset.hubPage = page;
+    hub.querySelectorAll('[data-hub-page]').forEach((el) => {
+      el.hidden = el.getAttribute('data-hub-page') !== page;
+    });
+    hub.querySelectorAll('[data-hub-nav]').forEach((a) => {
+      const on = a.getAttribute('data-hub-nav') === page;
+      a.classList.toggle('is-active', on);
+      if (on) a.setAttribute('aria-current', 'page');
+      else a.removeAttribute('aria-current');
+    });
+    return { page, prevPage };
   }
 
   function setActiveNav(hashId, view) {
@@ -166,8 +195,11 @@ function initNavigation() {
       d.querySelector('.nav-dropdown-trigger')?.setAttribute('aria-expanded', 'false');
     });
 
-    if (view === 'hub' && prevView !== 'hub') {
-      requestAnimationFrame(() => window.DAOITH_playHubJourney?.());
+    if (view === 'hub') {
+      const { page, prevPage } = syncHubSubpage(raw);
+      if (page === 'home' && (prevView !== 'hub' || prevPage !== 'home')) {
+        requestAnimationFrame(() => window.DAOITH_playHubJourney?.());
+      }
     }
     if (view === 'ai-solution' && prevView !== 'ai-solution') {
       requestAnimationFrame(() => window.DAOITH_playAiSolutionJourney?.());
@@ -10120,14 +10152,6 @@ function bindHubUi() {
   if (!root) return;
 
   root.addEventListener('click', (e) => {
-    const scrollHint = e.target.closest('[data-hub-scroll]');
-    if (scrollHint) {
-      e.preventDefault();
-      const target = document.getElementById(scrollHint.getAttribute('data-hub-scroll') || '');
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      return;
-    }
-
     const helpBtn = e.target.closest('[data-hub-help]');
     if (helpBtn) {
       const wrap = helpBtn.closest('.hub-help-wrap');
