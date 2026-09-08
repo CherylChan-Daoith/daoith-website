@@ -1366,6 +1366,17 @@ ul {
   background: var(--white);
 }
 
+/* About + Team share one view — don't stretch each to full viewport */
+#about[data-view].is-active-view {
+  min-height: 0;
+  padding-bottom: 20px;
+}
+
+#team[data-view].is-active-view {
+  min-height: 0;
+  padding-top: 28px;
+}
+
 #hub[data-view].is-active-view {
   padding-top: 0;
   padding-bottom: 64px;
