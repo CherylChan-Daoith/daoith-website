@@ -238,7 +238,7 @@ window.DAOITH_I18N_EN = {
     '#heroPanel0 .hero-panel-points li:nth-child(1)': { text: 'One question at a time' },
     '#heroPanel0 .hero-panel-points li:nth-child(2)': { text: 'Structured plan output' },
     '#heroPanel0 .hero-panel-points li:nth-child(3)': { text: 'Auto-matched services' },
-    '#heroPanel0 .btn-primary': { text: 'Try AI Diagnosis' },
+    '#heroPanel0 .btn-primary': { text: 'Free AI Diagnosis' },
     '#heroPanel0 .hero-mock-line.is-bot': { text: 'Which e-commerce platform do you sell on?' },
     '#heroPanel0 .hero-mock-chips span:nth-child(1)': { text: 'Amazon' },
     '#heroPanel0 .hero-mock-chips span:nth-child(2)': { text: 'Temu' },
