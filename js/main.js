@@ -3698,6 +3698,7 @@ function initAiChatbot() {
 
   const setBotBubble = (el, text) => {
     if (!el) return;
+    stopDiagStatusTyping(el);
     el.classList.add('is-bot', 'is-rich');
     el.innerHTML = renderChatBubbleHtml(text);
     scrollDiagChatToBottom();
@@ -4130,14 +4131,19 @@ function initAiChatbot() {
 
     const typing = document.createElement('div');
     typing.className = 'ai-chatbot-bubble is-bot';
-    typing.textContent = thinkingStatusMsg;
+    const setTypingText = (text) => {
+      stopDiagStatusTyping(typing);
+      typing.textContent = text;
+    };
+    const showThinkingStatus = () => ensureDiagStatusTyping(typing, thinkingStatusMsg);
+    showThinkingStatus();
     messages.appendChild(typing);
     scrollDiagChatToBottom();
 
     // 「方案没显示全」→ 本地重新渲染上一份方案，禁止再打 Agent 刷出原始 JSON
     if (isPostReportFollowUp && looksLikePlanDisplayComplaint(text)) {
       typing.classList.add('is-plan-status');
-      typing.textContent = '正在为您重新展示完整方案…';
+      setTypingText('正在为您重新展示完整方案…');
       const cached = getLastCachedDiagnosisReport();
       if (cached?.jsonReport && isDiagnosisReportJsonReady(cached.jsonReport)) {
         publishDiagnosisPlanToResultPanel(JSON.stringify(cached.jsonReport), {
@@ -4147,7 +4153,7 @@ function initAiChatbot() {
           finalize: true,
           refreshDiagnosis: true,
         });
-        typing.textContent = '已为您重新展示完整方案，请查看右侧方案生成区';
+        setTypingText('已为您重新展示完整方案，请查看右侧方案生成区');
       } else if (cached?.markdown) {
         publishDiagnosisPlanToResultPanel(cached.markdown, {
           kind: 'diagnosis',
@@ -4155,10 +4161,11 @@ function initAiChatbot() {
           finalize: true,
           refreshDiagnosis: true,
         });
-        typing.textContent = '已为您重新展示完整方案，请查看右侧方案生成区';
+        setTypingText('已为您重新展示完整方案，请查看右侧方案生成区');
       } else {
-        typing.textContent =
-          '暂时找不到上一份方案缓存。请向上滚动右侧方案区查看，或点击「新建对话」后重新生成。';
+        setTypingText(
+          '暂时找不到上一份方案缓存。请向上滚动右侧方案区查看，或点击「新建对话」后重新生成。'
+        );
       }
       busy = false;
       scrollDiagChatToBottom();
@@ -4169,9 +4176,11 @@ function initAiChatbot() {
       showResultWorking();
       typing.classList.add('is-plan-status');
       const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-      typing.textContent = loggedInNow
-        ? planBusyMsg
-        : `${planBusyMsg}。请先微信登录以保存方案并继续`;
+      setTypingText(
+        loggedInNow
+          ? planBusyMsg
+          : `${planBusyMsg}。请先微信登录以保存方案并继续`
+      );
       if (!loggedInNow) {
         window.DAOITH_AUTH?.requireLogin?.(
           'ai_plan',
@@ -4220,7 +4229,7 @@ function initAiChatbot() {
         if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
           publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
           typing.classList.add('is-plan-status');
-          typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+          setTypingText(QA_LONG_ANSWER_CHAT_TIP);
           clearQuickReplies();
           maybeShowServiceRecsAfterAnswer(aluminumReply);
         } else {
@@ -4242,18 +4251,22 @@ function initAiChatbot() {
         if (streamingPlan) {
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-          typing.textContent = loggedInNow
-            ? planBusyMsg
-            : `${planBusyMsg}。请先微信登录以保存方案并继续`;
+          setTypingText(
+            loggedInNow
+              ? planBusyMsg
+              : `${planBusyMsg}。请先微信登录以保存方案并继续`
+          );
           return;
         }
         streamingPlan = true;
         showResultWorking();
         typing.classList.add('is-plan-status');
         const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-        typing.textContent = loggedInNow
-          ? planBusyMsg
-          : `${planBusyMsg}。请先微信登录以保存方案并继续`;
+        setTypingText(
+          loggedInNow
+            ? planBusyMsg
+            : `${planBusyMsg}。请先微信登录以保存方案并继续`
+        );
         if (!loginPromptedForPlan && !loggedInNow) {
           loginPromptedForPlan = true;
           window.DAOITH_AUTH?.requireLogin?.(
@@ -4269,7 +4282,7 @@ function initAiChatbot() {
         streamingLongQa = true;
         // No logo animation for Q&A — only point user to the plan panel
         typing.classList.add('is-plan-status');
-        typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+        setTypingText(QA_LONG_ANSWER_CHAT_TIP);
       };
 
       const paintStream = (partial) => {
@@ -4279,7 +4292,7 @@ function initAiChatbot() {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
           else if (!typing.classList.contains('is-rich') && !streamingLongQa) {
-            typing.textContent = thinkingStatusMsg;
+            showThinkingStatus();
           }
           return;
         }
@@ -4287,7 +4300,7 @@ function initAiChatbot() {
         if (!clean) {
           if (forcePlanWhileThinking) beginPlanRouting();
           else if (!typing.classList.contains('is-rich') && !streamingLongQa) {
-            typing.textContent = thinkingStatusMsg;
+            showThinkingStatus();
           }
           return;
         }
@@ -4315,13 +4328,13 @@ function initAiChatbot() {
               refreshDiagnosis: true,
             });
             typing.classList.add('is-plan-status');
-            typing.textContent = DIAG_PLAN_DONE_MSG;
+            setTypingText(DIAG_PLAN_DONE_MSG);
             return;
           }
           if (looksLikeRawDiagnosisJsonDump(clean) || looksLikeIncompleteAgentDraft(clean)) {
             // Incomplete JSON / CoT stream — keep thinking status, don't paint drafts
             typing.classList.add('is-plan-status');
-            typing.textContent = thinkingStatusMsg;
+            showThinkingStatus();
             return;
           }
           beginLongQaRouting();
@@ -4333,7 +4346,7 @@ function initAiChatbot() {
         }
         if (looksLikeIncompleteAgentDraft(clean)) {
           if (!typing.classList.contains('is-rich') && !streamingLongQa) {
-            typing.textContent = thinkingStatusMsg;
+            showThinkingStatus();
           }
           return;
         }
@@ -4366,9 +4379,8 @@ function initAiChatbot() {
         const msg = String(firstErr?.message || '');
         // Streaming/CORS失败时回退 blocking
         if (/无法连接|Failed to fetch|NetworkError/i.test(msg)) {
-          typing.textContent = forcePlanWhileThinking
-            ? planBusyMsg
-            : thinkingStatusMsg;
+          if (forcePlanWhileThinking) setTypingText(planBusyMsg);
+          else showThinkingStatus();
           result = await callDify({
             endpoint,
             query: apiQuery,
@@ -4379,9 +4391,8 @@ function initAiChatbot() {
         } else if (conversationId && /conversation|not exist|not_found|无效|Conversation/i.test(msg)) {
           conversationId = '';
           persistConversationId(sessionId, false);
-          typing.textContent = forcePlanWhileThinking
-            ? planBusyMsg
-            : thinkingStatusMsg;
+          if (forcePlanWhileThinking) setTypingText(planBusyMsg);
+          else showThinkingStatus();
           result = await callChat('');
         } else {
           throw firstErr;
@@ -4438,7 +4449,7 @@ function initAiChatbot() {
         if (streamingPlan || forcePlanWhileThinking || shouldGeneratePlanNow) {
           beginPlanRouting();
           typing.classList.add('is-plan-status');
-          typing.textContent = '方案正文未就绪，正在强制重试生成…';
+          setTypingText('方案正文未就绪，正在强制重试生成…');
           try {
             const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
             const retryRes = await callDifyStream({
@@ -4470,8 +4481,9 @@ function initAiChatbot() {
         if (streamingPlan || forcePlanWhileThinking) {
           beginPlanRouting();
           typing.classList.add('is-plan-status');
-          typing.textContent =
-            '暂时未能生成可用方案，请点击「新建对话」后重试。';
+          setTypingText(
+            '暂时未能生成可用方案，请点击「新建对话」后重试。'
+          );
           clearQuickReplies();
           return;
         }
@@ -4506,7 +4518,7 @@ function initAiChatbot() {
           !isDiagnosisPlanReadyToShow(answer))
       ) {
         typing.classList.add('is-plan-status');
-        typing.textContent = '正在重新拉取结构化方案，请稍候…';
+        setTypingText('正在重新拉取结构化方案，请稍候…');
         try {
           const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
           const retryRes = await callDifyStream({
@@ -4538,7 +4550,7 @@ function initAiChatbot() {
           diagnosisReportConflictsWithSlots(conflictJson, getDiagSlots())
         ) {
           typing.classList.add('is-plan-status');
-          typing.textContent = '检测到方案与当前档案不一致，正在按本轮档案重新生成…';
+          setTypingText('检测到方案与当前档案不一致，正在按本轮档案重新生成…');
           try {
             const retryQuery = buildDiagnosisPlanApiQuery(text, { retry: true });
             const retryRes = await callDifyStream({
@@ -4587,17 +4599,20 @@ function initAiChatbot() {
           cacheLastDiagnosisReport({ jsonReport });
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-          typing.textContent = loggedInNow
-            ? planDoneMsg
-            : `${planDoneMsg}。请先微信登录以保存方案并继续`;
+          setTypingText(
+            loggedInNow
+              ? planDoneMsg
+              : `${planDoneMsg}。请先微信登录以保存方案并继续`
+          );
           clearQuickReplies();
         } else if (
           looksLikeNonStructuredDiagnosisMarkdown(answer) ||
           looksLikeNonStructuredDiagnosisMarkdown(result?.text || '')
         ) {
           typing.classList.add('is-plan-status');
-          typing.textContent =
-            '暂时未能生成结构化方案，请点击「新建对话」后重试。';
+          setTypingText(
+            '暂时未能生成结构化方案，请点击「新建对话」后重试。'
+          );
           clearQuickReplies();
           return;
         } else {
@@ -4608,8 +4623,9 @@ function initAiChatbot() {
           }
           if (!isDiagnosisPlanReadyToShow(answer) && !isDiagnosisPlanReadyToShow(result?.text || '')) {
             typing.classList.add('is-plan-status');
-            typing.textContent =
-              '方案内容不完整，请点击「新建对话」后重试。';
+            setTypingText(
+              '方案内容不完整，请点击「新建对话」后重试。'
+            );
             clearQuickReplies();
             return;
           }
@@ -4628,9 +4644,11 @@ function initAiChatbot() {
           });
           typing.classList.add('is-plan-status');
           const loggedInNow = Boolean(window.DAOITH_AUTH?.isLoggedIn?.());
-          typing.textContent = loggedInNow
-            ? planDoneMsg
-            : `${planDoneMsg}。请先微信登录以保存方案并继续`;
+          setTypingText(
+            loggedInNow
+              ? planDoneMsg
+              : `${planDoneMsg}。请先微信登录以保存方案并继续`
+          );
           clearQuickReplies();
         }
       } else if (streamingLongQa || shouldRouteLongAnswerToPlanPanel(answer)) {
@@ -4645,12 +4663,13 @@ function initAiChatbot() {
           });
           cacheLastDiagnosisReport({ jsonReport: qaJson });
           typing.classList.add('is-plan-status');
-          typing.textContent = '已更新右侧方案生成区，请查看完整方案';
+          setTypingText('已更新右侧方案生成区，请查看完整方案');
           clearQuickReplies();
         } else if (looksLikeRawDiagnosisJsonDump(answer)) {
           typing.classList.add('is-plan-status');
-          typing.textContent =
-            '方案已生成但展示异常。请再说一次「方案没显示全」，或点击「新建对话」后重试。';
+          setTypingText(
+            '方案已生成但展示异常。请再说一次「方案没显示全」，或点击「新建对话」后重试。'
+          );
           clearQuickReplies();
         } else {
           beginLongQaRouting();
@@ -4660,7 +4679,7 @@ function initAiChatbot() {
             finalize: true,
           });
           typing.classList.add('is-plan-status');
-          typing.textContent = QA_LONG_ANSWER_CHAT_TIP;
+          setTypingText(QA_LONG_ANSWER_CHAT_TIP);
           clearQuickReplies();
           maybeShowServiceRecsAfterAnswer(answer);
         }
@@ -5297,6 +5316,58 @@ const DIAG_PLAN_UPDATE_STATUS_MSG =
 const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
 const QA_LONG_ANSWER_CHAT_TIP =
   '由于内容较多，道一合规助手已将回复展示在右侧方案生成区，请查看。';
+
+/** Loop char-by-char status so long Agent waits feel alive (not frozen). */
+function stopDiagStatusTyping(el) {
+  if (!el) return;
+  const state = el.__diagStatusTyping;
+  if (state?.timer) clearTimeout(state.timer);
+  el.__diagStatusTyping = null;
+  el.classList.remove('is-status-typing');
+}
+
+function startDiagStatusTyping(el, phrase, opts = {}) {
+  if (!el) return;
+  const full = String(phrase || '');
+  stopDiagStatusTyping(el);
+  const charMs = opts.charMs ?? 110;
+  const holdMs = opts.holdMs ?? 720;
+  const gapMs = opts.gapMs ?? 260;
+  const state = { phrase: full, timer: null, i: 0 };
+  el.__diagStatusTyping = state;
+  el.classList.add('is-status-typing');
+  el.textContent = '';
+
+  const schedule = (fn, ms) => {
+    state.timer = setTimeout(fn, ms);
+  };
+
+  const tick = () => {
+    if (el.__diagStatusTyping !== state || !el.isConnected) return;
+    if (state.i < full.length) {
+      state.i += 1;
+      el.textContent = full.slice(0, state.i);
+      schedule(tick, charMs);
+      return;
+    }
+    schedule(() => {
+      if (el.__diagStatusTyping !== state || !el.isConnected) return;
+      state.i = 0;
+      el.textContent = '';
+      schedule(tick, gapMs);
+    }, holdMs);
+  };
+  tick();
+}
+
+function ensureDiagStatusTyping(el, phrase) {
+  if (!el) return;
+  const full = String(phrase || '');
+  const cur = el.__diagStatusTyping;
+  if (cur && cur.phrase === full) return;
+  startDiagStatusTyping(el, full);
+}
+
 const DIAG_PLAN_LIMIT = 3;
 const DIAG_PLAN_LIMIT_MSG =
   '您诊断的次数较多，如果您的业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。';
