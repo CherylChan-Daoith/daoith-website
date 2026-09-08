@@ -539,8 +539,9 @@ window.DAOITH_I18N_EN = {
       html: true,
       text: 'Trade data: GACC Jan–Dec 2025. For reference only — see the <a href="https://www.chinatax.gov.cn/chinatax/n810219/n810744/index.html" target="_blank" rel="noopener noreferrer">official SAT guide portal</a> for full rules.',
     },
+    '#about .section-header .section-badge': { text: 'About Us' },
     '#about .section-header h2': { text: 'About Us' },
-    '.about-intro': {
+    '#about .section-header p': {
       text: 'Professional integrity and trusted guidance — helping SMEs move from compliance to excellence.',
     },
     '.values-grid .value-card:nth-child(1) h4': { text: 'Vision' },

@@ -5205,10 +5205,20 @@ ul {
   border-right: 1px solid var(--border-light);
 }
 
-.service-card-foot-link:hover,
-.service-card-foot-btn:hover {
+.service-card-foot-link:hover {
   color: var(--accent);
   background: #f7f9fc;
+}
+
+.service-card-foot-btn {
+  background: var(--accent);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.service-card-foot-btn:hover {
+  background: var(--accent-hover);
+  color: var(--white);
 }
 
 .service-price span {
@@ -8517,28 +8527,19 @@ body.modal-open {
 
 /* ===== ABOUT ===== */
 #about {
-  padding: 32px 0 28px;
+  padding: 96px 0 28px;
 }
 
 #about .section-header {
-  margin-bottom: 20px;
+  margin-bottom: 40px;
 }
 
 #about .section-header h2 {
-  margin-bottom: 0;
+  margin-bottom: 16px;
 }
 
-.about-intro {
-  text-align: center;
-  font-family: var(--font-serif);
-  font-size: clamp(0.875rem, 1.15vw, 1.0625rem);
-  font-weight: 500;
-  color: var(--text-secondary);
-  max-width: none;
-  margin: 0 auto 18px;
-  line-height: 1.5;
-  font-style: normal;
-  white-space: nowrap;
+#about .section-header p {
+  max-width: 720px;
 }
 
 .values-grid {
@@ -9119,12 +9120,6 @@ body.modal-open {
     grid-template-columns: 1fr;
   }
 
-  .about-intro {
-    white-space: normal;
-    max-width: 640px;
-    font-size: 1rem;
-    line-height: 1.65;
-  }
 }
 
 @media (max-width: 768px) {
