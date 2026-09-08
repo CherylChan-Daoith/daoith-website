@@ -282,7 +282,7 @@ function initNavDropdown() {
   });
 }
 
-/* Hero showcase — Intuit-style tabs with auto-rotate */
+/* Hero showcase — Intuit-style tabs with auto-rotate + expand/crossfade */
 function initHeroFeatures() {
   const root = document.getElementById('heroShowcase');
   if (!root || root.dataset.bound === '1') return;
@@ -292,36 +292,89 @@ function initHeroFeatures() {
   if (!tabs.length || tabs.length !== panels.length) return;
 
   root.dataset.bound = '1';
-  const ROTATE_MS = 5500;
+  const ROTATE_MS = 2750;
+  const LEAVE_MS = 320;
   root.style.setProperty('--hero-rotate-ms', `${ROTATE_MS}ms`);
 
   let index = Math.max(0, tabs.findIndex((t) => t.classList.contains('is-active')));
   let timer = null;
+  let leaveTimer = null;
   let paused = false;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const setActive = (next, { restart = true } = {}) => {
-    index = ((next % tabs.length) + tabs.length) % tabs.length;
+  const resetProgress = (tab) => {
+    const bar = tab.querySelector('.hero-tab-progress i');
+    if (!bar) return;
+    bar.style.animation = 'none';
+    void bar.offsetWidth;
+    bar.style.animation = '';
+    bar.style.width = '';
+  };
+
+  const applyTabState = () => {
     tabs.forEach((tab, i) => {
       const on = i === index;
       tab.classList.toggle('is-active', on);
       tab.classList.toggle('is-playing', false);
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
       tab.tabIndex = on ? 0 : -1;
-      const bar = tab.querySelector('.hero-tab-progress i');
-      if (bar) {
-        bar.style.animation = 'none';
-        void bar.offsetWidth;
-        bar.style.animation = '';
-        bar.style.width = '';
+      resetProgress(tab);
+    });
+  };
+
+  const showPanel = (nextIndex) => {
+    panels.forEach((panel, i) => {
+      const on = i === nextIndex;
+      panel.classList.toggle('is-leaving', false);
+      panel.classList.toggle('is-active', on);
+      panel.setAttribute('aria-hidden', on ? 'false' : 'true');
+    });
+  };
+
+  const setActive = (next, { restart = true } = {}) => {
+    const target = ((next % tabs.length) + tabs.length) % tabs.length;
+    if (target === index && panels[target]?.classList.contains('is-active')) {
+      if (restart) startRotate();
+      return;
+    }
+
+    if (leaveTimer) {
+      clearTimeout(leaveTimer);
+      leaveTimer = null;
+    }
+
+    const prev = index;
+    index = target;
+    applyTabState();
+
+    if (reduceMotion || prev < 0 || !panels[prev]?.classList.contains('is-active')) {
+      showPanel(index);
+      if (restart) startRotate();
+      return;
+    }
+
+    panels[prev].classList.remove('is-active');
+    panels[prev].classList.add('is-leaving');
+    panels[prev].setAttribute('aria-hidden', 'true');
+
+    // Force reflow so enter animation restarts on the incoming panel
+    panels.forEach((panel, i) => {
+      if (i === index) {
+        panel.classList.remove('is-active', 'is-leaving');
+        void panel.offsetWidth;
+        panel.classList.add('is-active');
+        panel.setAttribute('aria-hidden', 'false');
+      } else if (i !== prev) {
+        panel.classList.remove('is-active', 'is-leaving');
+        panel.setAttribute('aria-hidden', 'true');
       }
     });
-    panels.forEach((panel, i) => {
-      const on = i === index;
-      panel.classList.toggle('is-active', on);
-      if (on) panel.removeAttribute('hidden');
-      else panel.setAttribute('hidden', '');
-    });
+
+    leaveTimer = window.setTimeout(() => {
+      panels[prev]?.classList.remove('is-leaving');
+      leaveTimer = null;
+    }, LEAVE_MS);
+
     if (restart) startRotate();
   };
 
@@ -387,7 +440,9 @@ function initHeroFeatures() {
     else if (!paused) startRotate();
   });
 
-  setActive(index, { restart: true });
+  showPanel(index);
+  applyTabState();
+  startRotate();
 }
 
 /* Paginated lists */

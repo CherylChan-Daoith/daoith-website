@@ -217,14 +217,11 @@ window.DAOITH_I18N_EN = {
     '.nav a[href="#about"]': { text: 'About' },
     '.header-inner > .btn-primary': { text: 'Free Plan' },
     '.hero h1': {
-      html: true,
-      text: 'Cross-Border E-Commerce Tax Compliance<br>All-in-One Solutions',
+      text: 'Cross-Border E-Commerce Tax Compliance, All-in-One',
     },
     '.hero-subtitle': {
-      text: 'AI-powered tax compliance for cross-border sellers — plan generation, compliance tax calculation, service marketplace, and progress tracking.',
+      text: 'AI + senior tax experts for cross-border sellers — plan generation, delivery services, and progress tracking.',
     },
-    '.hero-actions .btn-primary': { text: 'Generate Free Plan' },
-    '.hero-actions .btn-outline': { text: 'Latest Policies' },
     '#heroShowcase .hero-tab[data-index="0"] .hero-tab-title': { text: 'AI Diagnosis' },
     '#heroShowcase .hero-tab[data-index="0"] .hero-tab-sub': { text: 'Covers 80% of common cases' },
     '#heroShowcase .hero-tab[data-index="1"] .hero-tab-title': { text: '1:1 Tax Expert' },
