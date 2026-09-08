@@ -208,12 +208,21 @@ window.DAOITH_I18N_EN = {
     '.nav a[href="#hero"]': { text: 'Home' },
     '.nav a[href="#ai-solution"]': { text: 'AI Solutions' },
     '.nav a[href="#services"]': { text: 'Services' },
-    '.nav a[href="#hub"]': { text: 'Service Hub' },
-    '.nav-dropdown-trigger': { text: 'Policies & Tax' },
+    '.nav-dropdown-trigger[data-nav-parent="policy"]': {
+      html: true,
+      text: 'Policies & Tax<svg class="nav-dropdown-caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 L6 7.5 L9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    },
+    '.nav-dropdown-trigger[data-nav-parent="hub"]': {
+      html: true,
+      text: 'Service Hub<svg class="nav-dropdown-caret" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 L6 7.5 L9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    },
     '.nav-dropdown-menu a[href="#tax-systems"]': { text: 'Regional Tax Systems' },
     '.nav-dropdown-menu a[href="#policy-tax"]': { text: 'Tax Authority Updates' },
     '.nav-dropdown-menu a[href="#policy-platform"]': { text: 'Marketplace Policies' },
     '.nav-dropdown-menu a[href="#policy-expert"]': { text: 'Expert Insights' },
+    '.nav-dropdown-menu a[href="#hub-inquiries"]': { text: 'Inquiries' },
+    '.nav-dropdown-menu a[href="#hub-orders"]': { text: 'Service Orders' },
+    '.nav-dropdown-menu a[href="#hub-progress"]': { text: 'Progress Tracking' },
     '.nav a[href="#about"]': { text: 'About' },
     '.header-inner > .btn-primary': { text: 'Free Plan' },
     '.hero h1': {
@@ -270,9 +279,9 @@ window.DAOITH_I18N_EN = {
     '#heroPanel2 .hero-mock-tile:nth-child(1) b': { text: 'Compliance Bookkeeping' },
     '#heroPanel2 .hero-mock-tile:nth-child(1) span': { text: 'From ¥5,000 /yr' },
     '#heroPanel2 .hero-mock-tile:nth-child(2) b': { text: '0110 Export + HK Full Managed' },
-    '#heroPanel2 .hero-mock-tile:nth-child(2) span': { text: 'Modular pricing, 10% off from 3 items' },
+    '#heroPanel2 .hero-mock-tile:nth-child(2) span': { text: 'Managed pack pricing, 10% off from 3 items' },
     '#heroPanel2 .hero-mock-tile:nth-child(3) b': { text: '1039 Export + HK Full Managed' },
-    '#heroPanel2 .hero-mock-tile:nth-child(3) span': { text: 'Modular pricing, 10% off from 3 items' },
+    '#heroPanel2 .hero-mock-tile:nth-child(3) span': { text: 'Managed pack pricing, 10% off from 3 items' },
     '#heroPanel3 .hero-panel-copy h2': { text: 'AI + professional team, end to end' },
     '#heroPanel3 .hero-panel-copy > p:not(.hero-panel-kicker)': {
       text: 'Track milestones and status with AI-enabled delivery — service quality you can trust.',
@@ -435,23 +444,20 @@ window.DAOITH_I18N_EN = {
     '.tax-actions .tax-cart-btn-text': { text: 'Expert 1-on-1' },
     '#services .section-header h2': { text: 'Tax & Compliance Marketplace' },
     '#services .section-header p': {
-      text: 'Browse 16 compliance services by category. Open a product page for details, or add to inquiry for a preferential quote.',
+      text: 'Browse compliance services by category. Open a product page for details, or add to inquiry for a preferential quote.',
     },
     '.filter-btn[data-filter="all"]': { text: 'All' },
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
-    '.filter-btn[data-filter="agency"]': { text: 'Agency' },
-    '.filter-btn[data-filter="export"]': { text: 'Export' },
-    '.filter-btn[data-filter="rebate"]': { text: 'Rebate' },
+    '.filter-btn[data-filter="domestic"]': { text: 'Mainland China' },
     '.filter-btn[data-filter="hongkong"]': { text: 'Hong Kong' },
-    '.filter-btn[data-filter="bundle"]': { text: 'Bundles' },
+    '.filter-btn[data-filter="asia"]': { text: 'Asia' },
+    '.filter-btn[data-filter="europe"]': { text: 'Europe' },
+    '.filter-btn[data-filter="other"]': { text: 'Other regions' },
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .hub-hero .hub-home-link': { text: 'Service Hub' },
     '#hub .hub-hero .hero-subtitle': {
       text: 'Full-process AI-powered tracking — quality service you can trust.',
     },
-    '.hub-subnav-link[data-hub-nav="inquiries"]': { text: 'Inquiries' },
-    '.hub-subnav-link[data-hub-nav="orders"]': { text: 'Service Orders' },
-    '.hub-subnav-link[data-hub-nav="progress"]': { text: 'Progress Tracking' },
     '#hubJourney [data-step="1"] h4': { text: 'Inquiries' },
     '#hubJourney [data-step="1"] .process-desc': {
       text: 'Submit an inquiry and complete payment',
@@ -725,8 +731,8 @@ window.DAOITH_I18N_EN = {
     { title: 'Hong Kong company setup', desc: 'Private company incorporation including government fees, first-year address and secretary.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Hong Kong annual return', desc: 'NAR1, BR renewal, secretary/address continuation, and SCR maintenance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
     { title: 'Hong Kong audit & profits tax', desc: 'HKICPA audit report and profits-tax filing; dormant companies and catch-up audits supported.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
-    { title: '0110 rebate + HK compliance bundle', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
-    { title: '1039 exemption + HK compliance bundle', desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
+    { title: '0110 rebate + HK full managed', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
+    { title: '1039 exemption + HK full managed', desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
   ],
   servicesCatalog: [
     {
@@ -1117,7 +1123,7 @@ window.DAOITH_I18N_EN = {
     },
     {
       id: 'domestic-arch-0110-hk',
-      title: '0110 rebate + HK compliance bundle',
+      title: '0110 rebate + HK full managed',
       desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.',
       unit: '/ 10% off from 3 modules',
       details: window.DAOITH_enServiceBlocks({
@@ -1152,7 +1158,7 @@ window.DAOITH_I18N_EN = {
     },
     {
       id: 'domestic-arch-1039-hk',
-      title: '1039 exemption + HK compliance bundle',
+      title: '1039 exemption + HK full managed',
       desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.',
       unit: '/ 10% off from 3 modules',
       details: window.DAOITH_enServiceBlocks({

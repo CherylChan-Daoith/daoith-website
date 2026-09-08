@@ -6773,61 +6773,7 @@ body.modal-open {
   font-size: 1.0625rem;
   color: var(--text-secondary);
   line-height: 1.7;
-  margin: 0 auto 28px;
-}
-
-.hub-subnav {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 28px;
-  margin: 0 auto 40px;
-  padding: 0 0 4px;
-  max-width: 720px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-#hub[data-hub-page]:not([data-hub-page="home"]) .hub-subnav {
-  margin-bottom: 8px;
-}
-
-.hub-subnav-link {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  padding: 10px 2px 14px;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: color var(--transition);
-}
-
-.hub-subnav-link:hover {
-  color: var(--ink);
-}
-
-.hub-subnav-link.is-active {
-  color: var(--accent);
-}
-
-.hub-subnav-link.is-active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px 2px 0 0;
-}
-
-#hub[data-hub-page="home"] .hub-subnav-link.is-active {
-  color: var(--text-secondary);
-}
-
-#hub[data-hub-page="home"] .hub-subnav-link.is-active::after {
-  display: none;
+  margin: 0 auto 48px;
 }
 
 .hub-hero #hubJourney,

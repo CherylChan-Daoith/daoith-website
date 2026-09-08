@@ -1,7 +1,7 @@
 /* DAOITH service marketplace catalog
  * Source of truth: 服务产品汇总表_260904.xlsx（全文收录，未精简）
- * Categories: consult | agency | export | rebate | hongkong | bundle
- * Generated — do not hand-trim Excel body copy.
+ * Categories: consult | domestic | hongkong | asia | europe | other
+ * Excel 260904 body copy preserved; regional catalog expanded.
  */
 (function () {
   function excelBlocks(p) {
@@ -61,12 +61,12 @@
 
   window.DAOITH_SERVICE_CATEGORIES = [
     { id: 'all', label: '全部', en: 'All' },
-    { id: 'consult', label: '财税咨询', en: 'Advisory', blurb: '一对一诊断、合规体检与全年陪跑', blurbEn: '1-on-1 advisory, diagnosis, and annual coaching' },
-    { id: 'agency', label: '财税代理', en: 'Agency', blurb: '代账、注册与个体户核定申报', blurbEn: 'Bookkeeping, incorporation, and sole-trader filing' },
-    { id: 'export', label: '出口合规', en: 'Export', blurb: '1039市场采购与进出口权', blurbEn: '1039 market procurement and trade licences' },
-    { id: 'rebate', label: '出口退税', en: 'Rebate', blurb: '首单辅导与代理退税申报', blurbEn: 'First-time coaching and rebate filing' },
-    { id: 'hongkong', label: '香港公司', en: 'Hong Kong', blurb: '注册、年审与审计报税', blurbEn: 'Setup, annual return, and audit & tax' },
-    { id: 'bundle', label: '组合服务', en: 'Bundles', blurb: '0110 / 1039 与香港合规全托管', blurbEn: '0110 / 1039 + Hong Kong compliance packs' },
+    { id: 'consult', label: '财税咨询', en: 'Advisory', blurb: '诊断陪跑、资质认定与AI落地辅导', blurbEn: 'Diagnosis, coaching, and qualification filings' },
+    { id: 'domestic', label: '境内合规', en: 'Mainland China', blurb: '代账注册、出口合规、退税与全托管', blurbEn: 'Bookkeeping, export compliance, rebates and full-managed packs' },
+    { id: 'hongkong', label: '中国香港', en: 'Hong Kong', blurb: '注册、年审、审计报税与银行开户', blurbEn: 'Setup, annual return, audit & tax, and bank account' },
+    { id: 'asia', label: '亚洲', en: 'Asia', blurb: '越南、马来西亚、新加坡、日本、韩国公司与财税服务', blurbEn: 'Vietnam, Malaysia, Singapore, Japan and Korea' },
+    { id: 'europe', label: '欧洲', en: 'Europe', blurb: '英国、德国、法国 VAT、公司设立与做账报税', blurbEn: 'UK, Germany and France VAT, setup and bookkeeping' },
+    { id: 'other', label: '其他地区', en: 'Other regions', blurb: '美国、加拿大、BVI、迪拜等跨境主体与合规', blurbEn: 'US, Canada, BVI, Dubai and more' },
   ];
 
   window.DAOITH_SERVICES = [
@@ -229,7 +229,7 @@
     },
     {
       id: 'domestic-compliance-bookkeeping',
-      category: 'agency',
+      category: 'domestic',
       title: `合规代账`,
       desc: `专业代理记账·规范财务核算·合规税务申报。`,
       priceLabel: `¥5,000`,
@@ -292,7 +292,7 @@
     },
     {
       id: 'domestic-setup',
-      category: 'agency',
+      category: 'domestic',
       title: `公司注册服务（公司设立）`,
       desc: `公司设立全流程代办：核名、材料填报、执照领取、刻章、税务登记指导、社保/公积金开户指导、银行开户预约协助。`,
       priceLabel: `¥500`,
@@ -321,7 +321,7 @@
     },
     {
       id: 'domestic-1039-sole',
-      category: 'agency',
+      category: 'domestic',
       title: `个体户注册核定及税务申报`,
       desc: `一站式个体户注册·核定征收落地·合规完税。`,
       priceLabel: `¥4,500`,
@@ -369,7 +369,7 @@
     },
     {
       id: 'domestic-1039-export',
-      category: 'export',
+      category: 'domestic',
       title: `1039市场采购出口`,
       desc: `合规无票出口·阳光收汇结汇·一站式出海通道。`,
       priceLabel: `0.4%`,
@@ -411,7 +411,7 @@
     },
     {
       id: 'domestic-trade-license',
-      category: 'export',
+      category: 'domestic',
       title: `进出口权办理`,
       desc: `一站式进出口权办理（自主报关收汇·合规出海必备）。`,
       priceLabel: `¥2,000`,
@@ -448,7 +448,7 @@
     },
     {
       id: 'domestic-rebate-first',
-      category: 'rebate',
+      category: 'domestic',
       title: `首单退税辅导`,
       desc: `出口企业首次申报退税将面临税局全面真实性核查，本服务逐项梳理、精准准备全套核查资料，协助首次退税顺利通过核查、打通资金回笼链条。`,
       priceLabel: `¥10,000`,
@@ -498,7 +498,7 @@
     },
     {
       id: 'domestic-rebate',
-      category: 'rebate',
+      category: 'domestic',
       title: `代理退税申报`,
       desc: `为已完成首单退税、进入常态化出口经营的企业提供持续专业的出口退税申报代理，降低退税风险、加速资金回笼（未退税企业可单独购首单服务）。`,
       priceLabel: `0.1%`,
@@ -703,10 +703,10 @@ SCR重要控制人登记册维护
     },
     {
       id: 'domestic-arch-0110-hk',
-      category: 'bundle',
+      category: 'domestic',
       title: `0110出口退税+香港公司合规全托管`,
-      desc: `提供出口公司走通0110报关出口退税、店铺公司财税合规记账、香港公司审计等组合服务`,
-      priceLabel: `组合计价`,
+      desc: `提供出口公司走通0110报关出口退税、店铺公司财税合规记账、香港公司审计等全托管服务`,
+      priceLabel: `全托管计价`,
       priceValue: 0,
       unit: `/3项起9折`,
       details: excelBlocks({
@@ -719,8 +719,8 @@ SCR重要控制人登记册维护
 ⑥香港公司年审
 ⑦香港公司审计报税`,
         process: `需求确认→线上下单确认服务选项→资料收集→服务项目跟进（可于具体项目查看流程）。`,
-        pricing: `根据选项组合计价，3项及以上组合可享受9折`,
-        pricingNote: `服务套餐组合参考
+        pricing: `按勾选模块全托管计价，3项及以上可享受9折`,
+        pricingNote: `全托管套餐参考
 跨境电商境内外合规 ①+②+③+⑤+⑥+⑦
 新出口企业境内合规服务 ①+②+③+⑤
 已有出口业务，需退税及记账 ④+⑤
@@ -729,7 +729,7 @@ SCR重要控制人登记册维护
         advantages: `全链条闭环服务，一站搞定；
 境内外合规联动，退税无忧；
 可勾选灵活定制，按需组合；
-组合多项服务，价格更实惠；`,
+多项全托管打包，价格更实惠；`,
         audience: `跨境电商卖家（亚马逊/TikTok/SHEIN等平台）
 供应商可开具专用发票
 出口产品适用退税政策
@@ -739,7 +739,7 @@ SCR重要控制人登记册维护
           id: '0110',
           discountFrom: 3,
           discountRate: 0.9,
-          discountLabel: '3项及以上组合可享受9折',
+          discountLabel: '3项及以上全托管可享受9折',
           modules: [
             { label: `①出口公司设立`, serviceId: 'domestic-setup', priceValue: 500, priceLabel: `¥500` },
             { label: `②进出口权办理`, serviceId: 'domestic-trade-license', priceValue: 2000, priceLabel: `¥2,000` },
@@ -754,10 +754,10 @@ SCR重要控制人登记册维护
     },
     {
       id: 'domestic-arch-1039-hk',
-      category: 'bundle',
+      category: 'domestic',
       title: `1039出口免税+香港公司合规全托管`,
-      desc: `提供个体户走通1039报关出口免税、个体户核定征收、店铺公司财税合规记账、香港公司审计等组合服务`,
-      priceLabel: `组合计价`,
+      desc: `提供个体户走通1039报关出口免税、个体户核定征收、店铺公司财税合规记账、香港公司审计等全托管服务`,
+      priceLabel: `全托管计价`,
       priceValue: 0,
       unit: `/3项起9折`,
       details: excelBlocks({
@@ -767,8 +767,8 @@ SCR重要控制人登记册维护
 ③香港公司年审
 ④香港公司审计报税`,
         process: `需求确认→线上下单确认服务选项→资料收集→服务项目跟进（可于具体项目查看流程）。`,
-        pricing: `根据选项组合计价，3项及以上组合可享受9折`,
-        pricingNote: `服务套餐组合参考
+        pricing: `按勾选模块全托管计价，3项及以上可享受9折`,
+        pricingNote: `全托管套餐参考
 跨境电商境内外合规 ①+②+③+④
 新出口企业境内合规服务 ①+②
 香港公司维护专案 ⑥+⑦`,
@@ -785,7 +785,7 @@ SCR重要控制人登记册维护
           id: '1039',
           discountFrom: 3,
           discountRate: 0.9,
-          discountLabel: '3项及以上组合可享受9折',
+          discountLabel: '3项及以上全托管可享受9折',
           modules: [
             { label: `①个体户注册核定及税务申报`, serviceId: 'domestic-1039-sole', priceValue: 4500, priceLabel: `¥4,500起` },
             { label: `②1039市场采购出口`, serviceId: 'domestic-1039-export', priceValue: 0, priceLabel: `按报关金额0.4%` },
@@ -795,6 +795,846 @@ SCR重要控制人登记册维护
         },
       }),
     },
+    {
+      id: 'consult-hnte',
+      category: 'consult',
+      title: `高新技术企业申请`,
+      desc: `辅导高新技术企业认定申报：条件评估、材料梳理、系统填报与答辩支持。`,
+      priceLabel: `¥50,000`,
+      priceValue: 50000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、认定条件预评估
+对照《高新技术企业认定管理办法》核查知识产权、科技人员、研发费用、高新收入等核心指标
+识别缺口并给出补强建议与时间表
+二、材料梳理与撰写辅导
+知识产权、研发项目、成果转化、组织管理等证明材料清单
+研发费用辅助账与高新收入口径辅导
+申请书与附件填报辅导
+三、申报与后续支持
+网报系统填报协助、形式审查补正
+评审沟通支持；认定后资格维护提示`,
+        process: `条件预评估→资料清单→材料辅导→系统填报→补正与评审支持→认定结果跟进`,
+        pricing: `参考市价 ¥50,000 起（按企业基础与材料完整度评估；不含第三方鉴定／专项审计及政府规费）。`,
+        pricingNote: `不含第三方鉴定、审计专项及政府规费；最终以签约方案为准。`,
+        advantages: `熟悉跨境与科技企业场景；材料口径可落地；节点提醒不断档`,
+        audience: `拟申请或复审高新技术企业的科技型、制造型与跨境数字化企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'consult-software-enterprise',
+      category: 'consult',
+      title: `软件企业申请`,
+      desc: `软件企业相关资质／政策申报辅导：条件评估、材料准备与申报跟进。`,
+      priceLabel: `¥28,000`,
+      priceValue: 28000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、适用政策与条件评估
+对照现行软件企业相关认定／优惠政策，评估收入结构、软件产品与人员构成
+二、材料准备辅导
+软件产品、版权／软著、研发与销售合同、财务与人员名册等材料梳理
+三、申报填报与沟通
+申报表填写辅导、补正答复与进度跟进`,
+        process: `政策匹配→条件评估→材料清单→填报辅导→补正跟进→结果确认`,
+        pricing: `参考市价 ¥28,000 起（按适用政策与材料完整度评估；第三方测评费用另计）。`,
+        pricingNote: `具体适用政策以主管机关当期口径为准；第三方测评费用另计。`,
+        advantages: `政策口径更新跟进；材料结构化整理；跨境软件／SaaS场景经验`,
+        audience: `软件产品与信息服务类企业、跨境数字化与SaaS团队`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'consult-atas',
+      category: 'consult',
+      title: `技术先进型服务企业申请`,
+      desc: `技术先进型服务企业（如离岸服务外包等）认定申报辅导：条件评估到材料递交。`,
+      priceLabel: `¥35,000`,
+      priceValue: 35000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、认定方向与条件评估
+结合企业经营范围、服务收入结构与人员构成，评估技术先进型服务企业适用路径
+二、材料与口径辅导
+服务合同、收入确认、人员名册、技术先进业务说明等材料梳理
+三、申报与后续
+申报表填报辅导、补正支持与资格维护提示`,
+        process: `路径评估→资料清单→材料辅导→申报填报→补正跟进→结果确认`,
+        pricing: `参考市价 ¥35,000 起（地区政策差异较大，以拟申报地口径与签约方案为准）。`,
+        pricingNote: `地区政策存在差异，以拟申报地主管口径为准。`,
+        advantages: `跨境服务与离岸外包场景熟悉；材料口径可落地`,
+        audience: `从事信息技术、医药研发、财务结算等技术先进型服务业务的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'hk-bank',
+      category: 'hongkong',
+      title: `香港公司银行开户`,
+      desc: `香港公司银行／持牌机构开户辅导：材料清单、预约协助与面签准备。`,
+      priceLabel: `¥5,000`,
+      priceValue: 5000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、开户路径评估
+根据公司业务、董事股东结构与预期账户用途，评估传统银行／持牌机构路径
+二、材料准备
+公司文件（CI、BR、章程等）、董事／股东身份与地址证明、业务说明与流水预期
+三、预约与面签辅导
+开户预约协助、面签问题预演、补件跟进
+四、开户后基础指引
+网银开通、收款路径与后续维护提示`,
+        process: `路径评估→材料清单→资料预审→预约面签→补件跟进→开户完成指引`,
+        pricing: `参考市价 ¥5,000 起（开户结果由银行／机构独立审批，不承诺必过；翻译公证、差旅等另计）。`,
+        pricingNote: `开户结果由银行／机构独立审批，不承诺必过；翻译公证、差旅等第三方费用另计。`,
+        advantages: `熟悉跨境电商收款场景；材料预审降低反复补件；节点跟进`,
+        audience: `已注册或拟注册香港公司、需要合规收款与结算账户的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-vn-setup',
+      category: 'asia',
+      title: `越南公司设立`,
+      desc: `越南本地公司注册／设立辅导：主体类型建议、材料准备与注册递交跟进。`,
+      priceLabel: `¥12,000`,
+      priceValue: 12000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型与架构建议
+结合业务模式（本地销售、跨境电商、服务出口等）建议合适主体类型与股权结构
+二、名称与材料准备
+公司名称预查、董事股东与注册地址材料清单
+三、注册递交与证件领取
+当地注册机关递交、补正与执照／登记文件领取跟进
+四、注册后基础合规提示
+税务登记、银行开户与基础申报义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→开户／税务指引`,
+        pricing: `参考市价 ¥12,000 起（政府规费、地址与翻译公证另计）。`,
+        pricingNote: `政府规费、翻译公证、本地注册地址与秘书等第三方费用另计；以越南当地法规为准。`,
+        advantages: `本地合作伙伴协同；中文沟通对接；跨境电商场景可衔接`,
+        audience: `计划在越南设立经营／持股主体的跨境企业与卖家`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-vn-bookkeeping',
+      category: 'asia',
+      title: `越南做账报税`,
+      desc: `越南日常账务处理与税务申报代理：记账、报表与当地税种申报。`,
+      priceLabel: `¥8,000`,
+      priceValue: 8000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、账务处理
+按当地会计准则处理日常凭证、收入成本与往来
+二、报表编制
+月／季／年度财务报表（按约定）
+三、税务申报
+增值税／消费税、企业所得税、个人所得税代扣等当地税种申报（按适用）
+四、风险提示
+税负异常与资料缺失预警`,
+        process: `资料交接→期初核对→月度记账→税务申报→对账归档→定期沟通`,
+        pricing: `参考市价 ¥8,000／年起（按票据量与业务复杂度调整）。`,
+        pricingNote: `以越南税法与申报日历为准；历史乱账整理可另报价。`,
+        advantages: `本地持证团队；跨境电商账税可协同；节点提醒`,
+        audience: `已在越南经营或新设公司、需要本地合规做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-vn-audit',
+      category: 'asia',
+      title: `越南审计服务`,
+      desc: `越南法定／管理审计安排：账务整理、审计协调与报告交付跟进。`,
+      priceLabel: `¥12,000`,
+      priceValue: 12000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、审计需求评估
+明确法定审计、银行／投资人要求或集团合并需要
+二、账务与资料准备
+科目清理、银行函证与合同发票归集辅导
+三、审计执行协调
+与本地审计师沟通抽样、询证与调整分录
+四、报告交付
+审计报告出具与后续问询支持`,
+        process: `需求确认→资料清单→账务准备→审计进场→报告出具→归档`,
+        pricing: `参考市价 ¥12,000 起（审计意见由持牌机构出具；加急与历史补审另计）。`,
+        pricingNote: `审计意见由持牌审计机构独立出具；加急与历史年度补审另计。`,
+        advantages: `本地持牌资源；跨境集团沟通顺畅`,
+        audience: `在越南有法定审计、融资或集团合并需求的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-my-setup',
+      category: 'asia',
+      title: `马来西亚公司设立`,
+      desc: `马来西亚本地公司注册／设立辅导：主体类型建议、材料准备与注册递交跟进。`,
+      priceLabel: `¥10,000`,
+      priceValue: 10000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型与架构建议
+结合业务模式（本地销售、跨境电商、服务出口等）建议合适主体类型与股权结构
+二、名称与材料准备
+公司名称预查、董事股东与注册地址材料清单
+三、注册递交与证件领取
+当地注册机关递交、补正与执照／登记文件领取跟进
+四、注册后基础合规提示
+税务登记、银行开户与基础申报义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→开户／税务指引`,
+        pricing: `参考市价 ¥10,000 起（政府规费、地址与翻译公证另计）。`,
+        pricingNote: `政府规费、翻译公证、本地注册地址与秘书等第三方费用另计；以马来西亚当地法规为准。`,
+        advantages: `本地合作伙伴协同；中文沟通对接；跨境电商场景可衔接`,
+        audience: `计划在马来西亚设立经营／持股主体的跨境企业与卖家`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-my-bookkeeping',
+      category: 'asia',
+      title: `马来西亚做账报税`,
+      desc: `马来西亚日常账务处理与税务申报代理：记账、报表与当地税种申报。`,
+      priceLabel: `¥10,000`,
+      priceValue: 10000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、账务处理
+按当地会计准则处理日常凭证、收入成本与往来
+二、报表编制
+月／季／年度财务报表（按约定）
+三、税务申报
+增值税／消费税、企业所得税、个人所得税代扣等当地税种申报（按适用）
+四、风险提示
+税负异常与资料缺失预警`,
+        process: `资料交接→期初核对→月度记账→税务申报→对账归档→定期沟通`,
+        pricing: `参考市价 ¥10,000／年起（按票据量与业务复杂度调整）。`,
+        pricingNote: `以马来西亚税法与申报日历为准；历史乱账整理可另报价。`,
+        advantages: `本地持证团队；跨境电商账税可协同；节点提醒`,
+        audience: `已在马来西亚经营或新设公司、需要本地合规做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-my-audit',
+      category: 'asia',
+      title: `马来西亚审计服务`,
+      desc: `马来西亚法定／管理审计安排：账务整理、审计协调与报告交付跟进。`,
+      priceLabel: `¥15,000`,
+      priceValue: 15000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、审计需求评估
+明确法定审计、银行／投资人要求或集团合并需要
+二、账务与资料准备
+科目清理、银行函证与合同发票归集辅导
+三、审计执行协调
+与本地审计师沟通抽样、询证与调整分录
+四、报告交付
+审计报告出具与后续问询支持`,
+        process: `需求确认→资料清单→账务准备→审计进场→报告出具→归档`,
+        pricing: `参考市价 ¥15,000 起（审计意见由持牌机构出具；加急与历史补审另计）。`,
+        pricingNote: `审计意见由持牌审计机构独立出具；加急与历史年度补审另计。`,
+        advantages: `本地持牌资源；跨境集团沟通顺畅`,
+        audience: `在马来西亚有法定审计、融资或集团合并需求的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-sg-setup',
+      category: 'asia',
+      title: `新加坡公司设立`,
+      desc: `新加坡本地公司注册／设立辅导：主体类型建议、材料准备与注册递交跟进。`,
+      priceLabel: `¥12,000`,
+      priceValue: 12000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型与架构建议
+结合业务模式（本地销售、跨境电商、服务出口等）建议合适主体类型与股权结构
+二、名称与材料准备
+公司名称预查、董事股东与注册地址材料清单
+三、注册递交与证件领取
+当地注册机关递交、补正与执照／登记文件领取跟进
+四、注册后基础合规提示
+税务登记、银行开户与基础申报义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→开户／税务指引`,
+        pricing: `参考市价 ¥12,000 起（若需本地董事／秘书或注册地址，费用另计）。`,
+        pricingNote: `政府规费、翻译公证、本地注册地址与秘书等第三方费用另计；以新加坡当地法规为准。`,
+        advantages: `本地合作伙伴协同；中文沟通对接；跨境电商场景可衔接`,
+        audience: `计划在新加坡设立经营／持股主体的跨境企业与卖家`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-sg-bookkeeping',
+      category: 'asia',
+      title: `新加坡做账报税`,
+      desc: `新加坡日常账务处理与税务申报代理：记账、报表与当地税种申报。`,
+      priceLabel: `¥15,000`,
+      priceValue: 15000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、账务处理
+按当地会计准则处理日常凭证、收入成本与往来
+二、报表编制
+月／季／年度财务报表（按约定）
+三、税务申报
+增值税／消费税、企业所得税、个人所得税代扣等当地税种申报（按适用）
+四、风险提示
+税负异常与资料缺失预警`,
+        process: `资料交接→期初核对→月度记账→税务申报→对账归档→定期沟通`,
+        pricing: `参考市价 ¥15,000／年起（按票据量与业务复杂度调整）。`,
+        pricingNote: `以新加坡税法与申报日历为准；历史乱账整理可另报价。`,
+        advantages: `本地持证团队；跨境电商账税可协同；节点提醒`,
+        audience: `已在新加坡经营或新设公司、需要本地合规做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-sg-audit',
+      category: 'asia',
+      title: `新加坡审计服务`,
+      desc: `新加坡法定／管理审计安排：账务整理、审计协调与报告交付跟进。`,
+      priceLabel: `¥20,000`,
+      priceValue: 20000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、审计需求评估
+明确法定审计、银行／投资人要求或集团合并需要
+二、账务与资料准备
+科目清理、银行函证与合同发票归集辅导
+三、审计执行协调
+与本地审计师沟通抽样、询证与调整分录
+四、报告交付
+审计报告出具与后续问询支持`,
+        process: `需求确认→资料清单→账务准备→审计进场→报告出具→归档`,
+        pricing: `参考市价 ¥20,000 起（审计意见由持牌机构出具；加急与历史补审另计）。`,
+        pricingNote: `审计意见由持牌审计机构独立出具；加急与历史年度补审另计。`,
+        advantages: `本地持牌资源；跨境集团沟通顺畅`,
+        audience: `在新加坡有法定审计、融资或集团合并需求的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-jp-setup',
+      category: 'asia',
+      title: `日本公司设立`,
+      desc: `日本本地公司注册／设立辅导：主体类型建议、材料准备与注册递交跟进。`,
+      priceLabel: `¥28,000`,
+      priceValue: 28000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型与架构建议
+结合业务模式（本地销售、跨境电商、服务出口等）建议合适主体类型与股权结构
+二、名称与材料准备
+公司名称预查、董事股东与注册地址材料清单
+三、注册递交与证件领取
+当地注册机关递交、补正与执照／登记文件领取跟进
+四、注册后基础合规提示
+税务登记、银行开户与基础申报义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→开户／税务指引`,
+        pricing: `参考市价 ¥28,000 起（公证认证、印章与政府规费另计）。`,
+        pricingNote: `政府规费、翻译公证、本地注册地址与秘书等第三方费用另计；以日本当地法规为准。`,
+        advantages: `本地合作伙伴协同；中文沟通对接；跨境电商场景可衔接`,
+        audience: `计划在日本设立经营／持股主体的跨境企业与卖家`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-jp-bookkeeping',
+      category: 'asia',
+      title: `日本做账报税`,
+      desc: `日本日常账务处理与税务申报代理：记账、报表与当地税种申报。`,
+      priceLabel: `¥25,000`,
+      priceValue: 25000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、账务处理
+按当地会计准则处理日常凭证、收入成本与往来
+二、报表编制
+月／季／年度财务报表（按约定）
+三、税务申报
+增值税／消费税、企业所得税、个人所得税代扣等当地税种申报（按适用）
+四、风险提示
+税负异常与资料缺失预警`,
+        process: `资料交接→期初核对→月度记账→税务申报→对账归档→定期沟通`,
+        pricing: `参考市价 ¥25,000／年起（按票据量与业务复杂度调整）。`,
+        pricingNote: `以日本税法与申报日历为准；历史乱账整理可另报价。`,
+        advantages: `本地持证团队；跨境电商账税可协同；节点提醒`,
+        audience: `已在日本经营或新设公司、需要本地合规做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-jp-audit',
+      category: 'asia',
+      title: `日本审计服务`,
+      desc: `日本法定／管理审计安排：账务整理、审计协调与报告交付跟进。`,
+      priceLabel: `¥35,000`,
+      priceValue: 35000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、审计需求评估
+明确法定审计、银行／投资人要求或集团合并需要
+二、账务与资料准备
+科目清理、银行函证与合同发票归集辅导
+三、审计执行协调
+与本地审计师沟通抽样、询证与调整分录
+四、报告交付
+审计报告出具与后续问询支持`,
+        process: `需求确认→资料清单→账务准备→审计进场→报告出具→归档`,
+        pricing: `参考市价 ¥35,000 起（审计意见由持牌机构出具；加急与历史补审另计）。`,
+        pricingNote: `审计意见由持牌审计机构独立出具；加急与历史年度补审另计。`,
+        advantages: `本地持牌资源；跨境集团沟通顺畅`,
+        audience: `在日本有法定审计、融资或集团合并需求的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-kr-setup',
+      category: 'asia',
+      title: `韩国公司设立`,
+      desc: `韩国本地公司注册／设立辅导：主体类型建议、材料准备与注册递交跟进。`,
+      priceLabel: `¥18,000`,
+      priceValue: 18000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型与架构建议
+结合业务模式（本地销售、跨境电商、服务出口等）建议合适主体类型与股权结构
+二、名称与材料准备
+公司名称预查、董事股东与注册地址材料清单
+三、注册递交与证件领取
+当地注册机关递交、补正与执照／登记文件领取跟进
+四、注册后基础合规提示
+税务登记、银行开户与基础申报义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→开户／税务指引`,
+        pricing: `参考市价 ¥18,000 起（翻译公证与政府规费另计）。`,
+        pricingNote: `政府规费、翻译公证、本地注册地址与秘书等第三方费用另计；以韩国当地法规为准。`,
+        advantages: `本地合作伙伴协同；中文沟通对接；跨境电商场景可衔接`,
+        audience: `计划在韩国设立经营／持股主体的跨境企业与卖家`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-kr-bookkeeping',
+      category: 'asia',
+      title: `韩国做账报税`,
+      desc: `韩国日常账务处理与税务申报代理：记账、报表与当地税种申报。`,
+      priceLabel: `¥18,000`,
+      priceValue: 18000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、账务处理
+按当地会计准则处理日常凭证、收入成本与往来
+二、报表编制
+月／季／年度财务报表（按约定）
+三、税务申报
+增值税／消费税、企业所得税、个人所得税代扣等当地税种申报（按适用）
+四、风险提示
+税负异常与资料缺失预警`,
+        process: `资料交接→期初核对→月度记账→税务申报→对账归档→定期沟通`,
+        pricing: `参考市价 ¥18,000／年起（按票据量与业务复杂度调整）。`,
+        pricingNote: `以韩国税法与申报日历为准；历史乱账整理可另报价。`,
+        advantages: `本地持证团队；跨境电商账税可协同；节点提醒`,
+        audience: `已在韩国经营或新设公司、需要本地合规做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'asia-kr-audit',
+      category: 'asia',
+      title: `韩国审计服务`,
+      desc: `韩国法定／管理审计安排：账务整理、审计协调与报告交付跟进。`,
+      priceLabel: `¥25,000`,
+      priceValue: 25000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、审计需求评估
+明确法定审计、银行／投资人要求或集团合并需要
+二、账务与资料准备
+科目清理、银行函证与合同发票归集辅导
+三、审计执行协调
+与本地审计师沟通抽样、询证与调整分录
+四、报告交付
+审计报告出具与后续问询支持`,
+        process: `需求确认→资料清单→账务准备→审计进场→报告出具→归档`,
+        pricing: `参考市价 ¥25,000 起（审计意见由持牌机构出具；加急与历史补审另计）。`,
+        pricingNote: `审计意见由持牌审计机构独立出具；加急与历史年度补审另计。`,
+        advantages: `本地持牌资源；跨境集团沟通顺畅`,
+        audience: `在韩国有法定审计、融资或集团合并需求的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-uk-vat',
+      category: 'europe',
+      title: `英国VAT税号注册`,
+      desc: `英国VAT／增值税号注册与申报起步辅导：是否需注册评估、申请与首报指引。`,
+      priceLabel: `¥4,500`,
+      priceValue: 4500,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、注册必要性评估
+远程销售门槛、库存／履约仓、平台代扣等情形判断是否需本地VAT注册
+二、税号申请
+主体信息、授权代表（如需）与申请材料准备、递交跟进
+三、申报起步
+税率适用、申报周期、发票与平台报告义务提示
+四、后续合规
+变更、注销与稽查资料准备指引`,
+        process: `场景评估→材料准备→税号申请→获号确认→首报指引→日常申报衔接`,
+        pricing: `参考市价 ¥4,500 起（含申请辅导；本地代理人／翻译另计）。`,
+        pricingNote: `各国门槛与OSS／IOSS等机制不同，以英国当期规则为准；翻译与本地代理人费用另计。`,
+        advantages: `跨境电商VAT场景经验；多国组合可统筹`,
+        audience: `在英国有销售、库存或需VAT合规的跨境卖家与品牌方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-uk-setup',
+      category: 'europe',
+      title: `英国公司设立`,
+      desc: `英国公司注册设立辅导：主体类型、材料与注册递交。`,
+      priceLabel: `¥6,800`,
+      priceValue: 6800,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型建议
+私人有限公司等常见形态与股权、董事安排建议
+二、材料与注册
+名称查册、章程／注册文件、注册地址与递交
+三、注册后
+税号、银行与基础合规义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→税号／开户指引`,
+        pricing: `参考市价 ¥6,800 起（政府规费、注册地址与秘书另计）。`,
+        pricingNote: `政府规费、公证认证、注册地址与秘书等另计。`,
+        advantages: `本地协同；中文对接；可与VAT服务衔接`,
+        audience: `计划在英国设立主体的跨境企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-uk-bookkeeping',
+      category: 'europe',
+      title: `英国做账报税`,
+      desc: `英国账务处理与税务申报：记账、VAT申报与企业所得税等（按适用）。`,
+      priceLabel: `¥12,000`,
+      priceValue: 12000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、日常记账
+收入、成本、费用与银行流水入账
+二、VAT申报
+按申报期完成VAT申报与缴纳安排
+三、年度报表与所得税
+年度账与企业所得税申报（按约定）
+四、沟通汇报
+定期汇报与资料归档`,
+        process: `资料交接→记账→VAT申报→年度结账→税报→归档沟通`,
+        pricing: `参考市价 ¥12,000／年起（含常规 VAT 申报衔接；按业务量调整）。`,
+        pricingNote: `以英国税法为准；历史账清理与税务争议代理另计。`,
+        advantages: `本地合规团队；电商多平台数据可对接`,
+        audience: `已在英国有公司或VAT义务、需要持续做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-de-vat',
+      category: 'europe',
+      title: `德国VAT税号注册`,
+      desc: `德国VAT／增值税号注册与申报起步辅导：是否需注册评估、申请与首报指引。`,
+      priceLabel: `¥5,500`,
+      priceValue: 5500,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、注册必要性评估
+远程销售门槛、库存／履约仓、平台代扣等情形判断是否需本地VAT注册
+二、税号申请
+主体信息、授权代表（如需）与申请材料准备、递交跟进
+三、申报起步
+税率适用、申报周期、发票与平台报告义务提示
+四、后续合规
+变更、注销与稽查资料准备指引`,
+        process: `场景评估→材料准备→税号申请→获号确认→首报指引→日常申报衔接`,
+        pricing: `参考市价 ¥5,500 起（含申请辅导；本地代理人／翻译另计）。`,
+        pricingNote: `各国门槛与OSS／IOSS等机制不同，以德国当期规则为准；翻译与本地代理人费用另计。`,
+        advantages: `跨境电商VAT场景经验；多国组合可统筹`,
+        audience: `在德国有销售、库存或需VAT合规的跨境卖家与品牌方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-de-setup',
+      category: 'europe',
+      title: `德国公司设立`,
+      desc: `德国公司注册设立辅导：主体类型、材料与注册递交。`,
+      priceLabel: `¥35,000`,
+      priceValue: 35000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型建议
+私人有限公司等常见形态与股权、董事安排建议
+二、材料与注册
+名称查册、章程／注册文件、注册地址与递交
+三、注册后
+税号、银行与基础合规义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→税号／开户指引`,
+        pricing: `参考市价 ¥35,000 起（GmbH 等形态公证认证与注册资本安排另计）。`,
+        pricingNote: `政府规费、公证认证、注册地址与秘书等另计。`,
+        advantages: `本地协同；中文对接；可与VAT服务衔接`,
+        audience: `计划在德国设立主体的跨境企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-de-bookkeeping',
+      category: 'europe',
+      title: `德国做账报税`,
+      desc: `德国账务处理与税务申报：记账、VAT申报与企业所得税等（按适用）。`,
+      priceLabel: `¥20,000`,
+      priceValue: 20000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、日常记账
+收入、成本、费用与银行流水入账
+二、VAT申报
+按申报期完成VAT申报与缴纳安排
+三、年度报表与所得税
+年度账与企业所得税申报（按约定）
+四、沟通汇报
+定期汇报与资料归档`,
+        process: `资料交接→记账→VAT申报→年度结账→税报→归档沟通`,
+        pricing: `参考市价 ¥20,000／年起（含常规 VAT 申报衔接；按业务量调整）。`,
+        pricingNote: `以德国税法为准；历史账清理与税务争议代理另计。`,
+        advantages: `本地合规团队；电商多平台数据可对接`,
+        audience: `已在德国有公司或VAT义务、需要持续做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-fr-vat',
+      category: 'europe',
+      title: `法国VAT税号注册`,
+      desc: `法国VAT／增值税号注册与申报起步辅导：是否需注册评估、申请与首报指引。`,
+      priceLabel: `¥5,500`,
+      priceValue: 5500,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、注册必要性评估
+远程销售门槛、库存／履约仓、平台代扣等情形判断是否需本地VAT注册
+二、税号申请
+主体信息、授权代表（如需）与申请材料准备、递交跟进
+三、申报起步
+税率适用、申报周期、发票与平台报告义务提示
+四、后续合规
+变更、注销与稽查资料准备指引`,
+        process: `场景评估→材料准备→税号申请→获号确认→首报指引→日常申报衔接`,
+        pricing: `参考市价 ¥5,500 起（含申请辅导；本地代理人／翻译另计）。`,
+        pricingNote: `各国门槛与OSS／IOSS等机制不同，以法国当期规则为准；翻译与本地代理人费用另计。`,
+        advantages: `跨境电商VAT场景经验；多国组合可统筹`,
+        audience: `在法国有销售、库存或需VAT合规的跨境卖家与品牌方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-fr-setup',
+      category: 'europe',
+      title: `法国公司设立`,
+      desc: `法国公司注册设立辅导：主体类型、材料与注册递交。`,
+      priceLabel: `¥22,000`,
+      priceValue: 22000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型建议
+私人有限公司等常见形态与股权、董事安排建议
+二、材料与注册
+名称查册、章程／注册文件、注册地址与递交
+三、注册后
+税号、银行与基础合规义务提示`,
+        process: `需求沟通→主体建议→材料准备→注册递交→证件交付→税号／开户指引`,
+        pricing: `参考市价 ¥22,000 起（公证认证、注册地址等另计）。`,
+        pricingNote: `政府规费、公证认证、注册地址与秘书等另计。`,
+        advantages: `本地协同；中文对接；可与VAT服务衔接`,
+        audience: `计划在法国设立主体的跨境企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'europe-fr-bookkeeping',
+      category: 'europe',
+      title: `法国做账报税`,
+      desc: `法国账务处理与税务申报：记账、VAT申报与企业所得税等（按适用）。`,
+      priceLabel: `¥18,000`,
+      priceValue: 18000,
+      unit: `/年起`,
+      details: excelBlocks({
+        content: `一、日常记账
+收入、成本、费用与银行流水入账
+二、VAT申报
+按申报期完成VAT申报与缴纳安排
+三、年度报表与所得税
+年度账与企业所得税申报（按约定）
+四、沟通汇报
+定期汇报与资料归档`,
+        process: `资料交接→记账→VAT申报→年度结账→税报→归档沟通`,
+        pricing: `参考市价 ¥18,000／年起（含常规 VAT 申报衔接；按业务量调整）。`,
+        pricingNote: `以法国税法为准；历史账清理与税务争议代理另计。`,
+        advantages: `本地合规团队；电商多平台数据可对接`,
+        audience: `已在法国有公司或VAT义务、需要持续做账报税的企业`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'other-us-setup',
+      category: 'other',
+      title: `美国公司设立与合规`,
+      desc: `公司注册与州税／销售税合规辅导，覆盖常见州与电商场景。`,
+      priceLabel: `¥12,000`,
+      priceValue: 12000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体与州选择建议
+二、联邦EIN与州注册辅导
+三、销售税／经济关联评估与登记申报指引
+四、基础账税与年检提示`,
+        process: `需求沟通→路径建议→材料准备→注册／登记→证件交付→后续合规指引`,
+        pricing: `参考市价 ¥12,000 起（州注册、销售税登记等按实际州别另报）。`,
+        pricingNote: `各地规费、代理地址、公证认证与翻译等第三方费用另计；最终以当地法规与签约方案为准。`,
+        advantages: `多法域协同；跨境架构可统筹；节点清晰`,
+        audience: `计划在美国设立或维持跨境主体的企业与高净值结构安排需求方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'other-ca-setup',
+      category: 'other',
+      title: `加拿大公司设立与合规`,
+      desc: `联邦／省公司设立与GST／HST等税务合规辅导。`,
+      priceLabel: `¥15,000`,
+      priceValue: 15000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、主体类型与注册地建议
+二、公司注册与营业号码申请辅导
+三、GST／HST注册与申报指引
+四、账税与年度申报提示`,
+        process: `需求沟通→路径建议→材料准备→注册／登记→证件交付→后续合规指引`,
+        pricing: `参考市价 ¥15,000 起（联邦／省注册与 GST／HST 登记按方案另报）。`,
+        pricingNote: `各地规费、代理地址、公证认证与翻译等第三方费用另计；最终以当地法规与签约方案为准。`,
+        advantages: `多法域协同；跨境架构可统筹；节点清晰`,
+        audience: `计划在加拿大设立或维持跨境主体的企业与高净值结构安排需求方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'other-bvi-setup',
+      category: 'other',
+      title: `BVI公司设立与合规`,
+      desc: `BVI（英属维尔京群岛）公司设立与经济实质／年审合规辅导。`,
+      priceLabel: `¥12,000`,
+      priceValue: 12000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、离岸架构适用性沟通
+二、公司注册与文件安排
+三、注册代理、年审与经济实质义务提示
+四、与香港／内地主体衔接建议`,
+        process: `需求沟通→路径建议→材料准备→注册／登记→证件交付→后续合规指引`,
+        pricing: `参考市价 ¥12,000 起（注册代理、年审与经济实质合规另计）。`,
+        pricingNote: `各地规费、代理地址、公证认证与翻译等第三方费用另计；最终以当地法规与签约方案为准。`,
+        advantages: `多法域协同；跨境架构可统筹；节点清晰`,
+        audience: `计划在BVI设立或维持跨境主体的企业与高净值结构安排需求方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
+    {
+      id: 'other-ae-setup',
+      category: 'other',
+      title: `迪拜／阿联酋公司设立与合规`,
+      desc: `迪拜／阿联酋自贸区或 Mainland 公司设立与税务登记辅导。`,
+      priceLabel: `¥22,000`,
+      priceValue: 22000,
+      unit: `起`,
+      details: excelBlocks({
+        content: `一、自贸区／Mainland路径建议
+二、公司注册与执照办理辅导
+三、税务登记与VAT（如适用）指引
+四、银行与办公合规提示`,
+        process: `需求沟通→路径建议→材料准备→注册／登记→证件交付→后续合规指引`,
+        pricing: `参考市价 ¥22,000 起（自贸区执照、办公与签证类费用另计）。`,
+        pricingNote: `各地规费、代理地址、公证认证与翻译等第三方费用另计；最终以当地法规与签约方案为准。`,
+        advantages: `多法域协同；跨境架构可统筹；节点清晰`,
+        audience: `计划在迪拜／阿联酋设立或维持跨境主体的企业与高净值结构安排需求方`,
+        pricingTable: null,
+        bundle: null,
+      }),
+    },
+
   ];
 
   const LEGACY_SERVICE_IDS = {

@@ -180,8 +180,8 @@
     const locale = window.DAOITH_getLocale?.() || 'zh';
     const tip =
       locale === 'en'
-        ? 'Select modules to see the combined price. 10% off when 3+ modules are selected.'
-        : bundle.discountLabel || '勾选模块后显示组合价格；3项及以上享9折';
+        ? 'Select modules to see the managed-pack price. 10% off when 3+ modules are selected.'
+        : bundle.discountLabel || '勾选模块后显示全托管价格；3项及以上享9折';
     const items = bundle.modules
       .map(
         (m, i) => `

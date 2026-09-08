@@ -75,7 +75,9 @@ function initNavigation() {
     '.nav > a[href^="#"], .nav-dropdown-menu a[href^="#"], .nav-dropdown-trigger[href^="#"]'
   );
   const policyTrigger = document.querySelector('.nav-dropdown-trigger[data-nav-parent="policy"]');
+  const hubTrigger = document.querySelector('.nav-dropdown-trigger[data-nav-parent="hub"]');
   const policyIds = new Set(['policy', 'tax-systems', 'policy-expert', 'policy-tax', 'policy-platform']);
+  const hubMenuIds = new Set(['hub-inquiries', 'hub-orders', 'hub-progress']);
 
   const hashToView = {
     '': 'home',
@@ -127,12 +129,6 @@ function initNavigation() {
     hub.querySelectorAll('[data-hub-page]').forEach((el) => {
       el.hidden = el.getAttribute('data-hub-page') !== page;
     });
-    hub.querySelectorAll('[data-hub-nav]').forEach((a) => {
-      const on = a.getAttribute('data-hub-nav') === page;
-      a.classList.toggle('is-active', on);
-      if (on) a.setAttribute('aria-current', 'page');
-      else a.removeAttribute('aria-current');
-    });
     return { page, prevPage };
   }
 
@@ -143,9 +139,14 @@ function initNavigation() {
       const linkId = href.replace(/^#/, '');
       let active = false;
       if (link.closest('.nav-dropdown-menu')) {
-        active =
-          view === 'policy' &&
-          (linkId === id || (id === 'policy' && linkId === 'tax-systems'));
+        const parent = link.closest('.nav-dropdown')?.querySelector('[data-nav-parent]')?.getAttribute('data-nav-parent');
+        if (parent === 'policy') {
+          active =
+            view === 'policy' &&
+            (linkId === id || (id === 'policy' && linkId === 'tax-systems'));
+        } else if (parent === 'hub') {
+          active = view === 'hub' && hubMenuIds.has(id) && linkId === id;
+        }
       } else {
         active = href === viewToNavHref[view];
       }
@@ -153,6 +154,9 @@ function initNavigation() {
     });
     if (policyTrigger) {
       policyTrigger.classList.toggle('active', view === 'policy');
+    }
+    if (hubTrigger) {
+      hubTrigger.classList.toggle('active', view === 'hub');
     }
   }
 
