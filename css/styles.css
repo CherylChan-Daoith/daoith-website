@@ -2016,25 +2016,6 @@ ul {
   color: #5b6b95;
 }
 
-.result-inline-services {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(34, 81, 255, 0.12);
-}
-
-.result-inline-services .diag-services-heading {
-  font-size: 0.92rem;
-}
-
-.result-inline-services .diag-services-lead {
-  margin: 0 0 10px;
-  font-size: 0.78rem;
-}
-
-.result-inline-services .diag-service-card {
-  box-shadow: none;
-}
-
 .result-service-match-tip {
   flex-shrink: 0;
   position: relative;

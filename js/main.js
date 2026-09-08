@@ -5604,13 +5604,13 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
 }
 
 const DIAG_SERVICE_MATCH_TIP =
-  '道一合规小助手已为您匹配最相关的服务，请查看本条回复下方的服务卡片（页面下方亦有同款推荐）。';
+  '道一合规小助手已为您匹配最相关的服务，请在页面下方点选。';
 
-/** Remove tip copy from answer bodies (must only live in #resultServiceTip / inline card block). */
+/** Remove tip copy from answer bodies (must only live in #resultServiceTip). */
 function stripServiceMatchTip(text) {
   return String(text || '')
     .replace(
-      /道一合规小助手已为您匹配最相关的服务[，,]?\s*请(?:在本页面下方进行选择|查看本条回复下方的服务卡片)[^。\n]*。?/g,
+      /道一合规小助手已为您匹配最相关的服务[，,]?\s*请(?:在本页面下方进行选择|在页面下方点选|查看本条回复下方的服务卡片)[^。\n]*。?/g,
       ''
     )
     .replace(/\n{3,}/g, '\n\n')
@@ -5802,7 +5802,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     (timeLabel ? `<span class="result-entry-time">${escapeHtml(timeLabel)}</span>` : '') +
     `</p>`;
 
-  const mountEntry = (innerHtml, inlineServicesHtml = '') => {
+  const mountEntry = (innerHtml) => {
     purgeInlineServiceMatchTips(items);
     // Only replace the in-flight draft for this turn — never overwrite prior finished replies
     let entry = null;
@@ -5835,13 +5835,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
         : '') +
       metaHtml +
       innerHtml +
-      (inlineServicesHtml
-        ? `<div class="result-inline-services">${inlineServicesHtml}</div>`
-        : '') +
       `</div>`;
-    if (inlineServicesHtml) {
-      window.DAOITH_CART?.bindAddButtons?.(entry);
-    }
     // Keep page scroll fixed — only adjust the result panel scroller
     try {
       const scroller = items;
@@ -5854,11 +5848,10 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   };
 
   const attachServiceRecs = (sourceMarkdown, lead) => {
-    // Skip service spam while streaming draft tokens
-    if (replaceLatest && !finalize && !refreshDiagnosis) return '';
+    // Skip service spam while streaming draft tokens; cards only in page-bottom #diagServiceRecs
+    if (replaceLatest && !finalize && !refreshDiagnosis) return;
     const html = showDiagnosisServiceRecs(sourceMarkdown, { lead });
     if (html) setResultServiceTipVisible(true);
-    return html || '';
   };
 
   if (kind === 'diagnosis' && jsonReport && isDiagnosisReportJsonReady(jsonReport)) {
@@ -5874,18 +5867,17 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     const fromChat = `以下方案由左侧<strong>道一合规助手</strong>生成：`;
     const archiveHtml = buildDiagnosisArchiveConfirmHtml();
     const changeHtml = buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges());
-    const servicesHtml = attachServiceRecs(
-      clean,
-      '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。'
-    );
     mountEntry(
       `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
         archiveHtml +
         changeHtml +
-        body,
-      servicesHtml
+        body
     );
     cacheLastDiagnosisReport({ jsonReport, markdown: clean });
+    attachServiceRecs(
+      clean,
+      '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。'
+    );
     return;
   }
 
@@ -5915,18 +5907,17 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const archiveHtml = kind === 'diagnosis' ? buildDiagnosisArchiveConfirmHtml() : '';
   const changeHtml =
     kind === 'diagnosis' ? buildDiagnosisChangePointsHtml(getLastDiagFollowUpChanges()) : '';
-  const servicesHtml = attachServiceRecs(
-    clean,
-    kind === 'qa'
-      ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
-      : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。'
-  );
   mountEntry(
     `<p class="result-paragraph result-from-chat">${fromChat}</p>` +
       archiveHtml +
       changeHtml +
-      body,
-    servicesHtml
+      body
+  );
+  attachServiceRecs(
+    clean,
+    kind === 'qa'
+      ? '根据您的问题为您匹配，可加入询价单由顾问继续落地。'
+      : '根据方案中的行动建议为您匹配，可加入询价单由顾问继续落地。'
   );
 }
 
