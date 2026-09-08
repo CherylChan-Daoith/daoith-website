@@ -1659,4 +1659,9 @@ SCR重要控制人登记册维护
     const resolved = LEGACY_SERVICE_IDS[id] || id;
     return (window.DAOITH_SERVICES || []).find((s) => s.id === resolved) || null;
   };
+
+  window.formatServicePrice = function formatServicePrice(value) {
+    const n = Number(value) || 0;
+    return `¥${n.toLocaleString('zh-CN')}`;
+  };
 })();

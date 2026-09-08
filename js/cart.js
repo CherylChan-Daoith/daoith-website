@@ -86,16 +86,18 @@
   }
 
   function removeItem(serviceId) {
-    writeCart(readCart().filter((i) => i.id !== serviceId));
+    const key = String(serviceId || '');
+    writeCart(readCart().filter((i) => (i.cartKey || i.id) !== key));
   }
 
   function updateQty(serviceId, qty) {
+    const key = String(serviceId || '');
     const next = Math.max(0, Math.floor(Number(qty) || 0));
     const items = readCart();
-    const item = items.find((i) => i.id === serviceId);
+    const item = items.find((i) => (i.cartKey || i.id) === key);
     if (!item) return;
     if (next <= 0) {
-      writeCart(items.filter((i) => i.id !== serviceId));
+      writeCart(items.filter((i) => (i.cartKey || i.id) !== key));
       return;
     }
     item.qty = next;

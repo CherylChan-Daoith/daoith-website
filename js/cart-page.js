@@ -49,6 +49,13 @@
     return fallback;
   }
 
+  function formatMoney(value) {
+    if (typeof window.formatServicePrice === 'function') {
+      return window.formatServicePrice(value);
+    }
+    return `¥${(Number(value) || 0).toLocaleString('zh-CN')}`;
+  }
+
   function renderCart() {
     applyStaticI18n();
     const items = cartApi.getCart();
@@ -63,7 +70,7 @@
       emptyEl?.classList.remove('is-hidden');
       contentEl?.classList.add('is-hidden');
       if (body) body.innerHTML = '';
-      if (totalEl) totalEl.textContent = window.formatServicePrice?.(0) || '¥0';
+      if (totalEl) totalEl.textContent = formatMoney(0);
       return;
     }
 
@@ -71,21 +78,22 @@
     contentEl?.classList.remove('is-hidden');
 
     function unitPriceText(item) {
-      return item.priceLabel || window.formatServicePrice(item.priceValue);
+      return item.priceLabel || formatMoney(item.priceValue);
     }
 
     function subtotalText(item) {
       const value = (Number(item.priceValue) || 0) * (Number(item.qty) || 0);
       if (value <= 0 && item.priceLabel) return item.priceLabel;
-      return window.formatServicePrice(value);
+      return formatMoney(value);
     }
 
     body.innerHTML = items.map((item) => {
       const title = enTitle(item.id, item.title);
+      const rowKey = item.cartKey || item.id;
       return `
-        <tr data-id="${escapeHtml(item.id)}">
+        <tr data-id="${escapeHtml(item.id)}" data-cart-key="${escapeHtml(rowKey)}">
           <td>
-            <a class="cart-item-title" href="/service.html?id=${encodeURIComponent(item.id)}">${escapeHtml(title)}</a>
+            <a class="cart-item-title" href="/service.html?id=${encodeURIComponent(item.id)}">${escapeHtml(title || item.id || '')}</a>
             <div class="cart-item-unit">${escapeHtml(item.unit || '')}</div>
           </td>
           <td>${escapeHtml(unitPriceText(item))}</td>
@@ -102,7 +110,7 @@
       `;
     }).join('');
 
-    if (totalEl) totalEl.textContent = window.formatServicePrice(cartApi.getTotal());
+    if (totalEl) totalEl.textContent = formatMoney(cartApi.getTotal());
   }
 
   function openModal() {
@@ -124,9 +132,9 @@
   document.getElementById('cartTableBody')?.addEventListener('click', (e) => {
     const row = e.target.closest('tr[data-id]');
     if (!row) return;
-    const id = row.dataset.id;
+    const key = row.dataset.cartKey || row.dataset.id;
     if (e.target.matches('[data-remove]')) {
-      cartApi.removeItem(id);
+      cartApi.removeItem(key);
       renderCart();
       return;
     }
@@ -135,7 +143,7 @@
       const delta = Number(deltaBtn.dataset.qtyDelta) || 0;
       const input = row.querySelector('.cart-qty-input');
       const current = Number(input?.value) || 1;
-      cartApi.updateQty(id, current + delta);
+      cartApi.updateQty(key, current + delta);
       renderCart();
     }
   });
@@ -144,7 +152,7 @@
     if (!e.target.classList.contains('cart-qty-input')) return;
     const row = e.target.closest('tr[data-id]');
     if (!row) return;
-    cartApi.updateQty(row.dataset.id, e.target.value);
+    cartApi.updateQty(row.dataset.cartKey || row.dataset.id, e.target.value);
     renderCart();
   });
 
