@@ -459,17 +459,8 @@ window.DAOITH_I18N_EN = {
       text: 'Full-process AI-powered tracking — quality service you can trust.',
     },
     '#hubJourney [data-step="1"] h4': { text: 'Inquiries' },
-    '#hubJourney [data-step="1"] .process-desc': {
-      text: 'Submit an inquiry and complete payment',
-    },
     '#hubJourney [data-step="2"] h4': { text: 'Service Orders' },
-    '#hubJourney [data-step="2"] .process-desc': {
-      text: 'Look up service orders after close-won',
-    },
     '#hubJourney [data-step="3"] h4': { text: 'Progress Tracking' },
-    '#hubJourney [data-step="3"] .process-desc': {
-      text: 'Track delivery milestones and progress',
-    },
     '#hub .hub-hero .stats > div:nth-child(1) .stat-label': { text: 'Clients served' },
     '#hub .hub-hero .stats > div:nth-child(2) .stat-label': { text: 'Satisfaction' },
     '#hub .hub-hero .stats > div:nth-child(3) .stat-label': { text: 'Cities covered' },

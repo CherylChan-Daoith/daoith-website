@@ -129,6 +129,17 @@ function initNavigation() {
     hub.querySelectorAll('[data-hub-page]').forEach((el) => {
       el.hidden = el.getAttribute('data-hub-page') !== page;
     });
+    const pageHash = {
+      inquiries: 'hub-inquiries',
+      orders: 'hub-orders',
+      progress: 'hub-progress',
+    }[page];
+    hub.querySelectorAll('#hubJourney .process-card').forEach((card) => {
+      const active = !!pageHash && (card.getAttribute('href') || '') === `#${pageHash}`;
+      card.classList.toggle('is-active', active);
+      if (active) card.setAttribute('aria-current', 'page');
+      else card.removeAttribute('aria-current');
+    });
     return { page, prevPage };
   }
 
