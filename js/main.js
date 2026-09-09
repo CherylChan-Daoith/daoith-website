@@ -42,12 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (action === 'tax-calc') {
         document.getElementById('calcTax')?.click();
       } else if (action === 'ai_diagnosis_start') {
-        // Resume专属合规诊断 after WeChat login (fast local step-1 inside sendMessage)
+        // Resume专属合规方案 after WeChat login (fast local step-1 inside sendMessage)
         document.getElementById('ai-solution')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
         const form = document.getElementById('aiChatbotForm');
         const input = document.getElementById('aiChatbotInput');
         if (input && form) {
-          input.value = '开启专属合规诊断';
+          input.value = '生成专属合规方案';
           form.requestSubmit();
         }
       } else if (action === 'ai_chat') {
@@ -1699,7 +1699,7 @@ function buildLocalChatReply(message, ctx) {
 
 const DIAG_QUICK_REPLY_SETS = {
   modeSelect: [
-    '开启专属合规诊断',
+    '生成专属合规方案',
     '特定问题直接咨询',
   ],
   platform: [
@@ -1913,7 +1913,7 @@ function detectDiagQuickReplySet(botText) {
 
   // Mode selection after welcome
   if (
-    /(开启专属合规诊断|特定问题想直接提问|特定问题直接咨询|专属合规诊断|直接提问)/.test(zone) &&
+    /(生成专属合规方案|开启专属合规诊断|特定问题想直接提问|特定问题直接咨询|专属合规方案|专属合规诊断|直接提问)/.test(zone) &&
     /(请选择|请在下方选择|还是|或者|两种|模式)/.test(zone)
   ) {
     return 'modeSelect';
@@ -2059,9 +2059,9 @@ function entityOptionsForPlatform(platformLabel) {
 function wantsExclusiveDiagnosisStart(text) {
   const t = String(text || '').trim();
   if (!t) return false;
-  if (/开启专属合规诊断|重新诊断|换个模式|我要逐步诊断/.test(t)) return true;
+  if (/生成专属合规方案|开启专属合规诊断|重新诊断|换个模式|我要逐步诊断/.test(t)) return true;
   // Allow bare「专属合规诊断」as the whole message (Agent replies often mention the phrase in prose)
-  if (/^专属合规诊断[。.!！]?$/.test(t)) return true;
+  if (/^专属合规(方案|诊断)[。.!！]?$/.test(t)) return true;
   return false;
 }
 
@@ -2070,8 +2070,8 @@ function normalizeDiagnosisModeQuery(text) {
   const t = String(text || '').trim();
   if (wantsExclusiveDiagnosisStart(t) && !/特定问题/.test(t)) {
     return (
-      '【模式选择】用户选择：开启专属合规诊断。' +
-      '请立即进入模式A专属合规诊断，执行第一步：只提问「1. 您在哪个电商平台上销售商品？（可在下方点选）」；不要在正文罗列平台名称，官网底部会显示按钮。' +
+      '【模式选择】用户选择：生成专属合规方案。' +
+      '请立即进入模式A专属合规方案，执行第一步：只提问「1. 您在哪个电商平台上销售商品？（可在下方点选）」；不要在正文罗列平台名称，官网底部会显示按钮。' +
       '禁止说“这不是自动命令”，禁止要求用户改提其他具体问题，禁止输出欢迎语。'
     );
   }
@@ -2086,7 +2086,7 @@ function normalizeDiagnosisModeQuery(text) {
 
 function localDiagnosisPlatformAsk() {
   return (
-    '好的，已为您开启专属合规诊断。\n\n' +
+    '好的，开始为您生成专属合规方案。\n\n' +
     '1. 您在哪个电商平台上销售商品？（可在下方点选）'
   );
 }
@@ -2753,7 +2753,7 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
   return (
     (retry
       ? '【重试·强制】上一轮 JSON 与本轮【诊断档案】不一致（疑似套用旧会话/样本）。禁止再用历史案例；必须按下方档案重写。'
-      : '【专属合规诊断·生成报告】第1-7步已齐。') +
+      : '【专属合规方案·生成报告】第1-7步已齐。') +
     '【铁律·本轮档案】只采信下方【诊断档案】；禁止沿用对话历史中上一轮平台/主体/发货/出口/发票；' +
     '禁止把档案改写成其它未出现在本档案中的平台。' +
     '调用工具时：`diagnosis_archive` 必须**原样粘贴**下方从「销售平台：」到年销售额的七行档案（可含硬约束段），禁止凭记忆重写；`report_path` 必须与官网预判一致除非档案明显不符。' +
@@ -3120,7 +3120,7 @@ function stripDiagnosisArchivePreamble(text) {
 function looksLikeModeSelectReply(text) {
   const t = String(text || '');
   return (
-    /(开启专属合规诊断|特定问题想直接提问|特定问题直接咨询)/.test(t) &&
+    /(生成专属合规方案|开启专属合规诊断|特定问题想直接提问|特定问题直接咨询)/.test(t) &&
     /(请选择|还是|无法判断|仅凭)/.test(t)
   );
 }
@@ -3177,7 +3177,7 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
   const hint = stepHints[uiStep] || `请继续第${uiStep}步，一次只问一个问题。`;
   const archive = formatDiagSlotsForApi();
   return (
-    `【专属合规诊断进行中·模式A】用户本轮答复：${String(text || '').trim()}。` +
+    `【专属合规方案进行中·模式A】用户本轮答复：${String(text || '').trim()}。` +
     (platform ? `已确认销售平台：${platform}。` : '') +
     `${hint}` +
     '禁止重新询问模式选择，禁止输出欢迎语，禁止说“仅凭…无法判断需求”；步号必须正确（2=主体，3=发货）。' +
@@ -3625,7 +3625,7 @@ function initAiChatbot() {
     }
 
     // Recover wizard state when the bot is clearly asking a step 1–7 slot question
-    // (e.g. user typed「专属合规诊断」without「开启」, localStorage was empty)
+    // (e.g. user typed「专属合规方案」without「生成」, localStorage was empty)
     let uiMode = getUiMode();
     let uiStep = getUiStep();
     if (looksLikeDiagnosisWizardAsk(botText)) {
@@ -3719,13 +3719,13 @@ function initAiChatbot() {
     greetEl.className = 'ai-chatbot-bubble is-bot is-welcome';
     greetEl.innerHTML =
       `<p class="welcome-ask">请在下方选择：` +
-      `<span class="welcome-option"><strong>开启专属合规诊断</strong><span class="diag-ask-hint">（需微信登录，按步骤生成诊断报告）</span></span>` +
+      `<span class="welcome-option"><strong>生成专属合规方案</strong><span class="diag-ask-hint">（需微信登录，按步骤生成合规方案）</span></span>` +
       `，或 ` +
       `<span class="welcome-option"><strong>特定问题直接咨询</strong><span class="diag-ask-hint">（基于知识库即时解答）</span></span>` +
       `。</p>`;
     messages.appendChild(greetEl);
 
-    showQuickReplies('请在下方选择：开启专属合规诊断（需微信登录，按步骤生成诊断报告），或 特定问题直接咨询（基于知识库即时解答）。');
+    showQuickReplies('请在下方选择：生成专属合规方案（需微信登录，按步骤生成合规方案），或 特定问题直接咨询（基于知识库即时解答）。');
     scrollDiagChatToBottom();
   };
 
@@ -3757,7 +3757,7 @@ function initAiChatbot() {
     const returnToAi = `${window.location.pathname}${window.location.search}#ai-solution`;
     const wantsExclusiveDiagnosis = wantsExclusiveDiagnosisStart(text);
 
-    // 专属合规诊断：选模式时即要求微信登录（不要等到出方案才拦）
+    // 专属合规方案：选模式时即要求微信登录（不要等到出方案才拦）
     if (wantsExclusiveDiagnosis && !loggedIn) {
       window.DAOITH_AUTH?.requireLogin?.('ai_diagnosis_start', returnToAi, { silent: true });
       return;
@@ -3852,7 +3852,7 @@ function initAiChatbot() {
 
       const { difyChatEndpoint } = getDifyConfig();
       const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
-      const warmQuery = normalizeDiagnosisModeQuery('开启专属合规诊断');
+      const warmQuery = normalizeDiagnosisModeQuery('生成专属合规方案');
       diagnosisWarmPromise = (async () => {
         try {
           const result = await callDify({
@@ -4117,7 +4117,7 @@ function initAiChatbot() {
       !looksLikeDiagnosisFactQuestion(text) &&
       (followUpChanges.length > 0 || looksLikeDiagnosisScenarioRestate(text));
     const forcePlanWhileThinking = shouldGeneratePlanNow || expectFollowUpPlan;
-    // 「正在诊断」仅用于专属合规诊断问诊（第1～7步）；追问/直答一律「正在检索和思考」
+    // 「正在诊断」仅用于专属合规方案问诊（第1～7步）；追问/直答一律「正在检索和思考」
     const isDiagnosisWizardTurn =
       prevMode === 'diagnosis' &&
       !isPostReportFollowUp &&

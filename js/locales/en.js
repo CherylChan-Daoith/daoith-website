@@ -231,7 +231,7 @@ window.DAOITH_I18N_EN = {
     '.hero-subtitle': {
       text: 'AI + senior tax experts for cross-border sellers — plan generation, delivery services, and progress tracking.',
     },
-    '#heroShowcase .hero-tab[data-index="0"] .hero-tab-title': { text: 'AI Diagnosis' },
+    '#heroShowcase .hero-tab[data-index="0"] .hero-tab-title': { text: 'AI Solutions' },
     '#heroShowcase .hero-tab[data-index="0"] .hero-tab-sub': { text: 'Covers 80% of common cases' },
     '#heroShowcase .hero-tab[data-index="1"] .hero-tab-title': { text: '1:1 Tax Expert' },
     '#heroShowcase .hero-tab[data-index="1"] .hero-tab-sub': { text: 'Experts handle complex cases' },
@@ -239,7 +239,7 @@ window.DAOITH_I18N_EN = {
     '#heroShowcase .hero-tab[data-index="2"] .hero-tab-sub': { text: 'Bookkeeping · rebates · filing' },
     '#heroShowcase .hero-tab[data-index="3"] .hero-tab-title': { text: 'AI + Expert Care' },
     '#heroShowcase .hero-tab[data-index="3"] .hero-tab-sub': { text: 'Track progress end to end' },
-    '#heroPanel0 .hero-panel-copy h2': { text: 'AI Diagnosis' },
+    '#heroPanel0 .hero-panel-copy h2': { text: 'AI Solutions' },
     '#heroPanel0 .hero-panel-copy > p:not(.hero-panel-kicker)': {
       html: true,
       text: '<span class="hero-assistant-name">Daoith Compliance Assistant<span class="tag">AI</span></span> asks step-by-step about platform, entity, shipping and invoices — a tailored compliance plan in minutes for common seller scenarios.',
@@ -247,7 +247,7 @@ window.DAOITH_I18N_EN = {
     '#heroPanel0 .hero-panel-points li:nth-child(1)': { text: 'One question at a time' },
     '#heroPanel0 .hero-panel-points li:nth-child(2)': { text: 'Structured plan output' },
     '#heroPanel0 .hero-panel-points li:nth-child(3)': { text: 'Auto-matched services' },
-    '#heroPanel0 .btn-primary': { text: 'Free AI Diagnosis' },
+    '#heroPanel0 .btn-primary': { text: 'Try AI Solutions free' },
     '#heroPanel0 .hero-mock-line.is-bot': { text: 'Which e-commerce platform do you sell on?' },
     '#heroPanel0 .hero-mock-chips span:nth-child(1)': { text: 'Amazon' },
     '#heroPanel0 .hero-mock-chips span:nth-child(2)': { text: 'Temu' },
@@ -311,7 +311,7 @@ window.DAOITH_I18N_EN = {
     },
     '#aiSolutionJourney .process-card[data-step="2"] h4': { text: 'Choose a service' },
     '#aiSolutionJourney .process-branch-row:nth-child(1) .process-branch-name': {
-      text: 'Start guided diagnosis',
+      text: 'Generate a tailored compliance plan',
     },
     '#aiSolutionJourney .process-branch-row:nth-child(1) .tag': {
       text: 'Answer 7 questions prompted by the AI',
