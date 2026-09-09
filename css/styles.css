@@ -7144,6 +7144,7 @@ body.modal-open {
 
 .hub-table-scroll {
   overflow-x: visible;
+  border: 1px solid #c5d0ff;
   border-radius: 16px;
 }
 
@@ -7170,7 +7171,7 @@ body.modal-open {
 .hub-table th {
   font-size: 0.82rem;
   font-weight: 650;
-  color: #2251ff;
+  color: var(--ink);
   background: #e8eeff;
   letter-spacing: 0.02em;
   border-bottom: 1px solid #c5d0ff;

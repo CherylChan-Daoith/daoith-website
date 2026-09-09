@@ -9712,10 +9712,11 @@ function quoteStatusLabel(status) {
 }
 
 function formatYuanHub(v) {
+  const n = Math.round(Number(v) || 0);
   if (typeof window.formatServicePrice === 'function') {
-    return window.formatServicePrice(v);
+    return window.formatServicePrice(n);
   }
-  return `¥${(Number(v) || 0).toLocaleString('zh-CN')}`;
+  return `¥${n.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}`;
 }
 
 function hubStatusClass(status) {
@@ -9824,7 +9825,7 @@ function hubLineQuoted(q, it) {
   const totals = hubQuoteTotals(q);
   const lineStd = (Number(it?.priceValue) || 0) * (Number(it?.qty) || 1);
   if (totals.standard <= 0) return totals.quoted;
-  return Math.round((lineStd / totals.standard) * totals.quoted * 100) / 100;
+  return Math.round((lineStd / totals.standard) * totals.quoted);
 }
 
 function collectOrderRows(quotes, services) {
