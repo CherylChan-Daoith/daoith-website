@@ -4009,12 +4009,6 @@ ul {
   box-shadow: var(--daoith-cta-shadow) !important;
 }
 
-.hub-stack > .hub-panel.hub-skin-ai[data-hub-section="inquiries"],
-.hub-stack > .hub-panel.hub-skin-ai[data-hub-section="progress"] {
-  border: 1px solid #e6e8eb !important;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.04) !important;
-}
-
 .hub-stack > .hub-panel.hub-skin-ai[data-hub-section="inquiries"]::before,
 .hub-stack > .hub-panel.hub-skin-ai[data-hub-section="progress"]::before {
   display: none !important;
@@ -7090,11 +7084,11 @@ body.modal-open {
 #hub .hub-stack > .hub-panel[data-hub-section="inquiries"],
 #hub .hub-stack > .hub-panel[data-hub-section="orders"],
 #hub .hub-stack > .hub-panel[data-hub-section="progress"] {
-  padding: 24px 28px !important;
-  border: 1px solid #e6e8eb !important;
-  border-radius: 20px !important;
-  background: #fff !important;
-  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.04) !important;
+  padding: 8px 0 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   overflow: visible;
 }
 
@@ -7150,14 +7144,17 @@ body.modal-open {
 
 .hub-table-scroll {
   overflow-x: visible;
+  border-radius: 16px;
 }
 
 .hub-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.95rem;
   line-height: 1.5;
-  border: 1px solid #c9ced6;
+  border: none;
+  background: transparent;
 }
 
 .hub-table th,
@@ -7165,25 +7162,51 @@ body.modal-open {
   padding: 14px 16px;
   text-align: left;
   vertical-align: middle;
-  border: 1px solid #d0d5dd;
+  border: none;
+  border-bottom: 1px solid #d4dcff;
   white-space: nowrap;
 }
 
 .hub-table th {
   font-size: 0.82rem;
   font-weight: 650;
-  color: #4b5563;
-  background: #f3f4f6;
+  color: #2251ff;
+  background: #e8eeff;
   letter-spacing: 0.02em;
-  border-bottom: 1px solid #c5cad3;
+  border-bottom: 1px solid #c5d0ff;
+}
+
+.hub-table th:first-child {
+  border-top-left-radius: 16px;
+}
+
+.hub-table th:last-child {
+  border-top-right-radius: 16px;
 }
 
 .hub-skin-ai .hub-table th {
-  background: #f3f4f6;
+  background: #e8eeff;
+}
+
+.hub-table td {
+  background: transparent;
+  color: var(--ink);
+}
+
+.hub-table tbody tr:hover td {
+  background: rgba(34, 81, 255, 0.04);
 }
 
 .hub-table tbody tr:last-child td {
-  border-bottom: 1px solid #d0d5dd;
+  border-bottom: none;
+}
+
+.hub-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: 16px;
+}
+
+.hub-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: 16px;
 }
 
 .hub-table .hub-cell-wrap {
@@ -7225,7 +7248,7 @@ body.modal-open {
   padding: 3px 9px;
   background: linear-gradient(135deg, rgba(34, 81, 255, 0.12), rgba(34, 211, 238, 0.12));
   border: 1px solid rgba(34, 81, 255, 0.12);
-  border-radius: 4px;
+  border-radius: 8px;
   color: #1a3cff;
   font-size: 0.8rem;
   line-height: 1.35;
@@ -7343,9 +7366,15 @@ body.modal-open {
 
 .hub-progress-detail-row td {
   white-space: normal;
-  background: #f7f8fa;
+  background: rgba(34, 81, 255, 0.04);
   padding-top: 12px;
   padding-bottom: 14px;
+  border-bottom: none;
+  border-radius: 0;
+}
+
+.hub-table tbody tr.hub-progress-detail-row:hover td {
+  background: rgba(34, 81, 255, 0.06);
 }
 
 .hub-bar-wrap {
