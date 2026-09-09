@@ -6874,45 +6874,6 @@ body.modal-open {
   max-width: 820px;
 }
 
-.hub-hero-tabs {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 4px 2px;
-  margin: 0 auto 8px;
-  padding: 4px 0 0;
-  max-width: 720px;
-}
-
-.hub-hero-tabs a {
-  padding: 10px 18px 12px;
-  font-size: 0.9375rem;
-  color: var(--text-muted);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  transition: color var(--transition), border-color var(--transition);
-  white-space: nowrap;
-}
-
-.hub-hero-tabs a:hover {
-  color: var(--ink);
-}
-
-.hub-hero-tabs a.is-active {
-  color: var(--accent);
-  font-weight: 600;
-  border-bottom-color: var(--accent);
-}
-
-.hub-home-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.hub-home-link:hover {
-  color: var(--accent);
-}
-
 .hub-hero .hero-subtitle {
   font-size: 1.0625rem;
   color: var(--text-secondary);
@@ -9409,11 +9370,6 @@ body.modal-open {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
     max-width: none;
-  }
-
-  .hub-hero-tabs a {
-    padding: 8px 10px 10px;
-    font-size: 0.8125rem;
   }
 
   .hub-hero .stat-number {
