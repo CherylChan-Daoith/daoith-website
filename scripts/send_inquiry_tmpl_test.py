@@ -58,7 +58,7 @@ def main():
             "thing3": {"value": "官网询价"},
             "time4": {"value": now},
             "character_string5": {"value": "TEST" + datetime.now().strftime("%m%d%H%M%S")},
-            "const12": {"value": "已报价" if status == "待付款" else status},
+            "const12": {"value": "待付款" if status == "已报价" else status},
             "time29": {"value": due},
         },
     }

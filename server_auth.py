@@ -1610,8 +1610,8 @@ _INQUIRY_STATUS_ALIASES = {"已报价": "待付款"}
 _INQUIRY_STATUS_ORDER = ["已提交", "处理中", "待付款"]
 _INQUIRY_TERMINALS = {"已成交", "已关闭"}
 # WeChat template const12 enums currently approved in the OA console
-_WECHAT_TMPL_STATUSES = frozenset({"已提交", "处理中", "已报价", "已成交", "已关闭"})
-_WECHAT_TMPL_STATUS_ALIAS = {"待付款": "已报价"}
+_WECHAT_TMPL_STATUSES = frozenset({"已提交", "处理中", "待付款", "已成交", "已关闭"})
+_WECHAT_TMPL_STATUS_ALIAS = {"已报价": "待付款"}
 
 
 def canonical_inquiry_status(status: str) -> str:
@@ -2234,6 +2234,10 @@ def notify_inquiry_if_subscribed(
             "status": tmpl_status,
         }
     except Exception as e:
+        print(
+            f"[wechat-notify] inquiry={inquiry_id} status={status} error={e}",
+            flush=True,
+        )
         return {"sent": False, "error": str(e)}
 
 
@@ -3051,7 +3055,7 @@ def handle_inquiry_slip_upload(auth_header: str, body: dict, env_loader):
             env_loader,
         )
     except Exception as e:
-        return 502, {"error": f"水单已保存，但同步到项目管理失败：{e}"}
+        return 502, {"error": f"水单已保存，但同步到询价管理失败：{e}"}
     return 200, {"ok": True, **saved}
 
 

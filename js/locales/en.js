@@ -153,6 +153,7 @@ window.DAOITH_I18N_EN = {
     'services.collapse': 'Collapse list ↑',
     'nav.cart': 'Cart',
     'nav.cartExpert': 'Add expert 1-on-1 to cart',
+    'hub.tabsAria': 'Service Hub sections',
     'tax.viewDetail': 'View tax profile',
     'tax.trade': '2025 trade volume',
     'article.readMore': 'Read article',
@@ -455,6 +456,9 @@ window.DAOITH_I18N_EN = {
     '.filter-btn[data-filter="other"]': { text: 'Other regions' },
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .hub-hero .hub-home-link': { text: 'Service Hub' },
+    '.hub-hero-tabs a[data-hub-tab="inquiries"]': { text: 'Inquiries' },
+    '.hub-hero-tabs a[data-hub-tab="orders"]': { text: 'Service Orders' },
+    '.hub-hero-tabs a[data-hub-tab="progress"]': { text: 'Progress Tracking' },
     '#hub .hub-hero .hero-subtitle': {
       text: 'Full-process AI-powered tracking — quality service you can trust.',
     },

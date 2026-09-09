@@ -129,6 +129,12 @@ function initNavigation() {
     hub.querySelectorAll('[data-hub-page]').forEach((el) => {
       el.hidden = el.getAttribute('data-hub-page') !== page;
     });
+    hub.querySelectorAll('.hub-hero-tabs a[data-hub-tab]').forEach((tab) => {
+      const active = tab.getAttribute('data-hub-tab') === page;
+      tab.classList.toggle('is-active', active);
+      if (active) tab.setAttribute('aria-current', 'page');
+      else tab.removeAttribute('aria-current');
+    });
     return { page, prevPage };
   }
 
