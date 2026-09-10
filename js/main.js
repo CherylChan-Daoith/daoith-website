@@ -2855,6 +2855,22 @@ function looksLikeDiagnosisFactQuestion(text) {
   return false;
 }
 
+/**
+ * Standalone policy / statute lookups (e.g.「增值税起征点」).
+ * Do NOT open a fresh Dify conversation for these — follow-ups like「那按次呢」
+ * need the same thread. Sticky wrong numbers are handled by a query-side
+ * re-retrieve instruction, not by wiping memory.
+ */
+function looksLikeStandaloneKbQuestion(text) {
+  const t = String(text || '').trim();
+  if (!t || t.length > 96) return false;
+  if (looksLikeDiagnosisScenarioRestate(t)) return false;
+  if (/(?:我的方案|刚才的方案|上一份|按我这个|我们这个|本单|档案里)/.test(t)) return false;
+  return /起征点|免税额度|按次纳税|出口退税率?|税收协定|避免双重征税|文号|税率是多少|现行标准/.test(
+    t
+  );
+}
+
 /** User is complaining the right-hand plan is incomplete / not visible — re-show, don't ask Agent. */
 function looksLikePlanDisplayComplaint(text) {
   const t = String(text || '').trim();
@@ -3029,6 +3045,7 @@ function looksLikeDiagnosisScenarioRestate(text) {
 function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
   const baseline = formatDiagSlotsSnapshot(baselineSlots);
   const changeBlock = formatDiagChangeLines(changes);
+  const standaloneKb = looksLikeStandaloneKbQuestion(userText);
   return (
     '【诊断已完成·后续追问】\n' +
     '【上一轮诊断档案】\n' +
@@ -3041,7 +3058,12 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
     '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据** / **操作提示**（三者同级、标签加粗）；依据内全部同一级实心 `- **标题**：正文`；**操作提示**独立成块，禁止放进依据列表；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
-    '- 若为全新无关问题：按模式B作答，勿套用旧报告。'
+    '- 若为全新无关问题：按模式B作答，勿套用旧报告。' +
+    (standaloneKb
+      ? '\n- 【本轮·法规数字】本题为独立法规/标准查询：必须先重新检索知识库正文再答；' +
+        '起征点、免税额度、税率、门槛等具体数字以本轮检索到的文号正文为准，' +
+        '禁止沿用本对话此前回合写过的数字（即便用户未纠正）。追问同一政策主题时可承接上文，但仍须以检索为准。'
+      : '')
   );
 }
 
@@ -3155,7 +3177,16 @@ function looksLikeModeSelectReply(text) {
 function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {}) {
   const normalized = normalizeDiagnosisModeQuery(text);
   if (normalized !== String(text || '').trim()) return normalized;
-  if (uiMode !== 'diagnosis' || uiStep < 1) return String(text || '').trim();
+  const raw = String(text || '').trim();
+  const withStandaloneKbHint = (q) => {
+    if (!looksLikeStandaloneKbQuestion(q)) return q;
+    return (
+      `${q}\n` +
+      '【本轮·法规数字】必须先重新检索知识库正文再答；起征点、免税额度、税率、门槛等具体数字以本轮检索到的文号正文为准，' +
+      '禁止沿用本对话此前回合写过的数字。追问同一政策主题时可承接上文，但仍须以检索为准。'
+    );
+  };
+  if (uiMode !== 'diagnosis' || uiStep < 1) return withStandaloneKbHint(raw);
   if (options.isPostReportFollowUp) {
     return buildDiagnosisFollowUpQuery(
       text,
@@ -5341,7 +5372,7 @@ const DIAG_PLAN_UPDATE_STATUS_MSG =
   '道一合规助手正在对照上一轮诊断审视变化并更新方案，请查看右侧方案生成区';
 const DIAG_PLAN_UPDATE_DONE_MSG = '已根据您本轮补充或变更的条件更新方案，请查看右侧方案生成区';
 const QA_LONG_ANSWER_CHAT_TIP =
-  '由于内容较多，道一合规助手已将回复展示在右侧方案生成区，请查看。';
+  '由于内容较多，道一合规助手已将回复展示在右侧方案生成区，请查看最新一条「问答回复」。';
 
 /** Loop char-by-char status so long Agent waits feel alive (not frozen). */
 function stopDiagStatusTyping(el) {
@@ -5912,9 +5943,15 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   const mountEntry = (innerHtml) => {
     purgeInlineServiceMatchTips(items);
     // Only replace the in-flight draft for this turn — never overwrite prior finished replies
+    // Exception: Q&A corrections must overwrite the latest finished QA card; otherwise users
+    // keep staring at an older wrong answer while the left tip only says「请看右侧」.
     let entry = null;
     if (replaceLatest) {
       entry = items.querySelector(`.result-entry-${kind}.is-draft`);
+      if (!entry && kind === 'qa') {
+        const allQa = items.querySelectorAll('.result-entry-qa');
+        entry = allQa.length ? allQa[allQa.length - 1] : null;
+      }
     }
     if (!entry && refreshDiagnosis && kind === 'diagnosis') {
       const all = items.querySelectorAll('.result-entry-diagnosis');
