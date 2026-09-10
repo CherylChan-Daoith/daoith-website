@@ -1024,25 +1024,25 @@ function stripDiagnosisIntroBoilerplate(text) {
 }
 
 /** Mode B / follow-up Q&A: force bold section labels for display.
- *  仅规范化「结论/依据」等章节标签；「操作提示」一律当普通要点，禁止提成小标题。
+ *  「结论 / 依据 / 操作提示」等为同级章节标签。
  */
 function emphasizeQaSectionLabels(text) {
   return String(text || '')
     // `- **依据：**` / `**依据：**` → `**依据**：`（保留冒号后正文）
     .replace(
-      /(^|\n)[ \t]*[-*•]\s*\*\*(结论|依据|缺关键信息|边界说明)\s*[:：]?\*\*[ \t]*/gm,
+      /(^|\n)[ \t]*[-*•]\s*\*\*(结论|依据|操作提示|缺关键信息|边界说明)\s*[:：]?\*\*[ \t]*/gm,
       '$1**$2**：'
     )
     .replace(
-      /(^|\n)[ \t]*[-*•]\s*(结论|依据|缺关键信息|边界说明)\s*[:：]\s*/gm,
+      /(^|\n)[ \t]*[-*•]\s*(结论|依据|操作提示|缺关键信息|边界说明)\s*[:：]\s*/gm,
       '$1**$2**：'
     )
     .replace(
-      /(^|\n)[ \t]*\*\*(结论|依据|缺关键信息|边界说明)\s*[:：]\*\*[ \t]*/gm,
+      /(^|\n)[ \t]*\*\*(结论|依据|操作提示|缺关键信息|边界说明)\s*[:：]\*\*[ \t]*/gm,
       '$1**$2**：'
     )
     .replace(
-      /(^|\n)[ \t]*(?:\*\*)?(结论|依据|缺关键信息|边界说明)(?:\*\*)?[ \t]*[:：][ \t]*/gm,
+      /(^|\n)[ \t]*(?:\*\*)?(结论|依据|操作提示|缺关键信息|边界说明)(?:\*\*)?[ \t]*[:：][ \t]*/gm,
       '$1**$2**：'
     );
 }
@@ -1076,7 +1076,7 @@ function looksLikeQaAnswerMarkdown(text) {
  * Normalize Mode B / follow-up answers:
  * - Fold 总-分 into `**标题**：正文`
  * - Emit flat same-level solid bullets under 依据 (`- **标题**：正文`)
- * - Merge bare「操作提示」+ following body into one bullet
+ * - Promote「操作提示」to peer section with 结论 / 依据
  */
 function normalizeQaAnswerMarkdown(text) {
   let t = emphasizeQaSectionLabels(
@@ -1090,14 +1090,14 @@ function normalizeQaAnswerMarkdown(text) {
     .map((ln) => ln.replace(/^[ \t]+([-*•]|\d+[.)、．])\s+/, '$1 ').replace(/^[ \t]+/, ''))
     .join('\n');
 
-  // Put 结论 / 依据 on their own structural lines when glued to body
+  // Put 结论 / 依据 / 操作提示 on their own structural lines when glued to body
   t = t.replace(
-    /(^|\n)\*\*(结论|依据|缺关键信息|边界说明)\*\*：\s*/g,
+    /(^|\n)\*\*(结论|依据|操作提示|缺关键信息|边界说明)\*\*：\s*/g,
     '\n\n**$2**：'
   );
 
   const isSectionLabelLine = (s) =>
-    /^\*\*(结论|依据|缺关键信息|边界说明)\*\*：/.test(s);
+    /^\*\*(结论|依据|操作提示|缺关键信息|边界说明)\*\*：/.test(s);
 
   const stripBullet = (s) =>
     String(s || '')
@@ -1119,7 +1119,7 @@ function normalizeQaAnswerMarkdown(text) {
     if (!m) return null;
     const title = m[1].trim().replace(/[:：]\s*$/, '');
     if (!title || title.length > 48) return null;
-    if (/^(结论|依据|缺关键信息|边界说明|操作提示|补充说明|补充)$/.test(title)) return null;
+    if (/^(结论|依据|操作提示|缺关键信息|边界说明|补充说明|补充)$/.test(title)) return null;
     return title;
   };
 
@@ -1130,7 +1130,7 @@ function normalizeQaAnswerMarkdown(text) {
     const m = plain.match(/^\*\*([^*]+)\*\*\s*[:：]\s*(.+)$/);
     if (!m) return null;
     const title = m[1].trim();
-    if (!title || /^(结论|依据|缺关键信息|边界说明|操作提示|补充说明|补充)$/.test(title)) {
+    if (!title || /^(结论|依据|操作提示|缺关键信息|边界说明|补充说明|补充)$/.test(title)) {
       return null;
     }
     return { title, body: m[2].trim() };
@@ -1155,6 +1155,13 @@ function normalizeQaAnswerMarkdown(text) {
     arr.push('');
   };
 
+  const pushOpsSection = (arr, body) => {
+    const b = stripLeadingColons(body);
+    arr.push('**操作提示**：');
+    if (b) arr.push(b);
+    arr.push('');
+  };
+
   const lines = t.split('\n');
   const out = [];
   let i = 0;
@@ -1167,9 +1174,9 @@ function normalizeQaAnswerMarkdown(text) {
       continue;
     }
 
-    // Bare 结论/依据 line → keep as label (renderer turns into subtitle)
+    // Bare 结论/依据/操作提示 line → keep as label (renderer turns into subtitle)
     const labelOnly = trimmed.match(
-      /^\*\*(结论|依据|缺关键信息|边界说明)\*\*：\s*$/
+      /^\*\*(结论|依据|操作提示|缺关键信息|边界说明)\*\*：\s*$/
     );
     if (labelOnly) {
       out.push(`**${labelOnly[1]}**：`);
@@ -1179,7 +1186,7 @@ function normalizeQaAnswerMarkdown(text) {
 
     // 结论：body on same line → split label + paragraph
     const labelBody = trimmed.match(
-      /^\*\*(结论|依据|缺关键信息|边界说明)\*\*：\s*(.+)$/
+      /^\*\*(结论|依据|操作提示|缺关键信息|边界说明)\*\*：\s*(.+)$/
     );
     if (labelBody) {
       out.push(`**${labelBody[1]}**：`);
@@ -1188,7 +1195,7 @@ function normalizeQaAnswerMarkdown(text) {
       continue;
     }
 
-    // 「操作提示」+ 后续正文 → 同一条实心 bullet
+    // Legacy「操作提示」bullet / bare line → peer section (same as 结论)
     if (isOpsTipLine(trimmed)) {
       let rest = stripBullet(trimmed)
         .replace(/^\*\*操作提示\*\*\s*[:：]?\s*/, '')
@@ -1210,7 +1217,7 @@ function normalizeQaAnswerMarkdown(text) {
         bodyParts.push(stripBullet(next));
         j += 1;
       }
-      pushPoint(out, '操作提示', stripLeadingColons(joinDetailParts(bodyParts)));
+      pushOpsSection(out, joinDetailParts(bodyParts));
       i = j;
       continue;
     }
@@ -1277,7 +1284,7 @@ function flattenQaAnswerBullets(text) {
     // Collapse `- - **title**` / `• - **title**` leftovers
     ln = ln.replace(/^([ \t]*[-*•]\s+)+/, (m) => (/^\s*$/.test(m) ? m : '- '));
     const trimmed = ln.trim();
-    // Merge bare 操作提示 with next line that is only a colon-body
+    // Merge bare 操作提示 with next line → peer section (same as 结论)
     const opsOnly = /^[-*•]\s+\*\*操作提示\*\*\s*[:：]?\s*$/.test(trimmed) ||
       /^\*\*操作提示\*\*\s*[:：]?\s*$/.test(trimmed) ||
       /^[-*•]\s+操作提示\s*[:：]?\s*$/.test(trimmed);
@@ -1286,10 +1293,18 @@ function flattenQaAnswerBullets(text) {
       if (/^[:：]/.test(next) || (next && !/^\*\*/.test(next) && !/^[-*•]/.test(next))) {
         const body = stripLeadingColons(next);
         if (!body) { out.push(ln); continue; }
-        out.push(`- **操作提示**：${body}`);
+        out.push('**操作提示**：');
+        out.push(body);
         i += 1;
         continue;
       }
+    }
+    // Legacy bullet form → section label
+    const opsBullet = trimmed.match(/^[-*•]\s+\*\*操作提示\*\*\s*[:：]\s*(.+)$/);
+    if (opsBullet) {
+      out.push('**操作提示**：');
+      out.push(stripLeadingColons(opsBullet[1]));
+      continue;
     }
     out.push(ln);
   }
@@ -3024,7 +3039,7 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
-    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据**（标签加粗）；依据内全部同一级实心 `- **标题**：正文`，操作提示与正文写在同一条；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
+    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据** / **操作提示**（三者同级、标签加粗）；依据内全部同一级实心 `- **标题**：正文`；**操作提示**独立成块，禁止放进依据列表；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。'
   );
@@ -8312,19 +8327,24 @@ function renderAIPlanHtml(text) {
     if (/请您提供|请提供以下信息|请提供具体信息/.test(line)) continue;
     if (/通用框架|在您提供信息前|由于您尚未提供/.test(line)) continue;
 
-    // Mode B Q&A labels → subtitle (guarantees bold 「结论／依据」)
+    // Mode B Q&A labels → subtitle (结论／依据／操作提示 同级)
     const qaLabelPlain = line.replace(/\*/g, '').replace(/^[-*•]\s+/, '').trim();
-    // 「操作提示」永不渲染为章节小标题（避免标题/正文拆行与 ：：：）
-    const opsAsLabel = qaLabelPlain.match(/^操作提示[:：]?\s*(.*)$/);
-    if (opsAsLabel) {
-      let rest = stripLeadingColons(opsAsLabel[1] || '');
-      if (!rest) {
-        // consume next non-empty source line as body
-        // find index of rawLine in lines
+    const qaLabelMatch = qaLabelPlain.match(
+      /^(结论|依据|操作提示|缺关键信息|边界说明)[:：]\s*(.*)$/
+    );
+    if (qaLabelMatch) {
+      closeList();
+      resetPlanLayout();
+      html += `<h5 class="result-section-subtitle">${escapeHtml(qaLabelMatch[1])}：</h5>`;
+      let rest = stripLeadingColons(qaLabelMatch[2] || '');
+      // Bare「操作提示：」— absorb following non-section line as body
+      if (!rest && qaLabelMatch[1] === '操作提示') {
         const idx = lines.indexOf(rawLine);
         for (let k = idx + 1; k < lines.length; k += 1) {
           const nxt = String(lines[k] || '').trim();
           if (!nxt) continue;
+          const nxtPlain = nxt.replace(/\*/g, '').replace(/^[-*•]\s+/, '').trim();
+          if (/^(结论|依据|操作提示|缺关键信息|边界说明)[:：]/.test(nxtPlain)) break;
           rest = stripLeadingColons(
             nxt.replace(/^[-*•]\s+/, '').replace(/^\*\*操作提示\*\*\s*[:：]?\s*/, '')
           );
@@ -8332,21 +8352,6 @@ function renderAIPlanHtml(text) {
           break;
         }
       }
-      closeList();
-      openList('ul');
-      html += `<li><strong class="result-em">操作提示</strong>：${formatInline(rest || '')}</li>`;
-      liOpen = true;
-      continue;
-    }
-
-    const qaLabelMatch = qaLabelPlain.match(
-      /^(结论|依据|缺关键信息|边界说明)[:：]\s*(.*)$/
-    );
-    if (qaLabelMatch) {
-      closeList();
-      resetPlanLayout();
-      html += `<h5 class="result-section-subtitle">${escapeHtml(qaLabelMatch[1])}：</h5>`;
-      const rest = stripLeadingColons(qaLabelMatch[2] || '');
       if (rest) {
         html += `<p class="result-paragraph">${formatInline(rest)}</p>`;
       }
