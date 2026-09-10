@@ -3482,6 +3482,9 @@ function initAiChatbot() {
     ['daoith_ai_answer_cache_v1', 'daoith_ai_answer_cache_v2', 'daoith_ai_answer_cache_v3', 'daoith_ai_answer_cache_v4'].forEach(
       (k) => localStorage.removeItem(k)
     );
+    // Drop sticky Dify conversation ids — only user/device id is kept.
+    localStorage.removeItem(CONV_KEY);
+    localStorage.setItem(BOUND_KEY, '0');
   } catch {
     /* ignore */
   }
@@ -3607,31 +3610,31 @@ function initAiChatbot() {
     setTimeout(run, 50);
   };
 
+  /** Ephemeral UI id only — never sent to Dify as conversation_id. */
+  let ephemeralDiagSessionId = '';
+
   const ensureConversationId = () => {
-    let id = localStorage.getItem(CONV_KEY);
-    if (!id) {
-      id = newUuid();
-      localStorage.setItem(CONV_KEY, id);
-      localStorage.setItem(BOUND_KEY, '0');
-      resetUiWizard();
-    }
-    return id;
+    if (!ephemeralDiagSessionId) ephemeralDiagSessionId = newUuid();
+    return ephemeralDiagSessionId;
   };
 
   const resetConversation = () => {
-    const id = newUuid();
-    localStorage.setItem(CONV_KEY, id);
-    localStorage.setItem(BOUND_KEY, '0');
+    ephemeralDiagSessionId = newUuid();
+    try {
+      localStorage.removeItem(CONV_KEY);
+      localStorage.setItem(BOUND_KEY, '0');
+    } catch {
+      /* ignore */
+    }
     resetUiWizard();
-    return id;
+    return ephemeralDiagSessionId;
   };
 
-  const isConversationBound = () => localStorage.getItem(BOUND_KEY) === '1';
+  // Never bind to a Dify conversation_id (sticky history caused statute-number drift).
+  const isConversationBound = () => false;
 
-  const persistConversationId = (id, bound) => {
-    if (!id) return;
-    localStorage.setItem(CONV_KEY, id);
-    localStorage.setItem(BOUND_KEY, bound ? '1' : '0');
+  const persistConversationId = () => {
+    // no-op: keep stable user id only; query carries archive / follow-up context
   };
 
   const clearQuickReplies = () => {
@@ -4411,25 +4414,19 @@ function initAiChatbot() {
         scrollDiagChatToBottom();
       };
 
-      const callChat = (conversationId) => callDifyStream({
+      const callChat = (_conversationId) => callDifyStream({
         endpoint,
         query: apiQuery,
         inputs: {},
-        conversationId,
+        // Always empty: do not reuse Dify threads; context is in query + user id.
+        conversationId: '',
         onChunk: paintStream,
         timeoutMs: forcePlanWhileThinking ? 360000 : 180000,
       });
 
       let result;
-      // First full report: empty conversation so Agent cannot reuse a prior case's tool JSON
-      let conversationId =
-        shouldGeneratePlanNow && !isPostReportFollowUp
-          ? ''
-          : isModeSelect
-            ? ''
-            : isConversationBound()
-              ? sessionId
-              : '';
+      // Never pass a sticky Dify conversation_id (see isConversationBound / persistConversationId).
+      let conversationId = '';
       try {
         result = await callChat(conversationId);
       } catch (firstErr) {
@@ -4513,7 +4510,7 @@ function initAiChatbot() {
               endpoint,
               query: retryQuery,
               inputs: {},
-              conversationId: shouldGeneratePlanNow && !isPostReportFollowUp ? '' : result.conversationId || conversationId || '',
+              conversationId: '',
               onChunk: paintStream,
               timeoutMs: 360000,
             });
