@@ -1023,6 +1023,24 @@ function stripDiagnosisIntroBoilerplate(text) {
     .trim();
 }
 
+/**
+ * Hard-correct a recurring Agent slip: 按次起征点写成 100元（应为 1000元 / 2026年第10号）.
+ * Does not open/close Dify threads; only fixes visible text when the wrong pattern appears
+ * alongside 2026 / 10号 / 旧500 语境。Leaves 100万、10万元、1000元 untouched.
+ */
+function correctChinaVatPerTimeThreshold(text) {
+  let t = String(text || '');
+  if (!t || !/(起征点|按次纳税|免税额度)/.test(t)) return t;
+  if (!/(?:2026|第\s*10\s*号|10\s*号公告|500\s*元)/.test(t)) return t;
+  if (!/(?<![\d])100(?!\d)\s*元/.test(t)) return t;
+  t = t.replace(/(按次(?:纳税)?[^。\n；;]{0,60}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
+  t = t.replace(/(每次（日）销售额\s*)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
+  t = t.replace(/统一按\s*100\s*元(?:执行|为准)?/g, '统一按1000元执行');
+  t = t.replace(/一律按\s*100\s*元/g, '一律按1000元');
+  t = t.replace(/(?:改按|调整为|执行为)\s*100\s*元/g, (m) => m.replace(/100/, '1000'));
+  return t;
+}
+
 /** Mode B / follow-up Q&A: force bold section labels for display.
  *  「结论 / 依据 / 操作提示」等为同级章节标签。
  */
@@ -3623,6 +3641,13 @@ function initAiChatbot() {
     try {
       localStorage.removeItem(CONV_KEY);
       localStorage.setItem(BOUND_KEY, '0');
+      localStorage.removeItem('daoith_ai_conversation_id');
+      localStorage.setItem('daoith_ai_conversation_bound', '0');
+    } catch {
+      /* ignore */
+    }
+    try {
+      bumpAnonymousDifyUserId();
     } catch {
       /* ignore */
     }
@@ -4347,7 +4372,7 @@ function initAiChatbot() {
 
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
-        const cleaned = sanitizeAiAnswer(partial);
+        const cleaned = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(partial));
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
@@ -4465,14 +4490,14 @@ function initAiChatbot() {
         return list.find((c) => isDiagnosisReportJsonReady(c)) || null;
       };
 
-      let answer = sanitizeAiAnswer(result.text);
+      let answer = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(result.text));
       if (!answer || answer.length < 8) {
         const rawJson = pickJsonReport(result.text, result);
         if (rawJson && isDiagnosisReportJsonReady(rawJson)) {
           answer = JSON.stringify(rawJson);
         } else {
           // Do NOT fall back to raw result.text (often still contains think / CoT)
-          const retry = sanitizeAiAnswer(result.text);
+          const retry = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(result.text));
           const salvaged = salvageDiagnosisPlanFromRaw(result.text);
           // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
           if (
@@ -4486,9 +4511,10 @@ function initAiChatbot() {
           }
         }
       }
-      answer = sanitizeAiAnswer(answer);
+      answer = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(answer));
       answer = stripDiagnosisIntroBoilerplate(answer || '');
       answer = correctAluminumRefundHallucinations(answer);
+      answer = correctChinaVatPerTimeThreshold(answer);
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
@@ -5511,7 +5537,9 @@ function persistDiagnosisReport(markdown) {
     if (!auth?.isLoggedIn?.()) return;
     const token = auth.getToken?.();
     if (!token) return;
-    const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
+    const cleanRaw = stripDiagnosisArchivePreamble(
+      correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
+    );
     const jsonReport = extractDiagnosisReportJson(cleanRaw);
     const clean = jsonReport && isDiagnosisReportJsonReady(jsonReport)
       ? diagnosisReportJsonToMarkdown(jsonReport)
@@ -5916,7 +5944,9 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   purgeInlineServiceMatchTips(items);
 
   const cleanRaw = stripServiceMatchTip(
-    stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
+    stripDiagnosisArchivePreamble(
+      correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
+    )
   );
   // Always prefer structured report JSON — never dump raw braces as「问答回复」
   let kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
@@ -6116,6 +6146,25 @@ function getDifyUserId() {
   if (!id) {
     id = `web-${crypto.randomUUID()}`;
     localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+/** Anonymous web user only — rotate so「新建对话」cannot inherit any user-scoped Agent state. */
+function bumpAnonymousDifyUserId() {
+  const authUser = window.DAOITH_AUTH?.getUser?.();
+  if (authUser?.openid) return getDifyUserId();
+  const key = 'daoith_dify_user_id';
+  const id = `web-${crypto.randomUUID()}`;
+  try {
+    localStorage.setItem(key, id);
+    localStorage.setItem('daoith_dify_user_mark', id);
+    localStorage.removeItem('daoith_ai_conversation_id');
+    localStorage.setItem('daoith_ai_conversation_bound', '0');
+    localStorage.removeItem('daoith_diagnosis_conversation_id');
+    localStorage.setItem('daoith_diagnosis_conversation_bound', '0');
+  } catch {
+    /* ignore */
   }
   return id;
 }
