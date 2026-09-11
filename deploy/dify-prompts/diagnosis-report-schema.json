@@ -34,7 +34,7 @@
       "properties": {
         "processFlow": {
           "type": "string",
-          "description": "业务流程箭头链：供应商发票 → 出口方式 → 发货方式 → 平台（店铺主体）→ 境外消费者"
+          "description": "业务流程箭头链：供应商发票 → 出口方式 → 发货方式 → 平台（主体店铺）→ 境外消费者；平台节点写法如「eBay（英国公司店铺）」"
         },
         "summary": {
           "type": "string",

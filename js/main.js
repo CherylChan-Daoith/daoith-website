@@ -2329,7 +2329,8 @@ function formatDiagSlotsSnapshot(slots) {
 }
 
 /** Personalized 业务流程 arrow chain from diagnosis archive slots.
- *  Order: 供应商（发票）→ 出口方式 → 发货方式 → 平台（店铺主体）→ 境外消费者
+ *  Order: 供应商（发票）→ 出口方式 → 发货方式 → 平台（主体店铺）→ 境外消费者
+ *  e.g. eBay（英国公司店铺）
  */
 function buildDiagnosisProcessFlowFromSlots(slots) {
   const s = slots && typeof slots === 'object' ? slots : getDiagSlots();
@@ -2338,11 +2339,16 @@ function buildDiagnosisProcessFlowFromSlots(slots) {
   const exportMode = resolveDiagExportMode(s) || String(s.exportMode || '').trim() || '出口方式';
   const shipping = String(s.shipping || '').trim() || '发货方式';
   const platform = String(s.platform || '').trim() || '平台';
+  const entityShop = entity
+    ? entity.endsWith('店铺')
+      ? entity
+      : `${entity}店铺`
+    : '';
   let platformEntity;
-  if (platform && platform !== '平台' && entity) {
-    platformEntity = `${platform}（${entity}）`;
-  } else if (entity) {
-    platformEntity = `平台（${entity}）`;
+  if (platform && platform !== '平台' && entityShop) {
+    platformEntity = `${platform}（${entityShop}）`;
+  } else if (entityShop) {
+    platformEntity = `平台（${entityShop}）`;
   } else if (platform && platform !== '平台') {
     platformEntity = `${platform}（店铺主体）`;
   } else {
@@ -2566,7 +2572,7 @@ function ensureDiagnosisReportArchitectures(report, slots) {
   }
 
   // Always rebuild arrow chain from archive so order stays:
-  // 供应商发票 → 出口方式 → 发货方式 → 平台（店铺主体）→ 境外消费者
+  // 供应商发票 → 出口方式 → 发货方式 → 平台（主体店铺）→ 境外消费者
   const hasArchive = ['platform', 'entity', 'shipping', 'invoice', 'exportMode', 'productCategory'].some(
     (k) => String(s[k] || '').trim()
   );
@@ -2821,7 +2827,7 @@ function buildDiagnosisPlanApiQuery(userText, options = {}) {
     '【铁律·本轮档案】只采信下方【诊断档案】；禁止沿用对话历史中上一轮平台/主体/发货/出口/发票；' +
     '禁止把档案改写成其它未出现在本档案中的平台。' +
     '调用工具时：`diagnosis_archive` 必须**原样粘贴**下方从「销售平台：」到年销售额的七行档案（可含硬约束段），禁止凭记忆重写；`report_path` 必须与官网预判一致除非档案明显不符。' +
-    'risk.processFlow 必须按本轮档案逐字串成：供应商发票 → 出口方式 → 发货方式 → 平台（店铺主体）→ 境外消费者。' +
+    'risk.processFlow 必须按本轮档案逐字串成：供应商发票 → 出口方式 → 发货方式 → 平台（主体店铺）→ 境外消费者（如 eBay（英国公司店铺））。' +
     `请先按档案判定 report_path（官网预判为 ${reportPath}` +
     pathHint +
     '；禁止对用户说出路径字母），' +
