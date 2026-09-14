@@ -397,6 +397,21 @@ HEADER = '''/* DAOITH service marketplace catalog
  * Excel 260912 body copy preserved; catalog limited to Excel-listed products.
  */
 (function () {
+  /** Single fee → bold text; multi fee → pricing table only (never both). */
+  function formatSinglePricingDisplay(pricing) {
+    const t = String(pricing || '').trim();
+    if (!t) return '';
+    if (/^\\d[\\d,]*$/.test(t)) {
+      const n = Number(t.replace(/,/g, ''));
+      if (Number.isFinite(n)) return `¥${n.toLocaleString('zh-CN')}`;
+    }
+    if (/^\\d[\\d,]*起$/.test(t)) {
+      const n = Number(t.replace(/[,起]/g, ''));
+      if (Number.isFinite(n)) return `¥${n.toLocaleString('zh-CN')}起`;
+    }
+    return t;
+  }
+
   function excelBlocks(p) {
     const out = [];
     const content = p.content || '';
@@ -426,8 +441,8 @@ HEADER = '''/* DAOITH service marketplace catalog
     }
 
     out.push({ type: 'h2', text: '服务收费' });
-    if (pricing) out.push({ type: 'p', text: pricing });
-    if (pricingTable?.headers && pricingTable?.rows) {
+    const hasPricingTable = !!(pricingTable?.headers && pricingTable?.rows?.length);
+    if (hasPricingTable) {
       out.push({
         type: 'table',
         variant: 'pricing',
@@ -435,6 +450,8 @@ HEADER = '''/* DAOITH service marketplace catalog
         headers: pricingTable.headers,
         rows: pricingTable.rows,
       });
+    } else if (pricing) {
+      out.push({ type: 'price', text: formatSinglePricingDisplay(pricing) });
     }
     if (pricingNote) out.push({ type: 'rich', text: pricingNote });
     if (bundle) {

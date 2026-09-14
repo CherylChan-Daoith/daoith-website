@@ -5502,6 +5502,19 @@ ul {
   color: var(--text-muted);
 }
 
+/* Detail body: single fee = bold; multi fee = pricing table only */
+.service-pricing-single {
+  margin: 0 0 1rem;
+  font-family: var(--font-serif);
+  font-size: 1.45rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.service-pricing-single strong {
+  font-weight: 700;
+}
+
 .service-detail-actions {
   display: flex;
   flex-wrap: wrap;

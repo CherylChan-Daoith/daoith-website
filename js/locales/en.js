@@ -116,8 +116,8 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
   if (highlights?.length) out.push({ type: 'highlights', items: highlights });
   if (audience) out.push({ type: 'audience', text: audience });
   out.push({ type: 'h2', text: 'Pricing' });
-  if (pricing) out.push({ type: 'p', text: pricing });
-  if (pricingTable?.headers && pricingTable?.rows) {
+  const hasPricingTable = !!(pricingTable?.headers && pricingTable?.rows?.length);
+  if (hasPricingTable) {
     out.push({
       type: 'table',
       variant: 'pricing',
@@ -125,6 +125,8 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
       headers: pricingTable.headers,
       rows: pricingTable.rows,
     });
+  } else if (pricing) {
+    out.push({ type: 'price', text: pricing });
   }
   if (pricingNote) out.push({ type: 'p', text: pricingNote });
   out.push({ type: 'h2', text: 'Process' });
@@ -819,7 +821,7 @@ window.DAOITH_I18N_EN = {
         ],
         highlights: ['Survey before pricing tier', 'Priced by delivery window', 'Coach until independent'],
         audience: 'SMEs and growth companies that want AI in finance ops landed with advisory coaching—not just software purchase.',
-        pricing: 'Tiered after a survey of your realistic delivery window; the signed scope confirms the tier.',
+        pricing: '',
         pricingTable: {
           headers: ['Delivery window', 'Fee', 'Notes'],
           rows: [
@@ -858,7 +860,7 @@ window.DAOITH_I18N_EN = {
         ],
         highlights: ['On-time statutory filings', 'Export books can sit with rebate work', 'Health check and AIC report included'],
         audience: 'Start-ups, SMEs, e-commerce and trading companies without a full-time finance team.',
-        pricing: 'Annual fee by taxpayer type. General VAT taxpayers are priced by complexity, volume, and booking currency.',
+        pricing: '',
         pricingTable: {
           headers: ['Taxpayer type', 'Annual fee', 'Notes'],
           rows: [
@@ -868,6 +870,7 @@ window.DAOITH_I18N_EN = {
             ['Nil return · general taxpayer', '¥3,600', 'No operations / no revenue'],
           ],
         },
+        pricingNote: 'General VAT taxpayers are priced by complexity, volume, and booking currency.',
         process: ['Scoping', 'Handover', 'Monthly books', 'Filings', 'Reconciliation and archive', 'Periodic reviews'],
         faqs: [
           { q: 'Can we book purchases without invoices?', a: 'Yes, but it affects input VAT and rebate trails. We flag the risk.' },
@@ -913,7 +916,7 @@ window.DAOITH_I18N_EN = {
           'Ongoing VAT / business-income filings and AIC annual report reminders',
         ],
         audience: 'Operators short of cost invoices, cross-border sellers, and 1039 market-procurement principals.',
-        pricing: 'Dongguan reference pricing; other cities quoted case by case. Deemed collection generally applies when trailing-12-month sales stay within RMB 5 million.',
+        pricing: '',
         pricingTable: {
           headers: ['Item', 'Fee'],
           rows: [
@@ -923,6 +926,7 @@ window.DAOITH_I18N_EN = {
             ['Year 2 (filings ¥3,000 + address ¥3,000)', '¥6,000'],
           ],
         },
+        pricingNote: 'Dongguan reference pricing; other cities quoted case by case. Deemed collection generally applies when trailing-12-month sales stay within RMB 5 million.',
         process: ['Scoping', 'Name check', 'Registration', 'Tax onboarding', 'Deemed-collection filing', 'Ongoing maintenance'],
         faqs: [
           { q: 'Is there a sales cap?', a: 'Deemed collection typically watches the RMB 5 million trailing-12-month band. Above that, add entities or change structure.' },
@@ -944,7 +948,7 @@ window.DAOITH_I18N_EN = {
           'Compliant FX settlement, not limited to the USD 50,000 personal quota',
         ],
         audience: 'Factories and traders without purchase invoices, SOHO exporters, and e-commerce sellers needing a clean collection path.',
-        pricing: 'Agency fee 0.4% of RMB declared value, RMB 100 minimum per shipment. Logistics, warehousing, inspection, and sole-trader setup are extra.',
+        pricing: '',
         pricingTable: {
           headers: ['Item', 'Fee'],
           rows: [
@@ -953,6 +957,7 @@ window.DAOITH_I18N_EN = {
             ['Logistics / warehouse / trucking / inspection', 'At cost'],
           ],
         },
+        pricingNote: 'Sole-trader setup and tax filings are separate.',
         process: ['Fit assessment', 'Product filing', 'Consolidation and customs', 'FX settlement'],
         faqs: [
           { q: 'Can we export without a sole trader?', a: '1039 usually needs a market-zone sole trader. Add the sole-trader product.' },
@@ -1144,7 +1149,7 @@ window.DAOITH_I18N_EN = {
           'Dormant-company audit and nil filing',
         ],
         audience: 'All Hong Kong limited companies, including those needing bank, financing, or catch-up audits.',
-        pricing: 'Tiered by turnover. Trading vs e-commerce priced separately. Incomplete books and rush reports (3–5 days) extra.',
+        pricing: '',
         pricingTable: {
           headers: ['Turnover band', 'Trading', 'E-commerce'],
           rows: [
@@ -1156,6 +1161,7 @@ window.DAOITH_I18N_EN = {
             ['Catch-up years', 'Quoted', 'Quoted'],
           ],
         },
+        pricingNote: 'Trading vs e-commerce priced separately. Incomplete books and rush reports (3–5 days) extra.',
         process: ['Scoping', 'Collect CI/BR, bank statements, contracts', 'Books (2–3 weeks)', 'Audit (3–4 weeks)', 'Report (1–2 weeks)', 'Tax filing'],
         faqs: [
           { q: 'No activity — still audit?', a: 'Yes, or you risk a “false nil return”. Dormant companies can use a no-operations audit report.' },
@@ -1180,7 +1186,7 @@ window.DAOITH_I18N_EN = {
           '⑦ Hong Kong audit & profits tax',
         ],
         audience: 'Amazon / TikTok / SHEIN sellers with special VAT invoices and a need for a clean collection path.',
-        pricing: 'Priced by selected modules. Three or more modules: 10% off. Final quote from the advisor.',
+        pricing: '',
         pricingTable: {
           headers: ['Reference pack', 'Modules', 'Notes'],
           rows: [
@@ -1191,6 +1197,7 @@ window.DAOITH_I18N_EN = {
             ['First rebate', '②③', 'Licence + first-time coaching'],
           ],
         },
+        pricingNote: 'Priced by selected modules. Three or more modules: 10% off. Final quote from the advisor.',
         process: ['Confirm need', 'Select modules', 'Collect documents', 'Run modules in parallel', 'Milestone delivery'],
         faqs: [
           { q: 'We already have a mainland or HK company.', a: 'Skip those modules and inquire on the gap.' },
@@ -1212,7 +1219,7 @@ window.DAOITH_I18N_EN = {
           '④ Hong Kong audit & profits tax',
         ],
         audience: 'E-commerce sellers, invoice-short traders, and small-lot exporters needing a clean collection path.',
-        pricing: 'Priced by selected modules. Three or more: 10% off. 1039 export agency (0.4% of declared value) is extra.',
+        pricing: '',
         pricingTable: {
           headers: ['Reference pack', 'Modules', 'Notes'],
           rows: [
@@ -1221,6 +1228,7 @@ window.DAOITH_I18N_EN = {
             ['Hong Kong maintenance', '③④', 'Annual return + audit'],
           ],
         },
+        pricingNote: 'Priced by selected modules. Three or more: 10% off. 1039 export agency (0.4% of declared value) is extra.',
         process: ['Confirm need', 'Select modules', 'Collect documents', 'Run modules', 'Milestone delivery'],
         faqs: [
           { q: 'Is a Hong Kong company mandatory?', a: 'No. You can take ①② only and add Hong Kong later.' },

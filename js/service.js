@@ -219,6 +219,9 @@
         if (block.type === 'rich') {
           return renderRich(block.text);
         }
+        if (block.type === 'price') {
+          return `<p class="service-pricing-single"><strong>${escapeHtml(block.text || '')}</strong></p>`;
+        }
         if (block.type === 'bundle-picker') {
           return renderBundlePicker(block);
         }
