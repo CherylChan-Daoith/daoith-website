@@ -796,7 +796,18 @@ window.DAOITH_I18N_EN = {
         ],
         highlights: ['Plans actually land', 'Regular course-correction', 'Rapid response on tax matters'],
         audience: 'Teams with a plan to execute, rapid growth, prior tax notices, or no in-house compliance staff.',
-        pricing: '¥48,000 / year. Unlimited online contact, six on-site visits; major tax matters responded to as they arise.',
+        pricing: '',
+        pricingTable: {
+          headers: ['On-site visits', 'Fee', 'Notes'],
+          rows: [
+            ['4 / year', '¥38,000', 'Unlimited online + 4 on-site visits'],
+            ['6 / year', '¥53,000', 'Unlimited online + 6 on-site visits'],
+            ['8 / year', '¥68,000', 'Unlimited online + 8 on-site visits'],
+            ['10 / year', '¥83,000', 'Unlimited online + 10 on-site visits'],
+            ['12 / year', '¥98,000', 'Unlimited online + 12 on-site visits'],
+          ],
+        },
+        pricingNote: 'Annual contract. Unlimited online contact during the term; major tax matters responded to as they arise.',
         process: ['Handover', 'Breakdown', 'Confirm execution plan', 'Follow-up and reviews', 'Authority support', 'Stage acceptance'],
         faqs: [
           { q: 'Does coaching include bookkeeping or rebate filing?', a: 'No. Add bookkeeping or rebate agency separately.' },
