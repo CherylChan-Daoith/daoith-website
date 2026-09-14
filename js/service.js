@@ -95,66 +95,33 @@
       .join('')}</ol>`;
   }
 
+  /** Word publish-page body: plain lines, bold label before colon. */
+  function renderPublish(text) {
+    const raw = String(text || '').replace(/\r\n/g, '\n').trim();
+    if (!raw) return '';
+    const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return '';
+    return `<ul class="svc-publish-lines">${lines
+      .map((line) => {
+        const idx = line.search(/[：:]/);
+        if (idx > 0 && idx <= 24) {
+          const label = line.slice(0, idx + 1);
+          const rest = line.slice(idx + 1).trim();
+          return `<li><strong>${escapeHtml(label)}</strong>${
+            rest ? `<span>${escapeHtml(rest)}</span>` : ''
+          }</li>`;
+        }
+        return `<li><span>${escapeHtml(line)}</span></li>`;
+      })
+      .join('')}</ul>`;
+  }
+
   /** Preserve Excel wording; only structure for readability. */
   function renderRich(text) {
     const raw = String(text || '').replace(/\r\n/g, '\n').trim();
     if (!raw) return '';
-    const lines = raw.split('\n').map((l) => l.trimEnd());
-    const parts = [];
-    let listBuf = [];
-
-    function flushList() {
-      if (!listBuf.length) return;
-      parts.push(
-        `<ul class="service-rich-list">${listBuf
-          .map((item) => `<li>${escapeHtml(item)}</li>`)
-          .join('')}</ul>`
-      );
-      listBuf = [];
-    }
-
-    lines.forEach((line) => {
-      const t = line.trim();
-      if (!t) {
-        flushList();
-        return;
-      }
-      if (/^[一二三四五六七八九十]+[、.．]/.test(t) || /^（[一二三四五六七八九十]+）/.test(t)) {
-        flushList();
-        parts.push(`<h3 class="service-rich-h3">${escapeHtml(t)}</h3>`);
-        return;
-      }
-      if (/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫]/.test(t) || /^[0-9]+[\.、]/.test(t) || /^[•·●▪]/.test(t)) {
-        listBuf.push(t.replace(/^[•·●▪]\s*/, ''));
-        return;
-      }
-      if (/^[^：:\n]{1,24}[：:]/.test(t) && t.length < 220) {
-        flushList();
-        const idx = t.search(/[：:]/);
-        const label = t.slice(0, idx + 1);
-        const rest = t.slice(idx + 1).trim();
-        parts.push(
-          `<p class="service-rich-kv"><strong>${escapeHtml(label)}</strong>${
-            rest ? `<span>${escapeHtml(rest)}</span>` : ''
-          }</p>`
-        );
-        return;
-      }
-      if (/[；;]/.test(t) && t.length > 20 && t.split(/[；;]/).filter(Boolean).length >= 3) {
-        flushList();
-        const items = t.split(/[；;]/).map((s) => s.trim()).filter(Boolean);
-        parts.push(
-          `<ul class="service-rich-chips">${items
-            .map((item) => `<li>${escapeHtml(item.replace(/[。．]+$/, ''))}</li>`)
-            .join('')}</ul>`
-        );
-        return;
-      }
-      flushList();
-      parts.push(`<p class="service-rich-p">${escapeHtml(t)}</p>`);
-    });
-    flushList();
-    return `<div class="service-rich">${parts.join('')}</div>`;
+    // Prefer publish-page layout for marketplace copy
+    return renderPublish(raw);
   }
 
   function formatMoney(n) {
@@ -214,10 +181,18 @@
     return (details || [])
       .map((block) => {
         if (block.type === 'h2') {
-          return `<h2 class="article-view-h2 service-detail-heading"><span>${escapeHtml(block.text)}</span></h2>`;
+          return `<h2 class="service-detail-heading"><span class="svc-sec-label">${escapeHtml(
+            block.text
+          )}</span><span class="svc-sec-rule" aria-hidden="true"></span></h2>`;
         }
-        if (block.type === 'rich') {
-          return renderRich(block.text);
+        if (block.type === 'publish' || block.type === 'rich') {
+          return renderPublish(block.text);
+        }
+        if (block.type === 'note') {
+          return `<p class="svc-publish-note">${escapeHtml(block.text || '').replace(
+            /\n/g,
+            '<br>'
+          )}</p>`;
         }
         if (block.type === 'price') {
           return `<p class="service-pricing-single"><strong>${escapeHtml(block.text || '')}</strong></p>`;
@@ -411,9 +386,9 @@
     if (loadingEl) loadingEl.remove();
 
     viewEl.innerHTML = `
-      <header class="service-product-hero">
+      <header class="service-product-hero service-product-hero--publish">
         <span class="service-product-badge">${escapeHtml(catLabel)}</span>
-        <h1 class="service-product-title">${escapeHtml(title)}</h1>
+        <h1 class="service-product-title"><span class="svc-title-mark" aria-hidden="true">▎</span>${escapeHtml(title)}</h1>
         <p class="service-product-lead">${escapeHtml(desc)}</p>
         <div class="service-product-bar">
           <div class="service-product-price">
@@ -426,7 +401,7 @@
           </div>
         </div>
       </header>
-      <div class="article-view-body service-product-body">${renderBlocks(details)}</div>
+      <div class="article-view-body service-product-body service-product-body--publish">${renderBlocks(details)}</div>
     `;
 
     bindBundlePicker(viewEl, service);

@@ -5504,15 +5504,143 @@ ul {
 
 /* Detail body: single fee = bold; multi fee = pricing table only */
 .service-pricing-single {
-  margin: 0 0 1rem;
-  font-family: var(--font-serif);
-  font-size: 1.45rem;
+  margin: 0 0 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
   line-height: 1.45;
-  color: var(--ink);
+  color: #c55a11;
 }
 
 .service-pricing-single strong {
   font-weight: 700;
+  color: #c55a11;
+}
+
+.svc-publish-note {
+  margin: 0 0 1.25rem;
+  max-width: 46rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: #808080;
+}
+
+.svc-publish-lines {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  max-width: 48rem;
+}
+
+.svc-publish-lines li {
+  position: relative;
+  margin: 0 0 0.55rem;
+  padding-left: 0.9rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: #333;
+}
+
+.svc-publish-lines li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #2e75b6;
+}
+
+.svc-publish-lines li strong {
+  font-weight: 700;
+  color: #1f4e79;
+}
+
+.svc-publish-lines li span {
+  color: #333;
+}
+
+.service-product-body--publish .service-detail-list {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  max-width: 48rem;
+}
+
+.service-product-body--publish .service-detail-list li {
+  position: relative;
+  margin: 0 0 0.45rem;
+  padding-left: 0.9rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: #333;
+}
+
+.service-product-body--publish .service-detail-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #2e75b6;
+}
+
+.service-page .service-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 1.75rem 0 0.85rem;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0;
+}
+
+.service-page .service-detail-heading:first-child {
+  margin-top: 0.35rem;
+}
+
+.service-page .service-detail-heading .svc-sec-label {
+  flex: none;
+  padding: 0.28rem 0.7rem;
+  background: #1f4e79;
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.service-page .service-detail-heading .svc-sec-rule {
+  display: block;
+  flex: 1 1 auto;
+  height: 0.55rem;
+  margin-left: 0;
+  background: linear-gradient(
+    90deg,
+    #1f4e79 0%,
+    #2a5e8c 28%,
+    #356e9f 55%,
+    #4a86b5 78%,
+    transparent 100%
+  );
+  opacity: 0.95;
+}
+
+@media (max-width: 560px) {
+  .service-page .service-detail-heading {
+    flex-wrap: wrap;
+  }
+
+  .service-page .service-detail-heading .svc-sec-rule {
+    flex: 1 1 100%;
+    margin-top: 0.2rem;
+    height: 0.4rem;
+  }
 }
 
 .service-detail-actions {
@@ -5524,7 +5652,7 @@ ul {
 
 /* Service detail — product page */
 .service-page .article-main {
-  background: linear-gradient(180deg, #f6f8fb 0%, #fff 220px);
+  background: #fff;
 }
 
 .service-page .article-main .container {
@@ -5543,6 +5671,14 @@ ul {
   border-radius: 16px;
 }
 
+.service-product-hero--publish {
+  padding: 8px 0 24px;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #e6eaf0;
+  background: transparent;
+}
+
 .service-product-badge {
   display: inline-block;
   margin-bottom: 16px;
@@ -5557,6 +5693,12 @@ ul {
   color: var(--accent);
 }
 
+.service-product-hero--publish .service-product-badge {
+  margin-bottom: 10px;
+  color: #2e75b6;
+  letter-spacing: 0.08em;
+}
+
 .service-product-title {
   margin: 0 0 16px;
   font-family: var(--font-serif);
@@ -5567,12 +5709,37 @@ ul {
   color: var(--ink);
 }
 
+.service-product-hero--publish .service-product-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin: 0 0 10px;
+  font-family: var(--font-sans);
+  font-size: clamp(1.35rem, 2.6vw, 1.75rem);
+  font-weight: 700;
+  color: #2e75b6;
+}
+
+.svc-title-mark {
+  flex: none;
+  margin-right: 2px;
+  color: #2e75b6;
+}
+
 .service-product-lead {
   margin: 0 0 22px;
   max-width: 40rem;
   font-size: 1.0625rem;
   line-height: 1.7;
   color: var(--text-secondary);
+}
+
+.service-product-hero--publish .service-product-lead {
+  margin: 0 0 18px;
+  max-width: 46rem;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: #808080;
 }
 
 .service-product-bar {
@@ -5583,6 +5750,10 @@ ul {
   gap: 16px;
   padding-top: 18px;
   border-top: 1px solid var(--border-light);
+}
+
+.service-product-hero--publish .service-product-bar {
+  border-top-color: #eef1f5;
 }
 
 .service-product-price {
@@ -5597,6 +5768,12 @@ ul {
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
+}
+
+.service-product-hero--publish .service-product-price strong {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  color: #c55a11;
 }
 
 .service-product-price span {
@@ -5838,7 +6015,8 @@ ul {
   }
 }
 
-.service-page .article-view-h2.service-detail-heading {
+/* Legacy class only; publish pages use .service-detail-heading + .svc-sec-label */
+.service-page .article-view-h2.service-detail-heading:not(:has(.svc-sec-label)) {
   margin: 36px 0 14px;
   padding: 0;
   background: none;
@@ -5847,14 +6025,6 @@ ul {
   font-weight: 600;
   color: var(--ink);
   letter-spacing: -0.01em;
-}
-
-.service-page .article-view-h2.service-detail-heading:first-child {
-  margin-top: 0;
-}
-
-.service-page .article-view-h2.service-detail-heading span {
-  color: inherit;
 }
 
 .service-page .article-view-p {
@@ -6216,11 +6386,16 @@ ul {
   max-width: 100%;
 }
 
+.service-detail-table--pricing thead th {
+  background: #1f4e79;
+  color: #fff;
+}
+
 .service-detail-table--pricing tbody td.col-2,
 .service-detail-table--pricing tbody td.col-3 {
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  color: var(--ink);
+  font-weight: 600;
+  color: #c55a11;
   white-space: nowrap;
 }
 

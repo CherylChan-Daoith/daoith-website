@@ -577,22 +577,21 @@ HEADER = r'''/* DAOITH service marketplace catalog
     const pricingTable = p.pricingTable || null;
     const bundle = p.bundle || null;
 
-    out.push({ type: 'h2', text: '服务内容' });
+    function pushLines(title, text) {
+      const raw = String(text || '').trim();
+      if (!raw) return;
+      out.push({ type: 'h2', text: title });
+      out.push({ type: 'publish', text: raw });
+    }
+
+    pushLines('服务内容', bundle ? '' : content);
     if (bundle) {
+      out.push({ type: 'h2', text: '服务内容' });
       out.push({ type: 'bundle-picker', bundle });
-    } else if (content) {
-      out.push({ type: 'rich', text: content });
     }
 
-    if (conditions) {
-      out.push({ type: 'h2', text: '办理条件' });
-      out.push({ type: 'rich', text: conditions });
-    }
-
-    if (cycle) {
-      out.push({ type: 'h2', text: '服务周期' });
-      out.push({ type: 'rich', text: cycle });
-    }
+    pushLines('办理条件', conditions);
+    pushLines('服务周期', cycle);
 
     out.push({ type: 'h2', text: '服务流程' });
     if (processSteps && processSteps.length) {
@@ -602,7 +601,7 @@ HEADER = r'''/* DAOITH service marketplace catalog
       if (steps.length > 1) {
         out.push({ type: 'timeline', steps: steps.map((title) => ({ title })) });
       } else {
-        out.push({ type: 'rich', text: process });
+        out.push({ type: 'publish', text: process });
       }
     }
 
@@ -619,18 +618,21 @@ HEADER = r'''/* DAOITH service marketplace catalog
     } else if (pricing) {
       out.push({ type: 'price', text: formatSinglePricingDisplay(pricing) });
     }
-    if (pricingNote) out.push({ type: 'rich', text: pricingNote });
+    if (pricingNote) out.push({ type: 'note', text: pricingNote });
     if (bundle) {
       out.push({ type: 'bundle-price', bundleId: bundle.id });
     }
 
-    if (advantages) {
-      out.push({ type: 'h2', text: '核心优势' });
-      out.push({ type: 'rich', text: advantages });
-    }
+    pushLines('核心优势', advantages);
+
     if (audience) {
       out.push({ type: 'h2', text: '适合对象' });
-      out.push({ type: 'rich', text: audience });
+      const items = String(audience)
+        .split(/\n/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (items.length > 1) out.push({ type: 'ul', items });
+      else out.push({ type: 'publish', text: audience });
     }
     return out;
   }
