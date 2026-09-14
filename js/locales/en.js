@@ -748,7 +748,7 @@ window.DAOITH_I18N_EN = {
         highlights: ['Ex-Big-Four specialists', 'Actionable recommendations', 'Structure, rebate, and tax-risk coverage'],
         audience: 'Founders and finance leads planning an overseas structure or facing cross-border tax issues.',
         pricing: '¥2,999 / hour. Time under one hour is billed as one hour; overtime is billed pro rata. The signed engagement letter prevails.',
-        process: ['Inquiry / booking', 'Share background and agenda', 'Pre-read', 'Online or Shenzhen 1-on-1', 'Notes and next steps'],
+        process: ['Share background and agenda', 'Pre-read', 'Online or Shenzhen 1-on-1', 'Notes and next steps'],
         faqs: [
           { q: 'What should I prepare?', a: 'Platform, entity, fulfillment/export model, invoices, main markets, and your core question.' },
           { q: 'Is this a formal legal opinion?', a: 'Default is oral diagnosis plus notes. A written opinion can be scoped separately.' },
