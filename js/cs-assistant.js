@@ -24,6 +24,9 @@
     { id: 'hk-company', title: '香港公司注册', en: 'Hong Kong company setup', keys: '香港公司 注册香港 hk company hongkong' },
     { id: 'hk-annual', title: '香港公司年审', en: 'Hong Kong annual return', keys: '香港年审 nar1 商业登记' },
     { id: 'hk-audit-tax', title: '香港公司审计报税', en: 'HK audit & profits tax', keys: '香港审计 利得税 核数' },
+    { id: 'hk-bank', title: '香港公司开立银行账户', en: 'Hong Kong bank account', keys: '香港开户 银行开户 汇丰 星展 花旗 建行亚洲' },
+    { id: 'hk-change', title: '香港公司变更服务', en: 'Hong Kong company change', keys: '香港变更 改名 董事 股权 秘书 地址' },
+    { id: 'hk-deregister', title: '香港公司注销', en: 'Hong Kong deregistration', keys: '香港注销 解散 除名' },
     { id: 'domestic-arch-0110-hk', title: '0110出口退税＋香港公司合规全托管', en: '0110 rebate + HK bundle', keys: '0110 一般贸易 香港架构' },
     { id: 'domestic-arch-1039-hk', title: '1039出口免税＋香港公司合规全托管', en: '1039 exemption + HK bundle', keys: '1039架构 香港公司架构' },
   ];
