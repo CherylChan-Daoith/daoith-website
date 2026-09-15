@@ -5508,12 +5508,12 @@ ul {
   font-family: var(--font-sans);
   font-size: 1.25rem;
   line-height: 1.45;
-  color: #c55a11;
+  color: var(--ink);
 }
 
 .service-pricing-single strong {
   font-weight: 700;
-  color: #c55a11;
+  color: var(--ink);
 }
 
 .svc-publish-note {
@@ -5521,7 +5521,7 @@ ul {
   max-width: 46rem;
   font-size: 0.875rem;
   line-height: 1.65;
-  color: #808080;
+  color: var(--text-muted);
 }
 
 .svc-publish-lines {
@@ -5537,7 +5537,7 @@ ul {
   padding-left: 0.9rem;
   font-size: 0.9375rem;
   line-height: 1.7;
-  color: #333;
+  color: var(--text);
 }
 
 .svc-publish-lines li::before {
@@ -5548,16 +5548,24 @@ ul {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #2e75b6;
+  background: var(--accent);
 }
 
 .svc-publish-lines li strong {
   font-weight: 700;
-  color: #1f4e79;
+  color: var(--ink);
 }
 
 .svc-publish-lines li span {
-  color: #333;
+  color: var(--text);
+}
+
+.service-product-body--publish {
+  padding: 28px 32px 32px;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  box-shadow: 0 10px 32px rgba(5, 28, 44, 0.06);
 }
 
 .service-product-body--publish .service-detail-list {
@@ -5573,7 +5581,7 @@ ul {
   padding-left: 0.9rem;
   font-size: 0.9375rem;
   line-height: 1.7;
-  color: #333;
+  color: var(--text);
 }
 
 .service-product-body--publish .service-detail-list li::before {
@@ -5584,7 +5592,7 @@ ul {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #2e75b6;
+  background: var(--accent);
 }
 
 .service-page .service-detail-heading {
@@ -5608,9 +5616,10 @@ ul {
 
 .service-page .service-detail-heading .svc-sec-label {
   flex: none;
-  padding: 0.22rem 0.65rem;
-  background: #1f4e79;
+  padding: 0.22rem 0.7rem;
+  background: var(--ink);
   color: #fff;
+  border-radius: 8px 0 0 8px;
   font-family: var(--font-serif);
   font-size: 1.05rem;
   font-weight: 600;
@@ -5624,15 +5633,15 @@ ul {
   flex: 1 1 auto;
   height: 0.18rem;
   margin-left: 0;
+  border-radius: 0 999px 999px 0;
   background: linear-gradient(
     90deg,
-    #1f4e79 0%,
-    #2a5e8c 28%,
-    #356e9f 55%,
-    #4a86b5 78%,
+    var(--ink) 0%,
+    var(--ink-light) 32%,
+    var(--accent) 68%,
     transparent 100%
   );
-  opacity: 0.95;
+  opacity: 0.9;
 }
 
 @media (max-width: 560px) {
@@ -5640,10 +5649,15 @@ ul {
     flex-wrap: wrap;
   }
 
+  .service-page .service-detail-heading .svc-sec-label {
+    border-radius: 8px;
+  }
+
   .service-page .service-detail-heading .svc-sec-rule {
     flex: 1 1 100%;
-    margin-top: 0.2rem;
+    margin-top: 0.35rem;
     height: 0.13rem;
+    border-radius: 999px;
   }
 }
 
@@ -5656,7 +5670,7 @@ ul {
 
 /* Service detail — product page */
 .service-page .article-main {
-  background: #fff;
+  background: linear-gradient(180deg, #f6f8fb 0%, #fff 240px);
 }
 
 .service-page .article-main .container {
@@ -5672,15 +5686,16 @@ ul {
   padding: 28px 32px;
   background: var(--white);
   border: 1px solid var(--border-light);
-  border-radius: 16px;
+  border-radius: 20px;
+  box-shadow: 0 10px 32px rgba(5, 28, 44, 0.06);
 }
 
 .service-product-hero--publish {
-  padding: 8px 0 24px;
-  border: 0;
-  border-radius: 0;
-  border-bottom: 1px solid #e6eaf0;
-  background: transparent;
+  padding: 28px 32px;
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  background: var(--white);
+  box-shadow: 0 10px 32px rgba(5, 28, 44, 0.06);
 }
 
 .service-product-badge {
@@ -5699,7 +5714,7 @@ ul {
 
 .service-product-hero--publish .service-product-badge {
   margin-bottom: 10px;
-  color: #2e75b6;
+  color: var(--accent);
   letter-spacing: 0.08em;
 }
 
@@ -5718,16 +5733,16 @@ ul {
   align-items: flex-start;
   gap: 0;
   margin: 0 0 10px;
-  font-family: var(--font-sans);
-  font-size: clamp(1.35rem, 2.6vw, 1.75rem);
-  font-weight: 700;
-  color: #2e75b6;
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .svc-title-mark {
   flex: none;
   margin-right: 2px;
-  color: #2e75b6;
+  color: var(--accent);
 }
 
 .service-product-lead {
@@ -5743,7 +5758,7 @@ ul {
   max-width: 46rem;
   font-size: 0.95rem;
   line-height: 1.65;
-  color: #808080;
+  color: var(--text-secondary);
 }
 
 .service-product-bar {
@@ -5757,7 +5772,7 @@ ul {
 }
 
 .service-product-hero--publish .service-product-bar {
-  border-top-color: #eef1f5;
+  border-top-color: var(--border-light);
 }
 
 .service-product-price {
@@ -5775,9 +5790,9 @@ ul {
 }
 
 .service-product-hero--publish .service-product-price strong {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  color: #c55a11;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .service-product-price span {
@@ -5894,12 +5909,12 @@ ul {
 
 .bundle-picker {
   margin: 0 0 24px;
-  padding: 18px;
-  border: 1px solid rgba(126, 182, 255, 0.4);
-  border-radius: 14px;
+  padding: 20px;
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
   background:
     linear-gradient(145deg, rgba(245, 249, 255, 0.95) 0%, rgba(255, 255, 255, 0.98) 55%, rgba(236, 244, 255, 0.9) 100%);
-  box-shadow: 0 8px 24px rgba(34, 81, 255, 0.06);
+  box-shadow: 0 10px 32px rgba(5, 28, 44, 0.06);
 }
 
 .bundle-picker-tip {
@@ -5922,20 +5937,20 @@ ul {
   margin: 0;
   padding: 12px 12px;
   border: 1px solid var(--border-light);
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .bundle-module:hover {
-  border-color: #c8d0e0;
+  border-color: color-mix(in srgb, var(--accent) 28%, #c8d0e0);
 }
 
 .bundle-module.is-on {
-  border-color: rgba(34, 81, 255, 0.55);
+  border-color: rgba(34, 81, 255, 0.45);
   box-shadow: 0 0 0 2px rgba(34, 81, 255, 0.08);
-  background: #f7f9ff;
+  background: var(--accent-soft);
 }
 
 .bundle-module input {
@@ -6171,8 +6186,9 @@ ul {
   overflow-x: auto;
   margin: 0 0 18px;
   border: 1px solid var(--border-light);
-  border-radius: 12px;
+  border-radius: 16px;
   background: #fff;
+  box-shadow: 0 8px 24px rgba(5, 28, 44, 0.04);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -6204,7 +6220,7 @@ ul {
 }
 
 .service-detail-table thead th {
-  background: #f3f5f8;
+  background: var(--accent-soft);
   color: var(--ink);
   font-weight: 600;
   font-size: 0.72rem;
@@ -6391,7 +6407,7 @@ ul {
 }
 
 .service-detail-table--pricing thead th {
-  background: #1f4e79;
+  background: var(--ink);
   color: #fff;
 }
 
@@ -6399,7 +6415,7 @@ ul {
 .service-detail-table--pricing tbody td.col-3 {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #c55a11;
+  color: var(--ink);
   white-space: nowrap;
 }
 
