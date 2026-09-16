@@ -1329,10 +1329,32 @@ function flattenQaAnswerBullets(text) {
   return out.join('\n');
 }
 
-/** If answer discusses 9810 but omits uncertainty tip, append the hard reminder. */
+/** True when the answer is advising the user to consider / use 9810 export. */
+function looksLikeRecommending9810Export(text) {
+  const t = String(text || '');
+  if (!/9810/.test(t)) return false;
+  // Explicit recommendation or feasibility advice — not mere catalog mentions
+  if (
+    /(?:建议|可评估|可考虑|优先评估|推荐)[^。；\n!]{0,48}9810|9810[^。；\n!]{0,48}(?:建议|可评估|可考虑|优先评估)/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  if (/(?:可走|可改走|改为|切换为|采用|使用)\s*9810|(?:走|用)\s*9810(?:出口|报关)?/.test(t)) {
+    return true;
+  }
+  if (/(?:我能走|可以以|能否|能不能|可不可以)\s*9810/.test(t)) return true;
+  if (/结论[^。\n]{0,100}9810|9810[^。\n]{0,40}(?:可行|可以考虑|适合(?:贵司|您)|可以办理)/.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+/** Only when advising 9810 export: if uncertainty tip is missing, append the hard reminder. */
 function ensure9810UncertaintyTip(text) {
   const t = String(text || '');
-  if (!/9810/.test(t)) return t;
+  if (!looksLikeRecommending9810Export(t)) return t;
   if (/实操[^。\n]{0,12}不确定|退税不确定|销售佐证|收汇证明/.test(t)) return t;
   return (
     `${t.replace(/\s+$/, '')}\n\n` +
@@ -3122,7 +3144,7 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
-    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据** / **操作提示**（三者同级、标签加粗）；依据内全部同一级实心 `- **标题**：正文`；**操作提示**独立成块，禁止放进依据列表；涉及9810必须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
+    '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据** / **操作提示**（三者同级、标签加粗）；依据内全部同一级实心 `- **标题**：正文`；**操作提示**独立成块，禁止放进依据列表；**仅当建议用户考虑/采用9810时**须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司（仅列举9810勿加该提示）；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。' +
     (ipProbe

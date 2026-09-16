@@ -5509,10 +5509,10 @@ ul {
 /* Detail body: single fee = bold; multi fee = pricing table only */
 .service-pricing-single {
   margin: 0 0 0.5rem;
-  font-family: var(--font-serif);
-  font-size: 1.125rem;
-  line-height: 1.5;
-  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
 }
 
 .service-pricing-single strong {
@@ -5523,7 +5523,7 @@ ul {
 .svc-publish-note {
   margin: 0 0 1.25rem;
   max-width: 46rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: 1.65;
   color: var(--text-muted);
 }
@@ -5560,7 +5560,7 @@ ul {
   position: relative;
   margin: 0 0 0.45rem;
   padding-left: 0.9rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: 1.7;
   color: var(--text-secondary);
 }
@@ -5616,7 +5616,7 @@ ul {
   position: relative;
   margin: 0 0 0.45rem;
   padding-left: 0.9rem;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: 1.7;
   color: var(--text-secondary);
 }
@@ -5859,8 +5859,8 @@ ul {
 
 .service-rich-h3 {
   margin: 18px 0 8px;
-  font-family: var(--font-serif);
-  font-size: 0.95rem;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--ink);
   letter-spacing: 0;
@@ -5872,8 +5872,8 @@ ul {
 
 .service-rich-p {
   margin: 0 0 10px;
-  font-size: 0.875rem;
-  line-height: 1.75;
+  font-size: 0.75rem;
+  line-height: 1.7;
   color: var(--text-secondary);
   white-space: pre-wrap;
 }
@@ -5887,7 +5887,7 @@ ul {
   border: 1px solid var(--border-light);
   border-radius: 10px;
   background: #fafbfd;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   line-height: 1.65;
   color: var(--text-secondary);
 }
@@ -6121,9 +6121,9 @@ ul {
 }
 
 .service-page .article-view-p {
-  font-size: 0.9375rem;
+  font-size: 0.75rem;
   color: var(--text-secondary);
-  line-height: 1.85;
+  line-height: 1.7;
   margin-bottom: 16px;
   max-width: 48rem;
 }
@@ -6164,7 +6164,7 @@ ul {
   border: 1px solid var(--border-light);
   border-radius: 12px;
   background: #fafbfd;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   line-height: 1.65;
   color: var(--text-secondary);
 }
@@ -6212,7 +6212,7 @@ ul {
   padding-left: 1.25rem;
   color: var(--text-secondary);
   line-height: 1.7;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
 .service-detail-list li + li {
@@ -6249,7 +6249,7 @@ ul {
 
 .service-faq-item p {
   margin: 6px 0 2px;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   line-height: 1.65;
   max-width: 48rem;
@@ -6270,7 +6270,7 @@ ul {
   width: 100%;
   min-width: 560px;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   line-height: 1.6;
   color: var(--text-secondary);
 }
