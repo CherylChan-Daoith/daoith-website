@@ -7,7 +7,6 @@
     const viewEl = document.getElementById('taxSystemView');
     const loadingEl = document.getElementById('taxSystemLoading');
     const notFoundEl = document.getElementById('taxSystemNotFound');
-    const source = window.DAOITH_TAX_SOURCE || {};
     const locale = window.DAOITH_getLocale?.() || 'zh';
 
     if (!id || typeof window.getTaxSystemById !== 'function') {
@@ -53,8 +52,8 @@
     }).join('');
 
     const sectionTitles = locale === 'en'
-      ? { taxes: 'Key taxes', treaty: 'Bilateral tax arrangements', tips: 'Cross-border compliance tips', source: 'Authoritative source' }
-      : { taxes: '主要税种一览', treaty: '双边税收安排要点', tips: '跨境合规提示', source: '权威来源' };
+      ? { taxes: 'Key taxes', treaty: 'Bilateral tax arrangements', tips: 'Cross-border compliance tips' }
+      : { taxes: '主要税种一览', treaty: '双边税收安排要点', tips: '跨境合规提示' };
 
     viewEl.innerHTML = `
       <header class="article-view-header">
@@ -62,7 +61,6 @@
         <h1 class="article-view-title">${country.flag} ${escapeHtml(name)}${locale !== 'en' && country.nameEn ? ` <span class="tax-system-name-en">${escapeHtml(country.nameEn)}</span>` : ''}</h1>
         <div class="article-view-meta">
           <span>${window.DAOITH_t('tax.tradeMeta')}：${escapeHtml(tradeSource)}</span>
-          <span class="article-view-tag">${window.DAOITH_t('tax.tag')}</span>
         </div>
         <p class="article-view-lead">${escapeHtml(summary)}</p>
       </header>
@@ -73,11 +71,6 @@
         <h2 class="article-view-h2">${sectionTitles.treaty}</h2>
         <p class="article-view-p">${escapeHtml(country.treaty)}</p>
         ${tips ? `<h2 class="article-view-h2">${sectionTitles.tips}</h2><ul class="tax-system-tips">${tips}</ul>` : ''}
-        <div class="tax-system-source">
-          <p><strong>${sectionTitles.source}：</strong>${escapeHtml(source.name || '')}</p>
-          <p>${escapeHtml(source.note || '')}</p>
-          ${source.url ? `<a href="${escapeHtml(source.url)}" class="tax-system-source-link" target="_blank" rel="noopener noreferrer">${locale === 'en' ? 'View official SAT guides →' : '前往税路通专栏查阅官方指南 →'}</a>` : ''}
-        </div>
       </div>
       <footer class="article-view-footer">
         <a href="/#tax-systems" class="btn btn-outline btn-sm">${window.DAOITH_t('tax.back')}</a>
