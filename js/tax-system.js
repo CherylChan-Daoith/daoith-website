@@ -30,7 +30,7 @@
       ? `Trade partner #${country.rank} · ${country.trade2025} ${tradeUnit}`
       : `贸易伙伴第 ${country.rank} 位 · ${country.trade2025} ${tradeUnit}`;
 
-    document.title = `${name} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询'}`;
+    document.title = `${name} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询DAOITH'}`;
     setMetaDescription(summary);
 
     if (loadingEl) loadingEl.remove();

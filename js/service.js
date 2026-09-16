@@ -430,7 +430,7 @@
         ? 'Service detail'
         : '服务详情';
 
-    document.title = `${title} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询'}`;
+    document.title = `${title} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询DAOITH'}`;
     setMetaDescription(desc);
 
     const backLink = document.querySelector('[data-i18n-service-back]');

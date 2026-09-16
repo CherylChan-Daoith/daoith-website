@@ -133,6 +133,7 @@ ul {
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
+  background: #fff;
 }
 
 .logo-text {

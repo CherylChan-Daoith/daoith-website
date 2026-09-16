@@ -25,7 +25,7 @@
     const title = locale === 'en' && en?.title ? en.title : article.title;
     const excerpt = locale === 'en' && en?.excerpt ? en.excerpt : article.excerpt;
 
-    document.title = `${title} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询'}`;
+    document.title = `${title} — ${locale === 'en' ? 'DAOITH Consulting' : '道一跨境咨询DAOITH'}`;
     setMetaDescription(excerpt);
 
     if (loadingEl) loadingEl.remove();
