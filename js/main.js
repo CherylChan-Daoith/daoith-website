@@ -5995,16 +5995,11 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
 
   const mountEntry = (innerHtml) => {
     purgeInlineServiceMatchTips(items);
-    // Only replace the in-flight draft for this turn — never overwrite prior finished replies
-    // Exception: Q&A corrections must overwrite the latest finished QA card; otherwise users
-    // keep staring at an older wrong answer while the left tip only says「请看右侧」.
+    // Only update this turn's in-flight draft (streaming). Finished cards stay until「新建对话」.
+    // New Q&A / new diagnosis append; diagnosis refresh may overwrite the latest diagnosis card.
     let entry = null;
     if (replaceLatest) {
       entry = items.querySelector(`.result-entry-${kind}.is-draft`);
-      if (!entry && kind === 'qa') {
-        const allQa = items.querySelectorAll('.result-entry-qa');
-        entry = allQa.length ? allQa[allQa.length - 1] : null;
-      }
     }
     if (!entry && refreshDiagnosis && kind === 'diagnosis') {
       const all = items.querySelectorAll('.result-entry-diagnosis');
