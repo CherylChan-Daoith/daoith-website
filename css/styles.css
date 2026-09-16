@@ -5539,11 +5539,13 @@ ul {
 
 .svc-publish-h {
   margin: 0 0 0.5rem;
+  padding-left: 14px;
+  border-left: 3px solid var(--accent);
   font-family: var(--font-serif);
-  font-size: 1.125rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--ink);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .svc-publish-lines {
@@ -5630,68 +5632,77 @@ ul {
 }
 
 .service-page .service-detail-heading {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  margin: 1.75rem 0 0.85rem;
-  padding: 0;
+  position: relative;
+  display: block;
+  margin: 2rem 0 1.15rem;
+  padding: 1.55rem 0 0;
   background: none;
   border: 0;
-  font-family: var(--font-serif);
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #fff;
-  letter-spacing: -0.01em;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  letter-spacing: 0;
+  line-height: inherit;
+}
+
+.service-page .service-detail-heading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 55%, #9eb6ff) 18%,
+    color-mix(in srgb, var(--accent) 35%, #d7e2ff) 52%,
+    transparent 100%
+  );
 }
 
 .service-page .service-detail-heading:first-child {
-  margin-top: 0.35rem;
+  margin-top: 0.15rem;
+  padding-top: 0;
+}
+
+.service-page .service-detail-heading:first-child::before {
+  display: none;
 }
 
 .service-page .service-detail-heading .svc-sec-label {
-  flex: none;
-  padding: 0.22rem 0.7rem;
-  background: var(--ink);
-  color: #fff;
-  border-radius: 8px 0 0 8px;
+  display: block;
+  max-width: 40rem;
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
   font-family: var(--font-serif);
-  font-size: 1.05rem;
+  font-size: 1.1rem;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.4;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .service-page .service-detail-heading .svc-sec-rule {
-  display: block;
-  flex: 1 1 auto;
-  height: 0.18rem;
-  margin-left: 0;
-  border-radius: 0 999px 999px 0;
-  background: linear-gradient(
-    90deg,
-    var(--ink) 0%,
-    var(--ink-light) 32%,
-    var(--accent) 68%,
-    transparent 100%
-  );
-  opacity: 0.9;
+  display: none;
 }
 
 @media (max-width: 560px) {
   .service-page .service-detail-heading {
-    flex-wrap: wrap;
+    margin: 1.75rem 0 1rem;
+    padding-top: 1.35rem;
+  }
+
+  .service-page .service-detail-heading:first-child {
+    padding-top: 0;
   }
 
   .service-page .service-detail-heading .svc-sec-label {
-    border-radius: 8px;
-  }
-
-  .service-page .service-detail-heading .svc-sec-rule {
-    flex: 1 1 100%;
-    margin-top: 0.35rem;
-    height: 0.13rem;
-    border-radius: 999px;
+    font-size: 1.05rem;
   }
 }
 
@@ -6070,14 +6081,42 @@ ul {
 
 /* Legacy class only; publish pages use .service-detail-heading + .svc-sec-label */
 .service-page .article-view-h2.service-detail-heading:not(:has(.svc-sec-label)) {
-  margin: 36px 0 14px;
-  padding: 0;
+  position: relative;
+  margin: 2rem 0 1.15rem;
+  padding: 1.55rem 0 0 14px;
+  border-left: 3px solid var(--accent);
   background: none;
-  border: 0;
-  font-size: 1.05rem;
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
   font-weight: 600;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+.service-page .article-view-h2.service-detail-heading:not(:has(.svc-sec-label))::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 55%, #9eb6ff) 18%,
+    color-mix(in srgb, var(--accent) 35%, #d7e2ff) 52%,
+    transparent 100%
+  );
+}
+
+.service-page .article-view-h2.service-detail-heading:not(:has(.svc-sec-label)):first-child {
+  margin-top: 0.15rem;
+  padding-top: 0;
+}
+
+.service-page .article-view-h2.service-detail-heading:not(:has(.svc-sec-label)):first-child::before {
+  display: none;
 }
 
 .service-page .article-view-p {
