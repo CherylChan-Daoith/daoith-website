@@ -1,6 +1,22 @@
 /* Manually curated WeChat OA article links for expert insights list. */
 window.DAOITH_OA_MANUAL_ARTICLES = [
   {
+    "id": "oa-manual-21",
+    "title": "中国企业出海系列--英国税制",
+    "digest": "独立税制、数字化与强监管重塑市场准入；合规从可选项变成生死线",
+    "author": "Cheryl CHEN",
+    "date": "2026-09-16",
+    "url": "https://mp.weixin.qq.com/s/V6RSI-FDm-NfU9C3OXyMxQ"
+  },
+  {
+    "id": "oa-manual-22",
+    "title": "外籍个人股息免税正式取消！20%不是唯一答案",
+    "digest": "27号公告取消外籍个人股息免税；协定税率与税收居民身份才是关键",
+    "author": "Cheryl CHEN",
+    "date": "2026-09-04",
+    "url": "https://mp.weixin.qq.com/s/dpYesrEX75HCuiux01Sb1g"
+  },
+  {
     "id": "oa-manual-01",
     "title": "中国企业出海系列--马来西亚税制",
     "digest": "合理利用进口免税、制造免税和原产地规则三重优势",
