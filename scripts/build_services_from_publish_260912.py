@@ -22,26 +22,26 @@ PRODUCT_META = {
     "跨境电商财税合规方案定制": ("domestic-diagnosis", "consult", "¥28,000", 28000, "/次"),
     "财税合规陪跑": ("consult-annual", "consult", "¥38,000", 38000, "/年起"),
     "企业财务管理 AI 落地陪跑": ("consult-ai-finance-coach", "consult", "¥60,000", 60000, "起"),
-    "高新技术企业申请": ("consult-hnte", "consult", "¥48,000", 48000, ""),
-    "软件企业申请": ("consult-software-enterprise", "consult", "¥25,000", 25000, ""),
-    "技术先进型服务企业申请": ("consult-atas", "consult", "¥20,000", 20000, ""),
-    "合规代账": ("domestic-compliance-bookkeeping", "agency", "¥5,000", 5000, "/年起"),
-    "公司注册服务（公司设立）": ("domestic-setup", "agency", "¥500", 500, "/次"),
-    "个体户注册核定及税务申报": ("domestic-1039-sole", "agency", "¥4,500", 4500, "/年"),
-    "1039 市场采购出口": ("domestic-1039-export", "export", "0.4%", 0, "/报关金额"),
-    "进出口权办理": ("domestic-trade-license", "export", "¥2,000", 2000, ""),
-    "首单退税辅导": ("domestic-rebate-first", "export", "¥10,000", 10000, ""),
-    "代理退税申报": ("domestic-rebate", "export", "0.1%", 5000, "/年起"),
-    "1210/9610 出口退税首单陪跑服务": ("domestic-rebate-1210-9610", "export", "¥10,000", 10000, ""),
-    "9810 出口退税首单陪跑服务": ("domestic-rebate-9810", "export", "¥10,000", 10000, ""),
+    "高新技术企业申请": ("consult-hnte", "consult", "¥68,000", 68000, ""),
+    "软件企业申请": ("consult-software-enterprise", "consult", "¥50,000", 50000, ""),
+    "技术先进型服务企业申请": ("consult-atas", "consult", "¥50,000", 50000, ""),
+    "合规代账": ("domestic-compliance-bookkeeping", "compliance", "¥5,000", 5000, "/年起"),
+    "公司注册服务（公司设立）": ("domestic-setup", "compliance", "¥500", 500, "/次"),
+    "个体户注册核定及税务申报": ("domestic-1039-sole", "compliance", "¥4,500", 4500, "/年"),
+    "1039 市场采购出口": ("domestic-1039-export", "compliance", "0.4%", 0, "/报关金额"),
+    "进出口权办理": ("domestic-trade-license", "compliance", "¥2,000", 2000, ""),
+    "首单退税辅导": ("domestic-rebate-first", "compliance", "¥10,000", 10000, ""),
+    "代理退税申报": ("domestic-rebate", "compliance", "0.1%", 5000, "/年起"),
+    "1210/9610 出口退税首单陪跑服务": ("domestic-rebate-1210-9610", "compliance", "¥10,000", 10000, ""),
+    "9810 出口退税首单陪跑服务": ("domestic-rebate-9810", "compliance", "¥10,000", 10000, ""),
     "香港公司注册": ("hk-company", "hongkong", "¥5,000", 5000, ""),
     "香港公司年审": ("hk-annual", "hongkong", "¥3,000", 3000, "/次"),
     "香港公司审计报税": ("hk-audit-tax", "hongkong", "¥2,200", 2200, "起"),
     "香港公司开立银行账户": ("hk-bank", "hongkong", "¥5,000", 5000, "起"),
     "香港公司变更服务": ("hk-change", "hongkong", "¥800", 800, "起"),
     "香港公司注销": ("hk-deregister", "hongkong", "¥3,500", 3500, "/次"),
-    "0110 出口退税 + 香港公司合规全托管": ("domestic-arch-0110-hk", "export", "全托管计价", 0, "/3项起9折"),
-    "1039 出口免税 + 香港公司合规全托管": ("domestic-arch-1039-hk", "export", "全托管计价", 0, "/3项起9折"),
+    "0110 出口退税 + 香港公司合规全托管": ("domestic-arch-0110-hk", "compliance", "全托管计价", 0, "/3项起9折"),
+    "1039 出口免税 + 香港公司合规全托管": ("domestic-arch-1039-hk", "compliance", "全托管计价", 0, "/3项起9折"),
 }
 
 # Overseas leaf SKUs (also used as product-start detectors under country sections)
@@ -52,9 +52,6 @@ OVERSEAS_META = {
     "新加坡公司设立": ("asia-sg-setup", "asia", "¥39,000", 39000, ""),
     "新加坡公司做账报税": ("asia-sg-bookkeeping", "asia", "¥55,800", 55800, "起"),
     "新加坡公司审计服务": ("asia-sg-audit", "asia", "¥34,200", 34200, "起"),
-    "迪拜公司设立": ("other-ae-setup", "other", "¥46,000", 46000, ""),
-    "迪拜公司做账报税": ("other-ae-bookkeeping", "other", "¥10,000", 10000, "起"),
-    "迪拜公司审计": ("other-ae-audit", "other", "¥10,000", 10000, "起"),
     "英国公司设立": ("europe-uk-setup", "europe", "¥4,300", 4300, ""),
     "英国 VAT 注册及申报": ("europe-uk-vat", "europe", "¥1,500", 1500, ""),
     "英国VAT注册及申报": ("europe-uk-vat", "europe", "¥1,500", 1500, ""),
@@ -74,7 +71,7 @@ OVERSEAS_META = {
     "美国公司做账报税": ("other-us-bookkeeping", "other", "¥2,500", 2500, "起"),
 }
 
-COUNTRY_MARKERS = {"马来西亚", "新加坡", "迪拜（阿联酋）", "英国", "德国", "法国", "美国"}
+COUNTRY_MARKERS = {"马来西亚", "新加坡", "英国", "德国", "法国", "美国"}
 
 BUNDLE_0110 = {
     "id": "0110",
@@ -545,7 +542,7 @@ def build_from_product(p: dict) -> list[str]:
 
 HEADER = r'''/* DAOITH service marketplace catalog
  * Source of truth: 服务产品发布页_260912.docx（发布页格式与内容）
- * Categories: consult | agency | export | hongkong | asia | europe | other
+ * Categories: consult | compliance | hongkong | asia | europe | other
  */
 (function () {
   /** Single fee → bold text; multi fee → pricing table only (never both). */
@@ -640,12 +637,11 @@ HEADER = r'''/* DAOITH service marketplace catalog
   window.DAOITH_SERVICE_CATEGORIES = [
     { id: 'all', label: '全部', en: 'All' },
     { id: 'consult', label: '财税咨询', en: 'Advisory', blurb: '1v1、方案定制、陪跑与资质认定', blurbEn: '1-on-1, custom plans, coaching and qualifications' },
-    { id: 'agency', label: '财税代理', en: 'Bookkeeping & setup', blurb: '合规代账、公司设立与个体户核定', blurbEn: 'Bookkeeping, company setup and sole-trader filing' },
-    { id: 'export', label: '出口合规', en: 'Export compliance', blurb: '1039、退税辅导与境内外全托管', blurbEn: '1039, rebate coaching and managed packs' },
+    { id: 'compliance', label: '财税合规', en: 'Tax compliance', blurb: '合规代账、全托管、退税与出口合规', blurbEn: 'Bookkeeping, managed packs, rebates and export compliance' },
     { id: 'hongkong', label: '中国香港', en: 'Hong Kong', blurb: '注册、年审、审计报税、开户与变更注销', blurbEn: 'Setup, annual return, audit & tax, banking, changes' },
     { id: 'asia', label: '亚洲', en: 'Asia', blurb: '马来西亚、新加坡公司与财税服务', blurbEn: 'Malaysia and Singapore' },
     { id: 'europe', label: '欧洲', en: 'Europe', blurb: '英国、德国、法国 VAT、公司设立与做账报税', blurbEn: 'UK, Germany and France VAT, setup and bookkeeping' },
-    { id: 'other', label: '其他地区', en: 'Other regions', blurb: '美国、迪拜等跨境主体与合规', blurbEn: 'US, Dubai and more' },
+    { id: 'other', label: '其他地区', en: 'Other regions', blurb: '美国等跨境主体与合规', blurbEn: 'US and other markets' },
   ];
 
   window.DAOITH_SERVICES = [
@@ -874,7 +870,7 @@ def main():
     for p in products:
         blocks.extend(build_from_product(p))
 
-    # Desired display order: consult → agency → export → hongkong → asia → europe → other
+    # Desired display order: consult → compliance → hongkong → asia → europe → other
     order = [
         "consult-1v1",
         "domestic-diagnosis",
@@ -884,6 +880,8 @@ def main():
         "consult-software-enterprise",
         "consult-atas",
         "domestic-compliance-bookkeeping",
+        "domestic-arch-0110-hk",
+        "domestic-arch-1039-hk",
         "domestic-setup",
         "domestic-1039-sole",
         "domestic-1039-export",
@@ -892,8 +890,6 @@ def main():
         "domestic-rebate",
         "domestic-rebate-1210-9610",
         "domestic-rebate-9810",
-        "domestic-arch-0110-hk",
-        "domestic-arch-1039-hk",
         "hk-company",
         "hk-annual",
         "hk-audit-tax",
@@ -906,9 +902,6 @@ def main():
         "asia-sg-setup",
         "asia-sg-bookkeeping",
         "asia-sg-audit",
-        "other-ae-setup",
-        "other-ae-bookkeeping",
-        "other-ae-audit",
         "europe-uk-setup",
         "europe-uk-vat",
         "europe-uk-bookkeeping",

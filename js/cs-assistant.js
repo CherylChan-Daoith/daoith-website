@@ -13,6 +13,8 @@
     { id: 'domestic-diagnosis', title: '跨境电商财税合规方案定制', en: 'Custom cross-border tax plan', keys: '人工诊断 合规评估 诊断报告 体检 方案定制' },
     { id: 'consult-annual', title: '财税合规陪跑', en: 'Compliance coaching', keys: '陪跑 全年 顾问年' },
     { id: 'domestic-compliance-bookkeeping', title: '合规代账', en: 'Compliance bookkeeping', keys: '代账 记账 报税 账务 全托管' },
+    { id: 'domestic-arch-0110-hk', title: '0110出口退税＋香港公司合规全托管', en: '0110 rebate + HK bundle', keys: '0110 一般贸易 香港架构' },
+    { id: 'domestic-arch-1039-hk', title: '1039出口免税＋香港公司合规全托管', en: '1039 exemption + HK bundle', keys: '1039架构 香港公司架构' },
     { id: 'domestic-setup', title: '公司注册服务', en: 'Company incorporation', keys: '内地公司 营业执照 公司设立 注册公司' },
     { id: 'domestic-1039-sole', title: '个体户注册核定及税务申报', en: 'Sole trader setup & deemed collection', keys: '个体户 核定 1039主体' },
     { id: 'domestic-1039-export', title: '1039市场采购出口', en: '1039 market procurement export', keys: '1039 市场采购 无票出口' },
@@ -27,8 +29,6 @@
     { id: 'hk-bank', title: '香港公司开立银行账户', en: 'Hong Kong bank account', keys: '香港开户 银行开户 汇丰 星展 花旗 建行亚洲' },
     { id: 'hk-change', title: '香港公司变更服务', en: 'Hong Kong company change', keys: '香港变更 改名 董事 股权 秘书 地址' },
     { id: 'hk-deregister', title: '香港公司注销', en: 'Hong Kong deregistration', keys: '香港注销 解散 除名' },
-    { id: 'domestic-arch-0110-hk', title: '0110出口退税＋香港公司合规全托管', en: '0110 rebate + HK bundle', keys: '0110 一般贸易 香港架构' },
-    { id: 'domestic-arch-1039-hk', title: '1039出口免税＋香港公司合规全托管', en: '1039 exemption + HK bundle', keys: '1039架构 香港公司架构' },
   ];
 
   const COPY = {
