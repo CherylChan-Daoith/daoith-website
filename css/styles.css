@@ -5509,21 +5509,21 @@ ul {
 /* Detail body: single fee = bold; multi fee = pricing table only */
 .service-pricing-single {
   margin: 0 0 0.5rem;
-  font-family: var(--font-sans);
-  font-size: 1.25rem;
-  line-height: 1.45;
+  font-family: var(--font-serif);
+  font-size: 1.125rem;
+  line-height: 1.5;
   color: var(--ink);
 }
 
 .service-pricing-single strong {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 
 .svc-publish-note {
   margin: 0 0 1.25rem;
   max-width: 46rem;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   line-height: 1.65;
   color: var(--text-muted);
 }
@@ -5540,7 +5540,7 @@ ul {
 .svc-publish-h {
   margin: 0 0 0.5rem;
   font-family: var(--font-serif);
-  font-size: 0.95rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--ink);
   line-height: 1.5;
@@ -5558,8 +5558,8 @@ ul {
   margin: 0 0 0.55rem;
   padding-left: 0.9rem;
   font-size: 0.9375rem;
-  line-height: 1.7;
-  color: var(--text);
+  line-height: 1.85;
+  color: var(--text-secondary);
 }
 
 .svc-publish-lines li::before {
@@ -5574,17 +5574,17 @@ ul {
 }
 
 .svc-publish-lines li strong {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 
 .svc-publish-lines li span {
-  color: var(--text);
+  color: var(--text-secondary);
 }
 
 .svc-publish-lines li.svc-sub {
   padding-left: 1.55rem;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 .svc-publish-lines li.svc-sub::before {
@@ -5614,8 +5614,8 @@ ul {
   margin: 0 0 0.45rem;
   padding-left: 0.9rem;
   font-size: 0.9375rem;
-  line-height: 1.7;
-  color: var(--text);
+  line-height: 1.85;
+  color: var(--text-secondary);
 }
 
 .service-product-body--publish .service-detail-list li::before {
@@ -6081,10 +6081,10 @@ ul {
 }
 
 .service-page .article-view-p {
-  font-size: 0.875rem;
-  color: #555;
-  line-height: 1.7;
-  margin-bottom: 14px;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.85;
+  margin-bottom: 16px;
   max-width: 48rem;
 }
 
@@ -6170,9 +6170,9 @@ ul {
 .service-detail-list {
   margin: 0 0 18px;
   padding-left: 1.25rem;
-  color: var(--text);
-  line-height: 1.7;
-  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.85;
+  font-size: 0.9375rem;
 }
 
 .service-detail-list li + li {
@@ -6209,9 +6209,9 @@ ul {
 
 .service-faq-item p {
   margin: 6px 0 2px;
-  font-size: 0.75rem;
-  color: #666;
-  line-height: 1.6;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.65;
   max-width: 48rem;
 }
 
@@ -6230,9 +6230,9 @@ ul {
   width: 100%;
   min-width: 560px;
   border-collapse: collapse;
-  font-size: 0.8125rem;
-  line-height: 1.55;
-  color: #444;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 .service-detail-table caption {
@@ -6369,12 +6369,12 @@ ul {
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-ok span:last-child,
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-no span:last-child,
 .service-detail-table--compare tbody td.col-3 .svc-cell-list li.is-plain {
-  color: #051c2c !important;
+  color: var(--text-secondary) !important;
   font-weight: 400;
 }
 
 .service-detail-table--compare tbody td.col-4 {
-  color: #444;
+  color: var(--text-secondary);
   padding: 6px 8px;
 }
 
@@ -6403,7 +6403,7 @@ ul {
 
 .svc-cell-list li.is-plain {
   grid-template-columns: 1fr;
-  color: #555;
+  color: var(--text-secondary);
   margin-bottom: 1px;
 }
 
@@ -6422,15 +6422,15 @@ ul {
 }
 
 .svc-cell-list li.is-ok span:last-child {
-  color: #333;
+  color: var(--text-secondary);
 }
 
 .svc-cell-list li.is-no span:last-child {
-  color: #333;
+  color: var(--text-secondary);
 }
 
 .service-detail-table--compare tbody td.col-4 .svc-cell-list li.is-plain {
-  color: #444;
+  color: var(--text-secondary);
   font-size: 0.68rem;
 }
 
@@ -6487,7 +6487,7 @@ ul {
 
 .service-detail-table--deliver thead th:nth-child(2),
 .service-detail-table--deliver tbody td.col-2 {
-  color: #555;
+  color: var(--text-secondary);
   white-space: nowrap;
   font-size: 0.7rem;
   width: 1%;
@@ -6495,7 +6495,7 @@ ul {
 
 .service-detail-table--deliver thead th:nth-child(3),
 .service-detail-table--deliver tbody td.col-3 {
-  color: #444;
+  color: var(--text-secondary);
   white-space: normal;
   max-width: 22rem;
 }
@@ -6571,7 +6571,7 @@ ul {
 .service-timeline-time {
   margin: 0;
   font-size: 0.66rem;
-  color: #888;
+  color: var(--text-muted);
   font-weight: 400;
   line-height: 1.4;
 }
