@@ -10727,7 +10727,7 @@ function initTaxSystemsGrid() {
       : c.summary;
     const mainTax = c.taxes?.[0];
     const mainTaxLabel = mainTax
-      ? `${locale === 'en' ? (mainTax.labelEn || mainTax.label) : mainTax.label} ${mainTax.value.split('（')[0].split('(')[0]}`
+      ? `${locale === 'en' ? (mainTax.labelEn || mainTax.label) : mainTax.label} ${mainTax.value}`
       : '';
     return `
       <article class="tax-system-card">

@@ -1338,7 +1338,7 @@ window.DAOITH_I18N_EN = {
   },
   taxSummaries: {
     us: 'Federal and state tax system; cross-border sellers should watch corporate income tax, state sales tax, and withholding.',
-    hk: 'Territorial profits tax, no VAT/GST; common hub for cross-border treasury and settlement.',
+    hk: 'Territorial profits tax 8.25% (first HK$2m) / 16.5%; no VAT/GST; common hub for cross-border treasury and settlement.',
     kr: 'Corporate tax and 10% VAT; platform sales may trigger local registration and PE risks.',
     jp: 'Corporate and consumption taxes with local surcharges; import and platform rules apply.',
     tw: 'Business income tax and VAT-style business tax; cross-strait investment rules apply.',
