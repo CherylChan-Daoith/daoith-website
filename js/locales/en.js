@@ -712,7 +712,7 @@ window.DAOITH_I18N_EN = {
   ],
   services: [
     { title: 'Expert 1-on-1 advisory', desc: 'One-on-one diagnosis covering structure, rebates, tax risk, and actionable next steps.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ hour' },
-    { title: 'Custom cross-border tax plan', desc: 'Multi-dimensional plan matched to your operations, financials, and platform data.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
+    { title: 'Custom tax compliance plan', desc: 'Full tax health check · scenario-based compliance plan · actionable implementation list.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
     { title: 'Compliance coaching', desc: 'Turn a compliance plan into a tracked execution calendar, with tax-authority support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
     { title: 'AI finance ops coaching', desc: 'Survey first, then land AI in finance workflows with hands-on coaching until the team can run independently.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Compliance bookkeeping', desc: 'Books, filings, risk alerts, health check, and annual AIC reporting support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
@@ -758,8 +758,8 @@ window.DAOITH_I18N_EN = {
     },
     {
       id: 'domestic-diagnosis',
-      title: 'Custom cross-border tax plan',
-      desc: 'Multi-dimensional plan matched to your operations, financials, and platform data.',
+      title: 'Custom tax compliance plan',
+      desc: 'Full tax health check · scenario-based compliance plan · actionable implementation list.',
       unit: '/ session',
       details: window.DAOITH_enServiceBlocks({
         content: 'Cross-check operating model, documents, statements, and filings across invoice, tax, and accounting dimensions. Deliver a prioritized remediation plan.',

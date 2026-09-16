@@ -19,6 +19,7 @@ JSON_OUT = ROOT / "data" / "service-publish-260912.json"
 # Mainland / HK products: title fragment → (id, category, priceLabel, priceValue, unit)
 PRODUCT_META = {
     "财税专家 1v1 咨询": ("consult-1v1", "consult", "¥2,999", 2999, "/小时"),
+    "财税合规方案定制": ("domestic-diagnosis", "consult", "¥28,000", 28000, "/次"),
     "跨境电商财税合规方案定制": ("domestic-diagnosis", "consult", "¥28,000", 28000, "/次"),
     "财税合规陪跑": ("consult-annual", "consult", "¥38,000", 38000, "/年起"),
     "企业财务管理 AI 落地陪跑": ("consult-ai-finance-coach", "consult", "¥60,000", 60000, "起"),
@@ -469,7 +470,7 @@ def build_from_product(p: dict) -> list[str]:
         )
     if sid == "consult-annual":
         main_price = ""
-        note = "按年签约；周期内线上沟通不限次数，重大税局事项随时响应；尚未完成诊断者可搭配「跨境电商财税合规方案定制」先行出方案再进入陪跑。"
+        note = "按年签约；周期内线上沟通不限次数，重大税局事项随时响应；尚未完成诊断者可搭配「财税合规方案定制」先行出方案再进入陪跑。"
     if sid == "consult-1v1":
         main_price = "¥2,999 / 小时"
         note = "不足 1 小时按 1 小时计费；超出1小时部分按半小时为单位计费"
