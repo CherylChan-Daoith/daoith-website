@@ -5538,14 +5538,15 @@ ul {
 }
 
 .svc-publish-h {
-  margin: 0 0 0.5rem;
-  padding-left: 14px;
-  border-left: 3px solid var(--accent);
-  font-family: var(--font-serif);
-  font-size: 1.1rem;
+  margin: 0 0 0.4rem;
+  padding: 0;
+  border: 0;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
   font-weight: 600;
   color: var(--ink);
-  line-height: 1.4;
+  line-height: 1.5;
+  letter-spacing: 0;
 }
 
 .svc-publish-lines {
@@ -5557,10 +5558,10 @@ ul {
 
 .svc-publish-lines li {
   position: relative;
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.45rem;
   padding-left: 0.9rem;
-  font-size: 0.9375rem;
-  line-height: 1.85;
+  font-size: 0.8125rem;
+  line-height: 1.7;
   color: var(--text-secondary);
 }
 
@@ -5615,8 +5616,8 @@ ul {
   position: relative;
   margin: 0 0 0.45rem;
   padding-left: 0.9rem;
-  font-size: 0.9375rem;
-  line-height: 1.85;
+  font-size: 0.8125rem;
+  line-height: 1.7;
   color: var(--text-secondary);
 }
 
@@ -6210,8 +6211,8 @@ ul {
   margin: 0 0 18px;
   padding-left: 1.25rem;
   color: var(--text-secondary);
-  line-height: 1.85;
-  font-size: 0.9375rem;
+  line-height: 1.7;
+  font-size: 0.8125rem;
 }
 
 .service-detail-list li + li {
