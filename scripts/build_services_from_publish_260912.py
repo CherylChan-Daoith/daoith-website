@@ -581,10 +581,12 @@ HEADER = r'''/* DAOITH service marketplace catalog
       out.push({ type: 'publish', text: raw });
     }
 
-    pushLines('服务内容', bundle ? '' : content);
     if (bundle) {
       out.push({ type: 'h2', text: '服务内容' });
+      if (String(content || '').trim()) out.push({ type: 'publish', text: content });
       out.push({ type: 'bundle-picker', bundle });
+    } else {
+      pushLines('服务内容', content);
     }
 
     pushLines('办理条件', conditions);

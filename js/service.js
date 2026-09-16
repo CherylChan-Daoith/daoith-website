@@ -95,25 +95,78 @@
       .join('')}</ol>`;
   }
 
-  /** Word publish-page body: plain lines, bold label before colon. */
+  function cleanPublishLine(line) {
+    return String(line || '')
+      .replace(/[\u000b\u000c]/g, '')
+      .replace(/[•●·▪☑✓]/g, '')
+      .replace(/\t/g, ' ')
+      .replace(/[ \u00a0]+/g, ' ')
+      .trim();
+  }
+
+  function isSectionHead(line) {
+    return (
+      /^[一二三四五六七八九十]+、/.test(line) ||
+      /^(办理条件|办理形式|可勾选服务项目)[：:]?/.test(line)
+    );
+  }
+
+  function isSubItem(line) {
+    return /^\d+\.\d+/.test(line) || /^[①②③④⑤⑥⑦⑧⑨⑩]/.test(line);
+  }
+
+  function formatLineInner(line) {
+    const idx = line.search(/[：:]/);
+    if (idx > 0 && idx <= 28) {
+      const label = line.slice(0, idx + 1);
+      const rest = line.slice(idx + 1).trim();
+      return `<strong>${escapeHtml(label)}</strong>${
+        rest ? `<span>${escapeHtml(rest)}</span>` : ''
+      }`;
+    }
+    return `<span>${escapeHtml(line)}</span>`;
+  }
+
+  /** Excel body: keep every line; section heads + nested items. */
   function renderPublish(text) {
-    const raw = String(text || '').replace(/\r\n/g, '\n').trim();
+    const raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
     if (!raw) return '';
-    const lines = raw.split('\n').map((l) => l.trim()).filter(Boolean);
+    const lines = raw.split('\n').map(cleanPublishLine).filter(Boolean);
     if (!lines.length) return '';
-    return `<ul class="svc-publish-lines">${lines
-      .map((line) => {
-        const idx = line.search(/[：:]/);
-        if (idx > 0 && idx <= 24) {
-          const label = line.slice(0, idx + 1);
-          const rest = line.slice(idx + 1).trim();
-          return `<li><strong>${escapeHtml(label)}</strong>${
-            rest ? `<span>${escapeHtml(rest)}</span>` : ''
-          }</li>`;
+
+    const sections = [];
+    let cur = { title: '', items: [] };
+    for (const line of lines) {
+      if (isSectionHead(line)) {
+        if (cur.title || cur.items.length) sections.push(cur);
+        const m = line.match(/^(办理条件|办理形式|可勾选服务项目)[：:]?\s*(.*)$/);
+        if (m) {
+          cur = { title: m[1], items: m[2] ? [m[2]] : [] };
+        } else {
+          cur = { title: line, items: [] };
         }
-        return `<li><span>${escapeHtml(line)}</span></li>`;
+      } else {
+        cur.items.push(line);
+      }
+    }
+    if (cur.title || cur.items.length) sections.push(cur);
+
+    return sections
+      .map((sec) => {
+        const h = sec.title
+          ? `<h3 class="svc-publish-h">${escapeHtml(sec.title)}</h3>`
+          : '';
+        const list = sec.items.length
+          ? `<ul class="svc-publish-lines">${sec.items
+              .map((line) => {
+                const cls = isSubItem(line) ? ' class="svc-sub"' : '';
+                return `<li${cls}>${formatLineInner(line)}</li>`;
+              })
+              .join('')}</ul>`
+          : '';
+        return `<section class="svc-publish-section">${h}${list}</section>`;
       })
-      .join('')}</ul>`;
+      .join('');
   }
 
   /** Preserve Excel wording; only structure for readability. */
