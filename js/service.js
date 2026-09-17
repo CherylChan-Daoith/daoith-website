@@ -267,7 +267,7 @@
         }
         if (block.type === 'options' && Array.isArray(block.items)) {
           return `<div class="svc-options">${block.items
-            .map((item) => {
+            .map((item, i) => {
               const name = escapeHtml(item?.name || '');
               const content = String(item?.content || '').trim();
               const price = String(item?.price || '').trim();
@@ -283,7 +283,7 @@
                 );
               }
               return `<section class="svc-option">
-                <h3 class="svc-publish-h">${name}</h3>
+                <h3 class="svc-publish-h">${i + 1}）${name}</h3>
                 ${lines.length ? `<ul class="svc-publish-lines">${lines.join('')}</ul>` : ''}
               </section>`;
             })
