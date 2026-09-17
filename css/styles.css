@@ -4827,13 +4827,16 @@ ul {
   border-radius: 999px;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
-.cs-chip:hover {
+.cs-chip:hover,
+.cs-chip.is-hint {
   border-color: #2251ff;
   background: #eaf0ff;
   color: #2251ff;
+  box-shadow: 0 0 0 3px rgba(34, 81, 255, 0.14);
+  transform: translateY(-1px);
 }
 
 .cs-chip.is-primary {

@@ -198,6 +198,9 @@
   let awaitingOrderNo = false;
   let lastProgressCards = [];
   const CTX_KEY = 'daoith_cs_ctx';
+  let chipHintTimer = 0;
+  let chipHintIndex = 0;
+  let chipHintStopped = false;
 
   function locale() {
     return window.DAOITH_getLocale?.() === 'en' ? 'en' : 'zh';
@@ -744,6 +747,36 @@
     host.hidden = !chips.length;
   }
 
+  function stopChipHint() {
+    chipHintStopped = true;
+    if (chipHintTimer) {
+      clearInterval(chipHintTimer);
+      chipHintTimer = 0;
+    }
+    document.querySelectorAll('#csAssistantChips .cs-chip.is-hint').forEach((el) => {
+      el.classList.remove('is-hint');
+    });
+  }
+
+  function startChipHint() {
+    stopChipHint();
+    chipHintStopped = false;
+    chipHintIndex = 0;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const host = document.getElementById('csAssistantChips');
+    if (!host || host.hidden) return;
+    const tick = () => {
+      if (chipHintStopped) return;
+      const list = [...host.querySelectorAll('[data-cs-chip]')];
+      if (list.length < 2) return;
+      list.forEach((el) => el.classList.remove('is-hint'));
+      list[chipHintIndex % list.length].classList.add('is-hint');
+      chipHintIndex += 1;
+    };
+    tick();
+    chipHintTimer = window.setInterval(tick, 850);
+  }
+
   function renderServiceCards(services) {
     const el = getMessagesEl();
     if (!el || !services.length) return;
@@ -848,6 +881,9 @@
     if (open) {
       document.getElementById('csAssistantInput')?.focus();
       scrollToBottom();
+      startChipHint();
+    } else {
+      stopChipHint();
     }
   }
 
@@ -1373,6 +1409,13 @@
 
     document.getElementById('csAssistantFab')?.addEventListener('click', () => setOpen(true));
     document.getElementById('csAssistantClose')?.addEventListener('click', () => setOpen(false));
+    document.getElementById('csAssistantChips')?.addEventListener(
+      'pointerenter',
+      (e) => {
+        if (e.target.closest('[data-cs-chip]')) stopChipHint();
+      },
+      true
+    );
     document.getElementById('csAssistantNew')?.addEventListener('click', () => {
       localStorage.removeItem(CONV_KEY);
       sessionStorage.removeItem(MSG_KEY);
@@ -1390,6 +1433,7 @@
     root.addEventListener('click', (e) => {
       const chip = e.target.closest('[data-cs-chip]');
       if (chip) {
+        stopChipHint();
         handleChip(chip.getAttribute('data-cs-chip') || '');
         return;
       }
