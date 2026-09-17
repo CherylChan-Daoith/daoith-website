@@ -725,7 +725,7 @@ window.DAOITH_I18N_EN = {
     { title: 'First-time rebate coaching', desc: 'First rebate audit pack: eligibility, site, staff, export and purchase documents.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: '1210/9610 first-time rebate coaching', desc: 'First rebate coaching for 1210/9610 list and bonded/retail export evidence.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: '9810 first-time rebate coaching', desc: 'First rebate coaching for overseas-warehouse export (9810).', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
-    { title: 'Rebate filing agency', desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
+    { title: 'Rebate filing agency', desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ export sales' },
     { title: 'Hong Kong company setup', desc: 'Private company incorporation including government fees, first-year address and secretary.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Hong Kong annual return', desc: 'NAR1, BR renewal, secretary/address continuation, and SCR maintenance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
     { title: 'Hong Kong audit & profits tax', desc: 'HKICPA audit report and profits-tax filing; dormant companies and catch-up audits supported.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
@@ -1079,7 +1079,7 @@ window.DAOITH_I18N_EN = {
       id: 'domestic-rebate',
       title: 'Rebate filing agency',
       desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.',
-      unit: '/ year from',
+      unit: '/ export sales',
       details: window.DAOITH_enServiceBlocks({
         content: 'For exporters who already passed the first rebate review. Annual filing, document coaching, and rebate ledgers. Buy first-time coaching separately if you have not filed yet.',
         bullets: [
