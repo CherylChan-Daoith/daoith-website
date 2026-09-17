@@ -15,7 +15,7 @@
     { id: 'domestic-compliance-bookkeeping', title: '合规代账', en: 'Compliance bookkeeping', keys: '代账 记账 报税 账务 全托管' },
     { id: 'domestic-arch-0110-hk', title: '0110出口退税＋香港公司合规全托管', en: '0110 rebate + HK bundle', keys: '0110 一般贸易 香港架构' },
     { id: 'domestic-arch-1039-hk', title: '1039出口免税＋香港公司合规全托管', en: '1039 exemption + HK bundle', keys: '1039架构 香港公司架构' },
-    { id: 'domestic-setup', title: '公司注册服务', en: 'Company incorporation', keys: '内地公司 营业执照 公司设立 注册公司' },
+    { id: 'domestic-setup', title: '中国内地公司设立服务', en: 'Mainland China company setup', keys: '内地公司 营业执照 公司设立 注册公司 中国内地' },
     { id: 'domestic-1039-sole', title: '个体户注册核定及税务申报', en: 'Sole trader setup & deemed collection', keys: '个体户 核定 1039主体' },
     { id: 'domestic-1039-export', title: '1039市场采购出口', en: '1039 market procurement export', keys: '1039 市场采购 无票出口' },
     { id: 'domestic-trade-license', title: '进出口权办理', en: 'Import/export license', keys: '进出口权 海关备案 电子口岸' },

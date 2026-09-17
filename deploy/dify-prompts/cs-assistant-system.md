@@ -28,7 +28,7 @@
 - domestic-diagnosis 跨境电商财税合规诊断
 - consult-annual 财税合规陪跑
 - domestic-compliance-bookkeeping 合规代账
-- domestic-setup 公司注册服务
+- domestic-setup 中国内地公司设立服务
 - domestic-1039-sole 个体户注册核定及税务申报
 - domestic-1039-export 1039市场采购出口
 - domestic-trade-license 进出口权办理

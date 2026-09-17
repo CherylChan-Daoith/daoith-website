@@ -176,7 +176,7 @@
         const desc = card.querySelector('p');
         const detailBtn = card.querySelector('[data-action="detail"]');
         const addBtn = card.querySelector('[data-action="add"]');
-        const priceSpan = card.querySelector('.service-price span');
+        const priceSpan = card.querySelector('.service-card-unit, .service-price span');
         if (h4) {
           captureOriginal(h4, false);
           setText(h4, locale === 'en' ? s.title : originalText.get(h4), false);

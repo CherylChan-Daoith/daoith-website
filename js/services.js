@@ -97,7 +97,7 @@
   window.DAOITH_SERVICE_CATEGORIES = [
     { id: 'all', label: '全部', en: 'All' },
     { id: 'consult', label: '财税咨询', en: 'Advisory', blurb: '1v1、方案定制、陪跑与资质认定', blurbEn: '1-on-1, custom plans, coaching and qualifications' },
-    { id: 'compliance', label: '财税合规', en: 'Tax compliance', blurb: '合规代账、全托管、退税与出口合规', blurbEn: 'Bookkeeping, managed packs, rebates and export compliance' },
+    { id: 'compliance', label: '中国内地', en: 'Mainland China', blurb: '合规代账、全托管、退税与出口合规', blurbEn: 'Bookkeeping, managed packs, rebates and export compliance' },
     { id: 'hongkong', label: '中国香港', en: 'Hong Kong', blurb: '注册、年审、审计报税、开户与变更注销', blurbEn: 'Setup, annual return, audit & tax, banking, changes' },
     { id: 'asia', label: '亚洲', en: 'Asia', blurb: '马来西亚、新加坡公司与财税服务', blurbEn: 'Malaysia and Singapore' },
     { id: 'europe', label: '欧洲', en: 'Europe', blurb: '英国、德国、法国 VAT、公司设立与做账报税', blurbEn: 'UK, Germany and France VAT, setup and bookkeeping' },
@@ -506,7 +506,7 @@
     {
       id: 'domestic-setup',
       category: 'compliance',
-      title: `公司注册服务（公司设立）`,
+      title: `中国内地公司设立服务`,
       desc: `核名、材料填报、执照领取、刻章、税务登记、社保/公积金开户、银行开户预约全流程代办。`,
       priceLabel: `¥500`,
       priceValue: 500,
@@ -708,9 +708,9 @@
       category: 'compliance',
       title: `代理退税申报`,
       desc: `常态化出口退税申报代理 · 降低退税风险 · 加速资金回笼。`,
-      priceLabel: `0.1%-0.3%`,
+      priceLabel: `0.1%-0.3%/ 出口销售额`,
       priceValue: 5000,
-      unit: `/ 出口销售额`,
+      unit: ``,
       details: excelBlocks({
         content: `一、退税资格核查
 核查企业出口退税资质有效性，涵盖海关备案、退税备案、外汇名录等关键

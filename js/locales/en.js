@@ -450,7 +450,7 @@ window.DAOITH_I18N_EN = {
     },
     '.filter-btn[data-filter="all"]': { text: 'All' },
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
-    '.filter-btn[data-filter="compliance"]': { text: 'Tax compliance' },
+    '.filter-btn[data-filter="compliance"]': { text: 'Mainland China' },
     '.filter-btn[data-filter="hongkong"]': { text: 'Hong Kong' },
     '.filter-btn[data-filter="asia"]': { text: 'Asia' },
     '.filter-btn[data-filter="europe"]': { text: 'Europe' },
@@ -718,14 +718,14 @@ window.DAOITH_I18N_EN = {
     { title: 'Compliance bookkeeping', desc: 'Books, filings, risk alerts, health check, and annual AIC reporting support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
     { title: '0110 rebate + HK full managed', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
     { title: '1039 exemption + HK full managed', desc: 'Sole trader + 1039 export, with optional Hong Kong annual return and audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
-    { title: 'Company incorporation', desc: 'Name check, filing, license, chops, and tax / social / bank onboarding guidance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
+    { title: 'Mainland China company setup', desc: 'Name check, filing, license, chops, and tax / social / bank onboarding guidance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: 'Sole-trader setup & deemed collection', desc: 'Sole-trader registration, deemed-collection filing, and ongoing tax returns.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: '1039 market-procurement export', desc: 'Product filing, dual-header customs, and compliant FX settlement under 1039.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' of declared value' },
     { title: 'Import/export license', desc: 'Customs registration, e-port cards, and export rebate/exemption filing.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: 'First-time rebate coaching', desc: 'First rebate audit pack: eligibility, site, staff, export and purchase documents.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: '1210/9610 first-time rebate coaching', desc: 'First rebate coaching for 1210/9610 list and bonded/retail export evidence.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
     { title: '9810 first-time rebate coaching', desc: 'First rebate coaching for overseas-warehouse export (9810).', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ case' },
-    { title: 'Rebate filing agency', desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ export sales' },
+    { title: 'Rebate filing agency', desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '' },
     { title: 'Hong Kong company setup', desc: 'Private company incorporation including government fees, first-year address and secretary.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Hong Kong annual return', desc: 'NAR1, BR renewal, secretary/address continuation, and SCR maintenance.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
     { title: 'Hong Kong audit & profits tax', desc: 'HKICPA audit report and profits-tax filing; dormant companies and catch-up audits supported.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
@@ -893,7 +893,7 @@ window.DAOITH_I18N_EN = {
     },
     {
       id: 'domestic-setup',
-      title: 'Company incorporation',
+      title: 'Mainland China company setup',
       desc: 'Name check, filing, license, chops, and tax / social / bank onboarding guidance.',
       unit: '/ case',
       details: window.DAOITH_enServiceBlocks({
@@ -1079,7 +1079,7 @@ window.DAOITH_I18N_EN = {
       id: 'domestic-rebate',
       title: 'Rebate filing agency',
       desc: 'Ongoing rebate filings, document review, authority follow-up, and ledgers.',
-      unit: '/ export sales',
+      unit: '',
       details: window.DAOITH_enServiceBlocks({
         content: 'For exporters who already passed the first rebate review. Annual filing, document coaching, and rebate ledgers. Buy first-time coaching separately if you have not filed yet.',
         bullets: [
