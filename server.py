@@ -264,6 +264,37 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/auth/wechat/mp/login":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            status, data = server_auth.handle_wechat_mp_login(
+                body,
+                load_env_value,
+                client_ip=server_auth.extract_client_ip(self.headers, self.client_address),
+            )
+            self.send_json(status, data)
+            return
+        if path == "/api/miniprogram/lead":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                self.send_json(400, {"error": "请求体必须是 JSON"})
+                return
+            if not isinstance(body, dict):
+                body = {}
+            status, data = server_auth.handle_miniprogram_lead(
+                self.headers,
+                body,
+                load_env_value,
+                client_address=self.client_address,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/diagnosis/ask-quota":
             length = int(self.headers.get("Content-Length", 0))
             try:

@@ -22,6 +22,7 @@ DB_PATH = ROOT / "data" / "daoith-auth.db"
 
 WECHAT_TOKEN_URL = "https://api.weixin.qq.com/sns/oauth2/access_token"
 WECHAT_USERINFO_URL = "https://api.weixin.qq.com/sns/userinfo"
+WECHAT_JSCODE2SESSION_URL = "https://api.weixin.qq.com/sns/jscode2session"
 
 _env_loader = lambda name: os.environ.get(name, "").strip()
 
@@ -1063,6 +1064,199 @@ def handle_wechat_login(body: dict, env_loader, client_ip: Optional[str] = None)
         return 400, {"error": str(e)}
     except Exception as e:
         return 502, {"error": str(e)}
+
+
+def exchange_wechat_mp_code(code: str, app_id: str, app_secret: str):
+    """Mini-program wx.login code → openid/session via jscode2session."""
+    params = urllib.parse.urlencode(
+        {
+            "appid": app_id,
+            "secret": app_secret,
+            "js_code": code,
+            "grant_type": "authorization_code",
+        }
+    )
+    data = _fetch_json(f"{WECHAT_JSCODE2SESSION_URL}?{params}")
+    if data.get("errcode"):
+        raise ValueError(data.get("errmsg") or f"微信错误 {data.get('errcode')}")
+    if not data.get("openid"):
+        raise ValueError("微信未返回 openid")
+    return data
+
+
+def handle_wechat_mp_login(body: dict, env_loader, client_ip: Optional[str] = None):
+    """Silent mini-program login. Additive — does not change website QR login."""
+    set_env_loader(env_loader)
+    code = (body.get("code") or "").strip()
+    if not code:
+        return 400, {"error": "缺少微信小程序 code"}
+
+    jwt_secret = load_env_value("JWT_SECRET", env_loader)
+    if not jwt_secret:
+        return 503, {"error": "未配置 JWT_SECRET", "hint": "请在 .env 中设置 JWT_SECRET"}
+
+    app_id = load_env_value("WECHAT_MP_APP_ID", env_loader) or "wx7323f1e3b33d832d"
+    app_secret = load_env_value("WECHAT_MP_APP_SECRET", env_loader)
+    if not app_secret:
+        return 503, {
+            "error": "未配置小程序 AppSecret",
+            "hint": "请在 .env 中设置 WECHAT_MP_APP_ID / WECHAT_MP_APP_SECRET",
+        }
+
+    try:
+        session = exchange_wechat_mp_code(code, app_id, app_secret)
+        openid = session["openid"]
+        user = upsert_wechat_user(
+            openid=openid,
+            unionid=session.get("unionid"),
+            nickname=None,
+            avatar_url=None,
+            login_ip=client_ip,
+            record_login=True,
+        )
+        try:
+            sync_user_to_pm(user, env_loader, record_login=True)
+        except Exception:
+            pass
+        jwt_token = sign_jwt(
+            {
+                "sub": str(user["id"]),
+                "openid": user["openid"],
+                "nickname": user.get("nickname"),
+                "avatarUrl": user.get("avatarUrl"),
+                "channel": "miniprogram",
+            },
+            jwt_secret,
+        )
+        return 200, {
+            "token": jwt_token,
+            "user": {
+                "id": user["id"],
+                "openid": user["openid"],
+                "nickname": user.get("nickname"),
+                "avatarUrl": user.get("avatarUrl"),
+                "phone": user.get("phone"),
+                "channel": "miniprogram",
+            },
+        }
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")
+        return 502, {"error": "微信接口请求失败", "detail": detail}
+    except ValueError as e:
+        return 400, {"error": str(e)}
+    except Exception as e:
+        return 502, {"error": str(e)}
+
+
+def handle_miniprogram_lead(headers, body: dict, env_loader, client_address=None):
+    """Guest or logged-in lead for 专家1v1 from the mini-program. Additive endpoint."""
+    set_env_loader(env_loader)
+    body = body or {}
+    company = (body.get("company") or "").strip()
+    contact = (body.get("contact") or body.get("name") or "").strip()
+    phone = (body.get("phone") or "").strip()
+    if not company or not contact or not phone:
+        return 400, {"error": "请填写姓名、手机、公司"}
+    if not re.fullmatch(r"1\d{10}", phone):
+        return 400, {"error": "请填写有效的11位手机号"}
+
+    website_openid = None
+    nickname = contact
+    auth = ""
+    if headers:
+        auth = headers.get("Authorization") or headers.get("authorization") or ""
+    if auth:
+        resolved, err = _bearer_payload(auth, env_loader)
+        if not err and resolved:
+            website_openid = resolved["websiteOpenid"]
+            nickname = (resolved.get("payload") or {}).get("nickname") or contact
+
+    if not website_openid:
+        digest = hashlib.sha256(phone.encode("utf-8")).hexdigest()[:24]
+        website_openid = f"mp-guest:{digest}"
+
+    items = [
+        {
+            "id": "consult-1v1",
+            "title": "财税专家 1v1 咨询",
+            "qty": 1,
+            "priceValue": 2999,
+            "priceLabel": "¥2,999",
+        }
+    ]
+    total = 2999.0
+    inquiry_id = _new_inquiry_id()
+    status = "已提交"
+    created_at = datetime.now(timezone.utc).isoformat()
+    status_history = {"已提交": created_at}
+    standard_total, quoted_total, discount_rate = compute_inquiry_totals(items, total)
+    record = {
+        "id": inquiry_id,
+        "websiteOpenid": website_openid,
+        "company": company,
+        "contact": contact,
+        "phone": phone,
+        "total": total,
+        "quotedTotal": quoted_total,
+        "items": items,
+        "status": status,
+        "statusHistory": status_history,
+        "notifySent": False,
+        "pmSynced": False,
+        "createdAt": created_at,
+        "nickname": nickname,
+        "source": "miniprogram",
+    }
+    save_inquiry(record)
+
+    try:
+        sync_user_to_pm(
+            {
+                "id": website_openid,
+                "openid": website_openid,
+                "nickname": nickname,
+                "phone": phone,
+            },
+            env_loader,
+            record_login=False,
+        )
+    except Exception:
+        pass
+
+    pm = {"ok": False}
+    try:
+        pm = sync_inquiry_to_pm(
+            {
+                "inquiryId": inquiry_id,
+                "company": company,
+                "contact": contact,
+                "phone": phone,
+                "total": total,
+                "items": items,
+                "status": status,
+                "websiteOpenid": website_openid,
+                "nickname": nickname,
+                "createdAt": created_at,
+                "source": "miniprogram",
+            },
+            env_loader,
+        )
+        if pm.get("ok") or pm.get("inquiry"):
+            update_inquiry_flags(inquiry_id, pm_synced=True)
+            pm["ok"] = True
+    except Exception as e:
+        pm = {"ok": False, "error": str(e)}
+
+    return 200, {
+        "ok": True,
+        "inquiryId": inquiry_id,
+        "status": status,
+        "quotedTotal": quoted_total,
+        "standardTotal": standard_total,
+        "discountRate": discount_rate,
+        "pm": pm,
+        "source": "miniprogram",
+    }
 
 
 def handle_wechat_me(auth_header: str, env_loader):

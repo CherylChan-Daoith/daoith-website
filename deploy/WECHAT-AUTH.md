@@ -12,6 +12,8 @@
 |------|------|
 | `WECHAT_APP_ID` | 微信开放平台 AppID |
 | `WECHAT_APP_SECRET` | 微信开放平台 AppSecret（仅服务端） |
+| `WECHAT_MP_APP_ID` | 小程序 AppID（默认 `wx7323f1e3b33d832d`） |
+| `WECHAT_MP_APP_SECRET` | 小程序 AppSecret（仅服务端；留资可无登录，登录免限需配） |
 | `JWT_SECRET` | JWT 签名密钥（随机长字符串） |
 | `DATABASE_URL` | PostgreSQL 连接串，指向新建库 `daoith_users` |
 | `DATABASE_SSL` | 可选，设为 `true` 时启用 SSL |
@@ -111,7 +113,9 @@ wechatRedirectUri: 'https://www.daoith.com/auth/wechat-callback.html',
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/auth/wechat/login` | Body: `{ "code": "..." }`，返回 `{ token, user }` |
+| POST | `/api/auth/wechat/login` | Body: `{ "code": "..." }`，返回 `{ token, user }`（网站扫码） |
+| POST | `/api/auth/wechat/mp/login` | Body: `{ "code": "..." }`，小程序 `wx.login` 换 JWT |
+| POST | `/api/miniprogram/lead` | Body: `{ contact, phone, company }`，专家1v1留资（可无登录） |
 | GET | `/api/auth/wechat/me` | Header: `Authorization: Bearer <token>` |
 
 ## 健康检查
