@@ -116,7 +116,7 @@
     { id: 'consult', label: '财税咨询', en: 'Advisory', blurb: '1v1、方案定制、陪跑与资质认定', blurbEn: '1-on-1, custom plans, coaching and qualifications' },
     { id: 'compliance', label: '中国内地', en: 'Mainland China', blurb: '合规代账、全托管、退税与出口合规', blurbEn: 'Bookkeeping, managed packs, rebates and export compliance' },
     { id: 'hongkong', label: '中国香港', en: 'Hong Kong', blurb: '注册、年审、审计报税、开户与变更注销', blurbEn: 'Setup, annual return, audit & tax, banking, changes' },
-    { id: 'asia', label: '亚洲', en: 'Asia', blurb: '马来西亚、新加坡：设立、做账报税、雇员税务与其他服务', blurbEn: 'Malaysia and Singapore: setup, bookkeeping, payroll and one-off services' },
+    { id: 'asia', label: '东南亚', en: 'Southeast Asia', blurb: '马来西亚、新加坡：设立、做账报税、雇员税务与其他服务', blurbEn: 'Malaysia and Singapore: setup, bookkeeping, payroll and one-off services' },
     { id: 'europe', label: '欧洲', en: 'Europe', blurb: '英国：设立、做账报税、雇员税务与其他服务', blurbEn: 'UK: setup, bookkeeping, payroll and one-off services' },
   ];
 

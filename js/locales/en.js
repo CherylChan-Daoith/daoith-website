@@ -452,7 +452,7 @@ window.DAOITH_I18N_EN = {
     '.filter-btn[data-filter="consult"]': { text: 'Advisory' },
     '.filter-btn[data-filter="compliance"]': { text: 'Mainland China' },
     '.filter-btn[data-filter="hongkong"]': { text: 'Hong Kong' },
-    '.filter-btn[data-filter="asia"]': { text: 'Asia' },
+    '.filter-btn[data-filter="asia"]': { text: 'Southeast Asia' },
     '.filter-btn[data-filter="europe"]': { text: 'Europe' },
     '#showMoreServices': { text: 'View all {n} services ↓' },
     '#hub .hub-hero h1': { text: 'Service Hub' },
