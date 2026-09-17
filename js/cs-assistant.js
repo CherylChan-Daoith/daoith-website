@@ -29,6 +29,18 @@
     { id: 'hk-bank', title: '香港公司开立银行账户', en: 'Hong Kong bank account', keys: '香港开户 银行开户 汇丰 星展 花旗 建行亚洲' },
     { id: 'hk-change', title: '香港公司变更服务', en: 'Hong Kong company change', keys: '香港变更 改名 董事 股权 秘书 地址' },
     { id: 'hk-deregister', title: '香港公司注销', en: 'Hong Kong deregistration', keys: '香港注销 解散 除名' },
+    { id: 'asia-my-setup', title: '马来西亚 · 公司设立服务', en: 'Malaysia · company setup', keys: '马来西亚 设立 SSM 名义董事 malaysia my setup' },
+    { id: 'asia-my-bookkeeping', title: '马来西亚 · 公司做账报税', en: 'Malaysia · bookkeeping & tax', keys: '马来西亚 做账 报税 SST malaysia bookkeeping' },
+    { id: 'asia-my-payroll', title: '马来西亚 · 雇员税务服务', en: 'Malaysia · payroll tax', keys: '马来西亚 雇员 EPF SOCSO 薪酬 payroll' },
+    { id: 'asia-my-other', title: '马来西亚 · 其他一次性服务', en: 'Malaysia · one-off services', keys: '马来西亚 年审 执照 税收优惠' },
+    { id: 'asia-sg-setup', title: '新加坡 · 公司设立服务', en: 'Singapore · company setup', keys: '新加坡 设立 名义董事 ACRA singapore sg setup' },
+    { id: 'asia-sg-bookkeeping', title: '新加坡 · 公司做账报税', en: 'Singapore · bookkeeping & tax', keys: '新加坡 做账 报税 XBRL GST 审计' },
+    { id: 'asia-sg-payroll', title: '新加坡 · 雇员税务服务', en: 'Singapore · payroll tax', keys: '新加坡 雇员 EP CPF IR8A 准证 payroll' },
+    { id: 'asia-sg-other', title: '新加坡 · 其他一次性服务', en: 'Singapore · one-off services', keys: '新加坡 GST 预扣税 税务居民' },
+    { id: 'europe-uk-setup', title: '英国 · 公司设立服务', en: 'UK · company setup', keys: '英国 设立 Companies House uk setup' },
+    { id: 'europe-uk-bookkeeping', title: '英国 · 公司做账报税', en: 'UK · bookkeeping & tax', keys: '英国 做账 报税 VAT Corporation Tax' },
+    { id: 'europe-uk-payroll', title: '英国 · 雇员税务服务', en: 'UK · payroll tax', keys: '英国 雇员 PAYE 养老金 payroll' },
+    { id: 'europe-uk-other', title: '英国 · 其他一次性服务', en: 'UK · one-off services', keys: '英国 年审 EORI VAT注册 注销' },
   ];
 
   const COPY = {

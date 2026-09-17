@@ -1,6 +1,6 @@
 /* DAOITH service marketplace catalog
  * Source of truth: 服务产品汇总表_260912.xlsx（服务内容全文）+ 发布页结构
- * Categories: consult | compliance | hongkong | asia | europe | other
+ * Categories: consult | compliance | hongkong | asia | europe
  */
 (function () {
   /** Single fee → bold text; multi fee → pricing table only (never both). */
@@ -39,7 +39,19 @@
       out.push({ type: 'publish', text: raw });
     }
 
-    if (bundle) {
+    const optionsTable = p.optionsTable || null;
+    const hasOptionsTable = !!(optionsTable?.headers && optionsTable?.rows?.length);
+
+    if (hasOptionsTable) {
+      out.push({ type: 'h2', text: '可选服务' });
+      out.push({
+        type: 'table',
+        variant: 'pricing',
+        firstColHeader: true,
+        headers: optionsTable.headers,
+        rows: optionsTable.rows,
+      });
+    } else if (bundle) {
       out.push({ type: 'h2', text: '服务内容' });
       if (String(content || '').trim()) out.push({ type: 'publish', text: content });
       out.push({ type: 'bundle-picker', bundle });
@@ -62,22 +74,26 @@
       }
     }
 
-    out.push({ type: 'h2', text: '服务收费' });
-    const hasPricingTable = !!(pricingTable?.headers && pricingTable?.rows?.length);
-    if (hasPricingTable) {
-      out.push({
-        type: 'table',
-        variant: 'pricing',
-        firstColHeader: true,
-        headers: pricingTable.headers,
-        rows: pricingTable.rows,
-      });
-    } else if (pricing) {
-      out.push({ type: 'price', text: formatSinglePricingDisplay(pricing) });
-    }
-    if (pricingNote) out.push({ type: 'note', text: pricingNote });
-    if (bundle) {
-      out.push({ type: 'bundle-price', bundleId: bundle.id });
+    if (!hasOptionsTable) {
+      out.push({ type: 'h2', text: '服务收费' });
+      const hasPricingTable = !!(pricingTable?.headers && pricingTable?.rows?.length);
+      if (hasPricingTable) {
+        out.push({
+          type: 'table',
+          variant: 'pricing',
+          firstColHeader: true,
+          headers: pricingTable.headers,
+          rows: pricingTable.rows,
+        });
+      } else if (pricing) {
+        out.push({ type: 'price', text: formatSinglePricingDisplay(pricing) });
+      }
+      if (pricingNote) out.push({ type: 'note', text: pricingNote });
+      if (bundle) {
+        out.push({ type: 'bundle-price', bundleId: bundle.id });
+      }
+    } else if (pricingNote) {
+      out.push({ type: 'note', text: pricingNote });
     }
 
     pushLines('核心优势', advantages);
@@ -99,9 +115,8 @@
     { id: 'consult', label: '财税咨询', en: 'Advisory', blurb: '1v1、方案定制、陪跑与资质认定', blurbEn: '1-on-1, custom plans, coaching and qualifications' },
     { id: 'compliance', label: '中国内地', en: 'Mainland China', blurb: '合规代账、全托管、退税与出口合规', blurbEn: 'Bookkeeping, managed packs, rebates and export compliance' },
     { id: 'hongkong', label: '中国香港', en: 'Hong Kong', blurb: '注册、年审、审计报税、开户与变更注销', blurbEn: 'Setup, annual return, audit & tax, banking, changes' },
-    { id: 'asia', label: '亚洲', en: 'Asia', blurb: '马来西亚、新加坡公司与财税服务', blurbEn: 'Malaysia and Singapore' },
-    { id: 'europe', label: '欧洲', en: 'Europe', blurb: '英国、德国、法国 VAT、公司设立与做账报税', blurbEn: 'UK, Germany and France VAT, setup and bookkeeping' },
-    { id: 'other', label: '其他地区', en: 'Other regions', blurb: '美国等跨境主体与合规', blurbEn: 'US and other markets' },
+    { id: 'asia', label: '亚洲', en: 'Asia', blurb: '马来西亚、新加坡：设立、做账报税、雇员税务与其他服务', blurbEn: 'Malaysia and Singapore: setup, bookkeeping, payroll and one-off services' },
+    { id: 'europe', label: '欧洲', en: 'Europe', blurb: '英国：设立、做账报税、雇员税务与其他服务', blurbEn: 'UK: setup, bookkeeping, payroll and one-off services' },
   ];
 
   window.DAOITH_SERVICES = [
@@ -1097,550 +1112,369 @@ SCR重要控制人备案
     {
       id: 'asia-my-setup',
       category: 'asia',
-      title: `马来西亚公司设立`,
-      desc: `注册 + 秘书 + 开户打包 · 多数客户需加购挂名董事 · 后续年审衔接。`,
-      priceLabel: `¥12,800`,
-      priceValue: 12800,
-      unit: ``,
+      title: `马来西亚 · 公司设立服务`,
+      desc: `可选：公司设立全套、名义董事、名义董事兼名义股东。`,
+      priceLabel: `RM6,700`,
+      priceValue: 6700,
+      unit: `起`,
       details: excelBlocks({
-        content: `一、设立方案设计
-确认公司类型（私人有限公司Sdn Bhd为主）、股权结构、注册资本与经营范围
-评估外资持股比例限制、行业准入（如需行业牌照）及本地董事/股东要求
-对比不同架构（本地/外资）在税务、外资持股、银行开户上的差异，给出最优方案
-二、注册与备案
-进行公司名称查册与保留，避免重名被驳
-准备公司章程、董事股东决议、注册通知书等注册文件，向马来西亚公司委员会（SSM）递交注册
-办理商业登记及（如适用）地方市政牌照、行业许可
-三、配套服务
-提供持牌公司秘书及注册地址服务，满足本地合规要求
-协助开设马来西亚本地银行账户，准备开户尽调资料
-四、交付与后续
-交付公司注册证书、公司章程、注册文件包（SSM记录）及印章
-衔接后续年度申报（Annual Return）、做账报税（含SST、CIT）、受益人备案与合规维护（单独收费）`,
-        cycle: `整体约 4–8 周（含银行开户尽调周期）`,
-        processSteps: [{ title: `设立方案确认`, time: `1 周` }, { title: `名称查册与保留`, time: `1–2 个工作日` }, { title: `资料准备`, time: `1 周` }, { title: `SSM 注册`, time: `约 3–5 个工作日` }, { title: `秘书与地址就位`, time: `注册后即时` }, { title: `银行开户`, time: `约 2–4 周，视银行尽调` }, { title: `文件交付`, time: `开户后 1 周内` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `12,800 元（含公司注册 + 秘书费 + 开户；不含挂名董事）`,
-        pricingNote: `中国籍等多数客户无本地董事资格时，需加购挂名董事：约 20,600 元/人/年（另需可退押金约 10,900 元；名义董事+股东套餐同口径）；政府规费、差旅等实报实销。`,
+        pricing: ``,
+        pricingNote: "报价以马币 RM 计；政府规费、差旅等实报实销。",
         advantages: ``,
-        audience: `布局东南亚、开拓马来西亚及东盟市场的贸易与制造企业
-需设立区域或采购主体的跨境电商及供应链企业`,
+        audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司设立全套（含注册 + 首年公司秘书）", "含 SSM 注册、首年持牌秘书委任；注册资本建议 RM3,000 起（以马币计）", "RM6,700 起"],
+          ["名义董事", "服务费口径（起始费 + 月费 ×12）；另收可退押金 RM6,600", "RM12,450/人/年起"],
+          ["名义董事兼名义股东", "其中含可退押金 RM6,600", "RM27,950/人/年起"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
       id: 'asia-my-bookkeeping',
       category: 'asia',
-      title: `马来西亚公司做账报税`,
-      desc: `按马来西亚财务报告标准（MFRS）建账理账、月度管理报表与年度财务报表、企业所得税（CIT）申报（Form C/C-S）、税款缴纳与 LHDN 沟通。`,
-      priceLabel: `¥10,000`,
-      priceValue: 10000,
-      unit: `起`,
+      title: `马来西亚 · 公司做账报税`,
+      desc: `可选：公司做账报税年度服务。`,
+      priceLabel: `RM6,000`,
+      priceValue: 6000,
+      unit: `起/年`,
       details: excelBlocks({
-        content: `一、账务梳理与建账
-按马来西亚财务报告标准（MFRS）梳理原始凭证、建立规范账套与科目体系
-核对银行流水、进销存数据及应收应付往来款项
-确认收入成本，确保账实、账账相符
-二、月度/年度理账
-整理凭证并编制月度管理报表（利润表、资产负债表等）
-出具年度财务报表，为审计与税务申报提供基础
-三、税务申报
-办理企业所得税（CIT）及年结申报（Form C/C-S）
-跟进税款缴纳与税局（LHDN）沟通`,
-        cycle: `按财年周期持续服务（月度理账 + 年度申报）`,
-        processSteps: [{ title: `资料收集`, time: `每月初` }, { title: `凭证梳理与建账`, time: `首次 2–3 周` }, { title: `月度理账`, time: `每月 10–15 个工作日内` }, { title: `年度报表编制`, time: `财年结束后 1–2 个月` }, { title: `税务申报`, time: `Form C/C-S：财年结束后 7 个月内` }, { title: `税款缴纳`, time: `按税局缴税通知` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `10,000 元起（按交易量、科目复杂度、是否含 SST 据实报价；审计费、SST 注册等实报实销）`,
-        pricingNote: ``,
+        pricing: ``,
+        pricingNote: "报价以马币 RM 计；按交易量与复杂度据实报价。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司做账报税", "月度理账 + 年度申报；按交易量与银行流水分档", "RM6,000 起/年"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
-      id: 'asia-my-audit',
+      id: 'asia-my-payroll',
       category: 'asia',
-      title: `马来西亚公司年审`,
-      desc: `年度申报（Annual Return）递交、公司秘书与注册地址维护、实益拥有人（BO）备案及年度更新、合规到期提醒。`,
-      priceLabel: `¥10,000`,
-      priceValue: 10000,
+      title: `马来西亚 · 雇员税务服务`,
+      desc: `可选：薪酬与 EPF/SOCSO 申报。`,
+      priceLabel: `面议`,
+      priceValue: 0,
       unit: ``,
       details: excelBlocks({
-        content: `一、年审材料准备
-核对公司股东、董事、股本、注册地址、公司秘书等登记信息是否最新
-准备年度申报所需文件，梳理需同步变更的登记事项
-二、法定申报
-向SSM递交年度申报（Annual Return），缴纳年审规费与逾期罚款（如有）
-维护公司秘书服务及注册地址，确保法定文件送达地址有效
-三、受益人备案
-完成实益拥有人（BO）身份识别、信息核验与向SSM的BO系统备案及年度更新
-四、合规提醒
-提示年报截止日、应保存的法定登记册与决议文件归档要求`,
-        cycle: `年度服务（周年日后 30 天内完成申报）`,
-        processSteps: [{ title: `年审提醒`, time: `提前 1 个月` }, { title: `资料核对`, time: `1–2 周` }, { title: `年度申报递交`, time: `周年日后 30 天内` }, { title: `规费缴纳`, time: `递交时同步` }, { title: `秘书与地址维护`, time: `同步续期` }, { title: `受益人备案与归档`, time: `申报后更新` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `10,000 元/年（含秘书、注册地址、受益人备案及年审报告；政府规费实报实销）`,
-        pricingNote: ``,
+        pricing: ``,
+        pricingNote: "报价以马币 RM 计；按员工人数面议。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["薪酬与 EPF/SOCSO 申报", "雇主登记、月度发薪与申报、EA 表 / Form E，面议", "按员工人数报价"]
+          ],
+        },
+        bundle: null,
+      }),
+    },
+    {
+      id: 'asia-my-other',
+      category: 'asia',
+      title: `马来西亚 · 其他一次性服务`,
+      desc: `可选：公司年审、行业执照代办、税务咨询与税收优惠申请。`,
+      priceLabel: `RM6,000`,
+      priceValue: 6000,
+      unit: `/年`,
+      details: excelBlocks({
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
+        process: ``,
+        pricing: ``,
+        pricingNote: "报价以马币 RM 计；政府及第三方规费实报实销。",
+        advantages: ``,
+        audience: ``,
+        conditions: ``,
+        pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司年审", "续年公司秘书 + 周年日申报（AR）+ 法定登记册维护", "RM6,000/年"],
+          ["行业执照代办", "视执照类型（制造、Halal、CIDB、LMW、WRT 等）；政府及第三方规费实报实销", "RM11,000–55,000"],
+          ["税务咨询与税收优惠申请", "CIT 与中小企业优惠税率、先锋地位、ITA 等税收优惠，按方案复杂度评估", "按项目报价"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
       id: 'asia-sg-setup',
       category: 'asia',
-      title: `新加坡公司设立`,
-      desc: `注册 + 秘书 + 名义董事 + 注册地址 · 次年起续费约 ¥25,800/年。`,
-      priceLabel: `¥39,000`,
-      priceValue: 39000,
-      unit: ``,
+      title: `新加坡 · 公司设立服务`,
+      desc: `可选：公司设立全套、仅注册、名义董事、注册地址、银行开户协助、公司秘书。`,
+      priceLabel: `S$7,400`,
+      priceValue: 7400,
+      unit: `起`,
       details: excelBlocks({
-        content: `一、设立方案设计
-确认公司类型（私人有限公司Pte Ltd）、股本结构与经营范围
-评估股东构成、本地董事（至少1名新加坡ordinarily resident董事）及公司秘书、审计等合规要求
-二、注册与备案
-进行名称核准备案（ACRA），避免名称违规或重名
-准备注册文件（章程、董事股东同意书、注册地址证明），递交注册
-三、配套服务
-提供持牌公司秘书、名义（本地）董事及商业注册地址服务，满足本地合规要求
-四、交付与后续
-交付公司注册文件（含注册证书、公司印章等）
-衔接做账、法定审计（视豁免条件）、年度股东大会（AGM）与年度申报（AR）等合规维护（（单独收费）`,
-        cycle: `整体约 2 周`,
-        processSteps: [{ title: `设立方案确认`, time: `1 周` }, { title: `名称核准`, time: `ACRA 1–2 个工作日` }, { title: `资料准备`, time: `3–5 个工作日` }, { title: `ACRA 注册`, time: `1–3 个工作日` }, { title: `秘书/名义董事/地址就位`, time: `注册后即时` }, { title: `文件交付`, time: `整体约 2 周` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `39,000 元（含注册 + 秘书代理 + 名义董事 + 注册地址；政府规费等实报实销；名义董事为合规挂名安排，不参与经营）`,
-        pricingNote: `次年起续费约 25,800 元/年（名义董事约 23,400 + 注册地址约 2,350，据实微调）；做账、审计等另计。`,
+        pricing: ``,
+        pricingNote: "报价以新币 S$ 计；保证金可退；政府规费实报实销。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司设立全套（注册 + 名义董事首年 + 注册地址 + 银行开户协助）", "开户按 OCBC 口径；其他本地银行 S$8,150；名义董事另收可退年度保证金 S$2,200", "S$7,400 起"],
+          ["公司注册（仅注册，不含名义董事）", "按标准章程及普通股架构，一次性", "S$1,650"],
+          ["名义董事", "另收可退年度保证金 S$2,200", "S$4,400/人/年起"],
+          ["注册地址", "—", "S$440/年"],
+          ["银行开户协助", "OCBC 口径 S$880；其他本地银行 S$1,650", "S$880 / S$1,650"],
+          ["公司秘书代理服务", "日常事项；公司变更、章程 / 股本等非日常事项按工时另计", "S$660/年起"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
       id: 'asia-sg-bookkeeping',
       category: 'asia',
-      title: `新加坡公司做账报税`,
-      desc: `按新加坡财务报告准则（SFRS）记账、财务报表编制与 XBRL 填报、ECI 及 Form C/CS 税务代理申报。`,
-      priceLabel: `¥55,800`,
-      priceValue: 55800,
-      unit: `起`,
+      title: `新加坡 · 公司做账报税`,
+      desc: `可选：做账报税年度包、单项记账/报表/XBRL、税务代理、法定审计。`,
+      priceLabel: `S$10,300`,
+      priceValue: 10300,
+      unit: `起/年`,
       details: excelBlocks({
-        content: `一、账务处理
-按新加坡财务报告准则进行日常记账、科目归集与凭证管理
-核对银行流水、平台回款与应收应付往来，确保账实相符
-按公司财年（FY）规范收入确认与费用归集
-二、财务报表编制
-编制财年年度财务报表（损益表、资产负债表等）
-XBRL 填报
-三、税务代理申报
-税务代理：完成ECI 及 Form C/CS/CS (Lite)申报`,
-        cycle: `按财年周期持续服务（月度记账 + 年度 ECI 及 Form C/C-S 申报）`,
-        processSteps: [{ title: `资料收集`, time: `按月/季` }, { title: `日常记账`, time: `按月完成` }, { title: `财务报表编制与 XBRL 申报`, time: `财年结束后 1–2 个月` }, { title: `企业税申报（ECI）`, time: `财年结束后 3 个月内` }, { title: `企业税申报（Form C/C-S）`, time: `每年 11 月 30 日前` }, { title: `税款缴纳`, time: `按评税通知` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `55,800 元起（按交易量与复杂程度据实报价；关联方交易、预扣税申报另收）`,
-        pricingNote: ``,
+        pricing: ``,
+        pricingNote: "报价以新币 S$ 计；按收入规模与复杂度据实报价。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["做账报税年度包", "月度记账 + 未经审计财务报表 + XBRL 申报 + 税务代理申报", "S$10,300 起/年"],
+          ["单项：记账 / 总部报表 / 未审计报表 / XBRL", "支持 Excel/MYOB 记账口径", "S$500/月起 · S$440/月起 · S$1,760/年 · S$880/年起"],
+          ["税务代理与合规申报", "ECI、Form C/C-S 等；关联方交易表 S$390/份、预扣税申报 S$460/次、税务居民证明 S$460/次、GST 申报 S$1,100/季度起", "S$1,650/年起"],
+          ["法定审计", "按收入规模与合并层级上浮；期初余额程序 S$1,350 起（一次性）", "S$5,000 起/年"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
-      id: 'asia-sg-audit',
+      id: 'asia-sg-payroll',
       category: 'asia',
-      title: `新加坡公司审计服务`,
-      desc: `法定审计豁免条件确认、审计实施与报告出具 · 按收入规模与合并层级据实上浮。`,
-      priceLabel: `¥26,300`,
-      priceValue: 26300,
+      title: `新加坡 · 雇员税务服务`,
+      desc: `可选：EP/家属准证、薪酬与 CPF、个税申报、雇佣合同与函件。`,
+      priceLabel: `S$2,950`,
+      priceValue: 2950,
       unit: `起`,
       details: excelBlocks({
-        content: `一、审计范围确认
-确认公司是否符合法定审计豁免条件（按营业额、总资产、雇员人数的休眠/小型公司豁免规则）
-明确审计范围、财年区间与期初余额处理方式
-评估关联方、跨境交易与重大合同对审计范围的影响
-二、审计实施
-审阅账务与凭证，执行分析性程序与实质性测试
-处理期初余额核对、往来款项函证、关联方交易核对与存货、固定资产盘点抽验
-评估内部控制与重大错报风险，识别需调整或披露事项
-三、报告出具
-按新加坡审计准则（SAS/ISA）出具独立审计报告及审计意见
-配合财务报表定稿与企业所得税报税表的衔接`,
-        cycle: `整体约 8–12 周`,
-        processSteps: [{ title: `审计条件确认`, time: `1 周` }, { title: `资料收集`, time: `1–2 周` }, { title: `期初余额与凭证审阅`, time: `2–3 周` }, { title: `审计程序执行`, time: `3–4 周` }, { title: `报告出具`, time: `1–2 周` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `26,300 元起（含法定审计及期初余额程序；按收入规模、合并层级等据实上浮；政府规费、做账报税另计）`,
-        pricingNote: ``,
+        pricing: ``,
+        pricingNote: "报价以新币 S$ 计。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["就业准证（EP）与家属准证", "中国护照持有人 EP 申请；学历认证 +S$500；工作准证上诉 S$660 起；家属 / 长期探访准证 S$1,900 起", "S$2,950 起"],
+          ["薪酬与 CPF 设置", "—", "S$390 起（一次性）"],
+          ["月度薪资与 CPF / SDL 申报", "—", "S$110 / 每 2 名员工 / 月起"],
+          ["个人所得税申报（IR8A / IR21）", "IR8A 雇主年度个税申报；IR21 离职员工清税", "IR8A S$280/人/年；IR21 S$550/次"],
+          ["雇佣合同与公司函件", "—", "S$660/人起；S$220/人起"]
+          ],
+        },
+        bundle: null,
+      }),
+    },
+    {
+      id: 'asia-sg-other',
+      category: 'asia',
+      title: `新加坡 · 其他一次性服务`,
+      desc: `可选：GST 注册、预扣税申报 / 税务居民证明。`,
+      priceLabel: `S$460`,
+      priceValue: 460,
+      unit: `/次`,
+      details: excelBlocks({
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
+        process: ``,
+        pricing: ``,
+        pricingNote: "报价以新币 S$ 计。",
+        advantages: ``,
+        audience: ``,
+        conditions: ``,
+        pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["GST（消费税）注册", "一次性", "S$1,100–1,650"],
+          ["预扣税申报 / 税务居民证明（单次）", "按次办理", "S$460/次"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
       id: 'europe-uk-setup',
       category: 'europe',
-      title: `英国公司设立`,
-      desc: `注册公司 + 注册地址 + 秘书服务 · 快速设立。`,
-      priceLabel: `¥4,300`,
-      priceValue: 4300,
+      title: `英国 · 公司设立服务`,
+      desc: `可选：公司注册、VIP 地址服务。`,
+      priceLabel: `£275`,
+      priceValue: 275,
       unit: ``,
       details: excelBlocks({
-        content: `一、设立方案设计
-确认公司类型（Private Limited Company）、董事与股东构成、注册地址与经营范围（SIC码）
-评估是否需设公司秘书、董事责任及KYC要求
-对比英国居民/非居民公司在税务、开户、公证认证上的差异，给出最优架构
-二、注册与备案
-进行名称核准备案（Companies House），避免敏感词或重名
-准备注册文件（章程、注册表格IN01、PSC信息、AOA等），向英国公司注册处递交注册
-三、配套服务
-提供注册办公地址（Registered Office）与公司秘书服务，保障法定文件送达
-四、交付与后续
-交付公司注册证书（Certificate of Incorporation）、章程及注册处备案记录
-衔接VAT注册、做账报税、年度确认书（Confirmation Statement）与年度账户申报等合规维护（单独收费）`,
-        cycle: `整体约 1 周`,
-        processSteps: [{ title: `设立方案确认`, time: `1–2 个工作日` }, { title: `名称核准`, time: `即时–1 个工作日` }, { title: `资料准备`, time: `1–2 个工作日` }, { title: `Companies House 注册`, time: `线上递交约 24 小时内出证` }, { title: `地址与秘书就位`, time: `注册后即时` }, { title: `文件交付`, time: `整体约 1 周` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `4,300 元（含注册公司 + 注册地址 + 秘书服务；政府规费、VAT 注册等按实际另计）`,
-        pricingNote: ``,
+        pricing: ``,
+        pricingNote: "报价以英镑 £ 计。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-uk-vat',
-      category: 'europe',
-      title: `英国 VAT 注册及申报`,
-      desc: `注册义务评估（远程销售阈值、平台代收规则）、HMRC 递交 VAT 注册、进销项发票与台账规范、季度申报与税款缴纳、MTD 电子申报合规提醒。`,
-      priceLabel: `¥1,500`,
-      priceValue: 1500,
-      unit: ``,
-      details: excelBlocks({
-        content: `一、VAT注册
-评估注册义务（远程销售阈值、本地库存/发货、进口、平台代收规则等），判断应注册本地VAT还是走OSS
-准备公司、董事、业务与供应链资料，向HMRC递交VAT注册申请，取得英国VAT号
-二、账务与发票规范
-规范进销项发票格式与税率处理（标准20%/减免5%/零税率等），区分B2B与B2C
-建立VAT台账与进项抵扣记录，做好进口增值税（I/VAT）与海关单据匹配
-三、申报与缴纳
-按季向HMRC 提交VAT申报
-完成税款缴纳与HMRC对账
-四、合规提醒
-提示申报截止日（MTD强制电子申报）、记录留存`,
-        cycle: `VAT 注册约 2–4 周；后续按季度持续申报`,
-        processSteps: [{ title: `注册义务评估`, time: `2–3 个工作日` }, { title: `资料准备`, time: `1 周` }, { title: `HMRC 注册取得 VAT 号`, time: `约 2–4 周` }, { title: `账务与发票规范`, time: `取得税号后 1–2 周` }, { title: `季度申报`, time: `季度结束后 1 个月零 7 天内` }, { title: `税款缴纳与档案留存`, time: `申报时同步` }],
-        process: ``,
-        pricing: `1,500 元（含 VAT 注册及年度申报，按交易量据实报价；HMRC 税款实报实销）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司注册", "注册后可立即开展贸易；含电子版注册证书、股份证书、企业所得税号（UTR）、工商局网上认证代码", "£275"],
+          ["VIP 地址服务", "虚拟地址，可接收工商局、税局、银行及其他商业信件", "£275/年"]
+          ],
+        },
         bundle: null,
       }),
     },
     {
       id: 'europe-uk-bookkeeping',
       category: 'europe',
-      title: `英国公司做账报税（不含 VAT）`,
-      desc: `按英国会计准则记账、年度财务报表编制、公司税（Corporation Tax）计算与 CT600 报税表申报。`,
-      priceLabel: `¥4,000`,
-      priceValue: 4000,
-      unit: `起`,
+      title: `英国 · 公司做账报税`,
+      desc: `可选：公司年报、月度记账、VAT 申报。`,
+      priceLabel: `£660`,
+      priceValue: 660,
+      unit: `起/年`,
       details: excelBlocks({
-        content: `一、账务处理
-按英国会计准则进行日常记账、科目归集与凭证管理
-核对银行流水、平台回款与往来款项，确保账实相符
-按财年规范收入确认、成本、费用归集
-编制财年年度财务报表（损益表、资产负债表等）
-二、企业所得税申报
-计算公司税（Corporation Tax），区分应税利润与可扣除项目，适用相应税率与小型利润税率
-编制公司税报税表（CT600），完成HMRC申报与税款缴纳`,
-        cycle: `按财年周期持续服务（月度记账 + 年度 CT600 申报）`,
-        processSteps: [{ title: `资料收集`, time: `财年结束后 1 个月内` }, { title: `日常记账`, time: `按月完成` }, { title: `公司税计算`, time: `财年结束后 1–2 个月` }, { title: `CT600 报税`, time: `财年结束后 9 个月内，与年报账目同步` }, { title: `税款缴纳`, time: `按 HMRC 缴税通知` }],
-        process: ``,
-        pricing: `4,000 元起（含公司税申报，不含 VAT；法定审计等按实际另计）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-de-setup',
-      category: 'europe',
-      title: `德国公司设立`,
-      desc: `注册公司 + 注册地址 + 秘书服务 + 银行开户 · 合规设立。`,
-      priceLabel: `¥80,000`,
-      priceValue: 80000,
-      unit: ``,
-      details: excelBlocks({
-        content: `一、设立方案设计
-确认公司类型（有限责任公司GmbH/微型有限责任公司UG等）、注册资本与经营范围
-二、开立验资账户并注资
-持核名通知书及公证章程开立临时验资账户，存入注册资本（GmbH最低实缴25,000欧元），银行出具验资证明。
-二、注册与备案
-进行名称与经营范围（含主营与附属业务）核定
-起草公司设立合同/章程并经德国公证人（Notar）公证，开设资本账户并入缴最低资本
-向商业登记簿（Handelsregister）递交登记并完成公告（如适用）
-三、配套服务
-提供商业注册地址与秘书/合规支持（含法定地址、文件接收）
-四、交付与后续
-交付商业登记证明、公证文件、章程及相关登记证明
-衔接VAT注册及申报、做账报税、企业所得税/营业税申报与工商年报、联邦公报电子披露等合规维护（单独收费）`,
-        cycle: `整体约 6–8 周`,
-        processSteps: [{ title: `设立方案确认`, time: `1 周` }, { title: `开临时账户与注资`, time: `1–2 周` }, { title: `章程起草与公证`, time: `1–2 周` }, { title: `商业登记`, time: `约 2–4 周` }, { title: `地址与秘书配套`, time: `登记后即时` }, { title: `文件交付`, time: `整体约 6–8 周` }],
-        process: ``,
-        pricing: `80,000 元（含银行开户 + 注册公司 + 注册地址 + 秘书服务；公证费、商业登记费等政府规费实报实销）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-de-vat',
-      category: 'europe',
-      title: `德国 VAT 注册及申报`,
-      desc: `注册义务评估、德国税务机关 VAT 号申请、进销项台账规范、月/季预申报（UStVA）与年度申报（Jahreserklärung）、ELSTER 电子申报合规提醒。`,
-      priceLabel: `¥2,500`,
-      priceValue: 2500,
-      unit: ``,
-      details: excelBlocks({
-        content: `一、VAT注册
-评估注册义务（本地库存/仓储、进口、远程销售阈值等），准备公司、业务与供应链资料
-向德国税务机关申请，取得德国VAT号
-二、账务与发票规范
-规范德国发票格式与税率，建立进销项台账与进项抵扣记录
-做好进口增值税、内reverse charge等不同场景的处理
-三、申报与缴纳
-按月/季提交预先增值税申报（Voranmeldung/UStVA）并预缴
-完成年度增值税申报（Jahreserklärung）
-四、合规提醒
-提示申报截止日、ELSTER电子申报要求、担保/保证金及税务稽查（Umsatzsteuer-Nachschau）应对要求
-提示发票合规、年度申报与预缴差异调整等风险点`,
-        cycle: `VAT 号申请约 4–8 周；后续按月/季持续申报`,
-        processSteps: [{ title: `注册义务评估`, time: `2–3 个工作日` }, { title: `资料与税务代表准备`, time: `1 周` }, { title: `取得 VAT 号`, time: `约 4–8 周，视税局签发速度` }, { title: `发票与台账规范`, time: `取得税号后 1–2 周` }, { title: `月度/季度预申报`, time: `月度申报于次月 10 日前` }, { title: `年度申报`, time: `次年 7 月 31 日前` }],
-        process: ``,
-        pricing: `2,500 元起（含 VAT 注册及申报，按交易量与频次据实报价；税务代表费等实报实销）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-de-bookkeeping',
-      category: 'europe',
-      title: `德国公司做账报税（不含 VAT）`,
-      desc: `按德国商法典（HGB）/GoBD 记账、年度财务报表编制、企业所得税（KSt）及团结附加计算、营业税（GewSt）测算、ELSTER 年度申报。`,
-      priceLabel: `¥20,000`,
-      priceValue: 20000,
-      unit: `起`,
-      details: excelBlocks({
-        content: `一、账务处理
-按德国商法典（HGB）/IFRS进行日常记账、科目归集与凭证管理，遵循及时记账原则（GoBD）
-核对银行流水与往来款项，建立合规账簿与电子可机读账务
-按财年规范收入确认、存货计价与折旧摊销
-编制财年年度财务报表（损益表、资产负债表等）
-二、企业所得税申报
-计算企业所得税（KSt）及团结附加，并测算营业税（GewSt，按当地税稽征率）
-编制年度财务与税务申报，向税务机关（ELSTER）递交年度账目与税务申报表`,
-        cycle: `按财年周期持续服务（月度记账 + 年度申报）`,
-        processSteps: [{ title: `资料收集`, time: `按月/季` }, { title: `日常记账`, time: `按月完成` }, { title: `所得税与营业税计算`, time: `财年结束后 1–2 个月` }, { title: `年度申报`, time: `次年 7 月 31 日前，经税务顾问可延期` }, { title: `税款缴纳`, time: `按税局缴税通知` }],
-        process: ``,
-        pricing: `20,000 元起（含所得税及营业税申报，不含 VAT）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-fr-setup',
-      category: 'europe',
-      title: `法国公司设立`,
-      desc: `注册公司 + 注册地址 + 秘书服务 · 合规设立。`,
-      priceLabel: `¥13,000`,
-      priceValue: 13000,
-      unit: ``,
-      details: excelBlocks({
-        content: `一、设立方案设计
-确认公司类型（SARL有限责任公司/SAS简易股份公司等）、注册资本、股东与经营范围
-评估董事（président/gérant）责任、公证、法定公告及银行资本金要求
-对比SARL与SAS在治理灵活度、社保、外资持股上的差异，给出适配建议
-二、注册与备案
-进行名称与经营范围核定
-起草章程、刊登设立公告并准备注册文件（含 beneficial owner 备案）
-向商业法庭/单一窗口（Guichet unique / INPI）递交注册，取得SIREN/SIRET及Kbis营业执照
-三、配套服务
-提供注册地址与秘书/法务支持，保障法定地址与文件送达
-四、交付与后续
-交付Kbis营业执照、章程、SIREN/SIRET及设立公告等公司文件
-衔接做账报税、年度财务报表与税务申报（liasse fiscale）、VAT申报等合规维护（单独收费）`,
-        cycle: `整体约 2–4 周`,
-        processSteps: [{ title: `设立方案确认`, time: `1 周` }, { title: `章程起草`, time: `1 周` }, { title: `公告刊登`, time: `1–2 个工作日` }, { title: `单一窗口注册`, time: `约 1–2 周` }, { title: `取得 Kbis`, time: `注册后即时可取` }, { title: `地址与秘书就位`, time: `注册后即时` }, { title: `文件交付`, time: `整体约 2–4 周` }],
-        process: ``,
-        pricing: `13,000 元（含注册公司 + 注册地址 + 秘书服务；政府公告费、登记费等实报实销）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-fr-vat',
-      category: 'europe',
-      title: `法国 VAT 税号注册`,
-      desc: `注册义务评估（含进口 VAT 与 OSS 适用边界）、法国税务机关 VAT 号申请、发票与台账规范、CA3（或 CA12）申报、2026 年起电子开票合规提醒。`,
-      priceLabel: `¥3,500`,
-      priceValue: 3500,
-      unit: `起`,
-      details: excelBlocks({
-        content: `一、VAT注册
-评估注册义务（本地库存/发货、进口、远程销售阈值、平台代收等），准备公司、业务与供应链资料
-向法国税务机关（SIE，通过Guichet unique）递交注册申请，取得法国VAT号（numéro de TVA intracommunautaire）及SIREN关联登记
-针对非欧盟卖家的进口 VAT（PVL）与自营/OSS适用边界进行说明
-二、账务与发票规范
-规范法国发票格式与税率（标准20%/减免等），建立进销项与进项抵扣台账
-做好进口增值税、内反向征收（autoliquidation）与跨境B2B交易的处理
-三、申报与缴纳
-按月/季/年提交CA3（或 régime simplifié 的CA12简并申报）申报表
-完成税款缴纳与税务机关对账，处理欧盟DEB/ESL货物与服务申报（达门槛）
-四、合规提醒
-提示申报截止日（TVA数字报告2026年起分批强制）、发票电子开票合规与稽查（vérification de comptabilité）应对要求`,
-        cycle: `VAT 号申请约 3–6 周；后续按月/季持续申报`,
-        processSteps: [{ title: `注册义务评估`, time: `2–3 个工作日` }, { title: `资料准备`, time: `1 周` }, { title: `取得 VAT 号`, time: `约 3–6 周` }, { title: `发票与台账规范`, time: `取得税号后 1–2 周` }, { title: `CA3 申报`, time: `月度申报于次月内提交` }, { title: `税款缴纳与档案留存`, time: `申报时同步` }],
-        process: ``,
-        pricing: `3,500 元起（含 VAT 注册及申报支持；税务代表费等实报实销）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'europe-fr-bookkeeping',
-      category: 'europe',
-      title: `法国公司做账报税（不含 VAT）`,
-      desc: `按法国通用会计准则（PCG）记账、年度财务报表编制、企业所得税（IS）计算与 liasse fiscale 申报（2065 等表格）。`,
-      priceLabel: `¥10,000`,
-      priceValue: 10000,
-      unit: `起`,
-      details: excelBlocks({
-        content: `一、账务处理
-按法国通用会计准则（PCG）进行日常记账、科目归集与凭证管理，凭证须依法留存
-核对银行流水与往来款项，建立合规账簿与年结分录
-按财年规范收入确认、存货计价与折旧摊销
-二、财务报表编制
-编制年度财务报表
-三、企业所得税申报
-计算企业所得税（IS，按适用税率/优惠税率），区分应税与可扣除项目
-编制税务申报附件（liasse fiscale），向税务机关递交年度账务与税务申报（2065等表格）`,
-        cycle: `按财年周期持续服务（月度记账 + 年度 liasse fiscale 申报）`,
-        processSteps: [{ title: `资料收集`, time: `按月/季` }, { title: `日常记账`, time: `按月完成` }, { title: `所得税计算`, time: `财年结束后 1–2 个月` }, { title: `年度税务申报`, time: `liasse fiscale，按财年法定期限` }, { title: `税款缴纳`, time: `按税局缴税通知` }],
-        process: ``,
-        pricing: `10,000 元起（含做账与企业所得税申报，不含 VAT）`,
-        pricingNote: ``,
-        advantages: ``,
-        audience: ``,
-        conditions: ``,
-        pricingTable: null,
-        bundle: null,
-      }),
-    },
-    {
-      id: 'other-us-setup',
-      category: 'other',
-      title: `美国公司设立`,
-      desc: `州际架构评估 + 注册 + 注册地址 + 注册代理 · 合规落地。`,
-      priceLabel: `¥2,500`,
-      priceValue: 2500,
-      unit: `起`,
-      details: excelBlocks({
-        content: `一、设立方案设计
-评估注册州（特拉华、怀俄明、科罗拉多、佛罗里达等）的法律、税收、年报费用与开户便利度差异
-确定公司类型（C-Corp/LLC/（S-Corp视身份））、股权结构、经营范围与合规义务
-结合业务模式、融资需求与身份（居民/非居民）给出州与架构选择建议
-二、注册与备案
-进行公司名称查册与保留
-向州务卿（Secretary of State）递交注册文件（Articles of Incorporation/Organization），取得州注册号（File Number）
-向国税局（IRS）申请联邦雇主识别号（EIN）
-三、配套服务
-提供注册地址与注册代理（Registered Agent）服务，保障法定文件接收与送达
-四、交付与后续
-交付注册证书（Certificate of Formation/Incorporation）、章程/运营协议、EIN确认函等文件
-衔接联邦与州税（如1120/1065/1120-S）、Franchise Tax、年报与合规申报、BOI申报等持续合规（单独收费）`,
-        cycle: `整体约 2–4 周（视注册州）`,
-        processSteps: [{ title: `架构与选州评估`, time: `2–3 个工作日` }, { title: `名称查册`, time: `1–2 个工作日` }, { title: `资料准备`, time: `1–2 个工作日` }, { title: `州务卿注册`, time: `科罗拉多/怀俄明约 1–3 个工作日；特拉华/佛罗里达约 1–2 周` }, { title: `取得 EIN`, time: `注册后约 1–2 周，非美国居民申请人稍长` }, { title: `注册地址与代理就位`, time: `注册后即时` }, { title: `文件交付`, time: `整体约 2–4 周，视州` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
         pricing: ``,
-        pricingNote: `（含秘书服务、代收官方信函、一年地址挂靠；其他州及多州注册另议）`,
+        pricingNote: "报价以英镑 £ 计；按实际业务量调整。",
         advantages: ``,
         audience: ``,
         conditions: ``,
-        pricingTable: {
-          headers: ["注册州及类型", "价格"],
-          rows: [["科罗拉多州 C-Corp / LLC", "2,500 / 2,800 元"], ["佛罗里达州 C-Corp / LLC", "3,800 / 4,800 元"], ["特拉华 C-Corp / LLC", "4,500 / 5,000 元"], ["怀俄明 C-Corp / LLC", "3,800 / 4,900 元"]],
+        pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司年报（账目 + 企业所得税申报）", "向工商局提交年报，并向税局提交企业所得税（Corporation Tax）申报；按实际业务量调整", "£660 起/年"],
+          ["月度记账和银行对账", "按每月实际业务量计算", "£65/月起"],
+          ["VAT 申报", "按季度收入与支出申报，含 VAT 类别准确归类", "£220/季度"]
+          ],
         },
         bundle: null,
       }),
     },
     {
-      id: 'other-us-bookkeeping',
-      category: 'other',
-      title: `美国公司做账报税`,
-      desc: `按美国会计准则（US GAAP）记账、年度财务报表编制、按实体类型编制联邦所得税申报、州所得税/销售税（Sales Tax）/特许经营税（Franchise Tax）申报、1099/W-8BEN-E/`,
-      priceLabel: `¥2,500`,
-      priceValue: 2500,
-      unit: `起`,
+      id: 'europe-uk-payroll',
+      category: 'europe',
+      title: `英国 · 雇员税务服务`,
+      desc: `可选：PAYE 申报、养老金申报。`,
+      priceLabel: `£22`,
+      priceValue: 22,
+      unit: `/人/月`,
       details: excelBlocks({
-        content: `一、账务处理
-按美国会计准则（US GAAP/现金制按需）进行日常记账、科目归集与凭证管理
-核对银行流水、平台回款与应收应付往来，确保账实相符
-按财年（日历/财政年）规范收入确认与费用归集
-编制财年年度财务报表（损益表、资产负债表等）
-二、税务申报
-按实体类型编制联邦所得税申报
-办理注册州所得税、销售税（Sales Tax，达关联 nexus）与特许经营税（Franchise Tax）申报
-三、合规提醒
-提示联邦/州申报截止日、延长期申请，以及1099、W-8BEN-E、BOI申报等合规报表要求`,
-        cycle: `按财年周期持续服务（月度记账 + 年度联邦及州税申报）`,
-        processSteps: [{ title: `资料收集`, time: `财年结束后 1 个月内` }, { title: `日常记账`, time: `按月完成` }, { title: `联邦所得税申报`, time: `C-Corp：4 月 15 日前；LLC/合伙：3 月 15 日前，均可申请延期` }, { title: `州税申报`, time: `按各州规定` }, { title: `税款缴纳`, time: `按 IRS/州税局通知` }],
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
         process: ``,
-        pricing: `2,500 元起（按交易量与复杂度据实报价；联邦/州税费、销售税申报、审计等按实际另计）`,
-        pricingNote: ``,
+        pricing: ``,
+        pricingNote: "报价以英镑 £ 计。",
         advantages: ``,
         audience: ``,
         conditions: ``,
         pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["PAYE 申报", "月度薪资申报、法定病假产假计算、最低时薪合规", "£22/人/月"],
+          ["养老金申报", "养老金计划定制与申报，最大限度提升员工与雇主利益", "£22/人/月"]
+          ],
+        },
+        bundle: null,
+      }),
+    },
+    {
+      id: 'europe-uk-other',
+      category: 'europe',
+      title: `英国 · 其他一次性服务`,
+      desc: `可选：公司年审、VAT/EORI/PAYE/养老金注册、税号重置注销、公司注销、查税保险等。`,
+      priceLabel: `£130`,
+      priceValue: 130,
+      unit: `/年`,
+      details: excelBlocks({
+        content: ``,
+        cycle: ``,
+        processSteps: [{ title: `对接具体需求` }, { title: `海外事务所对接` }, { title: `与海外事务所签订正式服务合同` }, { title: `制定服务计划` }, { title: `按服务计划监督服务完成` }],
+        process: ``,
+        pricing: ``,
+        pricingNote: "报价以英镑 £ 计。",
+        advantages: ``,
+        audience: ``,
+        conditions: ``,
+        pricingTable: null,
+        optionsTable: {
+          headers: ['服务名称', '服务内容', '服务报价'],
+          rows: [
+          ["公司年审", "年度账目申报 + 英国工商局（Companies House）年度信息更新", "£130/年"],
+          ["VAT 号码注册", "用于增值税申报及电商平台申请", "£220"],
+          ["EORI 号码注册", "经济运营商注册和识别号码，海关用于跨境货物追踪监控", "£110"],
+          ["PAYE 号码注册", "用于员工工资、奖金、病假、产假等税局申报", "£165"],
+          ["雇主养老金计划注册", "为符合条件的员工注册养老金计划（英国法定合规要求）", "£165"],
+          ["税号重置（UTR / 认证代码）", "公司商业税税号（UTR）或公司授权认证代码（Authentication Code）重置", "£220"],
+          ["税号注销（PAYE / VAT）", "向工商局及税局企业所得税部门通报注销", "£75/项"],
+          ["公司注销", "视公司状态与账务情况", "£165 起"],
+          ["税务调查 & 查税保险", "保障查税期间专业劳务代理费；不含补缴税款、罚金、利息等直接费用", "面议"]
+          ],
+        },
         bundle: null,
       }),
     }
+
   ];
 
   const LEGACY_SERVICE_IDS = {
@@ -1662,6 +1496,15 @@ XBRL 填报
     'hk-bank-account': 'hk-bank',
     'hk-alteration': 'hk-change',
     'hk-cancel': 'hk-deregister',
+    'asia-my-audit': 'asia-my-other',
+    'asia-sg-audit': 'asia-sg-bookkeeping',
+    'europe-uk-vat': 'europe-uk-other',
+    'europe-de-setup': 'europe-uk-setup',
+    'europe-de-vat': 'europe-uk-other',
+    'europe-de-bookkeeping': 'europe-uk-bookkeeping',
+    'europe-fr-setup': 'europe-uk-setup',
+    'europe-fr-vat': 'europe-uk-other',
+    'europe-fr-bookkeeping': 'europe-uk-bookkeeping',
   };
 
   window.getServiceById = function getServiceById(id) {
