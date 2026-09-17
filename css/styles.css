@@ -5600,6 +5600,27 @@ ul {
   margin-bottom: 1.25rem;
 }
 
+.svc-options {
+  max-width: 48rem;
+  margin: 0 0 0.5rem;
+}
+
+.svc-option {
+  margin: 0 0 1.25rem;
+  padding: 0 0 1.15rem;
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+}
+
+.svc-option:last-child {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.svc-option .svc-publish-h {
+  margin-bottom: 0.55rem;
+}
+
 .svc-publish-h {
   margin: 0 0 0.4rem;
   padding: 0;

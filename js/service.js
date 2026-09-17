@@ -265,6 +265,30 @@
         if (block.type === 'bundle-price') {
           return ''; // live total lives inside picker
         }
+        if (block.type === 'options' && Array.isArray(block.items)) {
+          return `<div class="svc-options">${block.items
+            .map((item) => {
+              const name = escapeHtml(item?.name || '');
+              const content = String(item?.content || '').trim();
+              const price = String(item?.price || '').trim();
+              const lines = [];
+              if (content && content !== '—') {
+                lines.push(
+                  `<li><strong>服务内容：</strong><span>${escapeHtml(content)}</span></li>`
+                );
+              }
+              if (price) {
+                lines.push(
+                  `<li><strong>服务报价：</strong><span>${escapeHtml(price)}</span></li>`
+                );
+              }
+              return `<section class="svc-option">
+                <h3 class="svc-publish-h">${name}</h3>
+                ${lines.length ? `<ul class="svc-publish-lines">${lines.join('')}</ul>` : ''}
+              </section>`;
+            })
+            .join('')}</div>`;
+        }
         if (block.type === 'ul' && Array.isArray(block.items)) {
           return `<ul class="service-detail-list">${block.items
             .map((item) => `<li>${escapeHtml(item)}</li>`)

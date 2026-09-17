@@ -45,11 +45,12 @@
     if (hasOptionsTable) {
       out.push({ type: 'h2', text: '可选服务' });
       out.push({
-        type: 'table',
-        variant: 'pricing',
-        firstColHeader: true,
-        headers: optionsTable.headers,
-        rows: optionsTable.rows,
+        type: 'options',
+        items: optionsTable.rows.map((row) => ({
+          name: String(row?.[0] || '').trim(),
+          content: String(row?.[1] || '').trim(),
+          price: String(row?.[2] || '').trim(),
+        })).filter((item) => item.name),
       });
     } else if (bundle) {
       out.push({ type: 'h2', text: '服务内容' });
