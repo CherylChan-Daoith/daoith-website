@@ -387,6 +387,34 @@
     refresh();
   }
 
+  function renderLoginGate(viewEl, loadingEl, locale) {
+    if (loadingEl) loadingEl.remove();
+    const zh = locale !== 'en';
+    const title = zh ? '查看服务详情需先微信登录' : 'Sign in to view service details';
+    const lead = zh
+      ? '登录后将自动返回本页，即可查看完整服务内容与收费说明。'
+      : 'After WeChat sign-in you will return here to view full details and pricing.';
+    const btn = zh ? '微信登录后查看' : 'Sign in with WeChat';
+    viewEl.classList.remove('is-hidden');
+    viewEl.innerHTML = `
+      <div class="service-login-gate">
+        <h1 class="service-login-gate-title">${escapeHtml(title)}</h1>
+        <p class="service-login-gate-lead">${escapeHtml(lead)}</p>
+        <button type="button" class="btn btn-primary" data-service-login>${escapeHtml(btn)}</button>
+      </div>
+    `;
+    const returnUrl = `${window.location.pathname}${window.location.search}${window.location.hash || ''}`;
+    const startLogin = () => {
+      window.DAOITH_AUTH?.requireLogin?.('service_detail', returnUrl, { silent: true });
+    };
+    viewEl.querySelector('[data-service-login]')?.addEventListener('click', startLogin);
+    // Auto-start OAuth once; keep the gate if user cancels/closes the window.
+    if (!window.__daoithServiceLoginStarted) {
+      window.__daoithServiceLoginStarted = true;
+      startLogin();
+    }
+  }
+
   function render() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
@@ -400,6 +428,14 @@
       if (viewEl) viewEl.classList.add('is-hidden');
       if (notFoundEl) notFoundEl.classList.remove('is-hidden');
       document.title = `${locale === 'en' ? 'Service not found' : '服务未找到'} — DAOITH`;
+    }
+
+    if (!viewEl) return;
+
+    if (!window.DAOITH_AUTH?.isLoggedIn?.()) {
+      if (notFoundEl) notFoundEl.classList.add('is-hidden');
+      renderLoginGate(viewEl, loadingEl, locale);
+      return;
     }
 
     if (!id || typeof window.getServiceById !== 'function') {
@@ -437,6 +473,8 @@
     if (backLink) backLink.textContent = backLabel;
 
     if (loadingEl) loadingEl.remove();
+    if (notFoundEl) notFoundEl.classList.add('is-hidden');
+    viewEl.classList.remove('is-hidden');
 
     viewEl.innerHTML = `
       <header class="service-product-hero service-product-hero--publish">

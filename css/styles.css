@@ -2149,6 +2149,7 @@ ul {
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .diag-service-card-body strong {
@@ -2169,6 +2170,56 @@ ul {
   font-weight: 600;
 }
 
+.diag-service-card-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.diag-service-detail-btn,
+.diag-service-cart-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.diag-service-detail-btn {
+  border: 1px solid #d5d9e0;
+  background: #fff;
+  color: var(--ink);
+}
+
+.diag-service-detail-btn:hover {
+  background: #f7f8fa;
+  border-color: #b8bec8;
+  color: var(--ink);
+}
+
+.diag-service-cart-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--white);
+}
+
+.diag-service-cart-btn:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--white);
+}
+
 .result-from-chat {
   color: #86868b;
   font-size: 0.8rem;
@@ -2178,6 +2229,15 @@ ul {
   .diag-service-card {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .diag-service-card-actions {
+    justify-content: stretch;
+  }
+
+  .diag-service-detail-btn,
+  .diag-service-cart-btn {
+    flex: 1 1 0;
   }
 }
 
@@ -5725,6 +5785,37 @@ ul {
 
 .service-page .article-back {
   margin-bottom: 20px;
+}
+
+.service-login-gate {
+  margin: 48px auto 80px;
+  max-width: 420px;
+  padding: 40px 32px;
+  text-align: center;
+  background: var(--white);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  box-shadow: 0 10px 32px rgba(5, 28, 44, 0.06);
+}
+
+.service-login-gate-title {
+  margin: 0 0 12px;
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.service-login-gate-lead {
+  margin: 0 0 24px;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+.service-login-gate .btn {
+  min-width: 180px;
 }
 
 .service-product-hero {

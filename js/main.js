@@ -5830,6 +5830,7 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
     .map((id) => {
       const s = (window.DAOITH_SERVICES || []).find((x) => x.id === id);
       if (!s) return '';
+      const href = `/service.html?id=${encodeURIComponent(s.id)}`;
       return (
         `<div class="diag-service-card">` +
         `<div class="diag-service-card-body">` +
@@ -5837,7 +5838,10 @@ function buildDiagnosisServiceRecsHtml(markdown, options = {}) {
         `<span class="diag-service-card-desc">${escapeHtml(s.desc || '')}</span>` +
         `<span class="diag-service-card-price">${escapeHtml(s.priceLabel || '')}${escapeHtml(s.unit || '')}</span>` +
         `</div>` +
-        `<button type="button" class="btn btn-outline btn-sm tax-cart-btn" data-action="add" data-service-id="${escapeHtml(s.id)}">加入询价单</button>` +
+        `<div class="diag-service-card-actions">` +
+        `<a class="diag-service-detail-btn" href="${href}" data-action="detail">了解详情</a>` +
+        `<button type="button" class="diag-service-cart-btn" data-action="add" data-service-id="${escapeHtml(s.id)}">加入询价单</button>` +
+        `</div>` +
         `</div>`
       );
     })
