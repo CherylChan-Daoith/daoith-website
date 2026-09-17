@@ -114,13 +114,13 @@
       priceValue: 2999,
       unit: `/小时`,
       details: excelBlocks({
-        content: `1、合规风险识别：了解企业现有财税流程，识别潜在合规漏洞与核心税务风险点，出具针对性整改建议。
-2、跨境架构规划：结合企业业务模式与目标市场，设计税务架构方案，合理降低整体税负，提升资金流转效率。
-3、股权架构设计：合理规划控股架构、资金路径与利润分配机制。
-4、涉税风险处理：针对税务疑点、风险任务、税务处罚等事项，提供专业应对策略。
-5、退税优化方案：深度分析企业退税环节，挖掘退税空间，优化退税路径与申报材料，提高退税成功率与到账速度。
-6、财税处理：针对跨境电商、海外仓、多平台经营等复杂业务场景，提供定制化记账报税方案。
-7、个性化答疑：针对企业具体业务场景，提供一对一深度答疑，提供可落地、可执行方案。`,
+        content: `合规风险识别：了解企业现有财税流程，识别潜在合规漏洞与核心税务风险点，出具针对性整改建议。
+跨境架构规划：结合企业业务模式与目标市场，设计税务架构方案，合理降低整体税负，提升资金流转效率。
+股权架构设计：合理规划控股架构、资金路径与利润分配机制。
+涉税风险处理：针对税务疑点、风险任务、税务处罚等事项，提供专业应对策略。
+退税优化方案：深度分析企业退税环节，挖掘退税空间，优化退税路径与申报材料，提高退税成功率与到账速度。
+财税处理：针对跨境电商、海外仓、多平台经营等复杂业务场景，提供定制化记账报税方案。
+个性化答疑：针对企业具体业务场景，提供一对一深度答疑，提供可落地、可执行方案。`,
         cycle: `服务开启后 1 小时`,
         processSteps: [{ title: `预约咨询`, time: `提前 1-3 个工作日` }, { title: `业务信息收集`, time: `咨询前完成` }, { title: `线上1v1 咨询`, time: `1小时起` }, { title: `咨询总结`, time: `咨询结束当天出具` }],
         process: ``,
@@ -449,13 +449,13 @@
       unit: `/3项起9折`,
       details: excelBlocks({
         content: `可勾选服务项目
-①出口公司设立
-②进出口权办理
-③首单退税辅导
-④代理退税申报
-⑤退税公司记账报税
-⑥香港公司年审
-⑦香港公司审计报税`,
+出口公司设立
+进出口权办理
+首单退税辅导
+代理退税申报
+退税公司记账报税
+香港公司年审
+香港公司审计报税`,
         cycle: `服务开启后 1 年`,
         processSteps: [{ title: `需求确认`, time: `当天` }, { title: `线上下单确认服务选项`, time: `当天` }, { title: `资料收集`, time: `1 周内` }, { title: `服务项目跟进`, time: `按各子项目时效执行` }],
         process: ``,
@@ -469,7 +469,7 @@
           headers: ["套餐参考", "模块组合", "说明"],
           rows: [["跨境电商境内外合规", "①+②+③+⑤+⑥+⑦", ""], ["新出口企业境内合规服务", "①+②+③+⑤", ""], ["已有出口业务、需退税及记账", "④+⑤", ""], ["香港公司维护专案", "⑥+⑦", ""], ["首次退税辅导", "②+③", ""]],
         },
-        bundle: {"id": "0110", "discountFrom": 3, "discountRate": 0.9, "discountLabel": "3项及以上全托管可享受9折", "modules": [{"label": "①出口公司设立", "serviceId": "domestic-setup", "priceValue": 500, "priceLabel": "¥500"}, {"label": "②进出口权办理", "serviceId": "domestic-trade-license", "priceValue": 2000, "priceLabel": "¥2,000"}, {"label": "③首单退税辅导", "serviceId": "domestic-rebate-first", "priceValue": 10000, "priceLabel": "¥10,000"}, {"label": "④代理退税申报", "serviceId": "domestic-rebate", "priceValue": 0, "priceLabel": "按出口额0.1%", "pricingModel": "percent", "volumeScope": "mainland", "rate": 0.001, "minFee": 5000, "maxFee": 30000}, {"label": "⑤退税公司记账报税", "serviceId": "domestic-compliance-bookkeeping", "priceValue": 5000, "priceLabel": "¥5,000起"}, {"label": "⑥香港公司年审", "serviceId": "hk-annual", "priceValue": 3000, "priceLabel": "¥3,000"}, {"label": "⑦香港公司审计报税", "serviceId": "hk-audit-tax", "priceValue": 0, "priceLabel": "按营业额分级", "pricingModel": "tier", "volumeScope": "hk", "tiers": "hk-audit-ecom"}]},
+        bundle: {"id": "0110", "discountFrom": 3, "discountRate": 0.9, "discountLabel": "3项及以上全托管可享受9折", "modules": [{"label": "①出口公司设立", "serviceId": "domestic-setup", "priceValue": 500, "priceLabel": "¥500"}, {"label": "②进出口权办理", "serviceId": "domestic-trade-license", "priceValue": 2000, "priceLabel": "¥2,000"}, {"label": "③首单退税辅导", "serviceId": "domestic-rebate-first", "priceValue": 10000, "priceLabel": "¥10,000"}, {"label": "④代理退税申报", "serviceId": "domestic-rebate", "priceValue": 0, "priceLabel": "按出口额0.1%-0.3%", "pricingModel": "percent", "volumeScope": "mainland", "rate": 0.001, "rateMax": 0.003, "minFee": 5000}, {"label": "⑤退税公司记账报税", "serviceId": "domestic-compliance-bookkeeping", "priceValue": 5000, "priceLabel": "¥5,000起"}, {"label": "⑥香港公司年审", "serviceId": "hk-annual", "priceValue": 3000, "priceLabel": "¥3,000"}, {"label": "⑦香港公司审计报税", "serviceId": "hk-audit-tax", "priceValue": 0, "priceLabel": "按营业额分级", "pricingModel": "tier", "volumeScope": "hk", "tiers": "hk-audit-ecom"}]},
       }),
     },
     {
@@ -482,10 +482,10 @@
       unit: `/3项起9折`,
       details: excelBlocks({
         content: `可勾选服务项目
-①个体户注册核定及税务申报
-②1039市场采购出口
-③香港公司年审
-④香港公司审计报税`,
+个体户注册核定及税务申报
+1039市场采购出口
+香港公司年审
+香港公司审计报税`,
         cycle: `服务开启后 1 年`,
         processSteps: [{ title: `需求确认`, time: `当天` }, { title: `线上下单确认服务选项`, time: `当天` }, { title: `资料收集`, time: `1 周内` }, { title: `服务项目跟进`, time: `按各子项目时效执行` }],
         process: ``,
@@ -708,7 +708,7 @@
       category: 'compliance',
       title: `代理退税申报`,
       desc: `常态化出口退税申报代理 · 降低退税风险 · 加速资金回笼。`,
-      priceLabel: `0.1%`,
+      priceLabel: `0.1%-0.3%`,
       priceValue: 5000,
       unit: `/年起`,
       details: excelBlocks({
@@ -735,7 +735,7 @@
         cycle: `服务开启后 1 年`,
         processSteps: [{ title: `需求沟通与资质复核`, time: `1 周内` }, { title: `资料交接`, time: `单证齐全后 2–3 个工作日` }, { title: `单证审核`, time: `3–5 个工作日` }, { title: `资料编制`, time: `3–5 个工作日` }, { title: `系统申报`, time: `申报后持续跟踪` }, { title: `审核配合`, time: `按税局进度` }, { title: `退税到账`, time: `审核通过后到账审核通过后按国库退付进度到账` }, { title: `归档维护`, time: `按月` }],
         process: ``,
-        pricing: `年度出口额人民币 0.1%，最低 5,000 元/年起，封顶 30,000 元/年（含全年退税申报代理、单证管理合规辅导、退税台账管理；多年度补申报、涉敏产品频繁函调、四类企业等复杂情况费用另议）`,
+        pricing: `年度出口额人民币 0.1%–0.3%，最低 5,000 元/年（含全年退税申报代理、单证管理合规辅导、退税台账管理；多年度补申报、涉敏产品频繁函调、四类企业等复杂情况费用另议）`,
         pricingNote: ``,
         advantages: ``,
         audience: `已完成首单退税、进入常态化出口经营的企业
@@ -975,20 +975,20 @@ SCR重要控制人备案
       details: excelBlocks({
         content: `一、银行匹配与方案定制
 根据客户业务背景、关联公司情况、开户预算，推荐合适银行与账户类型
-1.1 一类银行：汇丰、恒生、香港星展、香港花旗等，需有关联公司（同股东/法人/董事）
-1.2 二类银行：如建设银行（亚洲），无需关联公司，香港公司本地有实质运营或成立 18 个月以上提前告知不同银行的资料要求、审核重点与开户周期差异
+一类银行：汇丰、恒生、香港星展、香港花旗等，需有关联公司（同股东/法人/董事）
+二类银行：如建设银行（亚洲），无需关联公司，香港公司本地有实质运营或成立 18 个月以上提前告知不同银行的资料要求、审核重点与开户周期差异
 对比各银行账户管理费、最低存款要求、跨境汇款手续费及网银功能，给出性价比建议
 二、开户资料清单梳理
-2.1成立未满一年
-①香港公司注册资料（CR/BR/NNC1/章程）+意向购销合同各 1 份
-②董事身份证正反面+通行证正反面/护照+近 3 个月流水+近半年社保
-③国内关联公司营业执照+近 3 个月流水+购销合同各 2 份（配套发票/提单，合同金额需对应流水）
-④填写 KYC（尽职调查）问卷
-2.2 成立满 1 年及以上
-①香港公司 CR+BR+NAR1+变更文件（如有）
-②董事身份证正反面+通行证正反面/护照+近 3 个月流水+近半年社保
-③香港公司近 3 个月银行流水+购销合同各 2 份（配套提单，合同金额需对应流水）
-④填写 KYC（尽职调查）问卷
+成立未满一年
+香港公司注册资料（CR/BR/NNC1/章程）+意向购销合同各 1 份
+董事身份证正反面+通行证正反面/护照+近 3 个月流水+近半年社保
+国内关联公司营业执照+近 3 个月流水+购销合同各 2 份（配套发票/提单，合同金额需对应流水）
+填写 KYC（尽职调查）问卷
+成立满 1 年及以上
+香港公司 CR+BR+NAR1+变更文件（如有）
+董事身份证正反面+通行证正反面/护照+近 3 个月流水+近半年社保
+香港公司近 3 个月银行流水+购销合同各 2 份（配套提单，合同金额需对应流水）
+填写 KYC（尽职调查）问卷
 三、银行预约
 代为预约银行开户时间，整理高频面试问答清单并做模拟演练
 协助董事完成视频见证，指导应对客户经理尽调提问
@@ -1702,10 +1702,10 @@ XBRL 填报
       model: 'percent',
       scope: 'mainland',
       rate: 0.001,
+      rateMax: 0.003,
       minFee: 5000,
-      maxFee: 30000,
       metricLabel: { zh: '预计年度出口额（人民币）', en: 'Est. annual export value (RMB)' },
-      hint: { zh: '按年度出口额 0.1% 计，最低 ¥5,000 / 封顶 ¥30,000。', en: '0.1% of annual export value, min ¥5,000 / max ¥30,000.' },
+      hint: { zh: '按年度出口额 0.1%–0.3% 计，最低 ¥5,000/年。', en: '0.1%–0.3% of annual export value, min ¥5,000 / year.' },
     },
     'hk-audit-tax': {
       model: 'tier',

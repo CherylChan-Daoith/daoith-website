@@ -115,6 +115,15 @@
     return /^\d+\.\d+/.test(line) || /^[①②③④⑤⑥⑦⑧⑨⑩]/.test(line);
   }
 
+  /** Bullets already mark list order — drop redundant 1、 / ① / 1.1 prefixes. */
+  function stripListOrdinal(line) {
+    return String(line || '')
+      .replace(/^\d+、\s*/, '')
+      .replace(/^[①②③④⑤⑥⑦⑧⑨⑩]\s*/, '')
+      .replace(/^\d+\.\d+\s*/, '')
+      .trim();
+  }
+
   function formatLineInner(line) {
     const idx = line.search(/[：:]/);
     if (idx > 0 && idx <= 28) {
@@ -160,7 +169,7 @@
           ? `<ul class="svc-publish-lines">${sec.items
               .map((line) => {
                 const cls = isSubItem(line) ? ' class="svc-sub"' : '';
-                return `<li${cls}>${formatLineInner(line)}</li>`;
+                return `<li${cls}>${formatLineInner(stripListOrdinal(line))}</li>`;
               })
               .join('')}</ul>`
           : '';
