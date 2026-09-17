@@ -708,9 +708,9 @@
       category: 'compliance',
       title: `代理退税申报`,
       desc: `常态化出口退税申报代理 · 降低退税风险 · 加速资金回笼。`,
-      priceLabel: `0.1%-0.3%/ 出口销售额`,
+      priceLabel: `0.1%-0.3%`,
       priceValue: 5000,
-      unit: ``,
+      unit: `/出口销售额`,
       details: excelBlocks({
         content: `一、退税资格核查
 核查企业出口退税资质有效性，涵盖海关备案、退税备案、外汇名录等关键
