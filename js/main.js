@@ -2914,6 +2914,8 @@ function looksLikeDiagnosisFactQuestion(text) {
   if (!t) return false;
   if (/[？?]/.test(t)) return true;
   if (/(?:吗|么|呢)\s*$/.test(t)) return true;
+  // 「为什么会视同内销」没有问号，但仍是追问，禁止改档重出方案
+  if (/为什么|为何|为啥|怎么会|怎会|如何理解|什么意思/.test(t)) return true;
   // Mid-sentence questions: 「速卖通是不是可以…」「有没有9610清单」
   if (/是不是|是否|有没有|能不能|可不可以|可否|能否|可以吗/.test(t)) return true;
   if (/^(?:我能|我想问|请问|想问一下|帮我看|帮我确认)/.test(t)) return true;
