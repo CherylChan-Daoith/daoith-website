@@ -304,6 +304,7 @@
       contact,
       phone,
       total: cartApi.getTotal(),
+      source: 'website',
       items: items.map((i) => ({
         id: i.id,
         title: i.title,

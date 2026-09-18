@@ -2,9 +2,26 @@ import { applyCors, handleOptions } from '../lib/cors.js';
 import { getBearerToken, verifyJwt } from '../lib/jwt.js';
 import { getUserById, getUserByOpenid } from '../lib/db.js';
 import { pushDiagnosisReportToPmBackground } from '../lib/pm-sync.js';
+import { extractClientIp, lookupIpRegion } from '../lib/geoip.js';
 
 function hasDatabase() {
   return Boolean(process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim());
+}
+
+function normalizeSource(raw) {
+  const s = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (
+    s === 'miniprogram' ||
+    s === 'mp' ||
+    s === 'mini' ||
+    s.includes('miniprogram') ||
+    s.includes('小程序')
+  ) {
+    return 'miniprogram';
+  }
+  return 'website';
 }
 
 function asSlots(raw) {
@@ -53,24 +70,45 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  const body = req.body || {};
+  const source = normalizeSource(body.source);
+  const kind = body.kind === 'qa' ? 'qa' : 'diagnosis';
   const token = getBearerToken(req);
-  if (!token) {
+
+  let payload = null;
+  let user = null;
+
+  if (token) {
+    try {
+      payload = verifyJwt(token);
+    } catch {
+      if (source !== 'miniprogram' && kind !== 'qa') {
+        return res.status(503).json({ error: '未配置 JWT_SECRET' });
+      }
+    }
+    if (payload?.sub && hasDatabase()) {
+      try {
+        if (/^\d+$/.test(String(payload.sub))) {
+          user = await getUserById(Number(payload.sub));
+        }
+        if (!user && payload.openid) {
+          user = await getUserByOpenid(payload.openid);
+        }
+      } catch (err) {
+        console.error('[diagnosis/reports] db lookup', err.message || err);
+      }
+    }
+  } else if (source !== 'miniprogram' && kind !== 'qa') {
     return res.status(401).json({ error: '请先微信登录后再保存方案' });
   }
 
-  let payload;
-  try {
-    payload = verifyJwt(token);
-  } catch {
-    return res.status(503).json({ error: '未配置 JWT_SECRET' });
-  }
-  if (!payload?.sub) {
+  if (token && !payload?.sub && source !== 'miniprogram' && kind !== 'qa') {
     return res.status(401).json({ error: '登录已过期，请重新登录' });
   }
 
-  const body = req.body || {};
   const reportMarkdown = String(body.reportMarkdown || body.markdown || '').trim();
-  if (reportMarkdown.length < 80) {
+  const minLen = kind === 'qa' ? 40 : 80;
+  if (reportMarkdown.length < minLen) {
     return res.status(400).json({ error: '报告内容过短，未保存' });
   }
 
@@ -79,25 +117,34 @@ export default async function handler(req, res) {
     String(body.reportId || '').trim() ||
     `diag_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 
-  let user = null;
-  if (hasDatabase()) {
+  const openid = user?.openid || payload?.openid || null;
+  const nickname =
+    user?.nickname ||
+    payload?.nickname ||
+    body.nickname ||
+    (source === 'miniprogram' ? '小程序访客' : null);
+  const deviceId = String(body.deviceId || '').trim();
+  const clientIp = extractClientIp(req);
+  let geo = null;
+  if (clientIp) {
     try {
-      if (/^\d+$/.test(String(payload.sub))) {
-        user = await getUserById(Number(payload.sub));
-      }
-      if (!user && payload.openid) {
-        user = await getUserByOpenid(payload.openid);
-      }
-    } catch (err) {
-      console.error('[diagnosis/reports] db lookup', err.message || err);
+      geo = await lookupIpRegion(clientIp);
+    } catch {
+      geo = null;
     }
   }
-
-  const openid = user?.openid || payload.openid || null;
-  const nickname =
-    user?.nickname || payload.nickname || body.nickname || null;
-  const externalUserId = user?.id != null ? String(user.id) : String(payload.sub);
-  const summary = businessSummary(slots) || String(body.businessSummary || '').trim();
+  const externalUserId =
+    user?.id != null
+      ? String(user.id)
+      : payload?.sub
+        ? String(payload.sub)
+        : deviceId || (clientIp ? `ip:${clientIp}` : reportId);
+  const summarySlots = businessSummary(slots) || String(body.businessSummary || '').trim();
+  const question = String(body.question || '').trim();
+  const summary =
+    kind === 'qa' && question
+      ? `提问：${question}${summarySlots ? `\n${summarySlots}` : ''}`
+      : summarySlots;
 
   const report = {
     reportId,
@@ -108,10 +155,15 @@ export default async function handler(req, res) {
     businessSummary: summary,
     reportMarkdown,
     conversationId: body.conversationId ? String(body.conversationId) : null,
-    kind: body.kind === 'qa' ? 'qa' : 'diagnosis',
+    kind,
     recommendedServiceIds: Array.isArray(body.recommendedServiceIds)
       ? body.recommendedServiceIds.map(String)
       : [],
+    source,
+    clientIp,
+    country: geo?.country || user?.country || null,
+    province: geo?.province || user?.province || null,
+    city: geo?.city || user?.city || null,
     createdAt: new Date().toISOString(),
   };
 
@@ -120,6 +172,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     reportId,
+    source,
     synced: 'pending',
   });
 }

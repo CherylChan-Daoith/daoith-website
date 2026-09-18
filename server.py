@@ -116,6 +116,19 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/diagnosis/plan-quota":
+            body = {
+                "deviceId": (query.get("deviceId") or query.get("device_id") or [""])[0],
+            }
+            status, data = server_auth.handle_diagnosis_plan_quota(
+                self.headers.get("Authorization", ""),
+                body,
+                load_env_value,
+                consume=False,
+                headers=self.headers,
+            )
+            self.send_json(status, data)
+            return
         if path == "/api/inquiry":
             limit = int((query.get("limit") or ["50"])[0] or 50)
             status, data = server_auth.handle_inquiry_list(
@@ -312,6 +325,23 @@ class Handler(SimpleHTTPRequestHandler):
             )
             self.send_json(status, data)
             return
+        if path == "/api/diagnosis/plan-quota":
+            length = int(self.headers.get("Content-Length", 0))
+            try:
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+            except json.JSONDecodeError:
+                body = {}
+            if not isinstance(body, dict):
+                body = {}
+            status, data = server_auth.handle_diagnosis_plan_quota(
+                self.headers.get("Authorization", ""),
+                body,
+                load_env_value,
+                consume=True,
+                headers=self.headers,
+            )
+            self.send_json(status, data)
+            return
         if path in (
             "/api/auth/wechat/notify/ticket",
             "/api/auth/wechat/notify/bind",
@@ -430,6 +460,7 @@ class Handler(SimpleHTTPRequestHandler):
                 self.headers.get("Authorization", ""),
                 body,
                 load_env_value,
+                client_ip=server_auth.extract_client_ip(self.headers, self.client_address),
             )
             self.send_json(status, data)
             return
@@ -490,7 +521,7 @@ class Handler(SimpleHTTPRequestHandler):
                 503,
                 {
                     "ok": False,
-                    "message": "未配置出口退税率知识库",
+                    "message": "出口退税率查询服务未就绪",
                     "hint": "在 .env 设置 DIFY_DATASET_API_KEY 与 DIFY_HS_REFUND_DATASET_ID",
                 },
             )
@@ -504,25 +535,53 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         hs_code = str(body.get("hs_code") or body.get("hsCode") or "").strip()
-        if not hs_code:
-            self.send_json(400, {"ok": False, "message": "缺少 hs_code"})
+        keyword = str(
+            body.get("keyword")
+            or body.get("product_name")
+            or body.get("productName")
+            or body.get("query")
+            or ""
+        ).strip()
+        # Unified query field: digits → HS code; otherwise treat as product-name keyword
+        if not hs_code and not keyword:
+            raw_q = str(body.get("q") or "").strip()
+            digits = hs_refund.digits_only(raw_q)
+            if len(digits) >= 8:
+                hs_code = digits
+            elif raw_q:
+                keyword = raw_q
+
+        if not hs_code and not keyword:
+            self.send_json(
+                400,
+                {"ok": False, "message": "请提供海关编码（hs_code）或商品名称关键词（keyword）"},
+            )
             return
 
         try:
-            result = hs_refund.lookup_refund_rate(
-                hs_code,
-                api_base=api_base,
-                api_key=api_key,
-                dataset_id=dataset_id,
-            )
+            if keyword and len(hs_refund.digits_only(keyword)) < 8:
+                result = hs_refund.lookup_by_product_name(
+                    keyword,
+                    api_base=api_base,
+                    api_key=api_key,
+                    dataset_id=dataset_id,
+                )
+            else:
+                code = hs_code or keyword
+                result = hs_refund.lookup_refund_rate(
+                    code,
+                    api_base=api_base,
+                    api_key=api_key,
+                    dataset_id=dataset_id,
+                )
             self.send_json(200, result)
         except Exception as e:
             self.send_json(
                 502,
                 {
                     "ok": False,
-                    "message": f"知识库查询失败：{e}",
-                    "source": "Dify 出口退税率知识库",
+                    "message": "出口退税率查询暂时失败，请稍后重试",
+                    "matches": [],
                 },
             )
 

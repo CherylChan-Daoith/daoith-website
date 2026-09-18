@@ -1248,7 +1248,7 @@
       priceValue: i.priceValue || 0,
     }));
     const total = items.reduce((sum, i) => sum + (Number(i.priceValue) || 0) * (Number(i.qty) || 1), 0);
-    const payload = { company, contact, phone, total, items };
+    const payload = { company, contact, phone, total, items, source: 'website' };
 
     if (submitBtn) {
       submitBtn.disabled = true;

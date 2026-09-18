@@ -202,6 +202,7 @@ def ensure_db():
 
 
 FREE_ASK_LIMIT = 10
+DIAGNOSIS_PLAN_LIMIT = 3
 _DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{8,80}$")
 
 
@@ -420,6 +421,138 @@ def handle_diagnosis_ask_quota(
         "count": count,
         "limit": limit,
         "remaining": max(0, limit - count),
+    }
+
+
+def _plan_bypass_openids(env_loader=None) -> set:
+    raw = (
+        load_env_value("DIAGNOSIS_PLAN_BYPASS_OPENIDS", env_loader)
+        or load_env_value("DIAGNOSIS_PLAN_LIMIT_BYPASS_OPENIDS", env_loader)
+        or ""
+    )
+    return {x.strip() for x in str(raw).split(",") if x.strip()}
+
+
+def _read_plan_count(kind: str, ident: str) -> int:
+    """Reuse diagnosis_ask_quota rows with kind=plan / plan_device."""
+    ensure_db()
+    if not ident:
+        return 0
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                return _quota_count_for(cur, kind, ident, postgres=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        return _quota_count_for(conn, kind, ident, postgres=False)
+
+
+def _bump_plan_count(kind: str, ident: str, *, limit: int) -> int:
+    ensure_db()
+    if not ident:
+        return 0
+    now = datetime.now(timezone.utc).isoformat()
+    database_url = get_database_url()
+    if database_url:
+        with _pg_connect() as conn:
+            with conn.cursor() as cur:
+                _quota_bump(cur, kind, ident, postgres=True, now=now, limit=limit)
+            conn.commit()
+    else:
+        with sqlite3.connect(DB_PATH, isolation_level="IMMEDIATE") as conn:
+            _quota_bump(conn, kind, ident, postgres=False, now=now, limit=limit)
+            conn.commit()
+    return _read_plan_count(kind, ident)
+
+
+def resolve_plan_quota_identity(auth_header: str, body: dict, env_loader, headers=None):
+    """Exclusive plans require WeChat openid from JWT (no anonymous device fallback)."""
+    body = body or {}
+    resolved, err = _bearer_payload(auth_header or "", env_loader)
+    if err or not resolved:
+        return None, None, None
+    openid = (resolved.get("websiteOpenid") or "").strip() or None
+    if not openid:
+        return None, None, None
+    return "plan", openid, openid
+
+
+def consume_diagnosis_plan(kind: str, ident: str, *, env_loader=None, openid=None):
+    """Return (limited, count, limit, bypassed)."""
+    limit = DIAGNOSIS_PLAN_LIMIT
+    if openid and openid in _plan_bypass_openids(env_loader):
+        return False, _read_plan_count(kind, ident), limit, True
+    used = _read_plan_count(kind, ident)
+    if used >= limit:
+        return True, used, limit, False
+    count = _bump_plan_count(kind, ident, limit=limit)
+    return False, count, limit, False
+
+
+def handle_diagnosis_plan_quota(
+    auth_header: str, body: dict, env_loader, *, consume: bool, headers=None
+):
+    """Check / consume exclusive diagnosis plan quota (WeChat openid required)."""
+    set_env_loader(env_loader)
+    body = body or {}
+    kind, ident, openid = resolve_plan_quota_identity(
+        auth_header, body, env_loader, headers=headers
+    )
+    if not openid or not ident:
+        return 401, {
+            "error": "生成专属合规方案需先微信登录",
+            "needLogin": True,
+            "limited": True,
+        }
+    limit = DIAGNOSIS_PLAN_LIMIT
+    if openid in _plan_bypass_openids(env_loader):
+        used = _read_plan_count(kind, ident)
+        return 200, {
+            "ok": True,
+            "limited": False,
+            "bypassed": True,
+            "count": used,
+            "limit": limit,
+            "remaining": limit,
+            "openid": openid,
+        }
+    used = _read_plan_count(kind, ident)
+    if not consume:
+        limited = used >= limit
+        return 200, {
+            "ok": True,
+            "limited": limited,
+            "count": used,
+            "limit": limit,
+            "remaining": max(0, limit - used),
+            "openid": openid,
+            "kind": kind,
+        }
+    limited, count, limit, bypassed = consume_diagnosis_plan(
+        kind, ident, env_loader=env_loader, openid=openid
+    )
+    if limited:
+        return 403, {
+            "ok": False,
+            "limited": True,
+            "count": count,
+            "limit": limit,
+            "remaining": 0,
+            "openid": openid,
+            "error": (
+                f"您诊断的次数较多（已用完免费 {limit} 次合规方案）。"
+                "如果业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。"
+            ),
+        }
+    return 200, {
+        "ok": True,
+        "limited": False,
+        "bypassed": bypassed,
+        "count": count,
+        "limit": limit,
+        "remaining": max(0, limit - count),
+        "openid": openid,
+        "kind": kind,
     }
 
 
@@ -2005,6 +2138,9 @@ def _ensure_inquiry_extra_columns(cur, *, postgres: bool):
         cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS payment_slip_path TEXT")
         cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS payment_slip_mime TEXT")
         cur.execute("ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ")
+        cur.execute(
+            "ALTER TABLE website_inquiries ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'website'"
+        )
         return
     cols = {r[1] for r in cur.execute("PRAGMA table_info(website_inquiries)").fetchall()}
     specs = (
@@ -2013,10 +2149,18 @@ def _ensure_inquiry_extra_columns(cur, *, postgres: bool):
         ("payment_slip_path", "TEXT"),
         ("payment_slip_mime", "TEXT"),
         ("paid_at", "TEXT"),
+        ("source", "TEXT NOT NULL DEFAULT 'website'"),
     )
     for name, typ in specs:
         if name not in cols:
             cur.execute(f"ALTER TABLE website_inquiries ADD COLUMN {name} {typ}")
+
+
+def normalize_inquiry_source(raw) -> str:
+    s = str(raw or "").strip().lower()
+    if s in ("miniprogram", "mp", "mini") or "miniprogram" in s or "小程序" in s:
+        return "miniprogram"
+    return "website"
 
 
 SLIP_DIR = ROOT / "data" / "uploads" / "payment-slips"
@@ -2239,6 +2383,7 @@ def save_inquiry(record: dict):
     status = record.get("status") or "已提交"
     history = record.get("statusHistory") or _merge_status_history({}, status, created_at)
     history_json = json.dumps(history, ensure_ascii=False)
+    source = normalize_inquiry_source(record.get("source"))
     _, quoted, _ = compute_inquiry_totals(record.get("items") or [], record.get("total"))
     if record.get("quotedTotal") is not None:
         try:
@@ -2251,8 +2396,8 @@ def save_inquiry(record: dict):
                 cur.execute(
                     """
                     INSERT INTO website_inquiries
-                      (id, website_openid, company, contact, phone, total, quoted_total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                      (id, website_openid, company, contact, phone, total, quoted_total, items_json, status, status_history_json, notify_sent, pm_synced, created_at, source)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)
                     """,
                     (
                         record["id"],
@@ -2267,6 +2412,7 @@ def save_inquiry(record: dict):
                         history_json,
                         bool(record.get("notifySent")),
                         bool(record.get("pmSynced")),
+                        source,
                     ),
                 )
             conn.commit()
@@ -2276,8 +2422,8 @@ def save_inquiry(record: dict):
         conn.execute(
             """
             INSERT INTO website_inquiries
-              (id, website_openid, company, contact, phone, total, quoted_total, items_json, status, status_history_json, notify_sent, pm_synced, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              (id, website_openid, company, contact, phone, total, quoted_total, items_json, status, status_history_json, notify_sent, pm_synced, created_at, source)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record["id"],
@@ -2293,6 +2439,7 @@ def save_inquiry(record: dict):
                 1 if record.get("notifySent") else 0,
                 1 if record.get("pmSynced") else 0,
                 created_at,
+                source,
             ),
         )
         conn.commit()
@@ -2666,6 +2813,7 @@ def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
         slip_name = r[11] if len(r) > 11 else None
         slip_mime = r[12] if len(r) > 12 else None
         paid_at = r[13] if len(r) > 13 else None
+        source = r[14] if len(r) > 14 else "website"
         base = {
             "inquiryId": r[0],
             "websiteOpenid": r[1],
@@ -2683,6 +2831,7 @@ def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
         slip_name = r["payment_slip_name"] if "payment_slip_name" in r.keys() else None
         slip_mime = r["payment_slip_mime"] if "payment_slip_mime" in r.keys() else None
         paid_at = r["paid_at"] if "paid_at" in r.keys() else None
+        source = r["source"] if "source" in r.keys() else "website"
         base = {
             "inquiryId": r["id"],
             "websiteOpenid": r["website_openid"],
@@ -2719,6 +2868,7 @@ def _inquiry_row_to_dict(r, *, postgres: bool = False) -> dict:
         "status": status,
         "statusHistory": history,
         "createdAt": created_iso,
+        "source": normalize_inquiry_source(source),
     }
 
 
@@ -2733,7 +2883,7 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
                     """
                     SELECT id, website_openid, company, contact, phone, total, items_json,
                            status, status_history_json, created_at,
-                           quoted_total, payment_slip_name, payment_slip_mime, paid_at
+                           quoted_total, payment_slip_name, payment_slip_mime, paid_at, source
                     FROM website_inquiries
                     WHERE website_openid = %s
                     ORDER BY created_at DESC
@@ -2750,7 +2900,7 @@ def list_inquiries_for_openid(website_openid: str, limit: int = 50):
             """
             SELECT id, website_openid, company, contact, phone, total, items_json,
                    status, status_history_json, created_at,
-                   quoted_total, payment_slip_name, payment_slip_mime, paid_at
+                   quoted_total, payment_slip_name, payment_slip_mime, paid_at, source
             FROM website_inquiries
             WHERE website_openid = ?
             ORDER BY created_at DESC
@@ -3349,16 +3499,77 @@ def handle_service_file_get(auth_header: str, file_id: str, env_loader):
     }
 
 
-def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader):
-    """Logged-in user: accept diagnosis markdown and sync to PM inbox."""
+def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader, client_ip=None):
+    """Accept diagnosis markdown / Q&A and sync to PM inbox (website or miniprogram)."""
     set_env_loader(env_loader)
-    resolved, err = _bearer_payload(auth_header, env_loader)
-    if err:
-        return err
-
     body = body or {}
+    source = normalize_inquiry_source(body.get("source") or "website")
+    kind_diag = "qa" if body.get("kind") == "qa" else "diagnosis"
+
+    resolved = None
+    openid = None
+    nickname = None
+    external_user_id = None
+    payload = {}
+
+    resolved_pair, err = _bearer_payload(auth_header, env_loader)
+    if not err and resolved_pair:
+        resolved = resolved_pair
+        openid = resolved.get("websiteOpenid")
+        payload = resolved.get("payload") or {}
+        nickname = body.get("nickname") or payload.get("nickname") or None
+        try:
+            user = get_user_by_openid(openid) if openid else None
+            if user:
+                nickname = user.get("nickname") or nickname
+            external_user_id = (
+                str(user.get("id"))
+                if user and user.get("id") is not None
+                else str(payload.get("sub") or openid)
+            )
+        except Exception:
+            external_user_id = str(payload.get("sub") or openid)
+    elif source == "miniprogram":
+        # Soft path: silent wx.login may fail; still sync with device id.
+        device_id = str(body.get("deviceId") or "").strip()
+        nickname = body.get("nickname") or "小程序访客"
+        external_user_id = device_id or None
+        openid = None
+    elif kind_diag == "qa":
+        # Guest Q&A: identify by city + IP instead of WeChat name.
+        nickname = None
+        openid = None
+        external_user_id = None
+    else:
+        return err or (401, {"error": "请先微信登录后再保存方案"})
+
+    # Enforce exclusive plan quota by WeChat openid (login required)
+    if kind_diag == "diagnosis":
+        if not openid:
+            return 401, {
+                "ok": False,
+                "needLogin": True,
+                "error": "生成专属合规方案需先微信登录",
+            }
+        limited, count, limit, _bypassed = consume_diagnosis_plan(
+            "plan", openid, env_loader=env_loader, openid=openid
+        )
+        if limited:
+            return 403, {
+                "ok": False,
+                "limited": True,
+                "count": count,
+                "limit": limit,
+                "remaining": 0,
+                "error": (
+                    f"您诊断的次数较多（已用完免费 {limit} 次合规方案）。"
+                    "如果业务场景比较复杂，建议咨询财税专家获取更准确的解决方案。"
+                ),
+            }
+
     report_markdown = str(body.get("reportMarkdown") or body.get("markdown") or "").strip()
-    if len(report_markdown) < 80:
+    min_len = 40 if kind_diag == "qa" else 80
+    if len(report_markdown) < min_len:
         return 400, {"error": "报告内容过短，未保存"}
 
     slots_raw = body.get("slots") if isinstance(body.get("slots"), dict) else {}
@@ -3389,26 +3600,29 @@ def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader):
     summary = "\n".join(
         f"{label}：{slots[k]}" for k, label in labels if slots.get(k)
     ) or str(body.get("businessSummary") or "").strip()
+    question = str(body.get("question") or "").strip()
+    if kind_diag == "qa" and question:
+        summary = f"提问：{question}" + (f"\n{summary}" if summary else "")
+
+    geo = lookup_ip_region(client_ip) if client_ip else None
+    visitor_city = (geo or {}).get("city") if geo else None
+    visitor_province = (geo or {}).get("province") if geo else None
+    visitor_country = (geo or {}).get("country") if geo else None
+    if openid:
+        try:
+            user_row = get_user_by_openid(openid)
+            if user_row:
+                visitor_city = visitor_city or user_row.get("city")
+                visitor_province = visitor_province or user_row.get("province")
+                visitor_country = visitor_country or user_row.get("country")
+        except Exception:
+            pass
 
     report_id = str(body.get("reportId") or "").strip() or (
         f"diag_{int(time.time())}_{secrets.token_hex(4)}"
     )
-    openid = resolved["websiteOpenid"]
-    payload = resolved.get("payload") or {}
-    nickname = (
-        body.get("nickname")
-        or payload.get("nickname")
-        or None
-    )
-    try:
-        user = get_user_by_openid(openid)
-        if user and user.get("nickname"):
-            nickname = nickname or user.get("nickname")
-        external_user_id = str(user.get("id")) if user and user.get("id") is not None else str(
-            payload.get("sub") or openid
-        )
-    except Exception:
-        external_user_id = str(payload.get("sub") or openid)
+    if not external_user_id:
+        external_user_id = openid or (f"ip:{client_ip}" if client_ip else report_id)
 
     rec_ids = body.get("recommendedServiceIds")
     if not isinstance(rec_ids, list):
@@ -3425,8 +3639,13 @@ def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader):
         "conversationId": (
             str(body.get("conversationId")) if body.get("conversationId") else None
         ),
-        "kind": "qa" if body.get("kind") == "qa" else "diagnosis",
+        "kind": kind_diag,
         "recommendedServiceIds": [str(x) for x in rec_ids],
+        "source": source,
+        "clientIp": client_ip,
+        "country": visitor_country,
+        "province": visitor_province,
+        "city": visitor_city,
         "createdAt": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -3442,6 +3661,7 @@ def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader):
     return status, {
         "ok": bool(pm.get("ok") or pm.get("skipped")),
         "reportId": report_id,
+        "source": source,
         "pm": pm,
     }
 
@@ -3496,6 +3716,7 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
     created_at = datetime.now(timezone.utc).isoformat()
     status_history = {"已提交": created_at}
     standard_total, quoted_total, discount_rate = compute_inquiry_totals(items, total)
+    source = normalize_inquiry_source(body.get("source") or "website")
     record = {
         "id": inquiry_id,
         "websiteOpenid": website_openid,
@@ -3511,6 +3732,7 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
         "pmSynced": False,
         "createdAt": created_at,
         "nickname": nickname,
+        "source": source,
     }
     save_inquiry(record)
 
@@ -3541,6 +3763,7 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
                 "websiteOpenid": website_openid,
                 "nickname": nickname,
                 "createdAt": record["createdAt"],
+                "source": source,
             },
             env_loader,
         )
@@ -3559,4 +3782,5 @@ def handle_inquiry_create(auth_header: str, body: dict, env_loader):
         "discountRate": discount_rate,
         "notify": notify,
         "pm": pm,
+        "source": source,
     }

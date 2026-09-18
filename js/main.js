@@ -4396,6 +4396,7 @@ function initAiChatbot() {
 
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
+        persistAssistantReport(aluminumReply, { kind: 'qa', question: text });
         if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
           publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
           typing.classList.add('is-plan-status');
@@ -4837,6 +4838,7 @@ function initAiChatbot() {
           );
           clearQuickReplies();
         } else {
+          persistAssistantReport(answer, { kind: 'qa', question: text });
           beginLongQaRouting();
           publishDiagnosisPlanToResultPanel(answer, {
             kind: 'qa',
@@ -4849,6 +4851,7 @@ function initAiChatbot() {
           maybeShowServiceRecsAfterAnswer(answer);
         }
       } else {
+        persistAssistantReport(answer, { kind: 'qa', question: text });
         setBotBubble(typing, answer);
         showQuickReplies(answer);
         maybeShowServiceRecsAfterAnswer(answer);
@@ -5615,21 +5618,33 @@ function bumpDiagnosisPlanCount() {
   return next;
 }
 
-/** Persist finished diagnosis plan to PM analytics (best-effort). */
-function persistDiagnosisReport(markdown) {
+/** Persist finished diagnosis / Q&A to PM analytics (best-effort). */
+function persistAssistantReport(markdown, options = {}) {
   try {
+    const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
     const auth = window.DAOITH_AUTH;
-    if (!auth?.isLoggedIn?.()) return;
-    const token = auth.getToken?.();
-    if (!token) return;
+    const loggedIn = Boolean(auth?.isLoggedIn?.());
+    if (kind === 'diagnosis' && !loggedIn) return;
+    const token = auth?.getToken?.();
+    if (kind === 'diagnosis' && !token) return;
     const cleanRaw = stripDiagnosisArchivePreamble(
       correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
     );
-    const jsonReport = extractDiagnosisReportJson(cleanRaw);
-    const clean = jsonReport && isDiagnosisReportJsonReady(jsonReport)
-      ? diagnosisReportJsonToMarkdown(jsonReport)
-      : prepareDiagnosisPlanMarkdown(cleanRaw);
-    if (!clean || !isDiagnosisPlanReadyToShow(clean)) return;
+    let clean = cleanRaw;
+    if (kind === 'diagnosis') {
+      const jsonReport = extractDiagnosisReportJson(cleanRaw);
+      clean =
+        jsonReport && isDiagnosisReportJsonReady(jsonReport)
+          ? diagnosisReportJsonToMarkdown(jsonReport)
+          : prepareDiagnosisPlanMarkdown(cleanRaw);
+      if (!clean || !isDiagnosisPlanReadyToShow(clean)) return;
+    } else if (!clean || clean.replace(/\s+/g, '').length < 40) {
+      return;
+    } else if (
+      /请在下方选择|正在检索|正在为您生成专属合规方案|已为您生成专属合规方案/.test(clean)
+    ) {
+      return;
+    }
 
     const slots = typeof getDiagSlots === 'function' ? getDiagSlots() : {};
     const slotKey = [
@@ -5643,7 +5658,8 @@ function persistDiagnosisReport(markdown) {
     ]
       .map((v) => String(v || '').trim())
       .join('|');
-    const fingerprint = `${slotKey}::${clean.slice(0, 240)}`;
+    const question = String(options.question || '').trim();
+    const fingerprint = `${kind}::${question}::${slotKey}::${clean.slice(0, 240)}`;
     const dedupeKey = 'daoith_diag_report_fp';
     if (sessionStorage.getItem(dedupeKey) === fingerprint) return;
     sessionStorage.setItem(dedupeKey, fingerprint);
@@ -5652,8 +5668,7 @@ function persistDiagnosisReport(markdown) {
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `diag_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-    const user = auth.getUser?.() || {};
-    // Prefer Aliyun notify API (has PM_SYNC_SECRET); fall back to same-origin Vercel
+    const user = auth?.getUser?.() || {};
     const base = (
       window.DAOITH_CONFIG?.notifyApiBase ||
       window.DAOITH_CONFIG?.authApiBase ||
@@ -5661,21 +5676,22 @@ function persistDiagnosisReport(markdown) {
     ).replace(/\/$/, '');
     const recIds =
       typeof pickDiagnosisServiceIds === 'function' ? pickDiagnosisServiceIds(clean) : [];
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
 
     fetch(`${base}/api/diagnosis/reports`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify({
         reportId,
         slots,
         reportMarkdown: clean,
         nickname: user.nickname || null,
+        question: question || null,
         conversationId: localStorage.getItem('daoith_diagnosis_conversation_id') || null,
         recommendedServiceIds: Array.isArray(recIds) ? recIds : [],
-        kind: 'diagnosis',
+        kind,
+        source: 'website',
       }),
       keepalive: true,
     })
@@ -5691,6 +5707,10 @@ function persistDiagnosisReport(markdown) {
   } catch {
     /* never block diagnosis UX */
   }
+}
+
+function persistDiagnosisReport(markdown) {
+  persistAssistantReport(markdown, { kind: 'diagnosis' });
 }
 
 function isDiagnosisPlanLimitReached() {
@@ -6784,7 +6804,7 @@ function callDifyHsRate(hsCode) {
 
 输出要求（中文，简洁）：
 1. 第一行：出口退税率：X%
-2. 第二行：特殊商品标识：1 或 2（并注明征税/免税含义；知识库无该字段则写未收录）
+2. 第二行：仅当知识库有特殊商品标识 1 或 2 时写「特殊商品标识：…」；无该字段则整行省略，禁止写「未收录」
 3. 第三行：数据来源：知识库 / 国家税务总局出口退税率文库（注明依据）
 4. 第四行：简要说明（不超过40字；可同时注明增值税税率但不得与退税率混用）
 不要编造无法核实的税率；不确定时明确写「需人工核对官方税则」。`,
@@ -6806,24 +6826,30 @@ function hsRefundApiCandidates() {
 }
 
 /** Left-side HS refund lookup: Dataset Retrieve API (structured), not Chat LLM. */
-async function lookupRefundRateFromKnowledgeBase(hsCode) {
+async function lookupRefundRateFromKnowledgeBase(query) {
+  const raw = String(query || '').trim();
+  const digits = raw.replace(/\D/g, '');
+  const body =
+    digits.length >= 8
+      ? { hs_code: digits.slice(0, 10) }
+      : { keyword: raw };
   let lastError = null;
   for (const url of hsRefundApiCandidates()) {
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hs_code: hsCode }),
+        body: JSON.stringify(body),
       });
       let data;
       try {
         data = await res.json();
       } catch {
-        lastError = new Error(`退税率知识库返回异常（HTTP ${res.status}）`);
+        lastError = new Error(`出口退税率返回异常（HTTP ${res.status}）`);
         continue;
       }
       if (!res.ok) {
-        lastError = new Error(data.message || data.error || `知识库查询失败（HTTP ${res.status}）`);
+        lastError = new Error(data.message || data.error || `出口退税率查询失败（HTTP ${res.status}）`);
         continue;
       }
       return data;
@@ -6831,7 +6857,7 @@ async function lookupRefundRateFromKnowledgeBase(hsCode) {
       lastError = err;
     }
   }
-  throw lastError || new Error('知识库查询失败');
+  throw lastError || new Error('出口退税率查询失败');
 }
 
 /** Extract HS digits from a refund-rate style chat question. */
@@ -6959,8 +6985,9 @@ function formatStructuredRefundReply(kb, hsCode) {
   const matched = kb.hs_code || hsCode;
   const rate = kb.display || `${kb.rate}%`;
   const digits = String(matched).replace(/\D/g, '').slice(0, 10) || hsCode;
-  const flagLabel = kb.special_goods_flag_label || '';
-  if (flagLabel) {
+  const flagRaw = String(kb.special_goods_flag || '').trim();
+  const flagLabel = String(kb.special_goods_flag_label || '').trim();
+  if ((flagRaw === '1' || flagRaw === '2') && flagLabel && !/未收录|not\s*listed/i.test(flagLabel)) {
     return `${digits} 的出口退税率为 ${rate}。特殊商品标识 ${flagLabel}。`;
   }
   return `${digits} 的出口退税率为 ${rate}。`;
@@ -8975,7 +9002,11 @@ function getFormContext() {
     country,
     shipping,
     exportMode,
-    hsCode: val('hsCode').trim(),
+    hsCode: (() => {
+      const raw = val('hsCode').trim();
+      const digits = raw.replace(/\D/g, '');
+      return digits.length >= 8 ? digits.slice(0, 10) : '';
+    })(),
     revenue,
     teamSize,
     invoice,
@@ -9000,8 +9031,10 @@ function extractRatePercent(text) {
   return match ? `${match[1]}%` : '';
 }
 
-const HS_HINT_DEFAULT_ZH = '完整税号精确匹配；不足10位时按前8位尝试。';
-const HS_HINT_DEFAULT_EN = 'Exact match on full HS; if fewer than 10 digits, try first 8.';
+const HS_HINT_DEFAULT_ZH =
+  '可输入 8/10 位海关编码，或商品名称关键词（如「手机」）；10 位仅返回该编码。';
+const HS_HINT_DEFAULT_EN =
+  'Enter 8/10-digit HS code, or a product keyword (e.g. phone). 10-digit returns that code only.';
 const SPECIAL_GOODS_FLAG_HINT = {
   '1': {
     zh: '特殊商品标识：1（视同内销征税，进项可抵）',
@@ -9034,12 +9067,11 @@ function specialGoodsFlagHintText(result) {
   const mapped = SPECIAL_GOODS_FLAG_HINT[raw];
   if (mapped) return en ? mapped.en : mapped.zh;
   const label = String(result?.special_goods_flag_label || '').trim();
-  if (label) {
+  if (label && !/未收录|not\s*listed/i.test(label)) {
     return en ? `Special goods flag: ${label}` : `特殊商品标识：${label}`;
   }
-  return en
-    ? 'Special goods flag: not listed; please verify in the STA rebate schedule.'
-    : '特殊商品标识：未收录，请核对出口退税率文库';
+  // 未收录：不展示提示
+  return '';
 }
 
 function setHsHint(text, isFlag) {
@@ -9092,11 +9124,64 @@ function setHsProductName(name) {
   if (!text) {
     el.hidden = true;
     el.textContent = '';
+    el.innerHTML = '';
     return;
   }
   const label = isHsLocaleEn() ? 'Product name' : '商品名称';
   el.hidden = false;
   el.textContent = `${label}：${text}`;
+}
+
+function formatHsMatchLines(item) {
+  const en = isHsLocaleEn();
+  const code = String(item?.hs_code || '').trim();
+  const rate =
+    item?.display ||
+    (item?.rate != null && item?.rate !== '' ? `${item.rate}%` : '') ||
+    '—';
+  const name = extractHsProductName(item) || (en ? 'N/A' : '未查到');
+  const flagRaw = String(item?.special_goods_flag || '').trim();
+  const flagMapped = SPECIAL_GOODS_FLAG_HINT[flagRaw];
+  const flagText = flagMapped
+    ? en
+      ? flagMapped.en.replace(/^Special goods flag:\s*/, '')
+      : flagMapped.zh.replace(/^特殊商品标识：/, '')
+    : '';
+  if (en) {
+    return [
+      code ? `HS code: ${code}` : '',
+      `Export rebate: ${rate}`,
+      `Product name: ${name}`,
+      flagText ? `Special goods flag: ${flagText}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+  return [
+    code ? `商品编码：${code}` : '',
+    `出口退税率：${rate}`,
+    `商品名称：${name}`,
+    flagText ? `特殊商品标识：${flagText}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function setHsMatchList(matches) {
+  const el = document.getElementById('hsProductName');
+  if (!el) return;
+  const list = (Array.isArray(matches) ? matches : []).filter(Boolean);
+  if (list.length <= 1) {
+    if (list.length === 1) setHsProductName(extractHsProductName(list[0]));
+    else setHsProductName('');
+    return;
+  }
+  const blocks = list.map((m, i) => {
+    const title = isHsLocaleEn() ? `Result ${i + 1}` : `结果 ${i + 1}`;
+    return `【${title}】\n${formatHsMatchLines(m)}`;
+  });
+  el.hidden = false;
+  el.textContent = blocks.join('\n\n');
 }
 
 function setHsRateSource(kind, result) {
@@ -9187,7 +9272,12 @@ function initHsRebateQuery() {
       return;
     }
     const hsDigits = hsCode.replace(/\D/g, '');
-    if (hsDigits.length < 8) {
+    const isNameQuery = hsDigits.length < 8;
+    if (isNameQuery && hsCode.replace(/\s+/g, '').length < 2) {
+      alert('请填写8/10位海关编码，或至少2个字的商品名称关键词');
+      return;
+    }
+    if (!isNameQuery && hsDigits.length < 8) {
       alert('请填写10位海关编码以获得准确退税率（至少需8位数字）');
       return;
     }
@@ -9208,29 +9298,74 @@ function initHsRebateQuery() {
       let result = null;
       try {
         const kb = await lookupRefundRateFromKnowledgeBase(hsCode);
-        if (kb && kb.ok && kb.rate != null) {
+        if (kb && kb.ok && (kb.rate != null || (Array.isArray(kb.matches) && kb.matches.length))) {
+          result = kb;
+        } else if (kb && kb.ok === false && isNameQuery) {
           result = kb;
         }
       } catch {
-        // Fall back to local table when API/KB unavailable.
+        // Fall back to local table when API unavailable.
       }
 
-      if (!result) {
+      if (!result && !isNameQuery) {
         result = api.lookupRefundRate(hsCode);
       }
 
-      if (rateBox) rateBox.value = result.display || '—';
+      if (!result || (result.ok === false && !(Array.isArray(result.matches) && result.matches.length))) {
+        resetHsHint();
+        setHsProductName('');
+        alert(
+          (result && result.message) ||
+            (isNameQuery
+              ? '未查到相关商品出口退税率，请换个关键词或改用海关编码'
+              : '未查到参考退税率，请核对海关编码后重试')
+        );
+        return;
+      }
+
+      const matches = Array.isArray(result.matches)
+        ? result.matches.filter(Boolean)
+        : result.ok && result.rate != null
+          ? [result]
+          : [];
+      const primary = matches[0] || result;
+      const queryType = String(result.query_type || '').trim();
+
+      if (rateBox) {
+        rateBox.value =
+          matches.length > 1
+            ? `${matches.length}条`
+            : primary.display || '—';
+      }
       setHsRateSource('refund', null);
 
-      if (result.ok && result.rate != null) {
+      if (matches.length || (result.ok && result.rate != null)) {
         const refundInput = document.getElementById('taxRefund');
-        if (refundInput) refundInput.value = String(result.rate);
-        if (isZeroExportRefund(result)) {
-          setHsHint(specialGoodsFlagHintText(result), true);
+        if (refundInput && primary.rate != null) refundInput.value = String(primary.rate);
+        if (matches.length > 1) {
+          if (queryType === 'name' || isNameQuery) {
+            setHsHint(
+              isHsLocaleEn()
+                ? `Matched ${matches.length} products by keyword; ranked by relevance.`
+                : `按商品名称匹配到 ${matches.length} 条，已按相关性排序`,
+              false
+            );
+          } else {
+            setHsHint(
+              isHsLocaleEn()
+                ? `Matched ${matches.length} codes by first 8 digits; verify the full HS code.`
+                : `按前8位匹配到 ${matches.length} 条，请按完整编码核对`,
+              false
+            );
+          }
+          setHsMatchList(matches);
+        } else if (isZeroExportRefund(primary)) {
+          setHsHint(specialGoodsFlagHintText(primary), true);
+          setHsProductName(extractHsProductName(primary));
         } else {
           setHsHint('');
+          setHsProductName(extractHsProductName(primary));
         }
-        setHsProductName(extractHsProductName(result));
       } else {
         resetHsHint();
         setHsProductName('');

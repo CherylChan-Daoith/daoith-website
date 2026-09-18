@@ -1663,6 +1663,7 @@ ul {
 
 .diag-hs-block .hs-product-name {
   margin-top: 4px;
+  white-space: pre-wrap;
 }
 
 .diag-hs-block .hs-rate-source {
@@ -2397,6 +2398,7 @@ ul {
 
 .ai-grid .form-panel .hs-product-name {
   margin-top: 4px;
+  white-space: pre-wrap;
 }
 
 .ai-grid .form-panel .hs-rate-source {
