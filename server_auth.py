@@ -424,13 +424,26 @@ def handle_diagnosis_ask_quota(
     }
 
 
+# Website openids (snsapi_login) and mini-program openids differ by AppID.
+# 儀~Cheryl website: oqURV2STObg-wXYNoeRrcA9-JJcg
+# 儀~Cheryl mini-program: oknxI15Mfm8Q6tfFTyegKjT5ihnU
+_DEFAULT_PLAN_BYPASS_OPENIDS = {
+    "oqURV2STObg-wXYNoeRrcA9-JJcg",
+    "oqURV2ZUYx-el4Mjq7bF4nrzacXg",
+    "oqURV2cJpXPQ_1RC9PG_BVJg41QM",
+    "oknxI15Mfm8Q6tfFTyegKjT5ihnU",
+}
+
+
 def _plan_bypass_openids(env_loader=None) -> set:
     raw = (
         load_env_value("DIAGNOSIS_PLAN_BYPASS_OPENIDS", env_loader)
         or load_env_value("DIAGNOSIS_PLAN_LIMIT_BYPASS_OPENIDS", env_loader)
         or ""
     )
-    return {x.strip() for x in str(raw).split(",") if x.strip()}
+    ids = {x.strip() for x in str(raw).split(",") if x.strip()}
+    ids.update(_DEFAULT_PLAN_BYPASS_OPENIDS)
+    return ids
 
 
 def _read_plan_count(kind: str, ident: str) -> int:
@@ -512,8 +525,8 @@ def handle_diagnosis_plan_quota(
             "limited": False,
             "bypassed": True,
             "count": used,
-            "limit": limit,
-            "remaining": limit,
+            "limit": None,
+            "remaining": None,
             "openid": openid,
         }
     used = _read_plan_count(kind, ident)
