@@ -6827,14 +6827,10 @@ function hsRefundApiCandidates() {
   return [remote];
 }
 
-/** Left-side HS refund lookup: Dataset Retrieve API (structured), not Chat LLM. */
-async function lookupRefundRateFromKnowledgeBase(query) {
-  const raw = String(query || '').trim();
-  const digits = raw.replace(/\D/g, '');
-  const body =
-    digits.length >= 8
-      ? { hs_code: digits.slice(0, 10) }
-      : { keyword: raw };
+/** Left-side HS refund lookup: Dataset Retrieve API (structured), not Chat LLM. Website accepts HS codes only. */
+async function lookupRefundRateFromKnowledgeBase(hsCode) {
+  const digits = String(hsCode || '').replace(/\D/g, '').slice(0, 10);
+  const body = { hs_code: digits };
   let lastError = null;
   for (const url of hsRefundApiCandidates()) {
     try {
@@ -9033,10 +9029,8 @@ function extractRatePercent(text) {
   return match ? `${match[1]}%` : '';
 }
 
-const HS_HINT_DEFAULT_ZH =
-  '可输入 8/10 位海关编码，或商品名称关键词（如「手机」）；10 位仅返回该编码。';
-const HS_HINT_DEFAULT_EN =
-  'Enter 8/10-digit HS code, or a product keyword (e.g. phone). 10-digit returns that code only.';
+const HS_HINT_DEFAULT_ZH = '完整税号精确匹配；不足10位时按前8位尝试。';
+const HS_HINT_DEFAULT_EN = 'Exact match on full HS; if fewer than 10 digits, try first 8.';
 const SPECIAL_GOODS_FLAG_HINT = {
   '1': {
     zh: '特殊商品标识：1（视同内销征税，进项可抵）',
@@ -9274,12 +9268,7 @@ function initHsRebateQuery() {
       return;
     }
     const hsDigits = hsCode.replace(/\D/g, '');
-    const isNameQuery = hsDigits.length < 8;
-    if (isNameQuery && hsCode.replace(/\s+/g, '').length < 2) {
-      alert('请填写8/10位海关编码，或至少2个字的商品名称关键词');
-      return;
-    }
-    if (!isNameQuery && hsDigits.length < 8) {
+    if (hsDigits.length < 8) {
       alert('请填写10位海关编码以获得准确退税率（至少需8位数字）');
       return;
     }
@@ -9299,29 +9288,22 @@ function initHsRebateQuery() {
 
       let result = null;
       try {
-        const kb = await lookupRefundRateFromKnowledgeBase(hsCode);
+        const kb = await lookupRefundRateFromKnowledgeBase(hsDigits);
         if (kb && kb.ok && (kb.rate != null || (Array.isArray(kb.matches) && kb.matches.length))) {
-          result = kb;
-        } else if (kb && kb.ok === false && isNameQuery) {
           result = kb;
         }
       } catch {
         // Fall back to local table when API unavailable.
       }
 
-      if (!result && !isNameQuery) {
-        result = api.lookupRefundRate(hsCode);
+      if (!result) {
+        result = api.lookupRefundRate(hsDigits);
       }
 
       if (!result || (result.ok === false && !(Array.isArray(result.matches) && result.matches.length))) {
         resetHsHint();
         setHsProductName('');
-        alert(
-          (result && result.message) ||
-            (isNameQuery
-              ? '未查到相关商品出口退税率，请换个关键词或改用海关编码'
-              : '未查到参考退税率，请核对海关编码后重试')
-        );
+        alert((result && result.message) || '未查到参考退税率，请核对海关编码后重试');
         return;
       }
 
@@ -9331,7 +9313,6 @@ function initHsRebateQuery() {
           ? [result]
           : [];
       const primary = matches[0] || result;
-      const queryType = String(result.query_type || '').trim();
 
       if (rateBox) {
         rateBox.value =
@@ -9345,21 +9326,12 @@ function initHsRebateQuery() {
         const refundInput = document.getElementById('taxRefund');
         if (refundInput && primary.rate != null) refundInput.value = String(primary.rate);
         if (matches.length > 1) {
-          if (queryType === 'name' || isNameQuery) {
-            setHsHint(
-              isHsLocaleEn()
-                ? `Matched ${matches.length} products by keyword; ranked by relevance.`
-                : `按商品名称匹配到 ${matches.length} 条，已按相关性排序`,
-              false
-            );
-          } else {
-            setHsHint(
-              isHsLocaleEn()
-                ? `Matched ${matches.length} codes by first 8 digits; verify the full HS code.`
-                : `按前8位匹配到 ${matches.length} 条，请按完整编码核对`,
-              false
-            );
-          }
+          setHsHint(
+            isHsLocaleEn()
+              ? `Matched ${matches.length} codes by first 8 digits; verify the full HS code.`
+              : `按前8位匹配到 ${matches.length} 条，请按完整编码核对`,
+            false
+          );
           setHsMatchList(matches);
         } else if (isZeroExportRefund(primary)) {
           setHsHint(specialGoodsFlagHintText(primary), true);
