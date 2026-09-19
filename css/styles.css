@@ -692,12 +692,18 @@ ul {
 .hero-assistant-name {
   display: inline-flex;
   align-items: center;
-  gap: 0.35em;
-  margin-right: 2px;
+  gap: 0.45em;
+  margin-right: 0.15em;
   color: #2e50f5;
   font-weight: 700;
   white-space: nowrap;
-  vertical-align: baseline;
+  vertical-align: -0.08em;
+}
+
+.hero-assistant-name,
+.diag-chat-title,
+#aiSolutionJourney .process-card[data-step="1"] h4 {
+  --lockup-size: 1em;
 }
 
 .ai-badge {
@@ -706,16 +712,16 @@ ul {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  height: 2.05em;
-  padding: 0 0.72em;
-  margin: 0;
-  background: linear-gradient(90deg, #3a6bf3 0%, #56aded 100%);
+  height: calc(var(--lockup-size, 1em) * 1.22);
+  padding: 0 calc(var(--lockup-size, 1em) * 0.62);
+  margin: 0 0 calc(var(--lockup-size, 1em) * 0.04);
+  background: linear-gradient(90deg, #3a6bf3 0%, #5dbeec 100%);
   color: #fff !important;
   border: none !important;
   border-radius: 999px;
-  font-size: 0.55em;
+  font-size: calc(var(--lockup-size, 1em) * 0.5);
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   line-height: 1;
   box-shadow: none;
   vertical-align: middle;
@@ -1712,7 +1718,7 @@ ul {
 .diag-chat-title {
   display: flex;
   align-items: center;
-  gap: 0.35em;
+  gap: 0.45em;
   min-width: 0;
   font-size: 16px;
   font-weight: 700;
@@ -3925,7 +3931,7 @@ ul {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.28em;
+  gap: 0.4em;
   margin-bottom: 14px;
   color: #2e50f5;
   font-size: 1.35rem;

@@ -306,7 +306,8 @@ window.DAOITH_I18N_EN = {
       text: 'Follow the flow into the Daoith AI assistant to generate your plan and matched services.',
     },
     '#aiSolutionJourney .process-card[data-step="1"] h4': {
-      text: 'Daoith AI Compliance Assistant',
+      html: true,
+      text: 'Daoith Compliance Assistant<span class="ai-badge">AI</span>',
     },
     '#aiSolutionJourney .process-card[data-step="1"] .tag': {
       text: 'Limited-time free trial',
