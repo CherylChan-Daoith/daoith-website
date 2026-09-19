@@ -710,7 +710,7 @@ ul {
   height: calc(var(--lockup-size, 16px) * 1.28);
   padding: 0 calc(var(--lockup-size, 16px) * 0.7);
   margin: 0;
-  background: linear-gradient(90deg, #3a6bf3 0%, #5dbeec 100%);
+  background: linear-gradient(90deg, #6d9af8 0%, #9ad8f8 100%);
   color: #fff !important;
   border: none !important;
   border-radius: 999px;
@@ -3927,14 +3927,14 @@ ul {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4em;
-  margin-bottom: 14px;
-  color: #2e50f5;
-  font-size: 1.35rem;
-  font-weight: 700;
+  gap: 0.35em;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 1.0625rem;
+  font-weight: 600;
   letter-spacing: 0;
-  line-height: 1.15;
-  --lockup-size: 1.35rem;
+  line-height: 1.2;
+  --lockup-size: 1.0625rem;
 }
 
 #aiSolutionJourney .process-card[data-step="1"] .process-tags .tag {
