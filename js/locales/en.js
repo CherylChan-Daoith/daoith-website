@@ -244,7 +244,7 @@ window.DAOITH_I18N_EN = {
     '#heroPanel0 .hero-panel-copy h2': { text: 'AI Solutions' },
     '#heroPanel0 .hero-panel-copy > p:not(.hero-panel-kicker)': {
       html: true,
-      text: '<span class="hero-assistant-name">Daoith Compliance Assistant<span class="tag">AI</span></span> asks step-by-step about platform, entity, shipping and invoices — a tailored compliance plan in minutes for common seller scenarios.',
+      text: '<span class="hero-assistant-name">Daoith Compliance Assistant<span class="ai-badge">AI</span></span> asks step-by-step about platform, entity, shipping and invoices — a tailored compliance plan in minutes for common seller scenarios.',
     },
     '#heroPanel0 .hero-panel-points li:nth-child(1)': { text: 'One question at a time' },
     '#heroPanel0 .hero-panel-points li:nth-child(2)': { text: 'Structured plan output' },

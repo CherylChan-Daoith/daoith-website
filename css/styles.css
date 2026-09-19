@@ -692,7 +692,7 @@ ul {
 .hero-assistant-name {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 0.35em;
   margin-right: 2px;
   color: #2e50f5;
   font-weight: 700;
@@ -700,21 +700,25 @@ ul {
   vertical-align: baseline;
 }
 
-.hero-assistant-name .tag {
-  flex-shrink: 0;
+.ai-badge {
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 16px;
-  padding: 0 7px;
-  background: linear-gradient(90deg, #3866f3 0%, #5dbeec 100%);
-  color: #fff;
-  border: none;
-  font-size: 11px;
+  box-sizing: border-box;
+  height: 2.05em;
+  padding: 0 0.72em;
+  margin: 0;
+  background: linear-gradient(90deg, #3a6bf3 0%, #56aded 100%);
+  color: #fff !important;
+  border: none !important;
   border-radius: 999px;
+  font-size: 0.55em;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   line-height: 1;
+  box-shadow: none;
+  vertical-align: middle;
 }
 
 .hero-panel-points {
@@ -1699,8 +1703,8 @@ ul {
   gap: 8px;
   flex-shrink: 0;
   padding: 14px 16px 10px;
-  background: linear-gradient(180deg, #e4ebfe 0%, #f4f7ff 58%, #ffffff 100%) !important;
-  background-image: linear-gradient(180deg, #e4ebfe 0%, #f4f7ff 58%, #ffffff 100%) !important;
+  background: transparent !important;
+  background-image: none !important;
   color: #2e50f5;
   border-bottom: none;
 }
@@ -1708,39 +1712,28 @@ ul {
 .diag-chat-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.35em;
   min-width: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #2e50f5;
+  line-height: 1.15;
 }
 
 .diag-chat-title strong,
 #ai-solution .diag-chat-title strong {
-  font-size: 15px;
+  font-size: 1em;
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 1.15;
   color: #2e50f5 !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.diag-chat-title .tag {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 18px;
-  padding: 0 8px;
-  margin: 0;
-  background: linear-gradient(90deg, #3866f3 0%, #5dbeec 100%);
-  color: #fff;
-  border: none;
-  font-size: 11px;
-  line-height: 1;
-  border-radius: 999px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  box-shadow: none;
+.diag-chat-title .ai-badge {
+  align-self: center;
 }
 
 .diag-chat .ai-chatbot-new {
@@ -3932,19 +3925,13 @@ ul {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0.28em;
   margin-bottom: 14px;
-  color: #051c2c;
+  color: #2e50f5;
   font-size: 1.35rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-#aiSolutionJourney .process-card[data-step="1"] .process-title-arrow {
-  font-weight: 500;
-  font-size: 1.15rem;
-  line-height: 1;
-  color: #051c2c;
+  letter-spacing: 0;
+  line-height: 1.15;
 }
 
 #aiSolutionJourney .process-card[data-step="1"] .process-tags .tag {
