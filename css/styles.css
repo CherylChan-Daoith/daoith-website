@@ -698,12 +698,7 @@ ul {
   font-weight: 700;
   white-space: nowrap;
   vertical-align: -0.08em;
-}
-
-.hero-assistant-name,
-.diag-chat-title,
-#aiSolutionJourney .process-card[data-step="1"] h4 {
-  --lockup-size: 1em;
+  --lockup-size: 0.8125rem;
 }
 
 .ai-badge {
@@ -712,16 +707,16 @@ ul {
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  height: calc(var(--lockup-size, 1em) * 1.22);
-  padding: 0 calc(var(--lockup-size, 1em) * 0.62);
-  margin: 0 0 calc(var(--lockup-size, 1em) * 0.04);
+  height: calc(var(--lockup-size, 16px) * 1.28);
+  padding: 0 calc(var(--lockup-size, 16px) * 0.7);
+  margin: 0;
   background: linear-gradient(90deg, #3a6bf3 0%, #5dbeec 100%);
   color: #fff !important;
   border: none !important;
   border-radius: 999px;
-  font-size: calc(var(--lockup-size, 1em) * 0.5);
+  font-size: calc(var(--lockup-size, 16px) * 0.58);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   line-height: 1;
   box-shadow: none;
   vertical-align: middle;
@@ -1724,6 +1719,7 @@ ul {
   font-weight: 700;
   color: #2e50f5;
   line-height: 1.15;
+  --lockup-size: 16px;
 }
 
 .diag-chat-title strong,
@@ -3938,6 +3934,7 @@ ul {
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.15;
+  --lockup-size: 1.35rem;
 }
 
 #aiSolutionJourney .process-card[data-step="1"] .process-tags .tag {
