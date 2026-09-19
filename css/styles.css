@@ -710,7 +710,7 @@ ul {
   height: calc(var(--lockup-size, 16px) * 1.28);
   padding: 0 calc(var(--lockup-size, 16px) * 0.7);
   margin: 0;
-  background: linear-gradient(90deg, #6d9af8 0%, #9ad8f8 100%);
+  background: linear-gradient(135deg, #2251ff, #22d3ee);
   color: #fff !important;
   border: none !important;
   border-radius: 999px;
