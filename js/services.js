@@ -1147,7 +1147,7 @@ SCR重要控制人备案
       desc: `可选：公司做账报税年度服务。`,
       priceLabel: `RM6,000`,
       priceValue: 6000,
-      unit: `起/年`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1203,7 +1203,7 @@ SCR重要控制人备案
       desc: `可选：公司年审、行业执照代办、税务咨询与税收优惠申请。`,
       priceLabel: `RM6,000`,
       priceValue: 6000,
-      unit: `/年`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1266,7 +1266,7 @@ SCR重要控制人备案
       desc: `可选：做账报税年度包、单项记账/报表/XBRL、税务代理、法定审计。`,
       priceLabel: `S$10,300`,
       priceValue: 10300,
-      unit: `起/年`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1329,7 +1329,7 @@ SCR重要控制人备案
       desc: `可选：GST 注册、预扣税申报 / 税务居民证明。`,
       priceLabel: `S$460`,
       priceValue: 460,
-      unit: `/次`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1358,7 +1358,7 @@ SCR重要控制人备案
       desc: `可选：公司注册、VIP 地址服务。`,
       priceLabel: `£275`,
       priceValue: 275,
-      unit: ``,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1387,7 +1387,7 @@ SCR重要控制人备案
       desc: `可选：公司年报、月度记账、VAT 申报。`,
       priceLabel: `£660`,
       priceValue: 660,
-      unit: `起/年`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1417,7 +1417,7 @@ SCR重要控制人备案
       desc: `可选：PAYE 申报、养老金申报。`,
       priceLabel: `£22`,
       priceValue: 22,
-      unit: `/人/月`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
@@ -1446,7 +1446,7 @@ SCR重要控制人备案
       desc: `可选：公司年审、VAT/EORI/PAYE/养老金注册、税号重置注销、公司注销、查税保险等。`,
       priceLabel: `£130`,
       priceValue: 130,
-      unit: `/年`,
+      unit: `起`,
       details: excelBlocks({
         content: ``,
         cycle: ``,
