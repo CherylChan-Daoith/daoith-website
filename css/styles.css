@@ -6667,9 +6667,8 @@ ul {
   white-space: nowrap;
 }
 
-.service-table-wrap--pricing-tiers {
-  width: max-content;
-  max-width: 100%;
+.service-detail-table--pricing-tiers tbody th {
+  white-space: pre-line;
 }
 
 .service-table-wrap--scope,
