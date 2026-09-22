@@ -6671,6 +6671,11 @@ ul {
   white-space: pre-line;
 }
 
+.service-table-wrap--pricing-tiers {
+  width: max-content;
+  max-width: 100%;
+}
+
 .service-table-wrap--scope,
 .service-table-wrap--deliver,
 .service-table-wrap--pricing {
