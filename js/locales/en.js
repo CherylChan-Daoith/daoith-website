@@ -888,7 +888,7 @@ window.DAOITH_I18N_EN = {
           ],
         },
         pricingNote: 'Annual contract. Both plans include business tax consultation, inspection response, and policy briefings; deep-dive sessions and risk screening follow the selected tier.',
-        process: ['Confirm tier', 'Onboarding', 'Ongoing consultation', 'Policy updates', 'Deep-dive / screening by tier', 'Inspection support when triggered', 'Year-end review'],
+        process: ['Onboarding', 'Ongoing consultation', 'Policy updates', 'Deep-dive / screening by tier', 'Inspection support when triggered', 'Year-end review'],
         faqs: [
           { q: 'How is this different from compliance coaching?', a: 'Year-round advisory focuses on ongoing consultation, policy, inspection support and screening. Compliance coaching is for executing a remediation plan with on-site visits.' },
           { q: 'Can we upgrade from Basic to VIP mid-year?', a: 'Yes. We settle the prorated difference after confirming remaining deliverables.' },
