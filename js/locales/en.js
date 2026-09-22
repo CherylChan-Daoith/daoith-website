@@ -815,16 +815,16 @@ window.DAOITH_I18N_EN = {
         audience: 'Teams with a plan to execute, rapid growth, prior tax notices, or no in-house compliance staff.',
         pricing: '',
         pricingTable: {
-          headers: ['On-site visits', 'Fee', 'Notes'],
+          headers: ['Plan', 'On-site', 'Online', 'Tax-authority support', 'Fee'],
           rows: [
-            ['4 / year', '¥38,000', 'Unlimited online + 4 on-site visits'],
-            ['6 / year', '¥53,000', 'Unlimited online + 6 on-site visits'],
-            ['8 / year', '¥68,000', 'Unlimited online + 8 on-site visits'],
-            ['10 / year', '¥83,000', 'Unlimited online + 10 on-site visits'],
-            ['12 / year', '¥98,000', 'Unlimited online + 12 on-site visits'],
+            ['Plan 1', '4 visits', 'Up to 20 hours', '2 times', '¥38,000 / year'],
+            ['Plan 2', '6 visits', 'Up to 30 hours', '3 times', '¥53,000 / year'],
+            ['Plan 3', '8 visits', 'Up to 40 hours', '4 times', '¥68,000 / year'],
+            ['Plan 4', '10 visits', 'Unlimited', '5 times', '¥83,000 / year'],
+            ['Plan 5', '12 visits', 'Unlimited', 'Unlimited', '¥98,000 / year'],
           ],
         },
-        pricingNote: 'Annual contract. Unlimited online contact during the term; major tax matters responded to as they arise.',
+        pricingNote: 'Annual contract. Each plan includes the stated on-site, online, and tax-authority allowances; overages can be added. Pair with diagnosis first if you do not yet have a plan.',
         process: ['Handover', 'Breakdown', 'Confirm execution plan', 'Follow-up and reviews', 'Authority support', 'Stage acceptance'],
         faqs: [
           { q: 'Does coaching include bookkeeping or rebate filing?', a: 'No. Add bookkeeping or rebate agency separately.' },
