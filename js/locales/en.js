@@ -714,6 +714,7 @@ window.DAOITH_I18N_EN = {
     { title: 'Expert 1-on-1 advisory', desc: 'One-on-one diagnosis covering structure, rebates, tax risk, and actionable next steps.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ hour' },
     { title: 'Custom tax compliance plan', desc: 'Full tax health check · scenario-based compliance plan · actionable implementation list.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
     { title: 'Compliance coaching', desc: 'Turn a compliance plan into a tracked execution calendar, with tax-authority support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
+    { title: 'Year-round tax advisory', desc: 'Business tax Q&A, inspection response, policy briefings, deep-dive sessions, and risk screening.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
     { title: 'AI finance ops coaching', desc: 'Survey first, then land AI in finance workflows with hands-on coaching until the team can run independently.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Compliance bookkeeping', desc: 'Books, filings, risk alerts, health check, and annual AIC reporting support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
     { title: '0110 rebate + HK full managed', desc: 'Pick modules: mainland setup, rebate, bookkeeping, and Hong Kong annual/audit.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ 10% off from 3 modules' },
@@ -829,6 +830,68 @@ window.DAOITH_I18N_EN = {
         faqs: [
           { q: 'Does coaching include bookkeeping or rebate filing?', a: 'No. Add bookkeeping or rebate agency separately.' },
           { q: 'We do not have a diagnosis yet.', a: 'Pair this with the diagnosis product first.' },
+        ],
+      }),
+    },
+    {
+      id: 'consult-year-advisor',
+      title: 'Year-round tax advisory',
+      desc: 'Business tax Q&A, inspection response, policy briefings, deep-dive sessions, and risk screening.',
+      unit: '/ year from',
+      details: window.DAOITH_enServiceBlocks({
+        content:
+          'A year-round advisory retainer: day-to-day business tax questions, inspection response, policy navigation, expert deep-dive meetings, and AI-assisted risk screening.',
+        bullets: [
+          'Business tax consultation: invoicing, filings, incentives, contract tax clauses, and new-model tax assessment',
+          'Tax inspection response: strategy, notice review, and statement drafting support',
+          'Latest policy briefings turned into actionable steps for finance teams',
+          'Face-to-face deep-dive sessions on complex tax issues',
+          'Comprehensive tax-risk screening report with remediation advice',
+        ],
+        highlights: ['Basic and VIP annual plans', 'Always-on consultation support', 'Inspection and policy coverage'],
+        audience: 'Companies that need ongoing tax advisory support, frequent contract/new-model reviews, or periodic risk screening with inspection backup.',
+        pricing: '',
+        pricingTable: {
+          headers: ['Item', 'What is included', 'Basic', 'VIP'],
+          rows: [
+            ['Fee', 'Annual contract', '¥29,800 / year', '¥49,800 / year'],
+            [
+              'Business tax consultation\nAccompanying day-to-day support',
+              'Daily Q&A on invoicing, expense claims, VAT/CIT filings and incentives\nPre-signing review of tax clauses in major contracts\nTax characterization and rate assessment for new models',
+              '✓',
+              '✓',
+            ],
+            [
+              'Tax inspection response\nProfessional crisis handling',
+              'Guidance and strategy during inspections\nReview of tax notices and decision documents\nHelp drafting explanations and appeal statements when conclusions are disputed',
+              '✓',
+              '✓',
+            ],
+            [
+              'Latest policy interpretation\nTimely, practical navigation',
+              'Push relevant policy updates with key takeaways\nAssess opportunities and challenges for your business\nTurn rules into clear operating steps for finance staff',
+              '✓',
+              '✓',
+            ],
+            [
+              'Face-to-face deep communication\nCustom expert sessions',
+              'Expert workshops on complex issues such as expansion tax treatment, asset losses, and special tax matters',
+              '1 / year',
+              '2 / year',
+            ],
+            [
+              'Comprehensive tax-risk screening\nPreventive health check',
+              'AI-assisted tax health report covering invoice, supplier, customer and burden risks, with written findings and remediation advice',
+              '1 / year',
+              '2 / year',
+            ],
+          ],
+        },
+        pricingNote: 'Annual contract. Both plans include business tax consultation, inspection response, and policy briefings; deep-dive sessions and risk screening follow the selected tier.',
+        process: ['Confirm tier', 'Onboarding', 'Ongoing consultation', 'Policy updates', 'Deep-dive / screening by tier', 'Inspection support when triggered', 'Year-end review'],
+        faqs: [
+          { q: 'How is this different from compliance coaching?', a: 'Year-round advisory focuses on ongoing consultation, policy, inspection support and screening. Compliance coaching is for executing a remediation plan with on-site visits.' },
+          { q: 'Can we upgrade from Basic to VIP mid-year?', a: 'Yes. We settle the prorated difference after confirming remaining deliverables.' },
         ],
       }),
     },

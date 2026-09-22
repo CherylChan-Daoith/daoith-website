@@ -11,7 +11,8 @@
   const SERVICE_INDEX = [
     { id: 'consult-1v1', title: '财税专家1v1咨询', en: 'Expert 1-on-1 advisory', keys: '1v1 专家 咨询 顾问 consult' },
     { id: 'domestic-diagnosis', title: '财税合规方案定制', en: 'Custom tax compliance plan', keys: '人工诊断 合规评估 诊断报告 体检 方案定制 跨境电商' },
-    { id: 'consult-annual', title: '财税合规陪跑', en: 'Compliance coaching', keys: '陪跑 全年 顾问年' },
+    { id: 'consult-annual', title: '财税合规陪跑', en: 'Compliance coaching', keys: '陪跑 全年 顾问年 合规陪跑' },
+    { id: 'consult-year-advisor', title: '常年财税顾问', en: 'Year-round tax advisory', keys: '常年顾问 常年财税 顾问基础版 顾问VIP 税检应对 政策解读' },
     { id: 'domestic-compliance-bookkeeping', title: '合规代账', en: 'Compliance bookkeeping', keys: '代账 记账 报税 账务 全托管' },
     { id: 'domestic-arch-0110-hk', title: '0110出口退税＋香港公司合规全托管', en: '0110 rebate + HK bundle', keys: '0110 一般贸易 香港架构' },
     { id: 'domestic-arch-1039-hk', title: '1039出口免税＋香港公司合规全托管', en: '1039 exemption + HK bundle', keys: '1039架构 香港公司架构' },

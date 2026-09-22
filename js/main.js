@@ -5823,7 +5823,8 @@ function pickDiagnosisServiceIds(text) {
   }
   if (/记账|账务|做账|汇算清缴|账册|代账/.test(t)) add('domestic-compliance-bookkeeping');
   if (/合规体检|全面诊断|架构诊断|风险排查/.test(t)) add('domestic-diagnosis');
-  if (/全年陪跑|持续跟进|常年顾问|财税合规陪跑/.test(t)) add('consult-annual');
+  if (/全年陪跑|持续跟进|财税合规陪跑/.test(t)) add('consult-annual');
+  if (/常年财税顾问|常年顾问/.test(t)) add('consult-year-advisor');
 
   // 若除专家外仍无套餐：按出口方式兜底
   if (ids.length <= 1) {
