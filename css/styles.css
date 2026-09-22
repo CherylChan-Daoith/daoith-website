@@ -6642,9 +6642,9 @@ ul {
 
 .service-detail-table--pricing-tiers {
   min-width: 0;
-  width: 100%;
+  width: max-content;
   max-width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .service-detail-table--pricing-tiers thead th {
@@ -6669,6 +6669,8 @@ ul {
   color: var(--ink);
   white-space: nowrap;
   text-align: center;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 
 .service-detail-table--pricing-tiers tbody td.col-3 {
@@ -6677,26 +6679,24 @@ ul {
   color: var(--ink);
   white-space: nowrap;
   text-align: center;
-}
-
-.service-detail-table--pricing-tiers tbody th {
-  white-space: normal;
-}
-
-.service-detail-table--pricing-tiers thead th:nth-child(1),
-.service-detail-table--pricing-tiers tbody th {
-  width: 40%;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 
 .service-detail-table--pricing-tiers thead th:nth-child(2),
-.service-detail-table--pricing-tiers thead th:nth-child(3),
-.service-detail-table--pricing-tiers tbody td.col-2,
-.service-detail-table--pricing-tiers tbody td.col-3 {
-  width: 30%;
+.service-detail-table--pricing-tiers thead th:nth-child(3) {
+  text-align: center;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.service-detail-table--pricing-tiers tbody th {
+  white-space: nowrap;
+  padding-right: 1.5rem;
 }
 
 .service-table-wrap--pricing-tiers {
-  width: 100%;
+  width: max-content;
   max-width: 100%;
 }
 
