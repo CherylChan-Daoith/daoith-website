@@ -73,6 +73,9 @@ export default async function handler(req, res) {
   const body = req.body || {};
   const source = normalizeSource(body.source);
   const kind = body.kind === 'qa' ? 'qa' : 'diagnosis';
+  if (kind === 'qa') {
+    return res.status(200).json({ ok: true, skipped: true, reason: 'qa_not_stored' });
+  }
   const token = getBearerToken(req);
 
   let payload = null;

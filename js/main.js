@@ -5620,10 +5620,11 @@ function bumpDiagnosisPlanCount() {
   return next;
 }
 
-/** Persist finished diagnosis / Q&A to PM analytics (best-effort). */
+/** Persist finished compliance plans to PM (Q&A is not stored). */
 function persistAssistantReport(markdown, options = {}) {
   try {
-    const kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
+    if (options.kind === 'qa') return;
+    const kind = 'diagnosis';
     const auth = window.DAOITH_AUTH;
     const loggedIn = Boolean(auth?.isLoggedIn?.());
     if (kind === 'diagnosis' && !loggedIn) return;

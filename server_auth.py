@@ -3513,11 +3513,13 @@ def handle_service_file_get(auth_header: str, file_id: str, env_loader):
 
 
 def handle_diagnosis_report_create(auth_header: str, body: dict, env_loader, client_ip=None):
-    """Accept diagnosis markdown / Q&A and sync to PM inbox (website or miniprogram)."""
+    """Accept a compliance plan and sync to PM inbox (website or miniprogram). Q&A is not stored."""
     set_env_loader(env_loader)
     body = body or {}
     source = normalize_inquiry_source(body.get("source") or "website")
     kind_diag = "qa" if body.get("kind") == "qa" else "diagnosis"
+    if kind_diag == "qa":
+        return 200, {"ok": True, "skipped": True, "reason": "qa_not_stored"}
 
     resolved = None
     openid = None
