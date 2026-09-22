@@ -120,7 +120,7 @@ window.DAOITH_enServiceBlocks = function enServiceBlocks({
   if (hasPricingTable) {
     out.push({
       type: 'table',
-      variant: 'pricing',
+      variant: pricingTable.variant || 'pricing',
       firstColHeader: true,
       headers: pricingTable.headers,
       rows: pricingTable.rows,
@@ -852,39 +852,15 @@ window.DAOITH_I18N_EN = {
         audience: 'Companies that need ongoing tax advisory support, frequent contract/new-model reviews, or periodic risk screening with inspection backup.',
         pricing: '',
         pricingTable: {
-          headers: ['Item', 'What is included', 'Basic', 'VIP'],
+          variant: 'pricing-tiers',
+          headers: ['Item', 'Basic', 'VIP'],
           rows: [
-            ['Fee', 'Annual contract', '¥29,800 / year', '¥49,800 / year'],
-            [
-              'Business tax consultation\nAccompanying day-to-day support',
-              'Daily Q&A on invoicing, expense claims, VAT/CIT filings and incentives\nPre-signing review of tax clauses in major contracts\nTax characterization and rate assessment for new models',
-              '✓',
-              '✓',
-            ],
-            [
-              'Tax inspection response\nProfessional crisis handling',
-              'Guidance and strategy during inspections\nReview of tax notices and decision documents\nHelp drafting explanations and appeal statements when conclusions are disputed',
-              '✓',
-              '✓',
-            ],
-            [
-              'Latest policy interpretation\nTimely, practical navigation',
-              'Push relevant policy updates with key takeaways\nAssess opportunities and challenges for your business\nTurn rules into clear operating steps for finance staff',
-              '✓',
-              '✓',
-            ],
-            [
-              'Face-to-face deep communication\nCustom expert sessions',
-              'Expert workshops on complex issues such as expansion tax treatment, asset losses, and special tax matters',
-              '1 / year',
-              '2 / year',
-            ],
-            [
-              'Comprehensive tax-risk screening\nPreventive health check',
-              'AI-assisted tax health report covering invoice, supplier, customer and burden risks, with written findings and remediation advice',
-              '1 / year',
-              '2 / year',
-            ],
+            ['Fee', '¥29,800 / year', '¥49,800 / year'],
+            ['Business tax consultation\nAccompanying day-to-day support', '✓', '✓'],
+            ['Tax inspection response\nProfessional crisis handling', '✓', '✓'],
+            ['Latest policy interpretation\nTimely, practical navigation', '✓', '✓'],
+            ['Face-to-face deep communication\nCustom expert sessions', '1 / year', '2 / year'],
+            ['Comprehensive tax-risk screening\nPreventive health check', '1 / year', '2 / year'],
           ],
         },
         pricingNote: 'Annual contract. Both plans include business tax consultation, inspection response, and policy briefings; deep-dive sessions and risk screening follow the selected tier.',

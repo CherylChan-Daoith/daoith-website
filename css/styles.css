@@ -6640,6 +6640,38 @@ ul {
   white-space: nowrap;
 }
 
+.service-detail-table--pricing-tiers {
+  min-width: 0;
+  width: max-content;
+  max-width: 100%;
+}
+
+.service-detail-table--pricing-tiers thead th {
+  background: var(--ink);
+  color: #fff;
+}
+
+.service-detail-table--pricing-tiers thead th:nth-child(2),
+.service-detail-table--pricing-tiers tbody td.col-2 {
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.service-detail-table--pricing-tiers thead th:nth-child(3),
+.service-detail-table--pricing-tiers tbody td.col-3 {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.service-table-wrap--pricing-tiers {
+  width: max-content;
+  max-width: 100%;
+}
+
 .service-table-wrap--scope,
 .service-table-wrap--deliver,
 .service-table-wrap--pricing {
