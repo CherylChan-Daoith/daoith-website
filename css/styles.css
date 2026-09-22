@@ -6642,37 +6642,61 @@ ul {
 
 .service-detail-table--pricing-tiers {
   min-width: 0;
-  width: max-content;
+  width: 100%;
   max-width: 100%;
+  table-layout: fixed;
 }
 
 .service-detail-table--pricing-tiers thead th {
   background: var(--ink);
   color: #fff;
+  font-weight: 600;
 }
 
-.service-detail-table--pricing-tiers thead th:nth-child(2),
+.service-detail-table--pricing-tiers thead th:nth-child(2) {
+  font-weight: 400;
+  color: #fff;
+}
+
+.service-detail-table--pricing-tiers thead th:nth-child(3) {
+  font-weight: 700;
+  color: #fff;
+}
+
 .service-detail-table--pricing-tiers tbody td.col-2 {
   font-variant-numeric: tabular-nums;
   font-weight: 400;
   color: var(--ink);
   white-space: nowrap;
+  text-align: center;
 }
 
-.service-detail-table--pricing-tiers thead th:nth-child(3),
 .service-detail-table--pricing-tiers tbody td.col-3 {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
+  text-align: center;
 }
 
 .service-detail-table--pricing-tiers tbody th {
-  white-space: pre-line;
+  white-space: normal;
+}
+
+.service-detail-table--pricing-tiers thead th:nth-child(1),
+.service-detail-table--pricing-tiers tbody th {
+  width: 40%;
+}
+
+.service-detail-table--pricing-tiers thead th:nth-child(2),
+.service-detail-table--pricing-tiers thead th:nth-child(3),
+.service-detail-table--pricing-tiers tbody td.col-2,
+.service-detail-table--pricing-tiers tbody td.col-3 {
+  width: 30%;
 }
 
 .service-table-wrap--pricing-tiers {
-  width: max-content;
+  width: 100%;
   max-width: 100%;
 }
 
