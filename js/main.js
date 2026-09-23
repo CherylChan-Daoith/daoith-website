@@ -826,6 +826,63 @@ function renderPlanFaqs(ctx) {
   window.DAOITH_CART?.bindAddButtons?.(panel);
 }
 
+/** Strip model tool-call / DSML markup that must never reach visitors. */
+function stripModelToolCallMarkup(text) {
+  let t = String(text || '');
+  if (!t) return '';
+  // Normalize spaced DeepSeek DSML tags: < | DSML | function_calls >
+  t = t
+    .replace(/<\s*\|\s*\/?\s*DSML\s*\|/gi, (m) => (/\//.test(m) ? '</|DSML|' : '<|DSML|'))
+    .replace(/<\s*\/\s*\|\s*DSML\s*\|/gi, '</|DSML|')
+    .replace(/\|\s*>/g, '|>');
+  const close = (name) => `(?:<\\|\\s*/\\s*DSML\\s*\\|\\s*${name}\\s*>|<\\/\\|DSML\\|\\s*${name}\\s*>)`;
+  // Closed DSML function_calls / invoke / parameter blocks
+  t = t.replace(
+    new RegExp(
+      `<\\|\\s*DSML\\s*\\|\\s*function_calls\\s*>[\\s\\S]*?${close('function_calls')}`,
+      'gi'
+    ),
+    '\n'
+  );
+  t = t.replace(
+    new RegExp(`<\\|\\s*DSML\\s*\\|\\s*invoke\\b[^>]*>[\\s\\S]*?${close('invoke')}`, 'gi'),
+    '\n'
+  );
+  t = t.replace(
+    new RegExp(
+      `<\\|\\s*DSML\\s*\\|\\s*parameter\\b[^>]*>[\\s\\S]*?${close('parameter')}`,
+      'gi'
+    ),
+    '\n'
+  );
+  t = t.replace(/<\/?\|?\s*DSML\s*\|[^>]*>/gi, '');
+  t = t.replace(/<\|\s*\/?\s*DSML\s*\|[^>]*>/gi, '');
+  // Classic XML / markdown tool formats
+  t = t.replace(/<\s*function_calls\b[^>]*>[\s\S]*?<\/\s*function_calls\s*>/gi, '\n');
+  t = t.replace(/<\s*tool_call\b[^>]*>[\s\S]*?<\/\s*tool_call\s*>/gi, '\n');
+  t = t.replace(/<\s*invoke\b[^>]*>[\s\S]*?<\/\s*invoke\s*>/gi, '\n');
+  t = t.replace(/<\s*parameter\b[^>]*>[\s\S]*?<\/\s*parameter\s*>/gi, '\n');
+  t = t.replace(/<\/?\s*(?:function_calls|tool_call|invoke|parameter)\b[^>]*>/gi, '');
+  // Leftover bullet lines that are only markup / empty after strip
+  t = t.replace(
+    /(?:^|\n)\s*[-*•]?\s*(?:<\/?\s*\|?\s*DSML\b|<\/?\s*(?:function_calls|tool_call|invoke|parameter)\b)[^\n]*/gi,
+    '\n'
+  );
+  t = t.replace(/(?:^|\n)\s*[-*•]\s*(?=\n|$)/g, '\n');
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function looksLikeOnlyToolCallMarkup(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return false;
+  if (!/(?:DSML|function_calls|tool_call\b|<\s*invoke\b)/i.test(raw)) return false;
+  const cleaned = stripModelToolCallMarkup(raw)
+    .replace(/^[-*•\s]+$/gm, '')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+  return !cleaned;
+}
+
 function sanitizeAiAnswer(text) {
   const raw = String(text || '');
   // Preserve Workflow / Agent JSON report before CoT & draft stripping
@@ -839,7 +896,7 @@ function sanitizeAiAnswer(text) {
     }
   }
 
-  let t = raw;
+  let t = stripModelToolCallMarkup(raw);
 
   // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
@@ -4606,6 +4663,10 @@ function initAiChatbot() {
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
+      if (looksLikeOnlyToolCallMarkup(result?.text || '') || looksLikeOnlyToolCallMarkup(answer)) {
+        answer = stripModelToolCallMarkup(answer);
+        if (!answer || answer.length < 12) answer = '';
+      }
       if ((!answer || answer.length < 4) && result?.text) {
         answer = salvageDiagnosisPlanFromRaw(result.text) || '';
       }
@@ -4839,6 +4900,12 @@ function initAiChatbot() {
             '方案已生成但展示异常。请再说一次「方案没显示全」，或点击「新建对话」后重试。'
           );
           clearQuickReplies();
+        } else if (looksLikeOnlyToolCallMarkup(answer) || !String(answer || '').trim()) {
+          setBotBubble(
+            typing,
+            '**暂时未能完成检索**\n\n- 请换个问法再试，或点击「新建对话」后重试'
+          );
+          clearQuickReplies();
         } else {
           persistAssistantReport(answer, { kind: 'qa', question: text });
           beginLongQaRouting();
@@ -4987,6 +5054,9 @@ function isDiagnosisJunkLine(line) {
     .replace(/^[✓✔☑✅]\s*/, '')
     .trim();
   if (!s) return true;
+  if (/(?:<\s*\|?\s*\/?\s*DSML\b|function_calls|tool_call\b|<\s*\/?\s*invoke\b|<\s*\/?\s*parameter\b)/i.test(s)) {
+    return true;
+  }
   if (
     /^(?:业务流程一行|主要风险一行|3\s*[-–—~～]?\s*5\s*条风险|3\s*[-–—~～]?\s*6\s*条对症卡片|一段画像|对症卡片|方案卡片|风险条目|合规方案画像)\b/.test(
       s
@@ -6061,6 +6131,9 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
     )
   );
+  if (options.kind === 'qa' && looksLikeOnlyToolCallMarkup(cleanRaw)) {
+    return;
+  }
   // Always prefer structured report JSON — never dump raw braces as「问答回复」
   let kind = options.kind === 'qa' ? 'qa' : 'diagnosis';
   let jsonReport =
