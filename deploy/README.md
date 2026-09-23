@@ -1,5 +1,8 @@
 # www.daoith.com 部署指南
 
+> **从 Vercel 迁回阿里云**：见 [`MIGRATE-WWW-TO-ALIYUN.md`](./MIGRATE-WWW-TO-ALIYUN.md)  
+> （先上站再切 DNS；同机默认站是 PM，切早了会打开错站）
+
 ## 前置条件
 
 1. **域名** `daoith.com` 已在注册商完成实名并持有管理权
