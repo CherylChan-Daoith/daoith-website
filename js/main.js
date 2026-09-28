@@ -4452,6 +4452,22 @@ function initAiChatbot() {
         return;
       }
 
+      const parcel9610Reply = build9610SingleTicketLimitReply(text);
+      if (parcel9610Reply) {
+        if (shouldRouteLongAnswerToPlanPanel(parcel9610Reply)) {
+          publishDiagnosisPlanToResultPanel(parcel9610Reply, { kind: 'qa' });
+          typing.classList.add('is-plan-status');
+          setTypingText(QA_LONG_ANSWER_CHAT_TIP);
+          clearQuickReplies();
+          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
+        } else {
+          setBotBubble(typing, parcel9610Reply);
+          showQuickReplies(parcel9610Reply);
+          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
+        }
+        return;
+      }
+
       const aluminumReply = buildAluminumProductsRefundReply(text);
       if (aluminumReply) {
         persistAssistantReport(aluminumReply, { kind: 'qa', question: text });
@@ -4516,7 +4532,9 @@ function initAiChatbot() {
 
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
-        const cleaned = sanitizeAiAnswer(partial);
+        const cleaned = correct9610SingleTicketLimitHallucination(
+          correctAluminumRefundHallucinations(sanitizeAiAnswer(partial))
+        );
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
@@ -4658,6 +4676,7 @@ function initAiChatbot() {
       answer = sanitizeAiAnswer(answer);
       answer = stripDiagnosisIntroBoilerplate(answer || '');
       answer = correctAluminumRefundHallucinations(answer);
+      answer = correct9610SingleTicketLimitHallucination(answer);
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
@@ -6123,7 +6142,11 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   purgeInlineServiceMatchTips(items);
 
   const cleanRaw = stripServiceMatchTip(
-    stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
+    stripDiagnosisArchivePreamble(
+      correct9610SingleTicketLimitHallucination(
+        correctAluminumRefundHallucinations(sanitizeAiAnswer(markdown))
+      )
+    )
   );
   if (options.kind === 'qa' && looksLikeOnlyToolCallMarkup(cleanRaw)) {
     return;
@@ -6968,6 +6991,52 @@ function lookupLocalRefundDisplay(hsCode) {
   // 第76章铝材：2024-12-01 起多数取消退税
   if (String(hsCode || '').replace(/\D/g, '').startsWith('76')) return '0%';
   return null;
+}
+
+/**
+ * 9610 单票货值上限：本地口径（必读库附件三 = 5000元）。
+ * Agent 常误写成 500；命中后不走 Dify，避免整段答错。
+ */
+function build9610SingleTicketLimitReply(message) {
+  const q = String(message || '').trim();
+  if (!/9610/.test(q)) return '';
+  if (!/(?:单票|货值)/.test(q)) return '';
+  if (!/(?:上限|限额|额度|限值|是多少|多少钱|多少元|不能超过|不得超过)/.test(q) && !/单票货值/.test(q)) {
+    return '';
+  }
+  return [
+    '**结论**：9610（跨境电商零售出口）模式下，单票货值不能超过 **5000** 元人民币；在限值内可通过清单核放快速通关。',
+    '',
+    '**依据**：',
+    '',
+    '- **单票限值 5000 元**：9610通常适用于跨境电商B2C、经快递或小包出口的场景，要求单票货值不超过 **5000** 元人民币；超过则不适用该简易通关口径。',
+    '',
+    '- **清单核放**：企业向海关传输订单、支付、物流等数据，审核清单后放行包裹。',
+    '',
+    '- **汇总申报**：可在规定期限内（通常一个月）将清单合并成报关单（一张报关单最多50项）办理后续手续。',
+    '',
+    '**操作提示**：请以海关最新公告与物流商实操要求终核；货值常接近或超过限值时，宜评估正式报关等其他出口方式。',
+  ].join('\n');
+}
+
+/**
+ * 纠偏：9610 + 单票语境下把误写的 500元 改为 5000元。
+ * 不改 500万、起征点/按次语境中的 500元。
+ */
+function correct9610SingleTicketLimitHallucination(text) {
+  let t = String(text || '');
+  if (!t || !/9610/.test(t) || !/单票/.test(t)) return t;
+  if (!/(?:货值|限值|限额|上限|不超过|不能超过|不得超过)/.test(t)) return t;
+  if (!/(?<![\d])500(?!\d)\s*元/.test(t)) return t;
+  t = t.replace(/(?<![\d])500(?!\d)(\s*元(?:人民币)?)/g, (full, unit, offset) => {
+    const ahead = t.slice(offset, offset + 8);
+    if (/^500\s*万/.test(ahead) || /^5000/.test(ahead)) return full;
+    // Only look behind — looking ahead can hit nearby「旧起征点500元」and skip a real 单票500 typo
+    const behind = t.slice(Math.max(0, offset - 40), offset);
+    if (/起征|按次纳税|免税额度|旧按次/.test(behind)) return full;
+    return `5000${unit}`;
+  });
+  return t;
 }
 
 /**
