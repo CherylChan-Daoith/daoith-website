@@ -1080,24 +1080,6 @@ function stripDiagnosisIntroBoilerplate(text) {
     .trim();
 }
 
-/**
- * Hard-correct a recurring Agent slip: 按次起征点写成 100元（应为 1000元 / 2026年第10号）.
- * Does not open/close Dify threads; only fixes visible text when the wrong pattern appears
- * alongside 2026 / 10号 / 旧500 语境。Leaves 100万、10万元、1000元 untouched.
- */
-function correctChinaVatPerTimeThreshold(text) {
-  let t = String(text || '');
-  if (!t || !/(起征点|按次纳税|免税额度)/.test(t)) return t;
-  if (!/(?:2026|第\s*10\s*号|10\s*号公告|500\s*元)/.test(t)) return t;
-  if (!/(?<![\d])100(?!\d)\s*元/.test(t)) return t;
-  t = t.replace(/(按次(?:纳税)?[^。\n；;]{0,60}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/(每次（日）销售额\s*)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/统一按\s*100\s*元(?:执行|为准)?/g, '统一按1000元执行');
-  t = t.replace(/一律按\s*100\s*元/g, '一律按1000元');
-  t = t.replace(/(?:改按|调整为|执行为)\s*100\s*元/g, (m) => m.replace(/100/, '1000'));
-  return t;
-}
-
 /** Mode B / follow-up Q&A: force bold section labels for display.
  *  「结论 / 依据 / 操作提示」等为同级章节标签。
  */
@@ -1688,12 +1670,20 @@ function renderChatBubbleHtml(text) {
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
 }
 
+/**
+ * Hide the word「知识库」from visitors — but NEVER delete the sentence.
+ * Old regex wiped whole lines that cited 知识库, which also deleted facts (e.g. 5000元).
+ */
 function stripKnowledgeBaseDisclaimers(text) {
   let t = String(text || '');
-  // Any user-visible "知识库…" framing (miss, cite, or meta) — never show the word
-  t = t.replace(/[（(]\s*知识库[^）)]{0,120}[）)]\s*[:：]?/g, '');
-  t = t.replace(/[^。；！？\n]*知识库[^。；！？\n]*[。；！？]?\s*/g, '');
-  t = t.replace(/(?:由于|因)?AI和知识库具有一定的局限性[^。]*[。]?/g, '');
+  // Pure meta / limitation lines
+  t = t.replace(/(?:由于|因)?AI和知识库具有一定的局限性[^。\n]*[。]?/g, '');
+  t = t.replace(/(?:^|\n)\s*[-*•]?\s*知识库返回为空[^\n]*/g, '\n');
+  t = t.replace(/(?:^|\n)\s*[-*•]?\s*需要检索的知识库[：:][^\n]*/g, '\n');
+  // Parenthetical cite only: （知识库附件三）→ drop the cite, keep the fact sentence
+  t = t.replace(/[（(]\s*知识库[^）)]{0,80}[）)]/g, '');
+  // Inline: keep the fact sentence, just rename the source label
+  t = t.replace(/知识库(?:规定|要求|写明|显示|检索到的)?/g, '现行规定');
   t = t.replace(/(?:^|\n)\s*[-*•]\s*\*\*\s*[:：]/gm, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -2977,6 +2967,8 @@ function looksLikeDiagnosisFactQuestion(text) {
   if (/是不是|是否|有没有|能不能|可不可以|可否|能否|可以吗/.test(t)) return true;
   if (/^(?:我能|我想问|请问|想问一下|帮我看|帮我确认)/.test(t)) return true;
   if (/(?:能不能|可不可以|是否可以|是否能|能否).{0,12}(?:走|用|做|改|切换)/.test(t)) return true;
+  // 「9610单票货值上限」：政策查询，不是改出口方式重出方案
+  if (/(?:上限|货值|限额|额度|限制|条件|要求|是多少|多少钱|多少元)/.test(t)) return true;
   return false;
 }
 
@@ -3098,17 +3090,24 @@ function extractDiagnosisFactOverrides(text) {
   else if (/海外仓/.test(t)) out.shipping = '自发货（海外仓发货）';
   else if (/国内直发|自发货（国内直发）/.test(t)) out.shipping = '自发货（国内直发）';
 
-  if (/9810/.test(t) && /正式报关/.test(t) && !/0110|9710|1039/.test(t)) {
-    out.exportMode = '正式报关出口（9810）';
-  } else if (/正式报关出口（0110\/9710\/9810\/1039）|0110\/9710\/9810\/1039/.test(t)) {
-    out.exportMode = '正式报关出口（0110/9710/9810/1039）';
-  } else if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
-  else if (/1039|市场采购/.test(t)) out.exportMode = '市场采购出口（1039）';
-  else if (/未报关/.test(t)) out.exportMode = '小包快递出口（未报关）';
-  else if (/9610|1210|小包快递/.test(t)) out.exportMode = '小包快递出口（9610/1210）';
-  else if (/由平台安排出口/.test(t)) out.exportMode = '由平台安排出口';
-  else if (/委托货代/.test(t)) out.exportMode = '委托货代出口';
-  else if (/正式报关/.test(t)) out.exportMode = '正式报关出口（0110/9710）';
+  // Policy lookups that mention 9610/1039 must not rewrite exportMode
+  const exportModeMentionIsLookup =
+    /(?:上限|货值|限额|额度|限制|条件|要求|是多少|多少钱|多少元|怎么走|如何走|能不能|可不可以|是否)/.test(
+      t
+    );
+  if (!exportModeMentionIsLookup) {
+    if (/9810/.test(t) && /正式报关/.test(t) && !/0110|9710|1039/.test(t)) {
+      out.exportMode = '正式报关出口（9810）';
+    } else if (/正式报关出口（0110\/9710\/9810\/1039）|0110\/9710\/9810\/1039/.test(t)) {
+      out.exportMode = '正式报关出口（0110/9710/9810/1039）';
+    } else if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
+    else if (/1039|市场采购/.test(t)) out.exportMode = '市场采购出口（1039）';
+    else if (/未报关/.test(t)) out.exportMode = '小包快递出口（未报关）';
+    else if (/9610|1210|小包快递/.test(t)) out.exportMode = '小包快递出口（9610/1210）';
+    else if (/由平台安排出口/.test(t)) out.exportMode = '由平台安排出口';
+    else if (/委托货代/.test(t)) out.exportMode = '委托货代出口';
+    else if (/正式报关/.test(t)) out.exportMode = '正式报关出口（0110/9710）';
+  }
 
   if (/无法提供发票|不能.*发票|无票/.test(t)) out.invoice = '无法提供发票';
   else if (/部分专票.{0,8}部分普票|专票.*普票/.test(t)) out.invoice = '部分专票+部分普票';
@@ -4517,7 +4516,7 @@ function initAiChatbot() {
 
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
-        const cleaned = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(partial));
+        const cleaned = sanitizeAiAnswer(partial);
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
@@ -4635,14 +4634,14 @@ function initAiChatbot() {
         return list.find((c) => isDiagnosisReportJsonReady(c)) || null;
       };
 
-      let answer = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(result.text));
+      let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
         const rawJson = pickJsonReport(result.text, result);
         if (rawJson && isDiagnosisReportJsonReady(rawJson)) {
           answer = JSON.stringify(rawJson);
         } else {
           // Do NOT fall back to raw result.text (often still contains think / CoT)
-          const retry = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(result.text));
+          const retry = sanitizeAiAnswer(result.text);
           const salvaged = salvageDiagnosisPlanFromRaw(result.text);
           // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
           if (
@@ -4656,10 +4655,9 @@ function initAiChatbot() {
           }
         }
       }
-      answer = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(answer));
+      answer = sanitizeAiAnswer(answer);
       answer = stripDiagnosisIntroBoilerplate(answer || '');
       answer = correctAluminumRefundHallucinations(answer);
-      answer = correctChinaVatPerTimeThreshold(answer);
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
@@ -5700,9 +5698,7 @@ function persistAssistantReport(markdown, options = {}) {
     if (kind === 'diagnosis' && !loggedIn) return;
     const token = auth?.getToken?.();
     if (kind === 'diagnosis' && !token) return;
-    const cleanRaw = stripDiagnosisArchivePreamble(
-      correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
-    );
+    const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
     let clean = cleanRaw;
     if (kind === 'diagnosis') {
       const jsonReport = extractDiagnosisReportJson(cleanRaw);
@@ -6127,9 +6123,7 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   purgeInlineServiceMatchTips(items);
 
   const cleanRaw = stripServiceMatchTip(
-    stripDiagnosisArchivePreamble(
-      correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
-    )
+    stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown))
   );
   if (options.kind === 'qa' && looksLikeOnlyToolCallMarkup(cleanRaw)) {
     return;
@@ -8134,14 +8128,29 @@ function sanitizeDiagnosisPlanText(text) {
   t = t.replace(/(?:^|\n)\s*[-*•]?\s*结尾句\s*(?=\n|$)/g, '\n');
   t = t.replace(/\n{3,}/g, '\n\n');
 
-  // Bullet + number mix: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only)
-  // Never strip 4+ digit tokens here — those are HS / customs codes (e.g. **7113119090**).
-  t = t.replace(/^(\s*[-*•]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*\s*/gm, '$1');
-  t = t.replace(/^(\s*[-*•]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?\s*/gm, '$1');
-  t = t.replace(/^(\s*[-*•]\s+)(\d{1,3})(?:\.\d+)*\s*[.、)）]\s+/gm, '$1');
+  // Bullet + ordinal only: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only).
+  // Never strip amounts（500元/1000元）or 4+ digit HS codes — lookbehind avoids 元/万/%.
+  t = t.replace(
+    /^(\s*[-*•]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*(?!\s*(?:元|万元|万|千|%|％))/gm,
+    '$1'
+  );
+  t = t.replace(
+    /^(\s*[-*•]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?(?!\s*(?:元|万元|万|千|%|％))\s*/gm,
+    '$1'
+  );
+  t = t.replace(
+    /^(\s*[-*•]\s+)(\d{1,3})(?:\.\d+)*\s*[.、)）](?!\s*(?:元|万元|万|千|%|％))\s+/gm,
+    '$1'
+  );
   // Ordered list with redundant bold number already in marker: "1. **1** 内容"
-  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*\s*/gm, '$1');
-  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?\s*/gm, '$1');
+  t = t.replace(
+    /^(\s*\d+[.)、]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*(?!\s*(?:元|万元|万|千|%|％))/gm,
+    '$1'
+  );
+  t = t.replace(
+    /^(\s*\d+[.)、]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?(?!\s*(?:元|万元|万|千|%|％))\s*/gm,
+    '$1'
+  );
 
   // Replace closing consult questions with a fixed tip (no 问句)
   const expertTip = '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。';
