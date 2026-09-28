@@ -649,7 +649,15 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json(502, {"message": str(e), "url": url})
 
     def send_json(self, status, data):
-        payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        # Postgres/psycopg may return datetime on user rows (e.g. lastLoginAt).
+        def _default(obj):
+            if hasattr(obj, "isoformat"):
+                return obj.isoformat()
+            raise TypeError(
+                f"Object of type {obj.__class__.__name__} is not JSON serializable"
+            )
+
+        payload = json.dumps(data, ensure_ascii=False, default=_default).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(payload)))

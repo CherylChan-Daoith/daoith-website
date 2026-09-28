@@ -569,6 +569,15 @@ def handle_diagnosis_plan_quota(
     }
 
 
+def _dt_to_iso(value):
+    """Normalize DB timestamps to JSON-safe ISO strings (psycopg returns datetime)."""
+    if value is None:
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value
+
+
 def _row_to_user(row):
     if not row:
         return None
@@ -583,11 +592,11 @@ def _row_to_user(row):
             "province": row.get("province"),
             "city": row.get("city"),
             "phone": row.get("phone"),
-            "lastLoginAt": row.get("last_login_at"),
+            "lastLoginAt": _dt_to_iso(row.get("last_login_at")),
             "loginCount": int(row.get("login_count") or 0),
             "lastLoginIp": row.get("last_login_ip"),
-            "createdAt": row.get("created_at"),
-            "updatedAt": row.get("updated_at"),
+            "createdAt": _dt_to_iso(row.get("created_at")),
+            "updatedAt": _dt_to_iso(row.get("updated_at")),
         }
     return {
         "id": row[0],
@@ -599,11 +608,11 @@ def _row_to_user(row):
         "province": row[6] if len(row) > 6 else None,
         "city": row[7] if len(row) > 7 else None,
         "phone": row[8] if len(row) > 8 else None,
-        "lastLoginAt": row[9] if len(row) > 9 else None,
+        "lastLoginAt": _dt_to_iso(row[9] if len(row) > 9 else None),
         "loginCount": int(row[10] or 0) if len(row) > 10 else 0,
         "lastLoginIp": row[11] if len(row) > 11 else None,
-        "createdAt": row[12] if len(row) > 12 else None,
-        "updatedAt": row[13] if len(row) > 13 else None,
+        "createdAt": _dt_to_iso(row[12] if len(row) > 12 else None),
+        "updatedAt": _dt_to_iso(row[13] if len(row) > 13 else None),
     }
 
 
