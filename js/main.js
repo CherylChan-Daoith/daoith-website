@@ -830,57 +830,59 @@ function renderPlanFaqs(ctx) {
 function stripModelToolCallMarkup(text) {
   let t = String(text || '');
   if (!t) return '';
-  // Normalize spaced DeepSeek DSML tags: < | DSML | function_calls >
-  t = t
-    .replace(/<\s*\|\s*\/?\s*DSML\s*\|/gi, (m) => (/\//.test(m) ? '</|DSML|' : '<|DSML|'))
-    .replace(/<\s*\/\s*\|\s*DSML\s*\|/gi, '</|DSML|')
-    .replace(/\|\s*>/g, '|>');
-  const close = (name) => `(?:<\\|\\s*/\\s*DSML\\s*\\|\\s*${name}\\s*>|<\\/\\|DSML\\|\\s*${name}\\s*>)`;
-  // Closed DSML function_calls / invoke / parameter blocks
+
+  // DeepSeek DSML tags vary a lot:
+  //   <|DSML|function_calls> … </|DSML|function_calls>
+  //   < | DSML | invoke … >
+  //   < | | DSML | | calls >   ← double pipes + short name "calls"
+  // Drop whole closed blocks first, then any leftover tag lines.
+  const dsmlTag =
+    '<\\s*/?\\s*(?:\\|\\s*)+DSML(?:\\s*\\|\\s*)+[\\w:-]*(?:\\s[^>]*)?>';
+  const dsmlBlock = new RegExp(`${dsmlTag}[\\s\\S]*?${dsmlTag}`, 'gi');
+  let prev = '';
+  let guard = 0;
+  while (t !== prev && guard < 8) {
+    prev = t;
+    guard += 1;
+    t = t.replace(dsmlBlock, '\n');
+  }
+  t = t.replace(new RegExp(dsmlTag, 'gi'), '\n');
+  // Lines that still mention DSML / pipe-wrapped tool names
   t = t.replace(
-    new RegExp(
-      `<\\|\\s*DSML\\s*\\|\\s*function_calls\\s*>[\\s\\S]*?${close('function_calls')}`,
-      'gi'
-    ),
+    /(?:^|\n)\s*[-*•]?\s*<?\s*\/?\s*(?:\|\s*)*DSML[^\n]*/gi,
     '\n'
   );
   t = t.replace(
-    new RegExp(`<\\|\\s*DSML\\s*\\|\\s*invoke\\b[^>]*>[\\s\\S]*?${close('invoke')}`, 'gi'),
+    /(?:^|\n)\s*[-*•]?\s*<\/?\s*(?:function_calls|tool_call|invoke|parameter|calls)\b[^\n]*/gi,
     '\n'
   );
-  t = t.replace(
-    new RegExp(
-      `<\\|\\s*DSML\\s*\\|\\s*parameter\\b[^>]*>[\\s\\S]*?${close('parameter')}`,
-      'gi'
-    ),
-    '\n'
-  );
-  t = t.replace(/<\/?\|?\s*DSML\s*\|[^>]*>/gi, '');
-  t = t.replace(/<\|\s*\/?\s*DSML\s*\|[^>]*>/gi, '');
+
   // Classic XML / markdown tool formats
   t = t.replace(/<\s*function_calls\b[^>]*>[\s\S]*?<\/\s*function_calls\s*>/gi, '\n');
   t = t.replace(/<\s*tool_call\b[^>]*>[\s\S]*?<\/\s*tool_call\s*>/gi, '\n');
   t = t.replace(/<\s*invoke\b[^>]*>[\s\S]*?<\/\s*invoke\s*>/gi, '\n');
   t = t.replace(/<\s*parameter\b[^>]*>[\s\S]*?<\/\s*parameter\s*>/gi, '\n');
-  t = t.replace(/<\/?\s*(?:function_calls|tool_call|invoke|parameter)\b[^>]*>/gi, '');
-  // Leftover bullet lines that are only markup / empty after strip
-  t = t.replace(
-    /(?:^|\n)\s*[-*•]?\s*(?:<\/?\s*\|?\s*DSML\b|<\/?\s*(?:function_calls|tool_call|invoke|parameter)\b)[^\n]*/gi,
-    '\n'
-  );
+  t = t.replace(/<\/?\s*(?:function_calls|tool_call|invoke|parameter|calls)\b[^>]*>/gi, '');
+
+  // Empty bullets left after tag removal
   t = t.replace(/(?:^|\n)\s*[-*•]\s*(?=\n|$)/g, '\n');
+  t = t.replace(/(?:^|\n)\s*[-*•]\s+$/gm, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function looksLikeOnlyToolCallMarkup(text) {
   const raw = String(text || '').trim();
   if (!raw) return false;
-  if (!/(?:DSML|function_calls|tool_call\b|<\s*invoke\b)/i.test(raw)) return false;
+  if (!/(?:DSML|function_calls|tool_call\b|<\s*invoke\b|\|\s*DSML\s*\|)/i.test(raw)) {
+    return false;
+  }
   const cleaned = stripModelToolCallMarkup(raw)
     .replace(/^[-*•\s]+$/gm, '')
     .replace(/\n{2,}/g, '\n')
     .trim();
-  return !cleaned;
+  // Also treat as empty if only punctuation / orphan pipes remain
+  if (!cleaned) return true;
+  return !/[\u4e00-\u9fffA-Za-z]{2,}/.test(cleaned);
 }
 
 /**
@@ -6183,7 +6185,13 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       ? sanitizeQaAnswer(markdown)
       : correctAluminumRefundHallucinations(sanitizeAiAnswer(markdown));
   const cleanRaw = stripServiceMatchTip(stripDiagnosisArchivePreamble(cleanedMarkdown));
-  if (options.kind === 'qa' && looksLikeOnlyToolCallMarkup(cleanRaw)) {
+  if (
+    options.kind === 'qa' &&
+    (looksLikeOnlyToolCallMarkup(markdown) ||
+      looksLikeOnlyToolCallMarkup(cleanRaw) ||
+      !/[\u4e00-\u9fff]{4,}/.test(cleanRaw))
+  ) {
+    // Tool-call markup only / empty after strip — never paint DSML into the plan panel
     return;
   }
   // Always prefer structured report JSON — never dump raw braces as「问答回复」
@@ -6760,14 +6768,24 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     }
 
     if (event === 'message_end' || event === 'workflow_finished') {
-      // Prefer Dify final answer (matches Agent 日志). Stream accumulation can keep
-      // polluted CoT fragments that later sanitizers mis-pick (wrong 400万 / 500元).
+      // Prefer Dify final answer when it has real visitor text (matches Agent 日志).
+      // Do NOT replace a good stream with a DSML-only / tool-call final payload.
       const finalAnswer =
         (typeof data.answer === 'string' && data.answer) ||
         (typeof data.data?.answer === 'string' && data.data.answer) ||
         '';
       if (finalAnswer && finalAnswer.trim().length >= 12) {
-        answer = finalAnswer;
+        const finalClean = stripModelToolCallMarkup(finalAnswer);
+        const streamClean = stripModelToolCallMarkup(answer);
+        const finalOk =
+          finalClean.length >= 12 &&
+          !looksLikeOnlyToolCallMarkup(finalAnswer) &&
+          /[\u4e00-\u9fff]/.test(finalClean);
+        if (finalOk) {
+          answer = finalAnswer;
+        } else if (!streamClean && finalClean) {
+          answer = finalAnswer;
+        }
       }
       tryCaptureReportJson(finalAnswer);
       if (data.data?.outputs) {
