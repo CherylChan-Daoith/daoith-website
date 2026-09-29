@@ -883,6 +883,63 @@ function looksLikeOnlyToolCallMarkup(text) {
   return !cleaned;
 }
 
+/**
+ * Strip model think / tool markup only — shared by QA + diagnosis sanitizers.
+ * Must not rewrite policy amounts (4000万 / 5000元 etc.).
+ */
+function stripThinkAndToolMarkup(text) {
+  let t = stripModelToolCallMarkup(String(text || ''));
+  const think = String.fromCharCode(116, 104, 105, 110, 107); // think
+  const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
+
+  t = t
+    .replace(/&lt;\s*(\/?)\s*(think|thinking|reason|reasoning)\b[^&]*&gt;/gi, '<$1$2>')
+    .replace(/＜\s*(\/?)\s*(think|thinking|reason|reasoning)[^＞]*＞/gi, '<$1$2>');
+
+  for (const name of tagNames) {
+    const afterClose = new RegExp(`<\\s*\\/\\s*${name}\\s*>\\s*([\\s\\S]*)$`, 'i');
+    const m = t.match(afterClose);
+    if (m && m[1] && m[1].trim().length >= 8 && !new RegExp(`<\\s*${name}\\b`, 'i').test(m[1])) {
+      t = m[1];
+      break;
+    }
+  }
+
+  let prev = '';
+  let guard = 0;
+  while (t !== prev && guard < 12) {
+    prev = t;
+    guard += 1;
+    for (const name of tagNames) {
+      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '\n');
+      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*$`, 'i'), '\n');
+      t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+    }
+  }
+
+  t = t
+    .replace(/^\s*thinking[:：].*$/gim, '')
+    .replace(/^\s*思考过程[:：].*$/gim, '')
+    .replace(/```(?:thinking|thought|reason|reasoning)[\s\S]*?```/gi, '\n')
+    .replace(/(?:^|\n)#{0,3}\s*思考过程[:：]?[\s\S]*?(?=\n#{1,3}\s|\n\*\*|【|$)/g, '\n')
+    .replace(/(?:^|\n)思考过程[:：][\s\S]*?(?=\n{2,}|$)/g, '\n')
+    .replace(/(?:^|\n)(?:Thought|Action|Observation)\s*[:：][^\n]*/gi, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return t;
+}
+
+/**
+ * Q&A answers: light clean only. Never run diagnosis ordinal/CoT salvage that can eat digits
+ * (e.g. 4000万→400万、5000元→500元).
+ */
+function sanitizeQaAnswer(text) {
+  let t = stripThinkAndToolMarkup(text);
+  t = stripKnowledgeBaseDisclaimers(t);
+  t = stripInternalTaxonomyLeaks(t);
+  return t.trim();
+}
+
 function sanitizeAiAnswer(text) {
   const raw = String(text || '');
   // Preserve Workflow / Agent JSON report before CoT & draft stripping
@@ -896,39 +953,13 @@ function sanitizeAiAnswer(text) {
     }
   }
 
-  let t = stripModelToolCallMarkup(raw);
+  // Mode B / follow-up Q&A: do not run diagnosis-plan salvage (protects policy figures)
+  if (looksLikeQaAnswerMarkdown(raw) || looksLikeQaAnswerMarkdown(stripThinkAndToolMarkup(raw))) {
+    return sanitizeQaAnswer(raw);
+  }
 
-  // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
+  let t = stripThinkAndToolMarkup(raw);
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
-  const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
-
-  // Decode common escaped forms first
-  t = t
-    .replace(/&lt;\s*(\/?)\s*(think|thinking|reason|reasoning)\b[^&]*&gt;/gi, '<$1$2>')
-    .replace(/＜\s*(\/?)\s*(think|thinking|reason|reasoning)[^＞]*＞/gi, '<$1$2>');
-
-  // Prefer text after the last closed think block (formal answer usually follows)
-  for (const name of tagNames) {
-    const afterClose = new RegExp(`<\\s*\\/\\s*${name}\\s*>\\s*([\\s\\S]*)$`, 'i');
-    const m = t.match(afterClose);
-    if (m && m[1] && m[1].trim().length >= 8 && !new RegExp(`<\\s*${name}\\b`, 'i').test(m[1])) {
-      t = m[1];
-      break;
-    }
-  }
-
-  // Iteratively drop all think / reasoning blocks (including nested / consecutive)
-  let prev = '';
-  let guard = 0;
-  while (t !== prev && guard < 12) {
-    prev = t;
-    guard += 1;
-    for (const name of tagNames) {
-      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '\n');
-      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*$`, 'i'), '\n');
-      t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
-    }
-  }
 
   const clean = (s) =>
     String(s || '')
@@ -953,7 +984,13 @@ function sanitizeAiAnswer(text) {
     if (m) t = m[0];
   }
 
-  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想|让我回顾一下/.test(t)) {
+  // Do NOT take "last short paragraph" when it would discard a longer formal body —
+  // that path previously risked keeping a wrong figure from CoT (400万 / 500元).
+  if (
+    t.length > 280 &&
+    /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想|让我回顾一下/.test(t) &&
+    !/(?:\*\*结论\*\*|【核心风险诊断】|【合规方案】)/.test(t)
+  ) {
     const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
       t = parts[parts.length - 1];
@@ -962,12 +999,8 @@ function sanitizeAiAnswer(text) {
 
   t = clean(t);
 
-  // Strip visible “思考过程” / agent planning sections (with or without XML tags)
+  // Strip leftover agent planning lines (diagnosis path only)
   t = t
-    .replace(/```(?:thinking|thought|reason|reasoning)[\s\S]*?```/gi, '\n')
-    .replace(/(?:^|\n)#{0,3}\s*思考过程[:：]?[\s\S]*?(?=\n#{1,3}\s|\n\*\*|【|$)/g, '\n')
-    .replace(/(?:^|\n)思考过程[:：][\s\S]*?(?=\n{2,}|$)/g, '\n')
-    .replace(/(?:^|\n)(?:Thought|Action|Observation)\s*[:：][^\n]*/gi, '\n')
     .replace(
       /(?:^|\n)(?:我先|让我|首先|接下来|现在)?(?:需要|正在|开始)?(?:检索|思考|分析|调用|查阅).{0,80}(?:知识库|工具|资料)[^\n]*/g,
       '\n'
@@ -4452,18 +4485,19 @@ function initAiChatbot() {
         return;
       }
 
-      const parcel9610Reply = build9610SingleTicketLimitReply(text);
-      if (parcel9610Reply) {
-        if (shouldRouteLongAnswerToPlanPanel(parcel9610Reply)) {
-          publishDiagnosisPlanToResultPanel(parcel9610Reply, { kind: 'qa' });
+      const localPolicyReply =
+        build9610SingleTicketLimitReply(text) || buildLocalFileThresholdReply(text);
+      if (localPolicyReply) {
+        if (shouldRouteLongAnswerToPlanPanel(localPolicyReply)) {
+          publishDiagnosisPlanToResultPanel(localPolicyReply, { kind: 'qa' });
           typing.classList.add('is-plan-status');
           setTypingText(QA_LONG_ANSWER_CHAT_TIP);
           clearQuickReplies();
-          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
+          maybeShowServiceRecsAfterAnswer(localPolicyReply);
         } else {
-          setBotBubble(typing, parcel9610Reply);
-          showQuickReplies(parcel9610Reply);
-          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
+          setBotBubble(typing, localPolicyReply);
+          showQuickReplies(localPolicyReply);
+          maybeShowServiceRecsAfterAnswer(localPolicyReply);
         }
         return;
       }
@@ -4532,9 +4566,9 @@ function initAiChatbot() {
 
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
-        const cleaned = correct9610SingleTicketLimitHallucination(
-          correctAluminumRefundHallucinations(sanitizeAiAnswer(partial))
-        );
+        const cleaned = looksLikeQaAnswerMarkdown(partial)
+          ? sanitizeQaAnswer(partial)
+          : correctAluminumRefundHallucinations(sanitizeAiAnswer(partial));
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
@@ -4673,10 +4707,13 @@ function initAiChatbot() {
           }
         }
       }
-      answer = sanitizeAiAnswer(answer);
+      answer = looksLikeQaAnswerMarkdown(answer || result?.text || '')
+        ? sanitizeQaAnswer(answer || result?.text || '')
+        : sanitizeAiAnswer(answer);
       answer = stripDiagnosisIntroBoilerplate(answer || '');
-      answer = correctAluminumRefundHallucinations(answer);
-      answer = correct9610SingleTicketLimitHallucination(answer);
+      if (!looksLikeQaAnswerMarkdown(answer)) {
+        answer = correctAluminumRefundHallucinations(answer);
+      }
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
@@ -6141,13 +6178,12 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
   purgeInlineServiceMatchTips(items);
 
-  const cleanRaw = stripServiceMatchTip(
-    stripDiagnosisArchivePreamble(
-      correct9610SingleTicketLimitHallucination(
-        correctAluminumRefundHallucinations(sanitizeAiAnswer(markdown))
-      )
-    )
-  );
+  // Q&A: light sanitize only — never diagnosis ordinal/CoT salvage (protects 4000万 / 5000元)
+  const cleanedMarkdown =
+    options.kind === 'qa'
+      ? sanitizeQaAnswer(markdown)
+      : correctAluminumRefundHallucinations(sanitizeAiAnswer(markdown));
+  const cleanRaw = stripServiceMatchTip(stripDiagnosisArchivePreamble(cleanedMarkdown));
   if (options.kind === 'qa' && looksLikeOnlyToolCallMarkup(cleanRaw)) {
     return;
   }
@@ -6725,12 +6761,13 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     }
 
     if (event === 'message_end' || event === 'workflow_finished') {
-      // Prefer accumulated message tokens; only fill from final payload answer field
+      // Prefer Dify final answer (matches Agent 日志). Stream accumulation can keep
+      // polluted CoT fragments that later sanitizers mis-pick (wrong 400万 / 500元).
       const finalAnswer =
         (typeof data.answer === 'string' && data.answer) ||
         (typeof data.data?.answer === 'string' && data.data.answer) ||
         '';
-      if (finalAnswer && finalAnswer.length > answer.length) {
+      if (finalAnswer && finalAnswer.trim().length >= 12) {
         answer = finalAnswer;
       }
       tryCaptureReportJson(finalAnswer);
@@ -6994,8 +7031,27 @@ function lookupLocalRefundDisplay(hsCode) {
 }
 
 /**
+ * 本地文档触发门槛：其他关联交易合计 4000万元（内地企业所得税同期资料口径）。
+ * 命中后不走 Dify，避免展示链误伤金额。
+ */
+function buildLocalFileThresholdReply(message) {
+  const q = String(message || '').trim();
+  if (!/(?:本地文档|同期资料)/.test(q)) return '';
+  if (!/(?:门槛|触发|谁需要|关联交易|准备|多少|是多少|条件)/.test(q)) return '';
+  return [
+    '**结论**：本地文档是企业所得税同期资料三种类型之一（另有主体文档、特殊事项文档）。与关联方发生大额关联交易达到触发门槛时需要准备；一般不随年度申报主动报送，而是留存备查，税务机关要求时再提供。',
+    '',
+    '**依据**：',
+    '',
+    '- **谁需要准备（触发门槛）**：有形资产所有权转让金额超过**2亿元**，金融资产转让金额超过**1亿元**，无形资产所有权转让金额超过**1亿元**，其他关联交易金额合计超过**4000万元**，则需要准备；仅与境内关联方发生交易的企业除外。',
+    '',
+    '**操作提示**：以上为内地企业所得税同期资料口径，请以现行法规及主管税务机关要求终核。',
+  ].join('\n');
+}
+
+/**
  * 9610 单票货值上限：本地口径（必读库附件三 = 5000元）。
- * Agent 常误写成 500；命中后不走 Dify，避免整段答错。
+ * 命中后不走 Dify，避免整段答错。
  */
 function build9610SingleTicketLimitReply(message) {
   const q = String(message || '').trim();
@@ -8253,11 +8309,14 @@ function stripLeadingListIndex(content) {
   const s = String(content || '').trim();
   // Preserve HS codes / long numeric tax ids (never treat 4+ digits as list indexes)
   if (looksLikeLeadingHsCode(s)) return s;
+  // Never strip amounts: **4000**万元 / 500元 / 2亿元
+  if (/^\*{0,2}\d{1,3}(?:\.\d+)*\*{0,2}\s*(?:元|万元|万|亿|千|%|％)/.test(s)) return s;
+  if (/(?:元|万元|万|亿|千|%|％)/.test(s) && /^\*{0,2}\d/.test(s)) return s;
   return s
-    .replace(/^\*\*\s*\d{1,3}(?:\.\d+)*\s*[.、)）．]?\s*\*\*\s*/, '')
-    .replace(/^\*\*\d{1,3}(?:\.\d+)*\*\*\s*[.、)）．]?\s*/, '')
-    .replace(/^\d{1,3}\.\d+\s*[.)、．]?\s*/, '')
-    .replace(/^\d{1,3}\s*[.、)）．]\s*/, '')
+    .replace(/^\*\*\s*\d{1,2}(?:\.\d+)*\s*[.、)）．]\s*\*\*\s*/, '')
+    .replace(/^\*\*\d{1,2}(?:\.\d+)*\*\*\s*[.、)）．]\s*/, '')
+    .replace(/^\d{1,2}\.\d+\s*[.)、．]\s*/, '')
+    .replace(/^\d{1,2}\s*[.、)）．]\s*/, '')
     .replace(/^[●○◆▪•·◦▪️◉]+\s*/, '')
     .trim();
 }
@@ -8483,13 +8542,16 @@ function buildLocalSolutionMarkdown(ctx) {
 function renderAIPlanHtml(text) {
   const rawText = String(text || '');
   const isQaAnswer = looksLikeQaAnswerMarkdown(rawText);
-  let prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
+  let prepared;
   if (isQaAnswer) {
-    // Mode B / follow-up: normalize again at render-time, never auto-nest
+    // Q&A: skip sanitizeDiagnosisPlanText (ordinal strippers must not touch 4000万 etc.)
     prepared = flattenQaAnswerBullets(
-      normalizeQaAnswerMarkdown(normalizeColonInsideBoldTitles(prepared))
+      normalizeQaAnswerMarkdown(
+        normalizeColonInsideBoldTitles(convertMarkdownTablesToBullets(rawText))
+      )
     );
   } else {
+    prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
     prepared = nestCustomAfterNonCustomPeers(
       nestPlanNumberedHierarchy(
         nestPlanBulletHierarchy(structureAnnotationPlainText(prepared))
