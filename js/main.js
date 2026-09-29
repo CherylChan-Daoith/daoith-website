@@ -4485,19 +4485,18 @@ function initAiChatbot() {
         return;
       }
 
-      const localPolicyReply =
-        build9610SingleTicketLimitReply(text) || buildLocalFileThresholdReply(text);
-      if (localPolicyReply) {
-        if (shouldRouteLongAnswerToPlanPanel(localPolicyReply)) {
-          publishDiagnosisPlanToResultPanel(localPolicyReply, { kind: 'qa' });
+      const parcel9610Reply = build9610SingleTicketLimitReply(text);
+      if (parcel9610Reply) {
+        if (shouldRouteLongAnswerToPlanPanel(parcel9610Reply)) {
+          publishDiagnosisPlanToResultPanel(parcel9610Reply, { kind: 'qa' });
           typing.classList.add('is-plan-status');
           setTypingText(QA_LONG_ANSWER_CHAT_TIP);
           clearQuickReplies();
-          maybeShowServiceRecsAfterAnswer(localPolicyReply);
+          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
         } else {
-          setBotBubble(typing, localPolicyReply);
-          showQuickReplies(localPolicyReply);
-          maybeShowServiceRecsAfterAnswer(localPolicyReply);
+          setBotBubble(typing, parcel9610Reply);
+          showQuickReplies(parcel9610Reply);
+          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
         }
         return;
       }
@@ -7031,33 +7030,11 @@ function lookupLocalRefundDisplay(hsCode) {
 }
 
 /**
- * 本地文档触发门槛：其他关联交易合计 4000万元（内地企业所得税同期资料口径）。
- * 命中后不走 Dify，避免展示链误伤金额。
- */
-function buildLocalFileThresholdReply(message) {
-  const q = String(message || '').trim();
-  if (!/(?:本地文档|同期资料)/.test(q)) return '';
-  if (!/(?:门槛|触发|谁需要|关联交易|准备|多少|是多少|条件)/.test(q)) return '';
-  return [
-    '**结论**：本地文档是企业所得税同期资料三种类型之一（另有主体文档、特殊事项文档）。与关联方发生大额关联交易达到触发门槛时需要准备；一般不随年度申报主动报送，而是留存备查，税务机关要求时再提供。',
-    '',
-    '**依据**：',
-    '',
-    '- **谁需要准备（触发门槛）**：有形资产所有权转让金额超过**2亿元**，金融资产转让金额超过**1亿元**，无形资产所有权转让金额超过**1亿元**，其他关联交易金额合计超过**4000万元**，则需要准备；仅与境内关联方发生交易的企业除外。',
-    '',
-    '**操作提示**：以上为内地企业所得税同期资料口径，请以现行法规及主管税务机关要求终核。',
-  ].join('\n');
-}
-
-/**
- * 9610 单票货值上限：本地口径（必读库附件三 = 5000元）。
- * 命中后不走 Dify，避免整段答错。
+ * 9610 单票货值上限：仅极短问句本地兜底；长问/丰富答复仍走 Agent。
  */
 function build9610SingleTicketLimitReply(message) {
   const q = String(message || '').trim();
-  if (!/9610/.test(q)) return '';
-  if (!/(?:单票|货值)/.test(q)) return '';
-  if (!/(?:上限|限额|额度|限值|是多少|多少钱|多少元|不能超过|不得超过)/.test(q) && !/单票货值/.test(q)) {
+  if (!/^\s*9610单票货值上限\s*$/.test(q) && !/^\s*9610.{0,12}(?:单票货值)?(?:上限|限额|限值)\s*$/.test(q)) {
     return '';
   }
   return [
@@ -7073,26 +7050,6 @@ function build9610SingleTicketLimitReply(message) {
     '',
     '**操作提示**：请以海关最新公告与物流商实操要求终核；货值常接近或超过限值时，宜评估正式报关等其他出口方式。',
   ].join('\n');
-}
-
-/**
- * 纠偏：9610 + 单票语境下把误写的 500元 改为 5000元。
- * 不改 500万、起征点/按次语境中的 500元。
- */
-function correct9610SingleTicketLimitHallucination(text) {
-  let t = String(text || '');
-  if (!t || !/9610/.test(t) || !/单票/.test(t)) return t;
-  if (!/(?:货值|限值|限额|上限|不超过|不能超过|不得超过)/.test(t)) return t;
-  if (!/(?<![\d])500(?!\d)\s*元/.test(t)) return t;
-  t = t.replace(/(?<![\d])500(?!\d)(\s*元(?:人民币)?)/g, (full, unit, offset) => {
-    const ahead = t.slice(offset, offset + 8);
-    if (/^500\s*万/.test(ahead) || /^5000/.test(ahead)) return full;
-    // Only look behind — looking ahead can hit nearby「旧起征点500元」and skip a real 单票500 typo
-    const behind = t.slice(Math.max(0, offset - 40), offset);
-    if (/起征|按次纳税|免税额度|旧按次/.test(behind)) return full;
-    return `5000${unit}`;
-  });
-  return t;
 }
 
 /**
