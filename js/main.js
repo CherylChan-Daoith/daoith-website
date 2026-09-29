@@ -932,14 +932,37 @@ function stripThinkAndToolMarkup(text) {
 }
 
 /**
- * Q&A answers: light clean only. Never run diagnosis ordinal/CoT salvage that can eat digits
- * (e.g. 4000万→400万、5000元→500元).
+ * Q&A answers: light clean only. Never run diagnosis ordinal/CoT salvage that can eat digits.
+ * Also hard-fix known statutory slips the model keeps repeating.
  */
 function sanitizeQaAnswer(text) {
   let t = stripThinkAndToolMarkup(text);
   t = stripKnowledgeBaseDisclaimers(t);
   t = stripInternalTaxonomyLeaks(t);
+  t = correctLocalFileThresholdAmounts(t);
   return t.trim();
+}
+
+/**
+ * 42号公告：其他关联交易合计超过 4000 万元（不是 400 万）。
+ * 仅在「本地文档/同期资料」且同句出现 2亿/1亿 门槛时纠偏，避免误伤其它 400 万表述。
+ */
+function correctLocalFileThresholdAmounts(text) {
+  let t = String(text || '');
+  if (!t) return t;
+  if (!/(?:本地文档|同期资料)/.test(t)) return t;
+  if (!/(?:有形资产|金融资产|无形资产)/.test(t)) return t;
+  if (!/(?:2\s*亿|1\s*亿)/.test(t)) return t;
+  // 其他关联交易…400万 → 4000万（已是 4000 则 (?!\d) 不会误伤）
+  t = t.replace(
+    /(其他关联交易[^。；\n]{0,40}?)(?<![\d])400(?!\d)(\s*万)/g,
+    '$14000$2'
+  );
+  t = t.replace(
+    /(关联交易金额合计超过\s*)(?<![\d])400(?!\d)(\s*万)/g,
+    '$14000$2'
+  );
+  return t;
 }
 
 function sanitizeAiAnswer(text) {
@@ -986,19 +1009,8 @@ function sanitizeAiAnswer(text) {
     if (m) t = m[0];
   }
 
-  // Do NOT take "last short paragraph" when it would discard a longer formal body —
-  // that path previously risked keeping a wrong figure from CoT (400万 / 500元).
-  if (
-    t.length > 280 &&
-    /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想|让我回顾一下/.test(t) &&
-    !/(?:\*\*结论\*\*|【核心风险诊断】|【合规方案】)/.test(t)
-  ) {
-    const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
-      t = parts[parts.length - 1];
-    }
-  }
-
+  // Do NOT take "last short paragraph" from CoT — it discards formal body and can leave
+  // wrong figures (400万 / 500元) from draft reasoning.
   t = clean(t);
 
   // Strip leftover agent planning lines (diagnosis path only)
@@ -1160,7 +1172,10 @@ function looksLikeQaAnswerMarkdown(text) {
     /\*\*\s*(结论|依据)\s*[:：]?\s*\*\*/.test(t) ||
     /\*\*(结论|依据)\*\*/.test(t) ||
     /^\s*(结论|依据)\s*[:：]/m.test(t) ||
-    /\*\*操作提示\*\*/.test(t)
+    /\*\*操作提示\*\*/.test(t) ||
+    /(?:适用门槛|触发门槛|本地文档|同期资料).{0,40}(?:关联交易|2\s*亿|4000\s*万|400\s*万)/.test(
+      t
+    )
   );
 }
 
