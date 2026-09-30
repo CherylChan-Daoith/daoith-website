@@ -2973,6 +2973,144 @@ function getLastDiagFollowUpChanges() {
   return lastDiagFollowUpChanges.slice();
 }
 
+/**
+ * Short-term chat memory (query-side only).
+ * Dify conversation_id stays empty (D-34); continuity is injected into each query.
+ * Covers Mode B and post-report Q&A — not limited to export-mode codes.
+ */
+const QA_TURN_MEMORY_MAX = 6;
+const QA_ASSIST_MEMORY_MAX = 2;
+let qaUserTurnMemory = [];
+let qaAssistantMemory = [];
+
+function clearQaTurnMemory() {
+  qaUserTurnMemory = [];
+  qaAssistantMemory = [];
+}
+
+function rememberQaUserTurn(text) {
+  const t = String(text || '').trim();
+  if (!t) return;
+  if (/^【模式选择】/.test(t)) return;
+  if (wantsExclusiveDiagnosisStart(t)) {
+    clearQaTurnMemory();
+    return;
+  }
+  if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
+    clearQaTurnMemory();
+    return;
+  }
+  if (qaUserTurnMemory.length && qaUserTurnMemory[qaUserTurnMemory.length - 1] === t) return;
+  qaUserTurnMemory.push(t.length > 160 ? `${t.slice(0, 160)}…` : t);
+  if (qaUserTurnMemory.length > QA_TURN_MEMORY_MAX) {
+    qaUserTurnMemory = qaUserTurnMemory.slice(-QA_TURN_MEMORY_MAX);
+  }
+}
+
+function summarizeQaAnswerForMemory(text) {
+  const t = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .trim();
+  if (!t || looksLikeOnlyToolCallMarkup(t)) return '';
+  const concl = t.match(
+    /(?:^|\n)\s*(?:\*\*)?结论(?:\*\*)?[：:]\s*([^\n]{8,180})/
+  );
+  let s = (concl && concl[1] ? concl[1] : t.split('\n').find((ln) => /[\u4e00-\u9fff]{6,}/.test(ln)) || '')
+    .replace(/[#*`>_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) return '';
+  if (s.length > 110) s = `${s.slice(0, 110)}…`;
+  return s;
+}
+
+function rememberQaAssistantTurn(text) {
+  const s = summarizeQaAnswerForMemory(text);
+  if (!s) return;
+  if (qaAssistantMemory.length && qaAssistantMemory[qaAssistantMemory.length - 1] === s) return;
+  qaAssistantMemory.push(s);
+  if (qaAssistantMemory.length > QA_ASSIST_MEMORY_MAX) {
+    qaAssistantMemory = qaAssistantMemory.slice(-QA_ASSIST_MEMORY_MAX);
+  }
+}
+
+function extractQaTopicAnchors(texts) {
+  const blob = (Array.isArray(texts) ? texts : [texts]).map((x) => String(x || '')).join('\n');
+  const codes = [];
+  const codeRe = /\b(0110|9610|9710|9810|1039|1210)\b/g;
+  let m;
+  while ((m = codeRe.exec(blob))) {
+    if (!codes.includes(m[1])) codes.push(m[1]);
+  }
+  const hs = [];
+  const hsRe = /\b(\d{8,10})\b/g;
+  while ((m = hsRe.exec(blob))) {
+    if (!hs.includes(m[1])) hs.push(m[1]);
+    if (hs.length >= 3) break;
+  }
+  const topics = [];
+  const topicRules = [
+    [/报关单|报关填写|成交方式|境外收货人/, '报关填写'],
+    [/海外仓|FBA|备货|FBL/, '海外仓/备货'],
+    [/出口退税|退税率|免抵退/, '出口退税'],
+    [/增值税|起征点|按次|小规模/, '增值税'],
+    [/企业所得税|汇算清缴/, '企业所得税'],
+    [/个人所得税|个税|综合所得/, '个税'],
+    [/关联交易|同期资料|本地文档|主体文档/, '转让定价/同期资料'],
+    [/离境退税|即买即退/, '离境退税'],
+    [/IOSS|OSS|VOEC|欧盟增值税|英国VAT/i, '境外增值税登记'],
+    [/税收协定|常设机构|居民身份/, '税收协定'],
+    [/发票|专票|普票|无票/, '发票'],
+    [/香港公司|双层架构|0110\s*\+/, '架构搭建'],
+    [/信息报送|互联网平台企业/, '涉税信息报送'],
+    [/亚马逊|Temu|Shopee|Lazada|速卖通|SHEIN|TikTok|eBay|美客多|国际站|Shopify/i, '电商平台'],
+  ];
+  topicRules.forEach(([re, label]) => {
+    if (re.test(blob) && !topics.includes(label)) topics.push(label);
+  });
+  return { codes, hs, topics };
+}
+
+/** Shared memory block: Agent must classify 追问 vs 新问题 for any topic. */
+function formatQaMemoryBlock(userText) {
+  const raw = String(userText || '').trim();
+  const prior = qaUserTurnMemory.slice();
+  if (!prior.length && !qaAssistantMemory.length) return '';
+  const anchors = extractQaTopicAnchors(prior.concat(qaAssistantMemory).concat([raw]));
+  const priorLines = prior.length
+    ? prior.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    : '（无）';
+  const assistLines = qaAssistantMemory.length
+    ? qaAssistantMemory.map((a, i) => `${i + 1}. ${a}`).join('\n')
+    : '';
+  const anchorBits = [];
+  if (anchors.codes.length) anchorBits.push(`监管/贸易方式：${anchors.codes.join('、')}`);
+  if (anchors.hs.length) anchorBits.push(`商品编码：${anchors.hs.join('、')}`);
+  if (anchors.topics.length) anchorBits.push(`主题：${anchors.topics.join('、')}`);
+  return (
+    '【对话记忆·供判断】\n' +
+    '【近期用户问题】\n' +
+    `${priorLines}\n` +
+    (assistLines ? `【近期助手结论摘要】\n${assistLines}\n` : '') +
+    (anchorBits.length ? `【可沿用锚点】${anchorBits.join('；')}\n` : '') +
+    '【本轮用户原话】\n' +
+    `${raw}\n` +
+    '【作答要求】\n' +
+    '- 先自行判断本轮是「承接上文的追问」还是「全新独立问题」（不要向用户复述该判断过程）。\n' +
+    '- **追问**（省略指代、同一税种/同一业务场景的细化、同一表单字段续问等）：必须沿用近期对话中的主体、平台、出口方式、税种、文号、门槛数字等语境；举例不得无故切换（如上文9810则勿改答0110；上文增值税起征点则「那按次呢」仍答增值税）。\n' +
+    '- **新问题**（明显换了税种、平台、出口方式、国家/地区或法规主题）：按新题独立作答，不要硬套上文；可一句带过「以下按新问题说明」。\n' +
+    '- 禁止复述本段指令；结构仍用 **结论** / **依据** / **操作提示**（适用时）。'
+  );
+}
+
+/** Wrap Mode B / free Q&A with memory when prior turns exist. */
+function buildModeBQueryWithMemory(userText) {
+  const raw = String(userText || '').trim();
+  const block = formatQaMemoryBlock(raw);
+  return block || raw;
+}
+
 function diffDiagSlots(before, after) {
   const prev = before && typeof before === 'object' ? before : {};
   const next = after && typeof after === 'object' ? after : {};
@@ -3242,16 +3380,19 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
   const changeBlock = formatDiagChangeLines(changes);
   const standaloneKb = looksLikeStandaloneKbQuestion(userText);
   const ipProbe = looksLikeIpProbeQuestion(userText);
+  const memoryBlock = formatQaMemoryBlock(userText);
   return (
     '【诊断已完成·后续追问】\n' +
     '【上一轮诊断档案】\n' +
     `${baseline}\n` +
-    '【本轮用户原话】\n' +
-    `${String(userText || '').trim()}\n` +
+    (memoryBlock
+      ? `${memoryBlock}\n`
+      : '【本轮用户原话】\n' + `${String(userText || '').trim()}\n`) +
     '【前端识别的变化点·仅供参考】\n' +
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
+    '- 若上方有【对话记忆·供判断】：先判断是追问还是新问题；追问须承接记忆语境，新问题勿硬套上文。\n' +
     '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据** / **操作提示**（三者同级、标签加粗）；依据内全部同一级实心 `- **标题**：正文`；**操作提示**独立成块，禁止放进依据列表；**仅当建议用户考虑/采用9810时**须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司（仅列举9810勿加该提示）；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。' +
@@ -3397,7 +3538,11 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
       '禁止沿用本对话此前回合写过的数字。追问同一政策主题时可承接上文，但仍须以检索为准。'
     );
   };
-  if (uiMode !== 'diagnosis' || uiStep < 1) return withStandaloneKbHint(raw);
+  if (uiMode !== 'diagnosis' || uiStep < 1) {
+    // Mode B / free Q&A: inject recent turns (no Dify conversation_id).
+    const withMem = buildModeBQueryWithMemory(raw);
+    return withStandaloneKbHint(withMem);
+  }
   if (options.isPostReportFollowUp) {
     return buildDiagnosisFollowUpQuery(
       text,
@@ -3755,11 +3900,13 @@ function initAiChatbot() {
     const t = String(text || '').trim();
     if (wantsExclusiveDiagnosisStart(t)) {
       clearDiagSlots();
+      clearQaTurnMemory();
       resetResultPlanPanel();
       setUiWizard('diagnosis', 1, '');
       return;
     }
     if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
+      clearQaTurnMemory();
       setUiWizard('qa', 0, '');
       return;
     }
@@ -3831,6 +3978,7 @@ function initAiChatbot() {
 
   const resetConversation = () => {
     ephemeralDiagSessionId = newUuid();
+    clearQaTurnMemory();
     try {
       localStorage.removeItem(CONV_KEY);
       localStorage.setItem(BOUND_KEY, '0');
@@ -4484,6 +4632,13 @@ function initAiChatbot() {
               baselineSlots: followUpBaselineSlots,
               changes: followUpChanges,
             });
+      // Mode B + post-report Q&A: remember after query build (wizard steps 1–7 excluded)
+      const uiModeNow = getUiMode();
+      const uiStepNow = getUiStep();
+      const inDiagWizard = uiModeNow === 'diagnosis' && uiStepNow >= 1 && uiStepNow <= 7;
+      if (!inDiagWizard) {
+        rememberQaUserTurn(text);
+      }
 
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
@@ -4992,6 +5147,7 @@ function initAiChatbot() {
       } else {
         persistAssistantReport(answer, { kind: 'qa', question: text });
         setBotBubble(typing, answer);
+        rememberQaAssistantTurn(answer);
         showQuickReplies(answer);
         maybeShowServiceRecsAfterAnswer(answer);
       }
@@ -6340,6 +6496,10 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       changeHtml +
       body
   );
+  // Final Q&A card (not mid-stream draft): keep a short conclusion for next-turn memory
+  if (kind === 'qa' && !(replaceLatest && !finalize && !refreshDiagnosis)) {
+    rememberQaAssistantTurn(clean);
+  }
   attachServiceRecs(
     clean,
     kind === 'qa'
