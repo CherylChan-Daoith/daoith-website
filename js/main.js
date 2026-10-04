@@ -2176,18 +2176,11 @@ function detectDiagQuickReplySet(botText) {
   return null;
 }
 
-function shippingQuickReplySetForPlatform(platformLabel, entityLabel) {
+function shippingQuickReplySetForPlatform(platformLabel, _entityLabel) {
   const t = String(platformLabel || '');
-  const entity = String(
-    entityLabel ||
-      (typeof getDiagSlots === 'function' ? getDiagSlots().entity : '') ||
-      ''
-  ).trim();
   if (/亚马逊|Amazon/i.test(t)) return 'shippingAmazon';
   if (/国际站|阿里国际|Alibaba\.com/i.test(t)) {
-    // 境外主体：发货选项与其他平台一致（仓/自发货），不用一达通履约清单
-    if (isOverseasDiagEntity(entity)) return 'shipping';
-    // 大陆主体：自营/一达通/市场采购/便捷发货（无「其他」）
+    // 国际站：发货选项不随主体变化（无「其他」）
     return 'shippingAlibaba';
   }
   if (/SHEIN|希音/i.test(t)) return 'shippingShein';
@@ -3554,17 +3547,10 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
   const stepHints = {
     2: '请执行第二步：只提问「2. 您平台店铺的注册主体是哪一种？（可在下方点选）」；不要在正文罗列主体选项，官网会显示按钮。',
     3: (() => {
-      const entity = String(getDiagSlots().entity || '').trim();
-      if (/国际站|阿里国际|Alibaba\.com/i.test(platform) && isOverseasDiagEntity(entity)) {
-        return (
-          '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；' +
-          '国际站+境外主体时官网选项为发货到平台海外仓/国内仓、自发货国内直发/海外仓（与其他平台相同），不要问一达通履约选项。'
-        );
-      }
       if (/国际站|阿里国际|Alibaba\.com/i.test(platform)) {
         return (
           '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；' +
-          '国际站+大陆主体选项为自营出口/一达通3+N或2+N/市场采购出口/便捷发货出口，**不要**加「其他」。'
+          '国际站不论主体，官网选项均为自营出口/一达通3+N或2+N/市场采购出口/便捷发货出口，**不要**加「其他」，不要改成仓/自发货清单。'
         );
       }
       return '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；不要在正文罗列选项，官网会按平台显示按钮。';
