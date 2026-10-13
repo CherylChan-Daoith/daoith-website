@@ -29,7 +29,7 @@ exec "$PY" scripts/dify_upload_md.py \
   --dir "$DIR" \
   --recursive \
   --purge-all \
-  --separator '---' \
+  --separator=--- \
   --max-tokens 1200 \
   --chunk-overlap 1 \
   --sleep 0.5
