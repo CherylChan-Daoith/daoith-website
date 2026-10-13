@@ -11,6 +11,8 @@ data/dify-hs-codes.zip
 data/dify-hs-upload/
 data/dify-hs-rebate/
 data/dify-hs-import-vat/
+data/cmcode-2026c/
+data/cmcode-2026*/
 
 .venv-pdf/
 data/deloitte-tax-highlights-pdf/

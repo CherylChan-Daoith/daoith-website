@@ -28,11 +28,24 @@ OUT_DIR = ROOT / "data" / "dify-hs-codes"
 CURRENT_END_YEAR = 2099
 
 DEFAULT_CANDIDATES = [
+    ROOT / "data" / "cmcode-2026c",
+    Path.home() / "Desktop" / "出口退税率文库CMCODE2026C",
     Path.home() / "Desktop" / "出口退税率文库CMCODE2026B",
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b"),
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b-1"),
     Path("/Users/cheryl/Downloads/34ad0f0b7c4c460bb2a3bd137b4440ea"),
 ]
+
+
+def _pick_dbf(folder: Path, stem: str) -> Path | None:
+    for name in (f"{stem}.DBF", f"{stem}.dbf", f"{stem.upper()}.DBF", f"{stem.lower()}.dbf"):
+        p = folder / name
+        if p.exists():
+            return p
+    for p in list(folder.glob(f"{stem}.*")) + list(folder.glob(f"{stem.upper()}.*")):
+        if p.suffix.lower() == ".dbf":
+            return p
+    return None
 
 
 def find_source(explicit: Path | None = None) -> Path:
@@ -41,9 +54,7 @@ def find_source(explicit: Path | None = None) -> Path:
             raise SystemExit(f"Source folder not found: {explicit}")
         return explicit
     for p in DEFAULT_CANDIDATES:
-        if (p / "cmcode.DBF").exists() and (
-            (p / "stdcm.dbf").exists() or (p / "stdcm.DBF").exists()
-        ):
+        if _pick_dbf(p, "cmcode") and _pick_dbf(p, "stdcm"):
             return p
     raise SystemExit("No DBF source folder found. Pass the folder path as argv[1].")
 
@@ -112,11 +123,23 @@ def fmt_vat(zssl) -> str:
     return fmt_pct(raw)
 
 
+def resolve_rebate_display(cm: dict) -> tuple[str, str]:
+    """Prefer CMCODE TSL (文库退税率), then NOTE「退x」, else 未收录.
+
+    Do not treat TSL as 暂定税率 — that field is the library export rebate rate.
+    """
+    tsl_raw = cm.get("TSL")
+    if tsl_raw not in (None, ""):
+        return fmt_pct(tsl_raw), "文库TSL退税率"
+    note_rate = parse_export_rebate(cm.get("NOTE") or "")
+    if note_rate is not None:
+        return note_rate, "文库NOTE明确"
+    return "未收录", "未收录"
+
+
 def record_md(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
     vat = fmt_vat(cm.get("ZSSL_SET"))
-    rebate = parse_export_rebate(cm.get("NOTE") or "")
-    rebate_display = rebate if rebate is not None else "未收录"
-    tsl = fmt_pct(cm.get("TSL")) if cm.get("TSL") not in (None, "", 0, 0.0) else "0%"
+    rebate_display, rebate_src = resolve_rebate_display(cm)
 
     lines = [
         f"## 商品编码 {code}",
@@ -131,13 +154,14 @@ def record_md(code: str, name: str, unit: str, dwcode: str, cm: dict) -> str:
 
     lines.append(f"- **增值税税率**：{vat}")
     lines.append(f"- **出口退税率**：{rebate_display}")
-    lines.append(f"- **暂定税率**：{tsl}")
+    lines.append(f"- **出口退税率（仅此字段作答）**：{rebate_display}")
+    lines.append(f"- **退税率来源**：{rebate_src}")
     flag_line = special_goods_flag_line(cm)
     if flag_line:
         lines.append(flag_line)
-    if rebate is None:
+    if rebate_display == "未收录":
         lines.append(
-            "- **说明**：NOTE 无「退x」，出口退税率未收录（禁止默认 0%）；"
+            "- **说明**：文库无 TSL 且 NOTE 无「退x」，出口退税率未收录（禁止默认 0%）；"
             "增值税≠出口退税；请以税局出口退税率文库终核。"
         )
     else:
@@ -183,10 +207,12 @@ def main() -> None:
     src = find_source(explicit)
     print(f"Source: {src}")
 
-    cm_path = src / "cmcode.DBF"
-    std_path = src / "stdcm.dbf"
-    if not std_path.exists():
-        std_path = src / "stdcm.DBF"
+    cm_path = _pick_dbf(src, "cmcode")
+    std_path = _pick_dbf(src, "stdcm")
+    if not cm_path or not std_path:
+        raise SystemExit(f"Missing stdcm/cmcode DBF under {src}")
+    print(f"  cmcode: {cm_path.name}")
+    print(f"  stdcm:  {std_path.name}")
 
     std_table = open_dbf(std_path)
     std_map = {}
@@ -222,11 +248,11 @@ def main() -> None:
     index_lines = [
         "# 中国海关商品编码知识库（现行有效）",
         "",
-        f"数据来源：`{src.name}` 中的 `cmcode.DBF` + `stdcm`（含 memo 全称）。",
+        f"数据来源：`{src.name}` / CMCODE2026C（税总货劳函〔2026〕214号）`cmcode` + `stdcm`。",
         "",
         f"现行有效编码数量：**{len(current)}**（END_DATE ≥ {CURRENT_END_YEAR}）。",
         "",
-        "本知识库按 HS 章（商品编码前两位）拆分，便于上传到 Dify 知识库做检索增强。",
+        "出口退税率优先取文库 TSL 字段；本知识库按 HS 章拆分，供官网本地兜底与 Dify 检索。",
         "",
         "## 章节索引",
         "",
