@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Generate a FULL export-rebate Markdown KB from CMCODE2026B (all current HS codes).
+"""Generate a FULL export-rebate Markdown KB from CMCODE export-rebate library.
+
+Default source: CMCODE2026C (税总货劳函〔2026〕214号). Falls back to 2026B paths.
 
 CMCODE NOTE only marks a minority of codes with explicit「退x」. The actual
 library rebate rate is field TSL (退税率). Resolve rates as:
@@ -13,7 +15,7 @@ library rebate rate is field TSL (退税率). Resolve rates as:
 Do not treat whole HS chapters as 0% — that wrongly zeroed 7113119090 (13%).
 
 Usage:
-  .venv-dbf/bin/python scripts/dbf_to_dify_full_rebate_kb.py [/path/to/CMCODE2026B]
+  .venv-dbf/bin/python scripts/dbf_to_dify_full_rebate_kb.py [/path/to/CMCODE2026C]
 """
 from __future__ import annotations
 
@@ -39,9 +41,12 @@ OUT_REBATE = ROOT / "data" / "dify-hs-rebate"
 DESKTOP_REBATE = Path.home() / "Desktop" / "DIFY知识库" / "海关编码-出口退税率"
 
 DEFAULT_CANDIDATES = [
+    ROOT / "data" / "cmcode-2026c",
+    Path.home() / "Desktop" / "出口退税率文库CMCODE2026C",
     Path.home() / "Desktop" / "出口退税率文库CMCODE2026B",
     Path("/Users/cheryl/Downloads/f1fbd423b0f749dc8b6019496bbc621b"),
 ]
+LIBRARY_VERSION = "CMCODE2026C"
 
 # Silver finished goods whose library TSL is not 0%. Overlay: 2026 No.11
 # art.9(2)(4) — if silver (or other annex-9) raw-material cost ≥50% and
@@ -133,15 +138,26 @@ CHAPTER_DEFAULT = {
 }
 
 
+def _pick_dbf(folder: Path, stem: str) -> Path | None:
+    """Case-insensitive lookup for stem.dbf / stem.DBF."""
+    for name in (f"{stem}.DBF", f"{stem}.dbf", f"{stem.upper()}.DBF", f"{stem.lower()}.dbf"):
+        p = folder / name
+        if p.exists():
+            return p
+    matches = list(folder.glob(f"{stem}.*")) + list(folder.glob(f"{stem.upper()}.*"))
+    for p in matches:
+        if p.suffix.lower() == ".dbf":
+            return p
+    return None
+
+
 def find_source(explicit: Path | None = None) -> Path:
     if explicit:
         if not explicit.exists():
             raise SystemExit(f"Source folder not found: {explicit}")
         return explicit
     for p in DEFAULT_CANDIDATES:
-        if (p / "cmcode.DBF").exists() and (
-            (p / "stdcm.dbf").exists() or (p / "stdcm.DBF").exists()
-        ):
+        if _pick_dbf(p, "cmcode") and _pick_dbf(p, "stdcm"):
             return p
     raise SystemExit("No CMCODE folder found. Pass path as argv[1].")
 
@@ -334,8 +350,9 @@ def write_files(records: list[dict], std_map: dict[str, dict]) -> tuple[int, int
         idx = i // RECORDS_PER_FILE + 1
         name = f"hs_{idx:03d}_{start_code}_{end_code}.md"
         parts = [
-            f"# 中国出口退税率文库（CMCODE全量·现行有效）第 {idx} 批",
+            f"# 中国出口退税率文库（{LIBRARY_VERSION}全量·现行有效）第 {idx} 批",
             "",
+            f"- **文库版本**：{LIBRARY_VERSION}（税总货劳函〔2026〕214号）",
             f"- **编码范围**：{start_code} ~ {end_code}",
             f"- **本文件条数**：{len(chunk)}",
             "- **说明**：含现行有效税号出口退税率；优先文库TSL字段，其次NOTE「退x」，禁止按整章一律填0%。",
@@ -402,9 +419,12 @@ def main() -> None:
     src = find_source(explicit)
     print(f"Source: {src}")
 
-    std_path = src / "stdcm.dbf"
-    if not std_path.exists():
-        std_path = src / "stdcm.DBF"
+    std_path = _pick_dbf(src, "stdcm")
+    cm_path = _pick_dbf(src, "cmcode")
+    if not std_path or not cm_path:
+        raise SystemExit(f"Missing stdcm/cmcode DBF under {src}")
+    print(f"  cmcode: {cm_path.name}")
+    print(f"  stdcm:  {std_path.name}")
 
     std_map: dict[str, dict] = {}
     for r in open_dbf(std_path):
@@ -417,7 +437,7 @@ def main() -> None:
             }
 
     current: list[dict] = []
-    for r in open_dbf(src / "cmcode.DBF", ignore_memo=True):
+    for r in open_dbf(cm_path, ignore_memo=True):
         end = r.get("END_DATE")
         if not end or getattr(end, "year", 0) < CURRENT_END_YEAR:
             continue

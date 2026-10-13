@@ -242,6 +242,11 @@ def main() -> None:
         help="Delete existing docs with the same filename before upload",
     )
     ap.add_argument(
+        "--purge-all",
+        action="store_true",
+        help="Delete ALL documents in the dataset before upload (use for full library replace)",
+    )
+    ap.add_argument(
         "--recursive",
         action="store_true",
         help="Include .md files in subfolders (e.g. batch-01/)",
@@ -323,7 +328,7 @@ def main() -> None:
     print(f"Seg mode: {seg_label}")
 
     existing_by_name: dict[str, str] = {}
-    if args.replace:
+    if args.purge_all or args.replace:
         print("Listing existing documents…")
         existing = list_documents(args.base, args.dataset_id, api_key)
         for d in existing:
@@ -332,6 +337,12 @@ def main() -> None:
             if name and doc_id:
                 existing_by_name[name] = doc_id
         print(f"  existing: {len(existing_by_name)}")
+        if args.purge_all:
+            print(f"Purging {len(existing_by_name)} documents…")
+            for name, doc_id in list(existing_by_name.items()):
+                delete_document(args.base, args.dataset_id, api_key, doc_id)
+                print(f"  deleted {name}")
+            existing_by_name.clear()
 
     ok = fail = 0
     failures: list[str] = []
