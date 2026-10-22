@@ -934,13 +934,82 @@ function stripThinkAndToolMarkup(text) {
 /**
  * Q&A answers: light clean only. Never run diagnosis ordinal/CoT salvage that can eat digits.
  * Also hard-fix known statutory slips the model keeps repeating.
+ * When `question` is provided, restore user-stated amounts the model undercounted by 10×.
  */
-function sanitizeQaAnswer(text) {
+function sanitizeQaAnswer(text, question) {
   let t = stripThinkAndToolMarkup(text);
   t = stripKnowledgeBaseDisclaimers(t);
   t = stripInternalTaxonomyLeaks(t);
   t = correctLocalFileThresholdAmounts(t);
+  t = alignAnswerAmountsWithUserQuestion(question || getLatestQaUserQuestion(), t);
   return t.trim();
+}
+
+/** Escape for RegExp source. */
+function escapeRegExpLiteral(s) {
+  return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Unit families for amount alignment (万 ↔ 万元, 亿 ↔ 亿元).
+ * Bare「元」stays distinct from「万元」.
+ */
+function amountUnitAlternates(unit) {
+  const u = String(unit || '').trim();
+  if (u === '万元' || u === '万') return ['万元', '万'];
+  if (u === '亿元' || u === '亿') return ['亿元', '亿'];
+  if (u === '元') return ['元'];
+  return u ? [u] : [];
+}
+
+function textHasAmountFigure(text, num, unit) {
+  const alts = amountUnitAlternates(unit);
+  if (!alts.length) return false;
+  const unitGroup = alts.map(escapeRegExpLiteral).join('|');
+  const re = new RegExp(`(?<![\\d.])${escapeRegExpLiteral(String(num))}\\s*(?:${unitGroup})(?!\\d)`);
+  return re.test(String(text || ''));
+}
+
+/**
+ * Recurring slip: user wrote 2000万 / 4000万 / 5000元, answer only has the
+ * 10× undercount (200万 / 400万 / 500元). Restore the user figure when the
+ * correct amount is absent from the answer (avoids rewriting unrelated thresholds).
+ */
+function alignAnswerAmountsWithUserQuestion(question, answer) {
+  const q = String(question || '');
+  let t = String(answer || '');
+  if (!q || !t) return t;
+
+  const seen = new Set();
+  const re = /(\d+(?:\.\d+)?)\s*(万元|万|亿元|亿|元)/g;
+  let m;
+  while ((m = re.exec(q))) {
+    const num = m[1];
+    const unit = m[2];
+    // Alternation prefers 万元/亿元 over bare 元 — no extra skip needed
+    const key = `${num}|${amountUnitAlternates(unit)[0] || unit}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const n = Number(num);
+    if (!Number.isFinite(n) || n < 10) continue;
+    // Only restore exact 10× undercounts of trailing-zero figures (2000→200, 5000→500)
+    if (!Number.isInteger(n) || n % 10 !== 0) continue;
+    const wrong = n / 10;
+    if (!Number.isInteger(wrong) || wrong < 1) continue;
+
+    if (textHasAmountFigure(t, num, unit)) continue;
+    if (!textHasAmountFigure(t, String(wrong), unit)) continue;
+
+    const alts = amountUnitAlternates(unit);
+    const unitGroup = alts.map(escapeRegExpLiteral).join('|');
+    const fixRe = new RegExp(
+      `(?<![\\d.])${escapeRegExpLiteral(String(wrong))}(\\s*)(${unitGroup})(?!\\d)`,
+      'g'
+    );
+    t = t.replace(fixRe, `${num}$1$2`);
+  }
+  return t;
 }
 
 /**
@@ -980,7 +1049,7 @@ function sanitizeAiAnswer(text) {
 
   // Mode B / follow-up Q&A: do not run diagnosis-plan salvage (protects policy figures)
   if (looksLikeQaAnswerMarkdown(raw) || looksLikeQaAnswerMarkdown(stripThinkAndToolMarkup(raw))) {
-    return sanitizeQaAnswer(raw);
+    return sanitizeQaAnswer(raw, getLatestQaUserQuestion());
   }
 
   let t = stripThinkAndToolMarkup(raw);
@@ -2975,10 +3044,17 @@ const QA_TURN_MEMORY_MAX = 6;
 const QA_ASSIST_MEMORY_MAX = 2;
 let qaUserTurnMemory = [];
 let qaAssistantMemory = [];
+/** Full latest user Q&A turn (not truncated) — used to lock stated amounts in answers. */
+let lastQaUserQuestionFull = '';
 
 function clearQaTurnMemory() {
   qaUserTurnMemory = [];
   qaAssistantMemory = [];
+  lastQaUserQuestionFull = '';
+}
+
+function getLatestQaUserQuestion() {
+  return String(lastQaUserQuestionFull || '').trim();
 }
 
 function rememberQaUserTurn(text) {
@@ -2993,6 +3069,7 @@ function rememberQaUserTurn(text) {
     clearQaTurnMemory();
     return;
   }
+  lastQaUserQuestionFull = t;
   if (qaUserTurnMemory.length && qaUserTurnMemory[qaUserTurnMemory.length - 1] === t) return;
   qaUserTurnMemory.push(t.length > 160 ? `${t.slice(0, 160)}…` : t);
   if (qaUserTurnMemory.length > QA_TURN_MEMORY_MAX) {
@@ -4646,7 +4723,7 @@ function initAiChatbot() {
       const parcel9610Reply = build9610SingleTicketLimitReply(text);
       if (parcel9610Reply) {
         if (shouldRouteLongAnswerToPlanPanel(parcel9610Reply)) {
-          publishDiagnosisPlanToResultPanel(parcel9610Reply, { kind: 'qa' });
+          publishDiagnosisPlanToResultPanel(parcel9610Reply, { kind: 'qa', question: text });
           typing.classList.add('is-plan-status');
           setTypingText(QA_LONG_ANSWER_CHAT_TIP);
           clearQuickReplies();
@@ -4663,7 +4740,7 @@ function initAiChatbot() {
       if (aluminumReply) {
         persistAssistantReport(aluminumReply, { kind: 'qa', question: text });
         if (shouldRouteLongAnswerToPlanPanel(aluminumReply)) {
-          publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa' });
+          publishDiagnosisPlanToResultPanel(aluminumReply, { kind: 'qa', question: text });
           typing.classList.add('is-plan-status');
           setTypingText(QA_LONG_ANSWER_CHAT_TIP);
           clearQuickReplies();
@@ -4724,7 +4801,7 @@ function initAiChatbot() {
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
         const cleaned = looksLikeQaAnswerMarkdown(partial)
-          ? sanitizeQaAnswer(partial)
+          ? sanitizeQaAnswer(partial, text)
           : correctAluminumRefundHallucinations(sanitizeAiAnswer(partial));
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
@@ -4778,6 +4855,7 @@ function initAiChatbot() {
           beginLongQaRouting();
           publishDiagnosisPlanToResultPanel(clean, {
             kind: 'qa',
+            question: text,
             replaceLatest: true,
           });
           return;
@@ -4865,12 +4943,14 @@ function initAiChatbot() {
         }
       }
       answer = looksLikeQaAnswerMarkdown(answer || result?.text || '')
-        ? sanitizeQaAnswer(answer || result?.text || '')
+        ? sanitizeQaAnswer(answer || result?.text || '', text)
         : sanitizeAiAnswer(answer);
       answer = stripDiagnosisIntroBoilerplate(answer || '');
       if (!looksLikeQaAnswerMarkdown(answer)) {
         answer = correctAluminumRefundHallucinations(answer);
       }
+      // Final amount lock (covers non-QA-shaped answers that still quote user figures)
+      answer = alignAnswerAmountsWithUserQuestion(text, answer);
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
@@ -5122,6 +5202,7 @@ function initAiChatbot() {
           beginLongQaRouting();
           publishDiagnosisPlanToResultPanel(answer, {
             kind: 'qa',
+            question: text,
             replaceLatest: true,
             finalize: true,
           });
@@ -6337,9 +6418,10 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   purgeInlineServiceMatchTips(items);
 
   // Q&A: light sanitize only — never diagnosis ordinal/CoT salvage (protects 4000万 / 5000元)
+  const qaQuestion = String(options.question || getLatestQaUserQuestion() || '').trim();
   const cleanedMarkdown =
     options.kind === 'qa'
-      ? sanitizeQaAnswer(markdown)
+      ? sanitizeQaAnswer(markdown, qaQuestion)
       : correctAluminumRefundHallucinations(sanitizeAiAnswer(markdown));
   const cleanRaw = stripServiceMatchTip(stripDiagnosisArchivePreamble(cleanedMarkdown));
   if (
