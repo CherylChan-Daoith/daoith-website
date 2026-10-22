@@ -830,57 +830,139 @@ function renderPlanFaqs(ctx) {
 function stripModelToolCallMarkup(text) {
   let t = String(text || '');
   if (!t) return '';
-  // Normalize spaced DeepSeek DSML tags: < | DSML | function_calls >
-  t = t
-    .replace(/<\s*\|\s*\/?\s*DSML\s*\|/gi, (m) => (/\//.test(m) ? '</|DSML|' : '<|DSML|'))
-    .replace(/<\s*\/\s*\|\s*DSML\s*\|/gi, '</|DSML|')
-    .replace(/\|\s*>/g, '|>');
-  const close = (name) => `(?:<\\|\\s*/\\s*DSML\\s*\\|\\s*${name}\\s*>|<\\/\\|DSML\\|\\s*${name}\\s*>)`;
-  // Closed DSML function_calls / invoke / parameter blocks
+
+  // DeepSeek DSML tags vary a lot:
+  //   <|DSML|function_calls> … </|DSML|function_calls>
+  //   < | DSML | invoke … >
+  //   < | | DSML | | calls >   ← double pipes + short name "calls"
+  // Drop whole closed blocks first, then any leftover tag lines.
+  const dsmlTag =
+    '<\\s*/?\\s*(?:\\|\\s*)+DSML(?:\\s*\\|\\s*)+[\\w:-]*(?:\\s[^>]*)?>';
+  const dsmlBlock = new RegExp(`${dsmlTag}[\\s\\S]*?${dsmlTag}`, 'gi');
+  let prev = '';
+  let guard = 0;
+  while (t !== prev && guard < 8) {
+    prev = t;
+    guard += 1;
+    t = t.replace(dsmlBlock, '\n');
+  }
+  t = t.replace(new RegExp(dsmlTag, 'gi'), '\n');
+  // Lines that still mention DSML / pipe-wrapped tool names
   t = t.replace(
-    new RegExp(
-      `<\\|\\s*DSML\\s*\\|\\s*function_calls\\s*>[\\s\\S]*?${close('function_calls')}`,
-      'gi'
-    ),
+    /(?:^|\n)\s*[-*•]?\s*<?\s*\/?\s*(?:\|\s*)*DSML[^\n]*/gi,
     '\n'
   );
   t = t.replace(
-    new RegExp(`<\\|\\s*DSML\\s*\\|\\s*invoke\\b[^>]*>[\\s\\S]*?${close('invoke')}`, 'gi'),
+    /(?:^|\n)\s*[-*•]?\s*<\/?\s*(?:function_calls|tool_call|invoke|parameter|calls)\b[^\n]*/gi,
     '\n'
   );
-  t = t.replace(
-    new RegExp(
-      `<\\|\\s*DSML\\s*\\|\\s*parameter\\b[^>]*>[\\s\\S]*?${close('parameter')}`,
-      'gi'
-    ),
-    '\n'
-  );
-  t = t.replace(/<\/?\|?\s*DSML\s*\|[^>]*>/gi, '');
-  t = t.replace(/<\|\s*\/?\s*DSML\s*\|[^>]*>/gi, '');
+
   // Classic XML / markdown tool formats
   t = t.replace(/<\s*function_calls\b[^>]*>[\s\S]*?<\/\s*function_calls\s*>/gi, '\n');
   t = t.replace(/<\s*tool_call\b[^>]*>[\s\S]*?<\/\s*tool_call\s*>/gi, '\n');
   t = t.replace(/<\s*invoke\b[^>]*>[\s\S]*?<\/\s*invoke\s*>/gi, '\n');
   t = t.replace(/<\s*parameter\b[^>]*>[\s\S]*?<\/\s*parameter\s*>/gi, '\n');
-  t = t.replace(/<\/?\s*(?:function_calls|tool_call|invoke|parameter)\b[^>]*>/gi, '');
-  // Leftover bullet lines that are only markup / empty after strip
-  t = t.replace(
-    /(?:^|\n)\s*[-*•]?\s*(?:<\/?\s*\|?\s*DSML\b|<\/?\s*(?:function_calls|tool_call|invoke|parameter)\b)[^\n]*/gi,
-    '\n'
-  );
+  t = t.replace(/<\/?\s*(?:function_calls|tool_call|invoke|parameter|calls)\b[^>]*>/gi, '');
+
+  // Empty bullets left after tag removal
   t = t.replace(/(?:^|\n)\s*[-*•]\s*(?=\n|$)/g, '\n');
+  t = t.replace(/(?:^|\n)\s*[-*•]\s+$/gm, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function looksLikeOnlyToolCallMarkup(text) {
   const raw = String(text || '').trim();
   if (!raw) return false;
-  if (!/(?:DSML|function_calls|tool_call\b|<\s*invoke\b)/i.test(raw)) return false;
+  if (!/(?:DSML|function_calls|tool_call\b|<\s*invoke\b|\|\s*DSML\s*\|)/i.test(raw)) {
+    return false;
+  }
   const cleaned = stripModelToolCallMarkup(raw)
     .replace(/^[-*•\s]+$/gm, '')
     .replace(/\n{2,}/g, '\n')
     .trim();
-  return !cleaned;
+  // Also treat as empty if only punctuation / orphan pipes remain
+  if (!cleaned) return true;
+  return !/[\u4e00-\u9fffA-Za-z]{2,}/.test(cleaned);
+}
+
+/**
+ * Strip model think / tool markup only — shared by QA + diagnosis sanitizers.
+ * Must not rewrite policy amounts (4000万 / 5000元 etc.).
+ */
+function stripThinkAndToolMarkup(text) {
+  let t = stripModelToolCallMarkup(String(text || ''));
+  const think = String.fromCharCode(116, 104, 105, 110, 107); // think
+  const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
+
+  t = t
+    .replace(/&lt;\s*(\/?)\s*(think|thinking|reason|reasoning)\b[^&]*&gt;/gi, '<$1$2>')
+    .replace(/＜\s*(\/?)\s*(think|thinking|reason|reasoning)[^＞]*＞/gi, '<$1$2>');
+
+  for (const name of tagNames) {
+    const afterClose = new RegExp(`<\\s*\\/\\s*${name}\\s*>\\s*([\\s\\S]*)$`, 'i');
+    const m = t.match(afterClose);
+    if (m && m[1] && m[1].trim().length >= 8 && !new RegExp(`<\\s*${name}\\b`, 'i').test(m[1])) {
+      t = m[1];
+      break;
+    }
+  }
+
+  let prev = '';
+  let guard = 0;
+  while (t !== prev && guard < 12) {
+    prev = t;
+    guard += 1;
+    for (const name of tagNames) {
+      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '\n');
+      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*$`, 'i'), '\n');
+      t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
+    }
+  }
+
+  t = t
+    .replace(/^\s*thinking[:：].*$/gim, '')
+    .replace(/^\s*思考过程[:：].*$/gim, '')
+    .replace(/```(?:thinking|thought|reason|reasoning)[\s\S]*?```/gi, '\n')
+    .replace(/(?:^|\n)#{0,3}\s*思考过程[:：]?[\s\S]*?(?=\n#{1,3}\s|\n\*\*|【|$)/g, '\n')
+    .replace(/(?:^|\n)思考过程[:：][\s\S]*?(?=\n{2,}|$)/g, '\n')
+    .replace(/(?:^|\n)(?:Thought|Action|Observation)\s*[:：][^\n]*/gi, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return t;
+}
+
+/**
+ * Q&A answers: light clean only. Never run diagnosis ordinal/CoT salvage that can eat digits.
+ * Also hard-fix known statutory slips the model keeps repeating.
+ */
+function sanitizeQaAnswer(text) {
+  let t = stripThinkAndToolMarkup(text);
+  t = stripKnowledgeBaseDisclaimers(t);
+  t = stripInternalTaxonomyLeaks(t);
+  t = correctLocalFileThresholdAmounts(t);
+  return t.trim();
+}
+
+/**
+ * 42号公告：其他关联交易合计超过 4000 万元（不是 400 万）。
+ * 仅在「本地文档/同期资料」且同句出现 2亿/1亿 门槛时纠偏，避免误伤其它 400 万表述。
+ */
+function correctLocalFileThresholdAmounts(text) {
+  let t = String(text || '');
+  if (!t) return t;
+  if (!/(?:本地文档|同期资料)/.test(t)) return t;
+  if (!/(?:有形资产|金融资产|无形资产)/.test(t)) return t;
+  if (!/(?:2\s*亿|1\s*亿)/.test(t)) return t;
+  // 其他关联交易…400万 → 4000万（已是 4000 则 (?!\d) 不会误伤）
+  t = t.replace(
+    /(其他关联交易[^。；\n]{0,40}?)(?<![\d])400(?!\d)(\s*万)/g,
+    '$14000$2'
+  );
+  t = t.replace(
+    /(关联交易金额合计超过\s*)(?<![\d])400(?!\d)(\s*万)/g,
+    '$14000$2'
+  );
+  return t;
 }
 
 function sanitizeAiAnswer(text) {
@@ -896,39 +978,13 @@ function sanitizeAiAnswer(text) {
     }
   }
 
-  let t = stripModelToolCallMarkup(raw);
+  // Mode B / follow-up Q&A: do not run diagnosis-plan salvage (protects policy figures)
+  if (looksLikeQaAnswerMarkdown(raw) || looksLikeQaAnswerMarkdown(stripThinkAndToolMarkup(raw))) {
+    return sanitizeQaAnswer(raw);
+  }
 
-  // Build tag names at runtime so tooling cannot rewrite DeepSeek's "think" token
+  let t = stripThinkAndToolMarkup(raw);
   const think = String.fromCharCode(116, 104, 105, 110, 107); // think
-  const tagNames = [think, 'thinking', 'reason', 'reasoning', 'redacted_reasoning'];
-
-  // Decode common escaped forms first
-  t = t
-    .replace(/&lt;\s*(\/?)\s*(think|thinking|reason|reasoning)\b[^&]*&gt;/gi, '<$1$2>')
-    .replace(/＜\s*(\/?)\s*(think|thinking|reason|reasoning)[^＞]*＞/gi, '<$1$2>');
-
-  // Prefer text after the last closed think block (formal answer usually follows)
-  for (const name of tagNames) {
-    const afterClose = new RegExp(`<\\s*\\/\\s*${name}\\s*>\\s*([\\s\\S]*)$`, 'i');
-    const m = t.match(afterClose);
-    if (m && m[1] && m[1].trim().length >= 8 && !new RegExp(`<\\s*${name}\\b`, 'i').test(m[1])) {
-      t = m[1];
-      break;
-    }
-  }
-
-  // Iteratively drop all think / reasoning blocks (including nested / consecutive)
-  let prev = '';
-  let guard = 0;
-  while (t !== prev && guard < 12) {
-    prev = t;
-    guard += 1;
-    for (const name of tagNames) {
-      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${name}\\s*>`, 'gi'), '\n');
-      t = t.replace(new RegExp(`<\\s*${name}\\b[^>]*>[\\s\\S]*$`, 'i'), '\n');
-      t = t.replace(new RegExp(`<\\s*\\/?\\s*${name}\\b[^>]*>`, 'gi'), '');
-    }
-  }
 
   const clean = (s) =>
     String(s || '')
@@ -953,21 +1009,12 @@ function sanitizeAiAnswer(text) {
     if (m) t = m[0];
   }
 
-  if (t.length > 280 && /我们被要求回答|根据上下文|所以回答[:：]|核心答案如下|我回想|让我回顾一下/.test(t)) {
-    const parts = t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2 && parts[parts.length - 1].length < 220) {
-      t = parts[parts.length - 1];
-    }
-  }
-
+  // Do NOT take "last short paragraph" from CoT — it discards formal body and can leave
+  // wrong figures (400万 / 500元) from draft reasoning.
   t = clean(t);
 
-  // Strip visible “思考过程” / agent planning sections (with or without XML tags)
+  // Strip leftover agent planning lines (diagnosis path only)
   t = t
-    .replace(/```(?:thinking|thought|reason|reasoning)[\s\S]*?```/gi, '\n')
-    .replace(/(?:^|\n)#{0,3}\s*思考过程[:：]?[\s\S]*?(?=\n#{1,3}\s|\n\*\*|【|$)/g, '\n')
-    .replace(/(?:^|\n)思考过程[:：][\s\S]*?(?=\n{2,}|$)/g, '\n')
-    .replace(/(?:^|\n)(?:Thought|Action|Observation)\s*[:：][^\n]*/gi, '\n')
     .replace(
       /(?:^|\n)(?:我先|让我|首先|接下来|现在)?(?:需要|正在|开始)?(?:检索|思考|分析|调用|查阅).{0,80}(?:知识库|工具|资料)[^\n]*/g,
       '\n'
@@ -1080,24 +1127,6 @@ function stripDiagnosisIntroBoilerplate(text) {
     .trim();
 }
 
-/**
- * Hard-correct a recurring Agent slip: 按次起征点写成 100元（应为 1000元 / 2026年第10号）.
- * Does not open/close Dify threads; only fixes visible text when the wrong pattern appears
- * alongside 2026 / 10号 / 旧500 语境。Leaves 100万、10万元、1000元 untouched.
- */
-function correctChinaVatPerTimeThreshold(text) {
-  let t = String(text || '');
-  if (!t || !/(起征点|按次纳税|免税额度)/.test(t)) return t;
-  if (!/(?:2026|第\s*10\s*号|10\s*号公告|500\s*元)/.test(t)) return t;
-  if (!/(?<![\d])100(?!\d)\s*元/.test(t)) return t;
-  t = t.replace(/(按次(?:纳税)?[^。\n；;]{0,60}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/(每次（日）销售额\s*)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/统一按\s*100\s*元(?:执行|为准)?/g, '统一按1000元执行');
-  t = t.replace(/一律按\s*100\s*元/g, '一律按1000元');
-  t = t.replace(/(?:改按|调整为|执行为)\s*100\s*元/g, (m) => m.replace(/100/, '1000'));
-  return t;
-}
-
 /** Mode B / follow-up Q&A: force bold section labels for display.
  *  「结论 / 依据 / 操作提示」等为同级章节标签。
  */
@@ -1143,7 +1172,10 @@ function looksLikeQaAnswerMarkdown(text) {
     /\*\*\s*(结论|依据)\s*[:：]?\s*\*\*/.test(t) ||
     /\*\*(结论|依据)\*\*/.test(t) ||
     /^\s*(结论|依据)\s*[:：]/m.test(t) ||
-    /\*\*操作提示\*\*/.test(t)
+    /\*\*操作提示\*\*/.test(t) ||
+    /(?:适用门槛|触发门槛|本地文档|同期资料).{0,40}(?:关联交易|2\s*亿|4000\s*万|400\s*万)/.test(
+      t
+    )
   );
 }
 
@@ -1688,12 +1720,20 @@ function renderChatBubbleHtml(text) {
   return html || `<p class="result-paragraph">${formatInline(String(text || ''))}</p>`;
 }
 
+/**
+ * Hide the word「知识库」from visitors — but NEVER delete the sentence.
+ * Old regex wiped whole lines that cited 知识库, which also deleted facts (e.g. 5000元).
+ */
 function stripKnowledgeBaseDisclaimers(text) {
   let t = String(text || '');
-  // Any user-visible "知识库…" framing (miss, cite, or meta) — never show the word
-  t = t.replace(/[（(]\s*知识库[^）)]{0,120}[）)]\s*[:：]?/g, '');
-  t = t.replace(/[^。；！？\n]*知识库[^。；！？\n]*[。；！？]?\s*/g, '');
-  t = t.replace(/(?:由于|因)?AI和知识库具有一定的局限性[^。]*[。]?/g, '');
+  // Pure meta / limitation lines
+  t = t.replace(/(?:由于|因)?AI和知识库具有一定的局限性[^。\n]*[。]?/g, '');
+  t = t.replace(/(?:^|\n)\s*[-*•]?\s*知识库返回为空[^\n]*/g, '\n');
+  t = t.replace(/(?:^|\n)\s*[-*•]?\s*需要检索的知识库[：:][^\n]*/g, '\n');
+  // Parenthetical cite only: （知识库附件三）→ drop the cite, keep the fact sentence
+  t = t.replace(/[（(]\s*知识库[^）)]{0,80}[）)]/g, '');
+  // Inline: keep the fact sentence, just rename the source label
+  t = t.replace(/知识库(?:规定|要求|写明|显示|检索到的)?/g, '现行规定');
   t = t.replace(/(?:^|\n)\s*[-*•]\s*\*\*\s*[:：]/gm, '\n');
   return t.replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -2136,18 +2176,11 @@ function detectDiagQuickReplySet(botText) {
   return null;
 }
 
-function shippingQuickReplySetForPlatform(platformLabel, entityLabel) {
+function shippingQuickReplySetForPlatform(platformLabel, _entityLabel) {
   const t = String(platformLabel || '');
-  const entity = String(
-    entityLabel ||
-      (typeof getDiagSlots === 'function' ? getDiagSlots().entity : '') ||
-      ''
-  ).trim();
   if (/亚马逊|Amazon/i.test(t)) return 'shippingAmazon';
   if (/国际站|阿里国际|Alibaba\.com/i.test(t)) {
-    // 境外主体：发货选项与其他平台一致（仓/自发货），不用一达通履约清单
-    if (isOverseasDiagEntity(entity)) return 'shipping';
-    // 大陆主体：自营/一达通/市场采购/便捷发货（无「其他」）
+    // 国际站：发货选项不随主体变化（无「其他」）
     return 'shippingAlibaba';
   }
   if (/SHEIN|希音/i.test(t)) return 'shippingShein';
@@ -2933,6 +2966,144 @@ function getLastDiagFollowUpChanges() {
   return lastDiagFollowUpChanges.slice();
 }
 
+/**
+ * Short-term chat memory (query-side only).
+ * Dify conversation_id stays empty (D-34); continuity is injected into each query.
+ * Covers Mode B and post-report Q&A — not limited to export-mode codes.
+ */
+const QA_TURN_MEMORY_MAX = 6;
+const QA_ASSIST_MEMORY_MAX = 2;
+let qaUserTurnMemory = [];
+let qaAssistantMemory = [];
+
+function clearQaTurnMemory() {
+  qaUserTurnMemory = [];
+  qaAssistantMemory = [];
+}
+
+function rememberQaUserTurn(text) {
+  const t = String(text || '').trim();
+  if (!t) return;
+  if (/^【模式选择】/.test(t)) return;
+  if (wantsExclusiveDiagnosisStart(t)) {
+    clearQaTurnMemory();
+    return;
+  }
+  if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
+    clearQaTurnMemory();
+    return;
+  }
+  if (qaUserTurnMemory.length && qaUserTurnMemory[qaUserTurnMemory.length - 1] === t) return;
+  qaUserTurnMemory.push(t.length > 160 ? `${t.slice(0, 160)}…` : t);
+  if (qaUserTurnMemory.length > QA_TURN_MEMORY_MAX) {
+    qaUserTurnMemory = qaUserTurnMemory.slice(-QA_TURN_MEMORY_MAX);
+  }
+}
+
+function summarizeQaAnswerForMemory(text) {
+  const t = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .trim();
+  if (!t || looksLikeOnlyToolCallMarkup(t)) return '';
+  const concl = t.match(
+    /(?:^|\n)\s*(?:\*\*)?结论(?:\*\*)?[：:]\s*([^\n]{8,180})/
+  );
+  let s = (concl && concl[1] ? concl[1] : t.split('\n').find((ln) => /[\u4e00-\u9fff]{6,}/.test(ln)) || '')
+    .replace(/[#*`>_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!s) return '';
+  if (s.length > 110) s = `${s.slice(0, 110)}…`;
+  return s;
+}
+
+function rememberQaAssistantTurn(text) {
+  const s = summarizeQaAnswerForMemory(text);
+  if (!s) return;
+  if (qaAssistantMemory.length && qaAssistantMemory[qaAssistantMemory.length - 1] === s) return;
+  qaAssistantMemory.push(s);
+  if (qaAssistantMemory.length > QA_ASSIST_MEMORY_MAX) {
+    qaAssistantMemory = qaAssistantMemory.slice(-QA_ASSIST_MEMORY_MAX);
+  }
+}
+
+function extractQaTopicAnchors(texts) {
+  const blob = (Array.isArray(texts) ? texts : [texts]).map((x) => String(x || '')).join('\n');
+  const codes = [];
+  const codeRe = /\b(0110|9610|9710|9810|1039|1210)\b/g;
+  let m;
+  while ((m = codeRe.exec(blob))) {
+    if (!codes.includes(m[1])) codes.push(m[1]);
+  }
+  const hs = [];
+  const hsRe = /\b(\d{8,10})\b/g;
+  while ((m = hsRe.exec(blob))) {
+    if (!hs.includes(m[1])) hs.push(m[1]);
+    if (hs.length >= 3) break;
+  }
+  const topics = [];
+  const topicRules = [
+    [/报关单|报关填写|成交方式|境外收货人/, '报关填写'],
+    [/海外仓|FBA|备货|FBL/, '海外仓/备货'],
+    [/出口退税|退税率|免抵退/, '出口退税'],
+    [/增值税|起征点|按次|小规模/, '增值税'],
+    [/企业所得税|汇算清缴/, '企业所得税'],
+    [/个人所得税|个税|综合所得/, '个税'],
+    [/关联交易|同期资料|本地文档|主体文档/, '转让定价/同期资料'],
+    [/离境退税|即买即退/, '离境退税'],
+    [/IOSS|OSS|VOEC|欧盟增值税|英国VAT/i, '境外增值税登记'],
+    [/税收协定|常设机构|居民身份/, '税收协定'],
+    [/发票|专票|普票|无票/, '发票'],
+    [/香港公司|双层架构|0110\s*\+/, '架构搭建'],
+    [/信息报送|互联网平台企业/, '涉税信息报送'],
+    [/亚马逊|Temu|Shopee|Lazada|速卖通|SHEIN|TikTok|eBay|美客多|国际站|Shopify/i, '电商平台'],
+  ];
+  topicRules.forEach(([re, label]) => {
+    if (re.test(blob) && !topics.includes(label)) topics.push(label);
+  });
+  return { codes, hs, topics };
+}
+
+/** Shared memory block: Agent must classify 追问 vs 新问题 for any topic. */
+function formatQaMemoryBlock(userText) {
+  const raw = String(userText || '').trim();
+  const prior = qaUserTurnMemory.slice();
+  if (!prior.length && !qaAssistantMemory.length) return '';
+  const anchors = extractQaTopicAnchors(prior.concat(qaAssistantMemory).concat([raw]));
+  const priorLines = prior.length
+    ? prior.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    : '（无）';
+  const assistLines = qaAssistantMemory.length
+    ? qaAssistantMemory.map((a, i) => `${i + 1}. ${a}`).join('\n')
+    : '';
+  const anchorBits = [];
+  if (anchors.codes.length) anchorBits.push(`监管/贸易方式：${anchors.codes.join('、')}`);
+  if (anchors.hs.length) anchorBits.push(`商品编码：${anchors.hs.join('、')}`);
+  if (anchors.topics.length) anchorBits.push(`主题：${anchors.topics.join('、')}`);
+  return (
+    '【对话记忆·供判断】\n' +
+    '【近期用户问题】\n' +
+    `${priorLines}\n` +
+    (assistLines ? `【近期助手结论摘要】\n${assistLines}\n` : '') +
+    (anchorBits.length ? `【可沿用锚点】${anchorBits.join('；')}\n` : '') +
+    '【本轮用户原话】\n' +
+    `${raw}\n` +
+    '【作答要求】\n' +
+    '- 先自行判断本轮是「承接上文的追问」还是「全新独立问题」（不要向用户复述该判断过程）。\n' +
+    '- **追问**（省略指代、同一税种/同一业务场景的细化、同一表单字段续问等）：必须沿用近期对话中的主体、平台、出口方式、税种、文号、门槛数字等语境；举例不得无故切换（如上文9810则勿改答0110；上文增值税起征点则「那按次呢」仍答增值税）。\n' +
+    '- **新问题**（明显换了税种、平台、出口方式、国家/地区或法规主题）：按新题独立作答，不要硬套上文；可一句带过「以下按新问题说明」。\n' +
+    '- 禁止复述本段指令；结构仍用 **结论** / **依据** / **操作提示**（适用时）。'
+  );
+}
+
+/** Wrap Mode B / free Q&A with memory when prior turns exist. */
+function buildModeBQueryWithMemory(userText) {
+  const raw = String(userText || '').trim();
+  const block = formatQaMemoryBlock(raw);
+  return block || raw;
+}
+
 function diffDiagSlots(before, after) {
   const prev = before && typeof before === 'object' ? before : {};
   const next = after && typeof after === 'object' ? after : {};
@@ -2977,6 +3148,8 @@ function looksLikeDiagnosisFactQuestion(text) {
   if (/是不是|是否|有没有|能不能|可不可以|可否|能否|可以吗/.test(t)) return true;
   if (/^(?:我能|我想问|请问|想问一下|帮我看|帮我确认)/.test(t)) return true;
   if (/(?:能不能|可不可以|是否可以|是否能|能否).{0,12}(?:走|用|做|改|切换)/.test(t)) return true;
+  // 「9610单票货值上限」：政策查询，不是改出口方式重出方案
+  if (/(?:上限|货值|限额|额度|限制|条件|要求|是多少|多少钱|多少元)/.test(t)) return true;
   return false;
 }
 
@@ -3098,17 +3271,24 @@ function extractDiagnosisFactOverrides(text) {
   else if (/海外仓/.test(t)) out.shipping = '自发货（海外仓发货）';
   else if (/国内直发|自发货（国内直发）/.test(t)) out.shipping = '自发货（国内直发）';
 
-  if (/9810/.test(t) && /正式报关/.test(t) && !/0110|9710|1039/.test(t)) {
-    out.exportMode = '正式报关出口（9810）';
-  } else if (/正式报关出口（0110\/9710\/9810\/1039）|0110\/9710\/9810\/1039/.test(t)) {
-    out.exportMode = '正式报关出口（0110/9710/9810/1039）';
-  } else if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
-  else if (/1039|市场采购/.test(t)) out.exportMode = '市场采购出口（1039）';
-  else if (/未报关/.test(t)) out.exportMode = '小包快递出口（未报关）';
-  else if (/9610|1210|小包快递/.test(t)) out.exportMode = '小包快递出口（9610/1210）';
-  else if (/由平台安排出口/.test(t)) out.exportMode = '由平台安排出口';
-  else if (/委托货代/.test(t)) out.exportMode = '委托货代出口';
-  else if (/正式报关/.test(t)) out.exportMode = '正式报关出口（0110/9710）';
+  // Policy lookups that mention 9610/1039 must not rewrite exportMode
+  const exportModeMentionIsLookup =
+    /(?:上限|货值|限额|额度|限制|条件|要求|是多少|多少钱|多少元|怎么走|如何走|能不能|可不可以|是否)/.test(
+      t
+    );
+  if (!exportModeMentionIsLookup) {
+    if (/9810/.test(t) && /正式报关/.test(t) && !/0110|9710|1039/.test(t)) {
+      out.exportMode = '正式报关出口（9810）';
+    } else if (/正式报关出口（0110\/9710\/9810\/1039）|0110\/9710\/9810\/1039/.test(t)) {
+      out.exportMode = '正式报关出口（0110/9710/9810/1039）';
+    } else if (/9810/.test(t)) out.exportMode = '正式报关出口（9810）';
+    else if (/1039|市场采购/.test(t)) out.exportMode = '市场采购出口（1039）';
+    else if (/未报关/.test(t)) out.exportMode = '小包快递出口（未报关）';
+    else if (/9610|1210|小包快递/.test(t)) out.exportMode = '小包快递出口（9610/1210）';
+    else if (/由平台安排出口/.test(t)) out.exportMode = '由平台安排出口';
+    else if (/委托货代/.test(t)) out.exportMode = '委托货代出口';
+    else if (/正式报关/.test(t)) out.exportMode = '正式报关出口（0110/9710）';
+  }
 
   if (/无法提供发票|不能.*发票|无票/.test(t)) out.invoice = '无法提供发票';
   else if (/部分专票.{0,8}部分普票|专票.*普票/.test(t)) out.invoice = '部分专票+部分普票';
@@ -3193,16 +3373,19 @@ function buildDiagnosisFollowUpQuery(userText, baselineSlots, changes) {
   const changeBlock = formatDiagChangeLines(changes);
   const standaloneKb = looksLikeStandaloneKbQuestion(userText);
   const ipProbe = looksLikeIpProbeQuestion(userText);
+  const memoryBlock = formatQaMemoryBlock(userText);
   return (
     '【诊断已完成·后续追问】\n' +
     '【上一轮诊断档案】\n' +
     `${baseline}\n` +
-    '【本轮用户原话】\n' +
-    `${String(userText || '').trim()}\n` +
+    (memoryBlock
+      ? `${memoryBlock}\n`
+      : '【本轮用户原话】\n' + `${String(userText || '').trim()}\n`) +
     '【前端识别的变化点·仅供参考】\n' +
     `${changeBlock}\n` +
     '【作答要求】\n' +
     '- 禁止复述本段指令、禁止输出英文思考过程或自我提醒（如 Actually / Let me / 实际上我应该注意）。\n' +
+    '- 若上方有【对话记忆·供判断】：先判断是追问还是新问题；追问须承接记忆语境，新问题勿硬套上文。\n' +
     '- 若用户在问可行性/政策点（如「我能走1039吗」「我可以以9810出口吗」）：先检索知识库再答；结构用 **结论** / **依据** / **操作提示**（三者同级、标签加粗）；依据内全部同一级实心 `- **标题**：正文`；**操作提示**独立成块，禁止放进依据列表；**仅当建议用户考虑/采用9810时**须提示实操退税不确定、须与税局沟通销售佐证与收汇证明，并说明常优先评估0110+香港公司（仅列举9810勿加该提示）；不要假装用户已改档，不要空列【核心风险诊断】等标题。\n' +
     '- 若用户明确改了业务条件（陈述句）：先写【变化点】（旧→新），再写【影响与注意事项】，然后输出完整四章报告；新事实覆盖旧档案。\n' +
     '- 若为全新无关问题：按模式B作答，勿套用旧报告。' +
@@ -3348,7 +3531,11 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
       '禁止沿用本对话此前回合写过的数字。追问同一政策主题时可承接上文，但仍须以检索为准。'
     );
   };
-  if (uiMode !== 'diagnosis' || uiStep < 1) return withStandaloneKbHint(raw);
+  if (uiMode !== 'diagnosis' || uiStep < 1) {
+    // Mode B / free Q&A: inject recent turns (no Dify conversation_id).
+    const withMem = buildModeBQueryWithMemory(raw);
+    return withStandaloneKbHint(withMem);
+  }
   if (options.isPostReportFollowUp) {
     return buildDiagnosisFollowUpQuery(
       text,
@@ -3360,17 +3547,10 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
   const stepHints = {
     2: '请执行第二步：只提问「2. 您平台店铺的注册主体是哪一种？（可在下方点选）」；不要在正文罗列主体选项，官网会显示按钮。',
     3: (() => {
-      const entity = String(getDiagSlots().entity || '').trim();
-      if (/国际站|阿里国际|Alibaba\.com/i.test(platform) && isOverseasDiagEntity(entity)) {
-        return (
-          '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；' +
-          '国际站+境外主体时官网选项为发货到平台海外仓/国内仓、自发货国内直发/海外仓（与其他平台相同），不要问一达通履约选项。'
-        );
-      }
       if (/国际站|阿里国际|Alibaba\.com/i.test(platform)) {
         return (
           '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；' +
-          '国际站+大陆主体选项为自营出口/一达通3+N或2+N/市场采购出口/便捷发货出口，**不要**加「其他」。'
+          '国际站不论主体，官网选项均为自营出口/一达通3+N或2+N/市场采购出口/便捷发货出口，**不要**加「其他」，不要改成仓/自发货清单。'
         );
       }
       return '请执行第三步：只提问「3. 请问您的发货方式是以下哪一种？（可在下方点选）」；不要在正文罗列选项，官网会按平台显示按钮。';
@@ -3706,11 +3886,13 @@ function initAiChatbot() {
     const t = String(text || '').trim();
     if (wantsExclusiveDiagnosisStart(t)) {
       clearDiagSlots();
+      clearQaTurnMemory();
       resetResultPlanPanel();
       setUiWizard('diagnosis', 1, '');
       return;
     }
     if (/我有特定问题想直接提问|特定问题想直接提问|特定问题直接咨询/.test(t)) {
+      clearQaTurnMemory();
       setUiWizard('qa', 0, '');
       return;
     }
@@ -3782,6 +3964,7 @@ function initAiChatbot() {
 
   const resetConversation = () => {
     ephemeralDiagSessionId = newUuid();
+    clearQaTurnMemory();
     try {
       localStorage.removeItem(CONV_KEY);
       localStorage.setItem(BOUND_KEY, '0');
@@ -4435,6 +4618,13 @@ function initAiChatbot() {
               baselineSlots: followUpBaselineSlots,
               changes: followUpChanges,
             });
+      // Mode B + post-report Q&A: remember after query build (wizard steps 1–7 excluded)
+      const uiModeNow = getUiMode();
+      const uiStepNow = getUiStep();
+      const inDiagWizard = uiModeNow === 'diagnosis' && uiStepNow >= 1 && uiStepNow <= 7;
+      if (!inDiagWizard) {
+        rememberQaUserTurn(text);
+      }
 
       const hsForRefund = extractHsFromRefundQuestion(text);
       if (hsForRefund) {
@@ -4450,6 +4640,22 @@ function initAiChatbot() {
         setBotBubble(typing, miss);
         showQuickReplies(miss);
         maybeShowServiceRecsAfterAnswer(miss);
+        return;
+      }
+
+      const parcel9610Reply = build9610SingleTicketLimitReply(text);
+      if (parcel9610Reply) {
+        if (shouldRouteLongAnswerToPlanPanel(parcel9610Reply)) {
+          publishDiagnosisPlanToResultPanel(parcel9610Reply, { kind: 'qa' });
+          typing.classList.add('is-plan-status');
+          setTypingText(QA_LONG_ANSWER_CHAT_TIP);
+          clearQuickReplies();
+          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
+        } else {
+          setBotBubble(typing, parcel9610Reply);
+          showQuickReplies(parcel9610Reply);
+          maybeShowServiceRecsAfterAnswer(parcel9610Reply);
+        }
         return;
       }
 
@@ -4517,7 +4723,9 @@ function initAiChatbot() {
 
       const paintStream = (partial) => {
         // Never fall back to raw partial — that re-exposes <think> / CoT in the chat bubble
-        const cleaned = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(partial));
+        const cleaned = looksLikeQaAnswerMarkdown(partial)
+          ? sanitizeQaAnswer(partial)
+          : correctAluminumRefundHallucinations(sanitizeAiAnswer(partial));
         if (!cleaned) {
           // While model is still thinking / retrieving, keep status text only
           if (forcePlanWhileThinking) beginPlanRouting();
@@ -4635,14 +4843,14 @@ function initAiChatbot() {
         return list.find((c) => isDiagnosisReportJsonReady(c)) || null;
       };
 
-      let answer = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(result.text));
+      let answer = sanitizeAiAnswer(result.text);
       if (!answer || answer.length < 8) {
         const rawJson = pickJsonReport(result.text, result);
         if (rawJson && isDiagnosisReportJsonReady(rawJson)) {
           answer = JSON.stringify(rawJson);
         } else {
           // Do NOT fall back to raw result.text (often still contains think / CoT)
-          const retry = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(result.text));
+          const retry = sanitizeAiAnswer(result.text);
           const salvaged = salvageDiagnosisPlanFromRaw(result.text);
           // Never substitute the local “请先填写业务信息” help blurb as a diagnosis plan
           if (
@@ -4656,10 +4864,13 @@ function initAiChatbot() {
           }
         }
       }
-      answer = correctChinaVatPerTimeThreshold(sanitizeAiAnswer(answer));
+      answer = looksLikeQaAnswerMarkdown(answer || result?.text || '')
+        ? sanitizeQaAnswer(answer || result?.text || '')
+        : sanitizeAiAnswer(answer);
       answer = stripDiagnosisIntroBoilerplate(answer || '');
-      answer = correctAluminumRefundHallucinations(answer);
-      answer = correctChinaVatPerTimeThreshold(answer);
+      if (!looksLikeQaAnswerMarkdown(answer)) {
+        answer = correctAluminumRefundHallucinations(answer);
+      }
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
       }
@@ -4922,6 +5133,7 @@ function initAiChatbot() {
       } else {
         persistAssistantReport(answer, { kind: 'qa', question: text });
         setBotBubble(typing, answer);
+        rememberQaAssistantTurn(answer);
         showQuickReplies(answer);
         maybeShowServiceRecsAfterAnswer(answer);
       }
@@ -5700,9 +5912,7 @@ function persistAssistantReport(markdown, options = {}) {
     if (kind === 'diagnosis' && !loggedIn) return;
     const token = auth?.getToken?.();
     if (kind === 'diagnosis' && !token) return;
-    const cleanRaw = stripDiagnosisArchivePreamble(
-      correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
-    );
+    const cleanRaw = stripDiagnosisArchivePreamble(sanitizeAiAnswer(markdown));
     let clean = cleanRaw;
     if (kind === 'diagnosis') {
       const jsonReport = extractDiagnosisReportJson(cleanRaw);
@@ -6126,12 +6336,19 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
   items.querySelectorAll('.result-working-block, #resultWorking').forEach((el) => el.remove());
   purgeInlineServiceMatchTips(items);
 
-  const cleanRaw = stripServiceMatchTip(
-    stripDiagnosisArchivePreamble(
-      correctChinaVatPerTimeThreshold(sanitizeAiAnswer(markdown))
-    )
-  );
-  if (options.kind === 'qa' && looksLikeOnlyToolCallMarkup(cleanRaw)) {
+  // Q&A: light sanitize only — never diagnosis ordinal/CoT salvage (protects 4000万 / 5000元)
+  const cleanedMarkdown =
+    options.kind === 'qa'
+      ? sanitizeQaAnswer(markdown)
+      : correctAluminumRefundHallucinations(sanitizeAiAnswer(markdown));
+  const cleanRaw = stripServiceMatchTip(stripDiagnosisArchivePreamble(cleanedMarkdown));
+  if (
+    options.kind === 'qa' &&
+    (looksLikeOnlyToolCallMarkup(markdown) ||
+      looksLikeOnlyToolCallMarkup(cleanRaw) ||
+      !/[\u4e00-\u9fff]{4,}/.test(cleanRaw))
+  ) {
+    // Tool-call markup only / empty after strip — never paint DSML into the plan panel
     return;
   }
   // Always prefer structured report JSON — never dump raw braces as「问答回复」
@@ -6265,6 +6482,10 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
       changeHtml +
       body
   );
+  // Final Q&A card (not mid-stream draft): keep a short conclusion for next-turn memory
+  if (kind === 'qa' && !(replaceLatest && !finalize && !refreshDiagnosis)) {
+    rememberQaAssistantTurn(clean);
+  }
   attachServiceRecs(
     clean,
     kind === 'qa'
@@ -6708,13 +6929,24 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     }
 
     if (event === 'message_end' || event === 'workflow_finished') {
-      // Prefer accumulated message tokens; only fill from final payload answer field
+      // Prefer Dify final answer when it has real visitor text (matches Agent 日志).
+      // Do NOT replace a good stream with a DSML-only / tool-call final payload.
       const finalAnswer =
         (typeof data.answer === 'string' && data.answer) ||
         (typeof data.data?.answer === 'string' && data.data.answer) ||
         '';
-      if (finalAnswer && finalAnswer.length > answer.length) {
-        answer = finalAnswer;
+      if (finalAnswer && finalAnswer.trim().length >= 12) {
+        const finalClean = stripModelToolCallMarkup(finalAnswer);
+        const streamClean = stripModelToolCallMarkup(answer);
+        const finalOk =
+          finalClean.length >= 12 &&
+          !looksLikeOnlyToolCallMarkup(finalAnswer) &&
+          /[\u4e00-\u9fff]/.test(finalClean);
+        if (finalOk) {
+          answer = finalAnswer;
+        } else if (!streamClean && finalClean) {
+          answer = finalAnswer;
+        }
       }
       tryCaptureReportJson(finalAnswer);
       if (data.data?.outputs) {
@@ -6974,6 +7206,29 @@ function lookupLocalRefundDisplay(hsCode) {
   // 第76章铝材：2024-12-01 起多数取消退税
   if (String(hsCode || '').replace(/\D/g, '').startsWith('76')) return '0%';
   return null;
+}
+
+/**
+ * 9610 单票货值上限：仅极短问句本地兜底；长问/丰富答复仍走 Agent。
+ */
+function build9610SingleTicketLimitReply(message) {
+  const q = String(message || '').trim();
+  if (!/^\s*9610单票货值上限\s*$/.test(q) && !/^\s*9610.{0,12}(?:单票货值)?(?:上限|限额|限值)\s*$/.test(q)) {
+    return '';
+  }
+  return [
+    '**结论**：9610（跨境电商零售出口）模式下，单票货值不能超过 **5000** 元人民币；在限值内可通过清单核放快速通关。',
+    '',
+    '**依据**：',
+    '',
+    '- **单票限值 5000 元**：9610通常适用于跨境电商B2C、经快递或小包出口的场景，要求单票货值不超过 **5000** 元人民币；超过则不适用该简易通关口径。',
+    '',
+    '- **清单核放**：企业向海关传输订单、支付、物流等数据，审核清单后放行包裹。',
+    '',
+    '- **汇总申报**：可在规定期限内（通常一个月）将清单合并成报关单（一张报关单最多50项）办理后续手续。',
+    '',
+    '**操作提示**：请以海关最新公告与物流商实操要求终核；货值常接近或超过限值时，宜评估正式报关等其他出口方式。',
+  ].join('\n');
 }
 
 /**
@@ -8134,14 +8389,29 @@ function sanitizeDiagnosisPlanText(text) {
   t = t.replace(/(?:^|\n)\s*[-*•]?\s*结尾句\s*(?=\n|$)/g, '\n');
   t = t.replace(/\n{3,}/g, '\n\n');
 
-  // Bullet + number mix: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only)
-  // Never strip 4+ digit tokens here — those are HS / customs codes (e.g. **7113119090**).
-  t = t.replace(/^(\s*[-*•]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*\s*/gm, '$1');
-  t = t.replace(/^(\s*[-*•]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?\s*/gm, '$1');
-  t = t.replace(/^(\s*[-*•]\s+)(\d{1,3})(?:\.\d+)*\s*[.、)）]\s+/gm, '$1');
+  // Bullet + ordinal only: "- **1** 内容" / "- 1. 内容" → "- 内容" (CSS bullet only).
+  // Never strip amounts（500元/1000元）or 4+ digit HS codes — lookbehind avoids 元/万/%.
+  t = t.replace(
+    /^(\s*[-*•]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*(?!\s*(?:元|万元|万|千|%|％))/gm,
+    '$1'
+  );
+  t = t.replace(
+    /^(\s*[-*•]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?(?!\s*(?:元|万元|万|千|%|％))\s*/gm,
+    '$1'
+  );
+  t = t.replace(
+    /^(\s*[-*•]\s+)(\d{1,3})(?:\.\d+)*\s*[.、)）](?!\s*(?:元|万元|万|千|%|％))\s+/gm,
+    '$1'
+  );
   // Ordered list with redundant bold number already in marker: "1. **1** 内容"
-  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*\s*/gm, '$1');
-  t = t.replace(/^(\s*\d+[.)、]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?\s*/gm, '$1');
+  t = t.replace(
+    /^(\s*\d+[.)、]\s+)\*\*\s*(\d{1,3})(?:\.\d+)*\s*[.、)）]?\s*\*\*(?!\s*(?:元|万元|万|千|%|％))/gm,
+    '$1'
+  );
+  t = t.replace(
+    /^(\s*\d+[.)、]\s+)\*\*(\d{1,3})(?:\.\d+)*\*\*\s*[.、)）]?(?!\s*(?:元|万元|万|千|%|％))\s*/gm,
+    '$1'
+  );
 
   // Replace closing consult questions with a fixed tip (no 问句)
   const expertTip = '可以选择页面下方「专家1v1财税咨询服务」进行深度沟通。';
@@ -8175,11 +8445,14 @@ function stripLeadingListIndex(content) {
   const s = String(content || '').trim();
   // Preserve HS codes / long numeric tax ids (never treat 4+ digits as list indexes)
   if (looksLikeLeadingHsCode(s)) return s;
+  // Never strip amounts: **4000**万元 / 500元 / 2亿元
+  if (/^\*{0,2}\d{1,3}(?:\.\d+)*\*{0,2}\s*(?:元|万元|万|亿|千|%|％)/.test(s)) return s;
+  if (/(?:元|万元|万|亿|千|%|％)/.test(s) && /^\*{0,2}\d/.test(s)) return s;
   return s
-    .replace(/^\*\*\s*\d{1,3}(?:\.\d+)*\s*[.、)）．]?\s*\*\*\s*/, '')
-    .replace(/^\*\*\d{1,3}(?:\.\d+)*\*\*\s*[.、)）．]?\s*/, '')
-    .replace(/^\d{1,3}\.\d+\s*[.)、．]?\s*/, '')
-    .replace(/^\d{1,3}\s*[.、)）．]\s*/, '')
+    .replace(/^\*\*\s*\d{1,2}(?:\.\d+)*\s*[.、)）．]\s*\*\*\s*/, '')
+    .replace(/^\*\*\d{1,2}(?:\.\d+)*\*\*\s*[.、)）．]\s*/, '')
+    .replace(/^\d{1,2}\.\d+\s*[.)、．]\s*/, '')
+    .replace(/^\d{1,2}\s*[.、)）．]\s*/, '')
     .replace(/^[●○◆▪•·◦▪️◉]+\s*/, '')
     .trim();
 }
@@ -8405,13 +8678,16 @@ function buildLocalSolutionMarkdown(ctx) {
 function renderAIPlanHtml(text) {
   const rawText = String(text || '');
   const isQaAnswer = looksLikeQaAnswerMarkdown(rawText);
-  let prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
+  let prepared;
   if (isQaAnswer) {
-    // Mode B / follow-up: normalize again at render-time, never auto-nest
+    // Q&A: skip sanitizeDiagnosisPlanText (ordinal strippers must not touch 4000万 etc.)
     prepared = flattenQaAnswerBullets(
-      normalizeQaAnswerMarkdown(normalizeColonInsideBoldTitles(prepared))
+      normalizeQaAnswerMarkdown(
+        normalizeColonInsideBoldTitles(convertMarkdownTablesToBullets(rawText))
+      )
     );
   } else {
+    prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
     prepared = nestCustomAfterNonCustomPeers(
       nestPlanNumberedHierarchy(
         nestPlanBulletHierarchy(structureAnnotationPlainText(prepared))

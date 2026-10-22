@@ -88,10 +88,11 @@ const follow = buildDiagnosisApiQuery(userQ, 'diagnosis', 8, '亚马逊 Amazon',
   changes,
 });
 check('followup-not-archive-lock', !/请基于【诊断档案】检索知识库并输出诊断报告/.test(follow));
-check('followup-has-compare', /诊断已完成·后续追问/.test(follow) && /本轮用户新问题/.test(follow));
+check('followup-has-compare', /诊断已完成·后续追问/.test(follow) && /本轮用户原话/.test(follow));
 check('followup-keeps-user-13', /13%退税率产品/.test(follow));
 check('followup-old-zero-as-baseline', /0退税率产品/.test(follow));
-check('followup-cover-rule', /用户本轮明确给出的新事实优先于旧档案/.test(follow));
+check('followup-cover-rule', /新事实覆盖旧档案/.test(follow));
+check('followup-asks-judge', /追问还是新问题/.test(follow));
 
 const firstReport = buildDiagnosisApiQuery('5000万-1亿', 'diagnosis', 8, '亚马逊 Amazon');
 check('first-report-still-locked', /第1-7步已齐/.test(firstReport));
