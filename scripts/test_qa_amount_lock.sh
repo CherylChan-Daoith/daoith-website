@@ -27,6 +27,9 @@ names = [
     "escapeRegExpLiteral",
     "amountUnitAlternates",
     "textHasAmountFigure",
+    "extractUserAmountFigures",
+    "scoreTextUserAmountHits",
+    "preferTextPreservingUserAmounts",
     "alignAnswerAmountsWithUserQuestion",
     "looksLikeLeadingHsCode",
     "stripLeadingListIndex",
@@ -74,11 +77,22 @@ const fixed = alignAnswerAmountsWithUserQuestion(q, bad);
 check('restore-2000-wan', /2000\s*万/.test(fixed) && !/(?<![0-9])200\s*万/.test(fixed));
 check('preserve-spacing-style', /2000\s+万元/.test(fixed));
 
-const already = '结论：债权金额为2000万元，不得写成200万。';
-check('no-touch-when-correct-present', alignAnswerAmountsWithUserQuestion(q, already) === already);
+const mixed = '结论：债权为2000万元；下文误写200万元也应纠正。';
+const mixedFixed = alignAnswerAmountsWithUserQuestion(q, mixed);
+check('fix-undercount-even-if-correct-present', /2000\s*万/.test(mixedFixed) && !/(?<![0-9])200\s*万/.test(mixedFixed));
 
 const unrelated = '小微企业年应纳税所得额不超过200万元的部分减半征收。';
 check('no-touch-unrelated-200', alignAnswerAmountsWithUserQuestion('请问小微优惠？', unrelated) === unrelated);
+
+const prefer = preferTextPreservingUserAmounts(
+  q,
+  '结论：按200万处理。',
+  '结论：按2000万处理。'
+);
+check('prefer-stream-with-user-amount', /2000/.test(prefer) && !/(?<![0-9])200\s*万/.test(prefer));
+
+const splitBold = alignAnswerAmountsWithUserQuestion(q, '欠款**200**0万元应抵消');
+check('heal-bold-split-200-0', /2000/.test(splitBold) && !/\*\*200\*\*0/.test(splitBold));
 
 const yuanQ = '9610单票货值上限是不是5000元？';
 const yuanBad = '单票货值上限为500元。';
