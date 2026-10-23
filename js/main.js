@@ -970,44 +970,111 @@ function textHasAmountFigure(text, num, unit) {
   return re.test(String(text || ''));
 }
 
-/**
- * Recurring slip: user wrote 2000万 / 4000万 / 5000元, answer only has the
- * 10× undercount (200万 / 400万 / 500元). Restore the user figure when the
- * correct amount is absent from the answer (avoids rewriting unrelated thresholds).
- */
-function alignAnswerAmountsWithUserQuestion(question, answer) {
+/** Extract amount figures the user explicitly wrote (万/元/亿). */
+function extractUserAmountFigures(question) {
   const q = String(question || '');
-  let t = String(answer || '');
-  if (!q || !t) return t;
-
+  const out = [];
   const seen = new Set();
   const re = /(\d+(?:\.\d+)?)\s*(万元|万|亿元|亿|元)/g;
   let m;
   while ((m = re.exec(q))) {
     const num = m[1];
     const unit = m[2];
-    // Alternation prefers 万元/亿元 over bare 元 — no extra skip needed
     const key = `${num}|${amountUnitAlternates(unit)[0] || unit}`;
     if (seen.has(key)) continue;
     seen.add(key);
-
     const n = Number(num);
+    if (!Number.isFinite(n)) continue;
+    out.push({ num, unit, n });
+  }
+  return out;
+}
+
+function scoreTextUserAmountHits(question, text) {
+  const t = String(text || '');
+  let score = 0;
+  for (const { num, unit, n } of extractUserAmountFigures(question)) {
+    if (textHasAmountFigure(t, num, unit)) score += 3;
+    if (Number.isInteger(n) && n >= 10 && n % 10 === 0) {
+      const wrong = n / 10;
+      if (Number.isInteger(wrong) && textHasAmountFigure(t, String(wrong), unit)) {
+        score -= 2;
+      }
+    }
+  }
+  return score;
+}
+
+/** Prefer the candidate that still carries user-stated amounts (stream vs message_end). */
+function preferTextPreservingUserAmounts(question, primary, fallback) {
+  const a = String(primary || '');
+  const b = String(fallback || '');
+  if (!a) return b;
+  if (!b) return a;
+  const sa = scoreTextUserAmountHits(question, a);
+  const sb = scoreTextUserAmountHits(question, b);
+  if (sb > sa) return b;
+  return a;
+}
+
+function recordQaAmountDebug(payload) {
+  try {
+    window.__DAOITH_LAST_QA__ = payload;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('daoith_debug_amounts') === '1') {
+      // eslint-disable-next-line no-console
+      console.info('[daoith amounts]', payload);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Recurring slip: user wrote 2000万 / 4000万 / 5000元, answer shows 10× undercount
+ * (200万 / 400万 / 500元). Always rewrite those undercounts — including when the
+ * correct figure also appears (stream/final mix) — and heal `**200**0万` splits.
+ */
+function alignAnswerAmountsWithUserQuestion(question, answer) {
+  const q = String(question || '');
+  let t = String(answer || '');
+  if (!q || !t) return t;
+
+  for (const { num, unit, n } of extractUserAmountFigures(q)) {
     if (!Number.isFinite(n) || n < 10) continue;
     // Only restore exact 10× undercounts of trailing-zero figures (2000→200, 5000→500)
     if (!Number.isInteger(n) || n % 10 !== 0) continue;
     const wrong = n / 10;
     if (!Number.isInteger(wrong) || wrong < 1) continue;
 
-    if (textHasAmountFigure(t, num, unit)) continue;
-    if (!textHasAmountFigure(t, String(wrong), unit)) continue;
-
     const alts = amountUnitAlternates(unit);
     const unitGroup = alts.map(escapeRegExpLiteral).join('|');
+    const wrongRe = escapeRegExpLiteral(String(wrong));
+    const rightRe = escapeRegExpLiteral(String(num));
+
+    // Heal bold split: **200**0万 / **200** 0万 → **2000**万
+    t = t.replace(
+      new RegExp(`\\*\\*${wrongRe}\\*\\*\\s*0(\\s*(?:${unitGroup}))(?!\\d)`, 'g'),
+      `**${num}**$1`
+    );
+
+    if (!textHasAmountFigure(t, String(wrong), unit)) continue;
+
     const fixRe = new RegExp(
-      `(?<![\\d.])${escapeRegExpLiteral(String(wrong))}(\\s*)(${unitGroup})(?!\\d)`,
+      `(?<![\\d.])${wrongRe}(\\s*)(${unitGroup})(?!\\d)`,
       'g'
     );
     t = t.replace(fixRe, `${num}$1$2`);
+
+    // If a lone undercount remains inside bold markers, force the user figure
+    t = t.replace(
+      new RegExp(`\\*\\*${wrongRe}\\*\\*(\\s*(?:${unitGroup}))(?!\\d)`, 'g'),
+      `**${num}**$1`
+    );
+    // Avoid leaving a duplicated digit if heal already produced **2000**0万
+    t = t.replace(
+      new RegExp(`\\*\\*${rightRe}\\*\\*0(\\s*(?:${unitGroup}))(?!\\d)`, 'g'),
+      `**${num}**$1`
+    );
   }
   return t;
 }
@@ -6532,10 +6599,22 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     return;
   }
 
-  const clean =
+  let clean =
     kind === 'qa'
       ? ensure9810UncertaintyTip(normalizeQaAnswerMarkdown(cleanRaw))
       : prepareDiagnosisPlanMarkdown(cleanRaw);
+  // Last mile: normalize/render must not leave 10× undercounts of user figures
+  if (kind === 'qa') {
+    clean = alignAnswerAmountsWithUserQuestion(qaQuestion, clean);
+    recordQaAmountDebug({
+      question: qaQuestion,
+      rawIn: String(markdown || '').slice(0, 1200),
+      cleanRaw: String(cleanRaw || '').slice(0, 1200),
+      clean: String(clean || '').slice(0, 1200),
+      rawHasUserAmt: scoreTextUserAmountHits(qaQuestion, markdown) > 0,
+      cleanHasUserAmt: scoreTextUserAmountHits(qaQuestion, clean) > 0,
+    });
+  }
   // Never fall back to raw model text that still contains think / CoT
   if (!clean) return;
   // Local generic help / English scaffolds / prompt-meta are not diagnosis reports
@@ -7013,9 +7092,11 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     if (event === 'message_end' || event === 'workflow_finished') {
       // Prefer Dify final answer when it has real visitor text (matches Agent 日志).
       // Do NOT replace a good stream with a DSML-only / tool-call final payload.
+      // When one side dropped a user-stated amount (2000万→200万), keep the other.
       const finalAnswer =
         (typeof data.answer === 'string' && data.answer) ||
         (typeof data.data?.answer === 'string' && data.data.answer) ||
+        (typeof data.metadata?.annotation_reply === 'string' && data.metadata.annotation_reply) ||
         '';
       if (finalAnswer && finalAnswer.trim().length >= 12) {
         const finalClean = stripModelToolCallMarkup(finalAnswer);
@@ -7025,11 +7106,16 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
           !looksLikeOnlyToolCallMarkup(finalAnswer) &&
           /[\u4e00-\u9fff]/.test(finalClean);
         if (finalOk) {
-          answer = finalAnswer;
+          answer = preferTextPreservingUserAmounts(
+            getLatestQaUserQuestion(),
+            finalAnswer,
+            answer
+          );
         } else if (!streamClean && finalClean) {
           answer = finalAnswer;
         }
       }
+      answer = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), answer);
       tryCaptureReportJson(finalAnswer);
       if (data.data?.outputs) {
         tryCaptureReportJson(JSON.stringify(data.data.outputs));
@@ -8758,7 +8844,11 @@ function buildLocalSolutionMarkdown(ctx) {
 }
 
 function renderAIPlanHtml(text) {
-  const rawText = String(text || '');
+  // Absolute last-mile amount lock (covers any earlier sanitize/normalize slip)
+  const rawText = alignAnswerAmountsWithUserQuestion(
+    getLatestQaUserQuestion(),
+    String(text || '')
+  );
   const isQaAnswer = looksLikeQaAnswerMarkdown(rawText);
   let prepared;
   if (isQaAnswer) {
@@ -8768,6 +8858,7 @@ function renderAIPlanHtml(text) {
         normalizeColonInsideBoldTitles(convertMarkdownTablesToBullets(rawText))
       )
     );
+    prepared = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), prepared);
   } else {
     prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
     prepared = nestCustomAfterNonCustomPeers(
