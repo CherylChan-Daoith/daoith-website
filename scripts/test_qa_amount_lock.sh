@@ -29,6 +29,10 @@ names = [
     "textHasAmountFigure",
     "extractUserAmountFigures",
     "scoreTextUserAmountHits",
+    "extractAmountFigures",
+    "scoreAmountDigitMass",
+    "countAmountDownshifts",
+    "detectAmountDownshift",
     "preferTextPreservingUserAmounts",
     "alignAnswerAmountsWithUserQuestion",
     "looksLikeLeadingHsCode",
@@ -91,6 +95,37 @@ const prefer = preferTextPreservingUserAmounts(
 );
 check('prefer-stream-with-user-amount', /2000/.test(prefer) && !/(?<![0-9])200\s*万/.test(prefer));
 
+// Root cause: question has no amount → user-hit scores tie at 0; must NOT pick
+// Annotation/final「100元」over stream「1000元」.
+const noAmtQ = '小规模纳税人按次纳税的免征额是多少？';
+const stream1000 = '按次纳税的免征额为每次（日）销售额1000元。';
+const final100 = '按次纳税的免征额为每次（日）销售额100元。';
+const preferNoUserAmt = preferTextPreservingUserAmounts(noAmtQ, final100, stream1000);
+check('prefer-digit-mass-1000-over-100', /1000\s*元/.test(preferNoUserAmt) && !/(?<![0-9])100\s*元/.test(preferNoUserAmt));
+check('downshift-detects-1000-to-100', detectAmountDownshift(stream1000, final100));
+check('digit-mass-1000-gt-100', scoreAmountDigitMass(stream1000) > scoreAmountDigitMass(final100));
+
+// Same for 2000/3000-style figures without the user repeating them
+const stream2000 = '关联交易合计超过2000万元需准备本地文档。';
+const final200 = '关联交易合计超过200万元需准备本地文档。';
+check(
+  'prefer-digit-mass-2000-over-200',
+  /2000/.test(preferTextPreservingUserAmounts('本地文档门槛？', final200, stream2000))
+);
+const stream3000 = '单票货值上限3000元。';
+const final300 = '单票货值上限300元。';
+check(
+  'prefer-digit-mass-3000-over-300',
+  /3000/.test(preferTextPreservingUserAmounts('上限多少？', final300, stream3000))
+);
+
+// Full tie → keep stream (fallback), not Annotation/final
+const same = '免征额为1000元。';
+check(
+  'tie-keeps-stream-fallback',
+  preferTextPreservingUserAmounts(noAmtQ, '免征额为1000元（终稿）。', same) === same
+);
+
 const splitBold = alignAnswerAmountsWithUserQuestion(q, '欠款**200**0万元应抵消');
 check('heal-bold-split-200-0', /2000/.test(splitBold) && !/\*\*200\*\*0/.test(splitBold));
 
@@ -114,3 +149,10 @@ if (failed.length) {
 }
 console.log(`All ${cases.length} amount-lock checks passed.`);
 NODE
+
+# Root-cause fix: no statutory hard-correct patch that invents 1000 from 100
+if grep -q 'correctChinaVatPerTimeThreshold' "$MAIN"; then
+  echo "FAIL: correctChinaVatPerTimeThreshold patch still present in main.js"
+  exit 1
+fi
+echo "OK: no-hardcode-100-to-1000"
