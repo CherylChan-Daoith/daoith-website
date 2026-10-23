@@ -933,47 +933,16 @@ function stripThinkAndToolMarkup(text) {
 
 /**
  * Q&A answers: light clean only. Never run diagnosis ordinal/CoT salvage that can eat digits.
- * Also hard-fix known statutory slips the model keeps repeating.
  * When `question` is provided, restore user-stated amounts the model undercounted by 10×.
+ * Do NOT hard-correct statutory figures (100→1000 etc.) — that masks stream/final selection bugs.
  */
 function sanitizeQaAnswer(text, question) {
   let t = stripThinkAndToolMarkup(text);
   t = stripKnowledgeBaseDisclaimers(t);
   t = stripInternalTaxonomyLeaks(t);
   t = correctLocalFileThresholdAmounts(t);
-  t = correctChinaVatPerTimeThreshold(t);
   t = alignAnswerAmountsWithUserQuestion(question || getLatestQaUserQuestion(), t);
   return t.trim();
-}
-
-/**
- * Hard-correct a recurring slip: 按次起征点写成 100元（应为 1000元 / 2026年第10号）.
- * Also heals display if a trailing zero was dropped from 1000→100 in 按次语境.
- * Leaves 100万、10万元、1000元 untouched.
- */
-function correctChinaVatPerTimeThreshold(text) {
-  let t = String(text || '');
-  if (!t || !/(起征点|按次纳税|按次|免税额度|免征额)/.test(t)) return t;
-  if (!/(?:2026|第\s*10\s*号|10\s*号公告|500\s*元|旧\s*500)/.test(t)) return t;
-  if (!/(?<![\d])100(?!\d)\s*元/.test(t)) return t;
-  // Heal bold split first: **100**0元 → **1000**元
-  t = t.replace(/\*\*100\*\*\s*0(\s*元)/g, '**1000**$1');
-  t = t.replace(/(按次(?:纳税)?[^。\n；;]{0,80}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/(每次（日）(?:销售额)?\s*)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/(每次\s*[/／]\s*日[^。\n；;]{0,20}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
-  t = t.replace(/统一按\s*100\s*元(?:执行|为准)?/g, '统一按1000元执行');
-  t = t.replace(/一律按\s*100\s*元/g, '一律按1000元');
-  t = t.replace(/(?:改按|调整为|执行为)\s*100\s*元/g, (m) => m.replace(/100/, '1000'));
-  // Bold forms: **100**元 / **100元** in 按次·起征点 sentences
-  t = t.replace(
-    /(按次|每次（日）|起征点)([^。\n；;]{0,40}?)\*\*100\*\*(\s*元)/g,
-    '$1$2**1000**$3'
-  );
-  t = t.replace(
-    /(按次|每次（日）|起征点)([^。\n；;]{0,40}?)\*\*100(\s*元)\*\*/g,
-    '$1$2**1000$3**'
-  );
-  return t;
 }
 
 /** Escape for RegExp source. */
@@ -1036,7 +1005,71 @@ function scoreTextUserAmountHits(question, text) {
   return score;
 }
 
-/** Prefer the candidate that still carries user-stated amounts (stream vs message_end). */
+/** All 万/元/亿 figures in text (not limited to the user question). */
+function extractAmountFigures(text) {
+  const t = String(text || '');
+  const out = [];
+  const re = /(\d+(?:\.\d+)?)\s*(万元|万|亿元|亿|元)/g;
+  let m;
+  while ((m = re.exec(t))) {
+    const num = m[1];
+    const unit = m[2];
+    const n = Number(num);
+    if (!Number.isFinite(n)) continue;
+    out.push({ num, unit, n });
+  }
+  return out;
+}
+
+/**
+ * Prefer candidates that kept longer amount digit strings (1000元 > 100元).
+ * Length² so one dropped trailing zero outweighs several short unrelated figures.
+ */
+function scoreAmountDigitMass(text) {
+  let score = 0;
+  for (const { num } of extractAmountFigures(text)) {
+    const digits = String(num).replace(/\D/g, '');
+    if (!digits) continue;
+    score += digits.length * digits.length;
+  }
+  return score;
+}
+
+/**
+ * Count how many figures in `reference` appear in `suspect` only as a 10× undercount
+ * (1000元 in reference, only 100元 in suspect). Systematic trailing-zero drop detector.
+ */
+function countAmountDownshifts(reference, suspect) {
+  let penalty = 0;
+  const seen = new Set();
+  for (const { n, unit } of extractAmountFigures(reference)) {
+    if (!Number.isInteger(n) || n < 10 || n % 10 !== 0) continue;
+    const wrong = n / 10;
+    if (!Number.isInteger(wrong) || wrong < 1) continue;
+    const key = `${n}|${amountUnitAlternates(unit)[0] || unit}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (
+      textHasAmountFigure(suspect, String(wrong), unit) &&
+      !textHasAmountFigure(suspect, String(n), unit)
+    ) {
+      penalty += 1;
+    }
+  }
+  return penalty;
+}
+
+/** True when cleaned text dropped a trailing zero vs a richer reference (stream). */
+function detectAmountDownshift(reference, suspect) {
+  return countAmountDownshifts(reference, suspect) > 0;
+}
+
+/**
+ * Prefer the candidate that still carries user-stated amounts (stream vs message_end).
+ * When the question has no amounts (scores tie at 0), compare digit mass / 10× downshifts
+ * so Annotation/final「100元」cannot overwrite stream「1000元」.
+ * On a full tie, keep `fallback` (accumulated stream) — it is less often an Annotation swap.
+ */
 function preferTextPreservingUserAmounts(question, primary, fallback) {
   const a = String(primary || '');
   const b = String(fallback || '');
@@ -1045,7 +1078,21 @@ function preferTextPreservingUserAmounts(question, primary, fallback) {
   const sa = scoreTextUserAmountHits(question, a);
   const sb = scoreTextUserAmountHits(question, b);
   if (sb > sa) return b;
-  return a;
+  if (sa > sb) return a;
+
+  // User-amount tie (incl. both 0): detect cross-candidate trailing-zero drops
+  const downA = countAmountDownshifts(b, a); // a undercounts figures from b
+  const downB = countAmountDownshifts(a, b);
+  if (downA > downB) return b;
+  if (downB > downA) return a;
+
+  const ma = scoreAmountDigitMass(a);
+  const mb = scoreAmountDigitMass(b);
+  if (mb > ma) return b;
+  if (ma > mb) return a;
+
+  // Complete tie: prefer stream (fallback), not Annotation/final overwrite
+  return b;
 }
 
 function recordQaAmountDebug(payload) {
@@ -5047,8 +5094,7 @@ function initAiChatbot() {
       if (!looksLikeQaAnswerMarkdown(answer)) {
         answer = correctAluminumRefundHallucinations(answer);
       }
-      // Statutory 按次起征点 + user-stated amount locks (covers non-QA-shaped answers too)
-      answer = correctChinaVatPerTimeThreshold(answer);
+      // User-stated amount locks (covers non-QA-shaped answers too)
       answer = alignAnswerAmountsWithUserQuestion(text, answer);
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
@@ -6635,17 +6681,17 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     kind === 'qa'
       ? ensure9810UncertaintyTip(normalizeQaAnswerMarkdown(cleanRaw))
       : prepareDiagnosisPlanMarkdown(cleanRaw);
-  // Last mile: statutory 按次起征点 + user-stated amount locks after normalize
+  // Last mile: user-stated amount locks after normalize (no statutory hard-correct)
   if (kind === 'qa') {
-    clean = correctChinaVatPerTimeThreshold(clean);
     clean = alignAnswerAmountsWithUserQuestion(qaQuestion, clean);
     recordQaAmountDebug({
       question: qaQuestion,
       rawIn: String(markdown || '').slice(0, 1200),
       cleanRaw: String(cleanRaw || '').slice(0, 1200),
       clean: String(clean || '').slice(0, 1200),
-      rawHas1000: /1000\s*元/.test(String(markdown || '')),
-      cleanHas1000: /1000\s*元/.test(String(clean || '')),
+      rawMass: scoreAmountDigitMass(markdown),
+      cleanMass: scoreAmountDigitMass(clean),
+      downshift: detectAmountDownshift(markdown, clean),
       rawHasUserAmt: scoreTextUserAmountHits(qaQuestion, markdown) > 0,
       cleanHasUserAmt: scoreTextUserAmountHits(qaQuestion, clean) > 0,
     });
@@ -6854,12 +6900,9 @@ function extractDifyAnswer(data) {
   if (typeof data.message === 'string') candidates.push(data.message);
   if (typeof data.text === 'string') candidates.push(data.text);
 
-  // Some builds put usable text only under metadata / reasoning payloads
-  // Never prefer raw reasoning/thinking as the user-visible answer
-  const meta = data.metadata;
-  if (meta && typeof meta === 'object') {
-    if (typeof meta.annotation_reply === 'string') candidates.push(meta.annotation_reply);
-  }
+  // Do NOT pull metadata.annotation_reply here — Annotation Reply often short-circuits
+  // with a wrong statutory figure and would beat an empty earlier candidate list only when
+  // stream/final already failed; call sites that need a last-resort fallback do so explicitly.
 
   for (const c of candidates) {
     if (typeof c === 'string' && c.trim()) return c.trim();
@@ -7127,10 +7170,15 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
     if (event === 'message_end' || event === 'workflow_finished') {
       // Prefer Dify final answer when it has real visitor text (matches Agent 日志).
       // Do NOT replace a good stream with a DSML-only / tool-call final payload.
-      // When one side dropped a user-stated amount (2000万→200万), keep the other.
+      // Never let metadata.annotation_reply alone overwrite stream — Annotation often
+      // carries a short wrong figure (100元) while the stream still has 1000元.
+      // When one side dropped a trailing zero (2000→200 / 1000→100), keep the richer one.
+      const streamBeforeFinal = answer;
       const finalAnswer =
         (typeof data.answer === 'string' && data.answer) ||
         (typeof data.data?.answer === 'string' && data.data.answer) ||
+        '';
+      const annotationReply =
         (typeof data.metadata?.annotation_reply === 'string' && data.metadata.annotation_reply) ||
         '';
       if (finalAnswer && finalAnswer.trim().length >= 12) {
@@ -7149,9 +7197,23 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
         } else if (!streamClean && finalClean) {
           answer = finalAnswer;
         }
+      } else if (!stripModelToolCallMarkup(answer) && annotationReply.trim().length >= 12) {
+        // Annotation only when stream is empty — never as a competing overwrite
+        answer = annotationReply;
       }
-      answer = correctChinaVatPerTimeThreshold(answer);
       answer = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), answer);
+      if (detectAmountDownshift(streamBeforeFinal, answer)) {
+        recordQaAmountDebug({
+          event: 'message_end_amount_downshift',
+          question: getLatestQaUserQuestion(),
+          stream: String(streamBeforeFinal || '').slice(0, 1200),
+          final: String(finalAnswer || '').slice(0, 1200),
+          annotation: String(annotationReply || '').slice(0, 400),
+          chosen: String(answer || '').slice(0, 1200),
+          streamMass: scoreAmountDigitMass(streamBeforeFinal),
+          chosenMass: scoreAmountDigitMass(answer),
+        });
+      }
       tryCaptureReportJson(finalAnswer);
       if (data.data?.outputs) {
         tryCaptureReportJson(JSON.stringify(data.data.outputs));
@@ -8881,8 +8943,10 @@ function buildLocalSolutionMarkdown(ctx) {
 
 function renderAIPlanHtml(text) {
   // Absolute last-mile amount lock (covers any earlier sanitize/normalize slip)
-  let rawText = correctChinaVatPerTimeThreshold(String(text || ''));
-  rawText = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), rawText);
+  let rawText = alignAnswerAmountsWithUserQuestion(
+    getLatestQaUserQuestion(),
+    String(text || '')
+  );
   const isQaAnswer = looksLikeQaAnswerMarkdown(rawText);
   let prepared;
   if (isQaAnswer) {
@@ -8892,7 +8956,6 @@ function renderAIPlanHtml(text) {
         normalizeColonInsideBoldTitles(convertMarkdownTablesToBullets(rawText))
       )
     );
-    prepared = correctChinaVatPerTimeThreshold(prepared);
     prepared = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), prepared);
   } else {
     prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
