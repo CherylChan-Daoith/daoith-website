@@ -941,8 +941,39 @@ function sanitizeQaAnswer(text, question) {
   t = stripKnowledgeBaseDisclaimers(t);
   t = stripInternalTaxonomyLeaks(t);
   t = correctLocalFileThresholdAmounts(t);
+  t = correctChinaVatPerTimeThreshold(t);
   t = alignAnswerAmountsWithUserQuestion(question || getLatestQaUserQuestion(), t);
   return t.trim();
+}
+
+/**
+ * Hard-correct a recurring slip: 按次起征点写成 100元（应为 1000元 / 2026年第10号）.
+ * Also heals display if a trailing zero was dropped from 1000→100 in 按次语境.
+ * Leaves 100万、10万元、1000元 untouched.
+ */
+function correctChinaVatPerTimeThreshold(text) {
+  let t = String(text || '');
+  if (!t || !/(起征点|按次纳税|按次|免税额度|免征额)/.test(t)) return t;
+  if (!/(?:2026|第\s*10\s*号|10\s*号公告|500\s*元|旧\s*500)/.test(t)) return t;
+  if (!/(?<![\d])100(?!\d)\s*元/.test(t)) return t;
+  // Heal bold split first: **100**0元 → **1000**元
+  t = t.replace(/\*\*100\*\*\s*0(\s*元)/g, '**1000**$1');
+  t = t.replace(/(按次(?:纳税)?[^。\n；;]{0,80}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
+  t = t.replace(/(每次（日）(?:销售额)?\s*)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
+  t = t.replace(/(每次\s*[/／]\s*日[^。\n；;]{0,20}?)(?<![\d])100(?!\d)(\s*元)/g, '$11000$2');
+  t = t.replace(/统一按\s*100\s*元(?:执行|为准)?/g, '统一按1000元执行');
+  t = t.replace(/一律按\s*100\s*元/g, '一律按1000元');
+  t = t.replace(/(?:改按|调整为|执行为)\s*100\s*元/g, (m) => m.replace(/100/, '1000'));
+  // Bold forms: **100**元 / **100元** in 按次·起征点 sentences
+  t = t.replace(
+    /(按次|每次（日）|起征点)([^。\n；;]{0,40}?)\*\*100\*\*(\s*元)/g,
+    '$1$2**1000**$3'
+  );
+  t = t.replace(
+    /(按次|每次（日）|起征点)([^。\n；;]{0,40}?)\*\*100(\s*元)\*\*/g,
+    '$1$2**1000$3**'
+  );
+  return t;
 }
 
 /** Escape for RegExp source. */
@@ -5016,7 +5047,8 @@ function initAiChatbot() {
       if (!looksLikeQaAnswerMarkdown(answer)) {
         answer = correctAluminumRefundHallucinations(answer);
       }
-      // Final amount lock (covers non-QA-shaped answers that still quote user figures)
+      // Statutory 按次起征点 + user-stated amount locks (covers non-QA-shaped answers too)
+      answer = correctChinaVatPerTimeThreshold(answer);
       answer = alignAnswerAmountsWithUserQuestion(text, answer);
       if (looksLikeLocalGenericHelp(answer)) {
         answer = '';
@@ -6603,14 +6635,17 @@ function publishDiagnosisPlanToResultPanel(markdown, options = {}) {
     kind === 'qa'
       ? ensure9810UncertaintyTip(normalizeQaAnswerMarkdown(cleanRaw))
       : prepareDiagnosisPlanMarkdown(cleanRaw);
-  // Last mile: normalize/render must not leave 10× undercounts of user figures
+  // Last mile: statutory 按次起征点 + user-stated amount locks after normalize
   if (kind === 'qa') {
+    clean = correctChinaVatPerTimeThreshold(clean);
     clean = alignAnswerAmountsWithUserQuestion(qaQuestion, clean);
     recordQaAmountDebug({
       question: qaQuestion,
       rawIn: String(markdown || '').slice(0, 1200),
       cleanRaw: String(cleanRaw || '').slice(0, 1200),
       clean: String(clean || '').slice(0, 1200),
+      rawHas1000: /1000\s*元/.test(String(markdown || '')),
+      cleanHas1000: /1000\s*元/.test(String(clean || '')),
       rawHasUserAmt: scoreTextUserAmountHits(qaQuestion, markdown) > 0,
       cleanHasUserAmt: scoreTextUserAmountHits(qaQuestion, clean) > 0,
     });
@@ -7115,6 +7150,7 @@ async function callDifyStream({ endpoint, inputs, query, conversationId, onChunk
           answer = finalAnswer;
         }
       }
+      answer = correctChinaVatPerTimeThreshold(answer);
       answer = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), answer);
       tryCaptureReportJson(finalAnswer);
       if (data.data?.outputs) {
@@ -8845,10 +8881,8 @@ function buildLocalSolutionMarkdown(ctx) {
 
 function renderAIPlanHtml(text) {
   // Absolute last-mile amount lock (covers any earlier sanitize/normalize slip)
-  const rawText = alignAnswerAmountsWithUserQuestion(
-    getLatestQaUserQuestion(),
-    String(text || '')
-  );
+  let rawText = correctChinaVatPerTimeThreshold(String(text || ''));
+  rawText = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), rawText);
   const isQaAnswer = looksLikeQaAnswerMarkdown(rawText);
   let prepared;
   if (isQaAnswer) {
@@ -8858,6 +8892,7 @@ function renderAIPlanHtml(text) {
         normalizeColonInsideBoldTitles(convertMarkdownTablesToBullets(rawText))
       )
     );
+    prepared = correctChinaVatPerTimeThreshold(prepared);
     prepared = alignAnswerAmountsWithUserQuestion(getLatestQaUserQuestion(), prepared);
   } else {
     prepared = convertMarkdownTablesToBullets(sanitizeDiagnosisPlanText(rawText));
