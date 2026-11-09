@@ -1,6 +1,30 @@
 /* Manually curated WeChat OA article links for expert insights list. */
 window.DAOITH_OA_MANUAL_ARTICLES = [
   {
+    "id": "oa-manual-23",
+    "title": "11月1日起最新税务行政处罚裁量基准：税务处罚的0.5倍/1倍/4倍等都是怎么定的？",
+    "digest": "税总2026年第20号全国裁量基准自11月1日施行；偷税罚款统一四档，看首次/金额门槛与是否配合补缴",
+    "author": "Cheryl CHEN",
+    "date": "2026-10-27",
+    "url": "https://mp.weixin.qq.com/s/sxMvlIrZTHgibOQ0-nZNrg"
+  },
+  {
+    "id": "oa-manual-24",
+    "title": "AI取代大部分工作后，你还剩下什么？",
+    "digest": "AI从问答走向任务执行；财税价值从「知道」转向判断、协调与担当",
+    "author": "Cheryl CHEN",
+    "date": "2026-10-08",
+    "url": "https://mp.weixin.qq.com/s/XzX9dzaKkszfGyXLVZ2RJA"
+  },
+  {
+    "id": "oa-manual-25",
+    "title": "本土店三大坑，开店前先算清楚",
+    "digest": "设立挂靠年费、进口与销售税负、利润回流路径——开本土店前先算清三笔账",
+    "author": "Cheryl CHEN",
+    "date": "2026-09-21",
+    "url": "https://mp.weixin.qq.com/s/v4P0YMDN_y2Qzar0tg8kUA"
+  },
+  {
     "id": "oa-manual-21",
     "title": "中国企业出海系列--英国税制",
     "digest": "独立税制、数字化与强监管重塑市场准入；合规从可选项变成生死线",
