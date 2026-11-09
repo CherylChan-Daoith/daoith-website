@@ -612,8 +612,8 @@ async function loadExpertArticlesFromWeChat() {
       renderExpertArticleCards(manual);
       setHint(
         locale === 'en'
-          ? 'Articles from the DAOITH WeChat Official Account.'
-          : '来自「道一跨境咨询DAOITH」公众号原创文章。'
+          ? 'Articles from our WeChat Official Account — tap to open the original post.'
+          : '同步公众号已发布文章，点击跳转微信原文阅读'
       );
       initExpertArticlesPager();
       return;
@@ -628,8 +628,8 @@ async function loadExpertArticlesFromWeChat() {
       renderExpertArticleCards(articles);
       setHint(
         locale === 'en'
-          ? 'Synced from WeChat Official Account.'
-          : '列表已同步公众号文章。'
+          ? 'Articles synced from our WeChat Official Account — tap to open the original post.'
+          : '同步公众号已发布文章，点击跳转微信原文阅读'
       );
       initExpertArticlesPager();
       return;
@@ -651,8 +651,8 @@ async function loadExpertArticlesFromWeChat() {
       renderExpertArticleCards(manual);
       setHint(
         locale === 'en'
-          ? 'Articles from the DAOITH WeChat Official Account.'
-          : '来自「道一跨境咨询DAOITH」公众号原创文章，点击跳转微信原文。'
+          ? 'Articles from our WeChat Official Account — tap to open the original post.'
+          : '同步公众号已发布文章，点击跳转微信原文阅读'
       );
       initExpertArticlesPager();
       return;

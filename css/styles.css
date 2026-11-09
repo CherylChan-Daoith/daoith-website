@@ -6343,14 +6343,14 @@ ul {
   }
 }
 
-.oa-articles-hint {
-  font-size: 0.82rem;
+.policy-block-header .oa-articles-hint {
+  font-size: 0.8rem;
   color: var(--text-muted);
-  margin: 0 0 16px;
+  margin: 0;
   line-height: 1.5;
 }
 
-.oa-articles-hint.is-error {
+.policy-block-header .oa-articles-hint.is-error {
   color: #b42318;
 }
 
