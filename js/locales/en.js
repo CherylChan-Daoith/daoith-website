@@ -1377,16 +1377,19 @@ window.DAOITH_I18N_EN = {
     },
   ],
   taxPolicies: [
+    { title: '2026 No.29: Adjusts export rebate rates for selected products', summary: 'From 1 Apr 2027, NEV export VAT rebate falls from 13% to 9%; e-cigarette devices and related items lose VAT export rebate. Rate follows the customs export date; consumption-tax rebate rules are unchanged.' },
     { title: '2026 No.25: VAT treatment of non-taxable transactions', summary: 'Sets positive/negative lists for non-deductible non-taxable items, including free services, insurance payouts, and fiscal subsidies. Effective 1 Sep 2026; Jan–Aug open items may follow the new rules.' },
+    { title: '2026 No.16: Tax relief for cross-border e-commerce export returns', summary: 'From 1 Jan 2026 to 31 Dec 2027, non-food goods under 1210/9610/9710/9810 returned in original condition within 6 months for slow sales or buyer returns are exempt from import duty and import VAT/consumption tax; prior export rebates must be repaid.' },
     { title: '2026 No.18: Catalogue of repealed tax normative documents', summary: 'Clears 144 tax normative documents ahead of the VAT Law (136 fully repealed, 8 partly). Cross-border sellers should check whether export-rebate and invoice guidance has been replaced.' },
     { title: 'STA: International transport tax service guide', summary: 'First industry tax guide for cross-border transport covering sea, air, and land obligations, treaty relief, and filing steps — useful for logistics and overseas-warehouse supply chains.' },
     { title: 'STA 2019 No.36: Deemed CIT for comprehensive pilot zone retail exporters', summary: 'Eligible retail exporters in pilot zones may use a 4% deemed taxable-income rate for CIT, and may stack small-business relief where rules allow.' },
-    { title: 'HMRC: Extending online marketplace VAT liability to UK domestic sellers', summary: 'Consultation closed 18 Aug 2026. Would have platforms account for VAT on UK domestic sellers’ platform sales of goods held in the UK.' },
+    { title: 'HMRC: Marketplace VAT liability extended to UK domestic sellers (Budget 2026)', summary: 'Budget 2026 confirms from Oct 2027 platforms collect VAT for UK VAT-registered sellers and UK businesses over £90,000 sales on that platform. Personal, second-hand, and B2B sales are out of scope.' },
     { title: '2026 No.11: Export VAT and consumption tax policy', summary: 'Bridge rules for export rebate/exemption after the VAT Law. Verify HS codes, documents, and 0110/9610/9710/9810 filing models.' },
     { title: '2025 No.3: Overseas warehouse "rebate upon departure"', summary: '9810 goods may claim provisional rebate after customs departure, then true-up after sales. Platform revenue matching and auxiliary ledgers remain key controls.' },
     { title: 'EU ViDA 2026 implementation work programme', summary: 'Advances e-invoice interoperability, digital reporting, and platform VAT data exchange. EU sellers should align ERP and platform tax modules early.' },
   ],
   platformPolicies: [
+    { title: 'EU / Amazon: €2 customs handling fee on distance sales', summary: 'From 1 Nov 2026, EU charges a €2 Union handling fee per item on e-commerce distance-sale imports (on top of the €3 temporary duty under €150). Remote fulfilment into the EU gets costlier; local EU warehouse dispatch is generally unaffected.' },
     { title: 'Amazon: EU VCS switches to shipment-level tax', summary: 'From 1 Jun 2026, VAT Calculation Service taxes by shipment rate across 10 EU/UK sites instead of per item. Self-invoicing sellers must update systems.' },
     { title: 'Amazon: US state sales tax collection', summary: 'Amazon collects sales tax in nexus states. Download Tax Collection reports and retain successive platform tax report versions.' },
     { title: 'Shopee Vietnam: Seller tax withholding guide', summary: 'Shopee Seller Education: VAT and PIT withholding for individual/household sellers; corporate sellers are out of that withholding and must self-file. Follow Seller Centre notices.' },
@@ -1477,6 +1480,6 @@ window.DAOITH_I18N_EN = {
     mx: '30% CIT and 16% VAT; USMCA supply chain node.',
     sa: '20% CIT and 15% VAT under Vision 2030 reforms.',
     ae: '9% federal corporate tax from 2023; free-zone rules differ.',
-    gb: '25% CIT and 20% VAT post-Brexit; marketplace rules apply.',
+    gb: '25% CIT and 20% VAT post-Brexit; from Oct 2027 platforms collect VAT for more UK domestic sellers.',
   },
 };
