@@ -467,7 +467,7 @@ window.DAOITH_TAX_SYSTEMS = [
     trade2025: '1,037',
     tradeUnit: '亿美元',
     tradeSource: '海关总署 2025年1—12月',
-    summary: '脱欧后独立 VAT 体系，企业所得税与海关规则与欧盟脱钩。',
+    summary: '脱欧后独立 VAT 体系；2027年10月起平台将对更多英国本土卖家代收VAT。',
     incomeTaxRates: [19, 25],
     taxes: [
       { label: '企业所得税', value: '25%（2023年4月起主税率；小企业阶梯税率）' },
@@ -475,10 +475,14 @@ window.DAOITH_TAX_SYSTEMS = [
       { label: '预提税', value: '股息 0%（英国不预提）；其他支付视情况' },
     ],
     treaty: '中英税收协定对跨境支付、常设机构及海运空运有详细规定。',
-    tips: ['HMRC 跨境电商 VAT', 'Northern Ireland 特殊安排', 'MTD 数字化申报'],
+    tips: [
+      '2027年10月起：平台对英VAT注册卖家及单平台年销>£90k英企代收VAT',
+      'Northern Ireland 特殊安排',
+      'MTD 数字化申报',
+    ],
     sections: [
       { type: 'h2', text: '税制概况' },
-      { type: 'p', text: '英国脱离欧盟后保留独立 VAT 及海关制度。企业所得税主税率 25%，中小企业适用较低阶梯税率。跨境电商卖家需关注 UK VAT 注册及 Postponed VAT Accounting 等工具。' },
+      { type: 'p', text: '英国脱离欧盟后保留独立 VAT 及海关制度。企业所得税主税率 25%，中小企业适用较低阶梯税率。跨境电商卖家需关注 UK VAT 注册及 Postponed VAT Accounting 等工具。2026年10月Budget确认，自2027年10月起在线市场将对英国本土卖家在库货物的平台销售扩展VAT代收责任（个人闲置、二手货与B2B除外）。' },
     ],
   },
 ];
