@@ -1519,24 +1519,13 @@ ul {
 }
 
 .diag-panel {
-  gap: 12px;
-}
-
-.diag-hs-block {
-  flex: 0 0 auto;
-  position: relative;
-  padding: 0;
-  margin: 0;
-  border: 1.5px solid rgba(34, 81, 255, 0.28);
-  border-radius: 16px;
-  background: #fff;
-  overflow: hidden;
-  box-shadow: 0 4px 18px rgba(34, 81, 255, 0.06);
+  gap: 0;
 }
 
 .diag-chat {
   flex: 1 1 auto;
   min-height: 0;
+  height: 100%;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1550,7 +1539,6 @@ ul {
 }
 
 /* Soft blue gradient wash along the top edge of AI panels */
-.diag-hs-block::before,
 .diag-chat::before,
 .result-panel::before {
   content: '';
@@ -1571,12 +1559,82 @@ ul {
   box-shadow: inset 0 1px 0 rgba(34, 81, 255, 0.35);
 }
 
+/* Floating HS rebate lookup on result panel */
+.diag-hs-float {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 30;
+  max-width: min(440px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.diag-hs-float-toggle {
+  appearance: none;
+  border: 1px solid rgba(34, 81, 255, 0.28);
+  border-radius: 980px;
+  background: linear-gradient(135deg, #2251ff 0%, #3b82f6 55%, #22d3ee 140%);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding: 10px 14px;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(34, 81, 255, 0.22);
+  white-space: nowrap;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+.diag-hs-float-toggle:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 10px 24px rgba(34, 81, 255, 0.3);
+}
+
+.diag-hs-float-toggle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 4px rgba(34, 81, 255, 0.18),
+    0 8px 20px rgba(34, 81, 255, 0.22);
+}
+
+.diag-hs-float[data-state="expanded"] .diag-hs-float-toggle {
+  display: none;
+}
+
+.diag-hs-block {
+  width: min(420px, calc(100vw - 48px));
+  position: relative;
+  padding: 0;
+  margin: 0;
+  border: 1.5px solid rgba(34, 81, 255, 0.28);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 14px 36px rgba(15, 28, 63, 0.16);
+}
+
+.diag-hs-block[hidden] {
+  display: none !important;
+}
+
+.diag-hs-float-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 0 4px;
+}
+
 .diag-hs-title,
 #ai-solution .diag-hs-title {
   position: relative;
   z-index: 5;
   margin: 0;
-  padding: 12px 16px 6px;
+  padding: 4px 12px 6px 14px;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -1586,8 +1644,35 @@ ul {
   border-bottom: none;
 }
 
+.diag-hs-float-close {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1px solid rgba(15, 28, 63, 0.1);
+  background: #f5f5f7;
+  color: #5b6b95;
+  border-radius: 980px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.diag-hs-float-close:hover {
+  background: #eef2ff;
+  color: #2251ff;
+  border-color: rgba(34, 81, 255, 0.22);
+}
+
 .diag-hs-body {
   padding: 0 16px 14px;
+}
+
+#resultPanel .diag-hs-float,
+#resultPanel .diag-hs-float * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 .diag-hs-row {
@@ -2636,7 +2721,7 @@ ul {
   flex-wrap: nowrap;
   align-items: baseline;
   gap: 8px;
-  padding: 12px 18px 8px;
+  padding: 12px 150px 8px 18px;
   background: transparent;
   border-bottom: none;
 }
@@ -4089,11 +4174,14 @@ ul {
   --daoith-cta-shadow: 0 8px 24px rgba(34, 81, 255, 0.14);
 }
 
-.diag-hs-block,
 .diag-chat,
 .result-panel {
   border-color: var(--daoith-cta-border) !important;
   box-shadow: var(--daoith-cta-shadow) !important;
+}
+
+.diag-hs-block {
+  border-color: var(--daoith-cta-border) !important;
 }
 
 .diag-services-section,
@@ -4107,7 +4195,6 @@ ul {
   display: none !important;
 }
 
-.diag-hs-block::before,
 .diag-chat::before,
 .result-panel::before {
   background: linear-gradient(
@@ -9718,14 +9805,24 @@ body.modal-open {
   }
 
   .diag-chat {
-    min-height: 420px;
-    max-height: min(70vh, 640px);
+    min-height: min(70vh, 640px);
+    max-height: none;
+    height: min(70vh, 640px);
   }
 
   .result-panel {
-    min-height: 420px;
+    min-height: min(70vh, 640px);
     max-height: min(75vh, 720px);
-    height: auto;
+    height: min(70vh, 640px);
+  }
+
+  .result-panel-head {
+    padding-right: 150px;
+  }
+
+  .diag-hs-float {
+    top: 8px;
+    right: 10px;
   }
 
   .ai-grid .faq-panel.faq-section {

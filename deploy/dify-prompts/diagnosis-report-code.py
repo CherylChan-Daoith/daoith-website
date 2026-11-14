@@ -7,13 +7,20 @@ import re
 
 def _strip_think(raw: str) -> str:
     s = str(raw or "")
+    # Dify / DeepSeek reasoning wrappers (closed or truncated)
     s = re.sub(
-        r"<\s*redacted_thinking\b[^>]*>[\s\S]*?<\s*/\s*redacted_thinking\s*>",
+        r"<\s*redacted_thinking\b[^>]*>[\s\S]*?(?:<\s*/\s*redacted_thinking\s*>|$)",
         "",
         s,
         flags=re.I,
     )
-    s = re.sub(r"<\s*think\b[^>]*>[\s\S]*?<\s*/\s*think\s*>", "", s, flags=re.I)
+    s = re.sub(r"<\s*think\b[^>]*>[\s\S]*?(?:<\s*/\s*think\s*>|$)", "", s, flags=re.I)
+    s = re.sub(
+        r"<!--\s*dify-deepseek-reasoning\s*-->[\s\S]*?(?=```|\{|$)",
+        "",
+        s,
+        flags=re.I,
+    )
     s = re.sub(r"```(?:thinking|thought|reasoning)[\s\S]*?```", "", s, flags=re.I)
     return s.strip()
 
@@ -107,59 +114,117 @@ def _deep_find_report(node):
     return None
 
 
+def _try_load_json(chunk: str):
+    chunk = (chunk or "").strip()
+    if not chunk:
+        return None
+    try:
+        obj = json.loads(chunk)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        pass
+    # Truncated JSON: close open braces/brackets (best-effort).
+    if "{" not in chunk:
+        return None
+    in_str = False
+    esc = False
+    stack = []
+    for c in chunk:
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+            continue
+        if c == '"':
+            in_str = True
+        elif c == "{":
+            stack.append("}")
+        elif c == "[":
+            stack.append("]")
+        elif c in ("}", "]"):
+            if stack and stack[-1] == c:
+                stack.pop()
+    if in_str:
+        chunk += '"'
+    if not stack:
+        return None
+    repaired = chunk + "".join(reversed(stack))
+    try:
+        obj = json.loads(repaired)
+        return obj if isinstance(obj, dict) else None
+    except Exception:
+        return None
+
+
 def _extract_json_objects(raw: str):
     text = _strip_think(raw)
     if not text:
         return []
 
-    if text.startswith("```"):
+    objects = []
+
+    # ```json ... ``` anywhere (not only at start)
+    for m in re.finditer(r"```(?:json)?\s*([\s\S]*?)```", text, flags=re.I):
+        obj = _try_load_json(m.group(1))
+        if obj:
+            objects.append(obj)
+
+    # Whole text / first object brace scan
+    candidates_text = [text]
+    if text.lstrip().startswith("```"):
         for part in text.split("```"):
             p = part.strip()
-            if p.startswith("json"):
+            if p.lower().startswith("json"):
                 p = p[4:].strip()
             if p.startswith("{"):
-                text = p
-                break
+                candidates_text.append(p)
 
-    objects = []
-    i = 0
-    while i < len(text):
-        if text[i] != "{":
-            i += 1
-            continue
-        depth = 0
-        in_str = False
-        esc = False
-        end = None
-        for j in range(i, len(text)):
-            c = text[j]
-            if in_str:
-                if esc:
-                    esc = False
-                elif c == "\\":
-                    esc = True
-                elif c == '"':
-                    in_str = False
-                continue
-            if c == '"':
-                in_str = True
-            elif c == "{":
-                depth += 1
-            elif c == "}":
-                depth -= 1
-                if depth == 0:
-                    end = j + 1
-                    break
-        if end is None:
-            i += 1
-            continue
-        chunk = text[i:end]
-        try:
-            obj = json.loads(chunk)
+    for src in candidates_text:
+        obj = _try_load_json(src)
+        if obj:
             objects.append(obj)
-        except Exception:
-            pass
-        i = end
+        i = 0
+        while i < len(src):
+            if src[i] != "{":
+                i += 1
+                continue
+            depth = 0
+            in_str = False
+            esc = False
+            end = None
+            for j in range(i, len(src)):
+                c = src[j]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif c == "\\":
+                        esc = True
+                    elif c == '"':
+                        in_str = False
+                    continue
+                if c == '"':
+                    in_str = True
+                elif c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = j + 1
+                        break
+            if end is None:
+                # truncated from this brace — try repair
+                obj = _try_load_json(src[i:])
+                if obj:
+                    objects.append(obj)
+                i += 1
+                continue
+            obj = _try_load_json(src[i:end])
+            if obj:
+                objects.append(obj)
+            i = end
 
     return objects
 
@@ -210,6 +275,13 @@ def _pick_best_report(candidates):
     return None
 
 
+def _text_preview(raw: str, n: int = 220) -> str:
+    s = re.sub(r"\s+", " ", _strip_think(raw) or "").strip()
+    if len(s) <= n:
+        return s
+    return s[:n] + "…"
+
+
 def _coerce_report(structured_output=None, report_text: str = ""):
     # Prefer LLM/text: Dify Structured Output often returns a stage fragment only.
     candidates = []
@@ -222,16 +294,20 @@ def _coerce_report(structured_output=None, report_text: str = ""):
         return best
 
     so_keys = list(structured_output.keys()) if isinstance(structured_output, dict) else []
-    text_len = len(_strip_think(report_text or ""))
+    stripped = _strip_think(report_text or "")
+    text_len = len(stripped)
+    preview = _text_preview(report_text or "")
     if _is_stage_fragment(structured_output if isinstance(structured_output, dict) else {}):
         raise ValueError(
             "Dify structured_output is only a stage {num,title,items} (wiring OK). "
-            f"LLM/text length={text_len}. "
+            f"LLM/text length={text_len}. preview={preview!r}. "
             "Fix: LLM node → turn OFF Structured Output, add to System「只输出纯JSON，version=1」; "
             "or increase Max Tokens to 8192; then re-run."
         )
     raise ValueError(
-        f"no full report JSON found; structured_output keys={so_keys}; text_len={text_len}"
+        "no full report JSON found; "
+        f"structured_output keys={so_keys}; text_len={text_len}; preview={preview!r}. "
+        "LLM must output a single JSON with risk+plan (version=1)."
     )
 
 

@@ -391,6 +391,8 @@ window.DAOITH_I18N_EN = {
       text: 'Additional notes <span class="opt-mark">Optional</span>',
     },
     '#queryTax': { text: 'Query' },
+    '#diagHsFloatToggle': { text: 'Export rebate lookup' },
+    '#diagHsFloatClose': { text: 'Close' },
     '.diag-hs-title': { text: 'Export rebate rate lookup' },
     '#hsCode': { placeholder: 'Enter 10-digit HS code' },
     '#refundRateBox': { placeholder: 'Rate' },
