@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css?v=20261109oa1">
+  <link rel="stylesheet" href="/css/styles.css?v=20261114hs1">
   <script type="application/ld+json" id="daoith-org-jsonld"></script>
 </head>
 <body>
@@ -296,20 +296,6 @@
       <div class="ai-grid">
         <div class="ai-left">
         <div class="form-panel diag-panel">
-          <div class="diag-hs-block">
-            <div class="diag-hs-title">出口退税率查询</div>
-            <div class="diag-hs-body">
-              <div class="diag-hs-row">
-                <input type="text" id="hsCode" placeholder="10位海关编码" inputmode="numeric" autocomplete="off" maxlength="14" aria-label="海关编码">
-                <button type="button" class="btn btn-sm hs-query-btn" id="queryTax">查询</button>
-                <input type="text" class="hs-rate-box" id="refundRateBox" readonly placeholder="退税率" aria-label="出口退税率">
-              </div>
-              <p class="hs-hint" id="hsHint">完整税号精确匹配；不足10位时按前8位尝试。</p>
-              <p class="hs-hint hs-product-name" id="hsProductName" hidden></p>
-              <p class="hs-rate-source" id="hsRateSource" hidden></p>
-            </div>
-          </div>
-
           <div class="diag-chat" id="aiChatbot" data-state="open">
             <div class="diag-chat-header">
               <div class="diag-chat-title">
@@ -346,6 +332,33 @@
           <div class="result-panel-head">
             <strong>专属合规方案</strong>
             <span class="result-panel-eyebrow">Compliance Plan</span>
+          </div>
+          <div class="diag-hs-float" id="diagHsFloat" data-state="collapsed">
+            <button
+              type="button"
+              class="diag-hs-float-toggle"
+              id="diagHsFloatToggle"
+              aria-expanded="false"
+              aria-controls="diagHsPanel"
+            >
+              出口退税率查询
+            </button>
+            <div class="diag-hs-block" id="diagHsPanel" hidden>
+              <div class="diag-hs-float-head">
+                <div class="diag-hs-title">出口退税率查询</div>
+                <button type="button" class="diag-hs-float-close" id="diagHsFloatClose" aria-label="收起">收起</button>
+              </div>
+              <div class="diag-hs-body">
+                <div class="diag-hs-row">
+                  <input type="text" id="hsCode" placeholder="10位海关编码" inputmode="numeric" autocomplete="off" maxlength="14" aria-label="海关编码">
+                  <button type="button" class="btn btn-sm hs-query-btn" id="queryTax">查询</button>
+                  <input type="text" class="hs-rate-box" id="refundRateBox" readonly placeholder="退税率" aria-label="出口退税率">
+                </div>
+                <p class="hs-hint" id="hsHint">完整税号精确匹配；不足10位时按前8位尝试。</p>
+                <p class="hs-hint hs-product-name" id="hsProductName" hidden></p>
+                <p class="hs-rate-source" id="hsRateSource" hidden></p>
+              </div>
+            </div>
           </div>
           <div class="result-watermark" aria-hidden="true"></div>
           <div class="result-placeholder" id="resultPlaceholder">
@@ -941,7 +954,7 @@
     </div>
   </div>
 
-  <script src="/js/locales/en.js?v=20261109pol2"></script>
+  <script src="/js/locales/en.js?v=20261114hs1"></script>
   <script src="/js/i18n.js?v=20260917rebate3"></script>
   <script src="/js/config.js?v=20260918wl1"></script>
   <script src="/js/company-info.js?v=20260803e"></script>
@@ -952,7 +965,7 @@
   <script src="/js/cart.js?v=20260914xlsx912"></script>
   <script src="/js/auth.js?v=20260810d"></script>
   <script src="/js/hs-rates.js?v=20260810c"></script>
-  <script src="/js/main.js?v=20261109oa1"></script>
+  <script src="/js/main.js?v=20261114hs1"></script>
   <script src="/js/cs-assistant.js?v=20260922advisor2"></script>
 </body>
 </html>

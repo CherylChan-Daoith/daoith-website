@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeroFeatures();
   initFAQ();
   initHsRebateQuery();
+  initDiagHsFloat();
   initAiSolutionGuide();
   initAiChatbot();
   initTaxCalculator();
@@ -9979,9 +9980,48 @@ function initHsRebateQuery() {
   });
 }
 
+function setDiagHsFloatExpanded(expanded) {
+  const float = document.getElementById('diagHsFloat');
+  const panel = document.getElementById('diagHsPanel');
+  const toggle = document.getElementById('diagHsFloatToggle');
+  if (!float || !panel || !toggle) return;
+  const open = Boolean(expanded);
+  float.dataset.state = open ? 'expanded' : 'collapsed';
+  panel.hidden = !open;
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
+    const hsInput = document.getElementById('hsCode');
+    window.setTimeout(() => hsInput?.focus?.(), 30);
+  }
+}
+
+function initDiagHsFloat() {
+  const float = document.getElementById('diagHsFloat');
+  const toggle = document.getElementById('diagHsFloatToggle');
+  const closeBtn = document.getElementById('diagHsFloatClose');
+  if (!float || !toggle) return;
+
+  toggle.addEventListener('click', () => setDiagHsFloatExpanded(true));
+  closeBtn?.addEventListener('click', () => setDiagHsFloatExpanded(false));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (float.dataset.state !== 'expanded') return;
+    setDiagHsFloatExpanded(false);
+  });
+
+  // Keep query usable via Enter inside the HS input.
+  document.getElementById('hsCode')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    document.getElementById('queryTax')?.click();
+  });
+}
+
 /* Legacy alias — form-based plan generator removed in favor of diagnosis chat */
 function initAIForm() {
   initHsRebateQuery();
+  initDiagHsFloat();
 }
 
 /* Tax Calculator */
