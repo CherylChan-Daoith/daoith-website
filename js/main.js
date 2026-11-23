@@ -1991,7 +1991,7 @@ function buildLocalChatReply(message, ctx) {
         '- 税号参考：多归入 **8517.13**（中国税则常见 85171300）',
         '- 注意：型号、通信功能、是否成套等会影响归类',
         '- 正式报关请以海关归类决定 / 预裁定为准',
-        '- 可用左侧「HS 查询」核对退税率',
+        '- 可点击本页右上角「出口退税率查询」核对退税率',
       ].join('\n');
     }
     if (/笔记本|电脑|平板/.test(q)) {
@@ -2000,14 +2000,14 @@ function buildLocalChatReply(message, ctx) {
         '',
         '- 税号参考：多归入 **8471.30**',
         '- 正式报关请以海关归类决定为准',
-        '- 可用左侧「HS 查询」核对退税率',
+        '- 可点击本页右上角「出口退税率查询」核对退税率',
       ].join('\n');
     }
     return [
       '**海关编码（HS）归类提示**',
       '',
       '- 需按商品材质、功能、用途归类',
-      '- 可在左侧填写大致编码后查询出口退税率',
+      '- 可点击本页右上角「出口退税率查询」填写海关编码后查询',
       '- 拿不准时可预约专家1v1，或申请海关预裁定',
     ].join('\n');
   }
@@ -5672,7 +5672,7 @@ function buildFallbackActionAdvice(slots) {
     `按【合规方案】落实报关与出口路径：以「${exportMode}」和「${shipping}」为准，优先把报关抬头与经营主体对齐。`,
     `核对「${entity}」与「${platform}」店铺主体是否一致，并整理订单流、资金流、物流凭证，避免申报主体与平台报送脱节。`,
     `对照「${invoice}」盘点开票缺口；能改专票的优先改，报关品名、单位与发票保持一致。`,
-    `就「${product}」在本页左侧「查询出口退税率」核实税号与退税率后再报关，不要把增值税税率当成出口退税率。`,
+    `就「${product}」在本页右上角「出口退税率查询」核实税号与退税率后再报关，不要把增值税税率当成出口退税率。`,
     '需要落地搭建或与税局沟通时，选择页面下方「专家1v1财税咨询服务」。',
   ];
   return `【行动建议】\n${items.map((x, i) => `${i + 1}. ${x}`).join('\n')}`;
@@ -8622,15 +8622,20 @@ function sanitizeDiagnosisPlanText(text) {
     '$1'
   );
 
-  // Export-rebate links → point to left-side HS query box
+  // Export-rebate links → point to top-right floating HS lookup
   t = t.replace(
     /可至\s*\[[^\]]*(?:出口退税|退税率)[^\]]*\]\([^)]+\)\s*核实/gi,
-    '可在本页左侧「查询出口退税率」核实'
+    '可在本页右上角「出口退税率查询」核实'
   );
   t = t.replace(
     /\[[^\]]*(?:出口退税|退税率|退税查询)[^\]]*\]\([^)]+\)/gi,
-    '本页左侧「查询出口退税率」'
+    '本页右上角「出口退税率查询」'
   );
+  // Legacy copy from older KB / prompts (left-side lookup)
+  t = t.replace(/本页左侧[「『]查询出口退税率[」』]/g, '本页右上角「出口退税率查询」');
+  t = t.replace(/可在本页左侧[「『]查询出口退税率[」』]核实/g, '可在本页右上角「出口退税率查询」核实');
+  t = t.replace(/在本页左侧[「『]查询出口退税率[」』]核实/g, '在本页右上角「出口退税率查询」核实');
+  t = t.replace(/左侧[「『]查询出口退税率[」』]/g, '右上角「出口退税率查询」');
   // Other markdown links: keep label, drop URL
   t = t.replace(/\[([^\]]+)\]\(\s*https?:\/\/[^)]+\)/gi, '$1');
   // Bare URLs / domains in parentheses
