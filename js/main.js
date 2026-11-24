@@ -2582,6 +2582,12 @@ function localDiagnosisProductCategoryAsk(preface) {
   return (head ? `${head}\n\n` : '') + '6. 您的产品属于以下哪种类别？（可在下方点选）';
 }
 
+/** After chip「其他（不在以上分类）」— ask product name locally (do not re-ask Q6 via Agent). */
+function localDiagnosisProductNameAsk(preface) {
+  const head = String(preface || '').trim();
+  return (head ? `${head}\n\n` : '') + '请问产品名称是什么？';
+}
+
 function localDiagnosisRevenueAsk(preface) {
   const head = String(preface || '').trim();
   return (head ? `${head}\n\n` : '') + '7. 您目前年销售额约多少人民币？（可在下方点选）';
@@ -2621,6 +2627,23 @@ function setDiagSlot(key, value) {
 
 function clearDiagSlots() {
   localStorage.removeItem(DIAG_SLOTS_KEY);
+  clearDiagClarify();
+}
+
+const DIAG_CLARIFY_KEY = 'daoith_diagnosis_ui_clarify';
+
+function getDiagClarify() {
+  return String(localStorage.getItem(DIAG_CLARIFY_KEY) || '').trim();
+}
+
+function setDiagClarify(kind) {
+  const k = String(kind || '').trim();
+  if (!k) localStorage.removeItem(DIAG_CLARIFY_KEY);
+  else localStorage.setItem(DIAG_CLARIFY_KEY, k);
+}
+
+function clearDiagClarify() {
+  localStorage.removeItem(DIAG_CLARIFY_KEY);
 }
 
 /** --- diag-followup-helpers start --- */
@@ -3792,7 +3815,10 @@ function buildDiagnosisApiQuery(text, uiMode, uiStep, platformLabel, options = {
       );
     })(),
     5: '请执行第五步：只提问「5. 您目前供应商发票情况如何？（可在下方点选）」；不要在正文罗列专票/普票等选项。',
-    6: '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
+    6:
+      getDiagClarify() === 'productName' || /^其他/.test(String(getDiagSlots().productCategory || ''))
+        ? '用户已选产品类别「其他」。本轮**只追问**「请问产品名称是什么？」；禁止再问第六步选项；禁止检索知识库；不要写报告。'
+        : '请执行第六步：只提问「6. 您的产品属于以下哪种类别？（可在下方点选）」；不要在正文罗列选项。',
     7: '请执行第七步：只提问「7. 您目前年销售额约多少人民币？（可在下方点选）」；不要在正文罗列选项。',
     8: '第1-7步已齐：必须调用工具 generate_diagnosis_report，传入【诊断档案】，向用户只输出工具返回的 JSON（version=1，含 risk.processFlow / stages 01-03 / plan.overview+details）；禁止自行写 Markdown 1.2.3. 四章。工具失败时只说失败请重试，不要 fallback 写方案。不要再提问。',
   };
@@ -3859,6 +3885,9 @@ function isVagueDiagnosisAnswer(text, step) {
 function looksLikeDiagnosisClarificationAsk(botText) {
   const t = String(botText || '');
   if (!t) return false;
+  if (/请问产品名称是什么|产品名称是什么|具体(?:的)?产品名称|产品叫什么名字/.test(t)) {
+    return true;
+  }
   if (/(回到第|先回到|先确认一下|再确认一下|能否具体说明|请具体说明|可以具体说明|请补充说明|补充一下)/.test(t)) {
     return true;
   }
@@ -4101,6 +4130,7 @@ function initAiChatbot() {
     localStorage.setItem(STEP_KEY, '0');
     localStorage.setItem(PLATFORM_KEY, '');
     clearDiagSlots();
+    clearDiagClarify();
     setLastDiagFollowUpChanges([]);
   };
 
@@ -4121,7 +4151,7 @@ function initAiChatbot() {
     }
     if (getUiMode() !== 'diagnosis') return;
     const step = getUiStep();
-    // 「其他」等模糊答复先不跳步，等 Agent/用户补全后再前进
+    // 「其他」等模糊答复先不跳步，等本地/Agent 追问补全后再前进
     if (isVagueDiagnosisAnswer(t, step)) return;
     if (step === 1) {
       setDiagSlot('platform', t);
@@ -4143,7 +4173,14 @@ function initAiChatbot() {
       setDiagSlot('invoice', t);
       setUiWizard('diagnosis', 6, getUiPlatform());
     } else if (step === 6) {
-      setDiagSlot('productCategory', t);
+      const pendingOther = getDiagClarify() === 'productName';
+      const prevCat = String(getDiagSlots().productCategory || '').trim();
+      if (pendingOther || /^其他/.test(prevCat)) {
+        setDiagSlot('productCategory', `其他：${t}`);
+        clearDiagClarify();
+      } else {
+        setDiagSlot('productCategory', t);
+      }
       setUiWizard('diagnosis', 7, getUiPlatform());
     } else if (step === 7) {
       setDiagSlot('revenue', t);
@@ -4704,6 +4741,40 @@ function initAiChatbot() {
           return result;
         } catch (err) {
           console.warn('[diagnosis] step6 productCategory sync failed', err);
+          return null;
+        }
+      })();
+      return;
+    }
+
+    // Fast path: step-6「其他」→ 本地追问产品名称（不走 Agent，避免慢且重问第六步）
+    if (prevMode === 'diagnosis' && prevStep === 6 && getUiStep() === 6 && isVagueDiagnosisAnswer(text, 6)) {
+      setDiagSlot('productCategory', text);
+      setDiagClarify('productName');
+      const localAsk = localDiagnosisProductNameAsk('好的，已记录「其他」。');
+      appendBubble(localAsk, 'bot');
+      clearQuickReplies();
+
+      const platform = getUiPlatform();
+      const prevWarm = diagnosisWarmPromise;
+      const { difyChatEndpoint } = getDifyConfig();
+      const endpoint = difyChatEndpoint || '/v1/diagnosis/chat-messages';
+      diagnosisWarmPromise = (async () => {
+        try {
+          if (prevWarm) await prevWarm;
+          const convId = isConversationBound() ? localStorage.getItem(CONV_KEY) || '' : '';
+          const query = buildDiagnosisApiQuery(text, 'diagnosis', 6, platform);
+          const result = await callDify({
+            endpoint,
+            query,
+            inputs: {},
+            conversationId: convId,
+            returnMeta: true,
+          });
+          if (result?.conversationId) persistConversationId(result.conversationId, true);
+          return result;
+        } catch (err) {
+          console.warn('[diagnosis] step6 product-name clarify sync failed', err);
           return null;
         }
       })();
