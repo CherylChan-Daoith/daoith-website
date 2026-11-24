@@ -780,7 +780,7 @@ window.DAOITH_I18N_EN = {
           ],
         },
         pricingNote:
-          'Flat fee. Optional equity-structure design +¥88,000 / year. Shared with Finance Leap: dedicated WeChat group, unlimited day-to-day Q&A, reply within 4 hours, quarterly OKR review, annual companionship report. Fees are tax-inclusive; on-site meetings ¥5,000 / half-day and online meetings ¥1,200 / hour are billed separately. Overseas registration, audits, VAT/rebate agents are third-party extras. Can be bought alone or with Finance Leap.',
+          'Flat fee, no sales tiers. Optional equity-structure design is ¥88,000 / year. Fees are tax-inclusive. Out-of-package on-site meetings are ¥5,000 / half-day; online meetings ¥1,200 / hour, billed separately.',
         process: [
           'Full tax-risk screen',
           'Compliance solution',
