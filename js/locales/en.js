@@ -824,7 +824,7 @@ window.DAOITH_I18N_EN = {
           ],
         },
         pricingNote:
-          'Sales above ¥1B are custom-quoted. Shared with Compliance Guard: dedicated group, unlimited day-to-day Q&A, 4-hour response, quarterly OKR review, annual companionship report. Tax-inclusive list price; on-site ¥5,000 / half-day and online ¥1,200 / hour extra. Material changes in type/sales during the term can be re-scoped. Third-party registration/audit/VAT/rebate fees are separate. Can pair with Compliance Guard.',
+          'Priced by company type and sales volume; sales above ¥1B are custom-quoted. Fees are tax-inclusive. Out-of-package on-site meetings are ¥5,000 / half-day; online meetings ¥1,200 / hour. Material changes in company type or sales during the term can be re-scoped.',
         process: [
           'Business-process mapping',
           'Finance data sedimentation',
