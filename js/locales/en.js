@@ -780,7 +780,7 @@ window.DAOITH_I18N_EN = {
           ],
         },
         pricingNote:
-          'Flat fee. Optional equity-structure design +¥88,000 / year. Shared with Finance Leap: dedicated WeChat group, unlimited day-to-day Q&A, reply within 4 hours, quarterly OKR review, annual companionship report. Fees are tax-inclusive; on-site meetings ¥5,000 / half-day and online meetings ¥1,200 / hour are billed separately. Overseas registration, audits, VAT/rebate agents are third-party extras. Can be bought alone or with Finance Leap.',
+          'Flat fee, no sales tiers. Optional equity-structure design is ¥88,000 / year. Fees are tax-inclusive. Out-of-package on-site meetings are ¥5,000 / half-day; online meetings ¥1,200 / hour, billed separately.',
         process: [
           'Full tax-risk screen',
           'Compliance solution',
@@ -824,7 +824,7 @@ window.DAOITH_I18N_EN = {
           ],
         },
         pricingNote:
-          'Sales above ¥1B are custom-quoted. Shared with Compliance Guard: dedicated group, unlimited day-to-day Q&A, 4-hour response, quarterly OKR review, annual companionship report. Tax-inclusive list price; on-site ¥5,000 / half-day and online ¥1,200 / hour extra. Material changes in type/sales during the term can be re-scoped. Third-party registration/audit/VAT/rebate fees are separate. Can pair with Compliance Guard.',
+          'Priced by company type and sales volume; sales above ¥1B are custom-quoted. Fees are tax-inclusive. Out-of-package on-site meetings are ¥5,000 / half-day; online meetings ¥1,200 / hour. Material changes in company type or sales during the term can be re-scoped.',
         process: [
           'Business-process mapping',
           'Finance data sedimentation',
