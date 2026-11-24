@@ -1722,6 +1722,13 @@ function stripDiagMetaHeadings(text) {
 
 const DIAG_PICK_HINT = '（可在下方点选）';
 
+/** Free-text product-name clarify after「其他」— no chips, so never attach pick hint. */
+function isDiagProductNameClarifyAsk(text) {
+  return /请问产品名称是什么|产品名称是什么|具体(?:的)?产品名称|产品叫什么名字/.test(
+    String(text || '')
+  );
+}
+
 /** Force diagnosis asks to tip chips below — never keep option lists in the question text. */
 function normalizeDiagAskHint(text) {
   let t = String(text || '');
@@ -1766,10 +1773,19 @@ function normalizeDiagAskHint(text) {
     /(^\s*(?:\*\*)?[1-7]\.\s+[^\n？?]*[？?])(?:\*\*)?\s*[（(](?!可在下方点选)[^）\n]{2,}[）)]/gm,
     `$1${DIAG_PICK_HINT}`
   );
-  // Step 1–7 asks missing the tip
+  // Step 1–7 asks missing the tip（产品名称追问除外：无点选）
   t = t.replace(
     /(^\s*(?:\*\*)?([1-7])\.\s+(?:您|请问)[^\n？?]*[？?])(?!\s*（可在下方点选）)/gm,
-    `$1${DIAG_PICK_HINT}`
+    (full, ask) => (isDiagProductNameClarifyAsk(ask) ? full : `${ask}${DIAG_PICK_HINT}`)
+  );
+  // Strip pick hint / stray「6.」if a clarify ask was wrongly treated as step 6
+  t = t.replace(
+    /(请问产品名称是什么[？?]|产品名称是什么[？?])\s*（可在下方点选）/g,
+    '$1'
+  );
+  t = t.replace(
+    /(^|\n)(\s*)(?:\*\*)?6\.\s*(请问产品名称是什么[？?]|产品名称是什么[？?])(?:\*\*)?/g,
+    '$1$2$3'
   );
   return t;
 }
@@ -1840,13 +1856,18 @@ function emphasizeDiagStepQuestion(text) {
         : mode === 'diagnosis' && step >= 1 && step <= 7
           ? step
           : 0;
-    if (useStep && !/(?:^|\n)\s*\*{0,2}\d+\.\s+\S*[？?]/.test(t)) {
+    // 产品名称追问：不要自动加「6.」前缀（无芯片可点）
+    const skipStepPrefix =
+      isDiagProductNameClarifyAsk(t) ||
+      (typeof getDiagClarify === 'function' && getDiagClarify() === 'productName');
+    if (useStep && !skipStepPrefix && !/(?:^|\n)\s*\*{0,2}\d+\.\s+\S*[？?]/.test(t)) {
       const lines = t.split('\n');
       for (let i = 0; i < lines.length; i++) {
         const tr = lines[i].trim().replace(/^\*\*|\*\*$/g, '');
         if (
           /[？?]/.test(tr) &&
           /(平台|主体|发货|出口|发票|产品|类别|销售额|请问|哪一种|怎样|多少)/.test(tr) &&
+          !isDiagProductNameClarifyAsk(tr) &&
           !/^\d+\./.test(tr) &&
           !/^了解/.test(tr)
         ) {
@@ -1869,11 +1890,15 @@ function emphasizeDiagStepQuestion(text) {
     if (/^\d+\.\s*了解/.test(trimmed.replace(/^\*\*|\*\*$/g, ''))) return '';
     const indent = line.match(/^\s*/)[0];
     // 「3. ……？」——只加粗问句；统一附「（可在下方点选）」，选项在下方 chips
+    // 产品名称追问即使被标成 6. 也不加「可在下方点选」
     const stepMatch = trimmed.match(/^(?:\*\*)?(\d+\.\s+[^？?\n]*[？?])(?:\*\*)?(.*)$/);
     if (stepMatch && !/了解/.test(stepMatch[1])) {
       hit = true;
       const q = stepMatch[1].replace(/\*\*/g, '');
       if (/^[1-7]\./.test(q)) {
+        if (isDiagProductNameClarifyAsk(q)) {
+          return `${indent}**${q}**`;
+        }
         return `${indent}**${q}**${DIAG_PICK_HINT}`;
       }
       const tail = String(stepMatch[2] || '').trim();
