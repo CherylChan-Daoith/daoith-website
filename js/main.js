@@ -6331,6 +6331,8 @@ function pickDiagnosisServiceIds(text) {
   }
   if (/记账|账务|做账|汇算清缴|账册|代账/.test(t)) add('domestic-compliance-bookkeeping');
   if (/合规体检|全面诊断|架构诊断|风险排查/.test(t)) add('domestic-diagnosis');
+  if (/合规护航|护航陪跑|怕出事/.test(t)) add('consult-compliance-guard');
+  if (/财务跃迁|跃迁陪跑|财务管理中台|不够用/.test(t)) add('consult-finance-leap');
   if (/全年陪跑|持续跟进|财税合规陪跑/.test(t)) add('consult-annual');
   if (/常年财税顾问|常年顾问/.test(t)) add('consult-year-advisor');
 

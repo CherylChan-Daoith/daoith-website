@@ -713,6 +713,8 @@ window.DAOITH_I18N_EN = {
     },
   ],
   services: [
+    { title: 'Compliance Guard Program', desc: 'Afraid of trouble · tax compliance plan + implementation coaching · flat annual fee.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year from' },
+    { title: 'Finance Leap Program', desc: 'Not enough · process, data, policies, and a finance management mid-platform.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
     { title: 'Expert 1-on-1 advisory', desc: 'One-on-one diagnosis covering structure, rebates, tax risk, and actionable next steps.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ hour' },
     { title: 'Custom tax compliance plan', desc: 'Full tax health check · scenario-based compliance plan · actionable implementation list.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ session' },
     { title: 'Compliance coaching', desc: 'Turn a compliance plan into a tracked execution calendar, with tax-authority support.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: '/ year' },
@@ -749,6 +751,94 @@ window.DAOITH_I18N_EN = {
     { title: 'UK · one-off services', desc: 'Annual return, VAT / EORI / PAYE / pension registration, UTR reset, strike-off, tax investigation cover.', detailBtn: 'Service details', cartBtn: 'Add to inquiry list', unit: ' from' },
   ],
   servicesCatalog: [
+    {
+      id: 'consult-compliance-guard',
+      title: 'Compliance Guard Program',
+      desc: 'Afraid of trouble · tax compliance plan + implementation coaching · flat annual fee.',
+      unit: '/ year from',
+      details: window.DAOITH_enServiceBlocks({
+        content:
+          'Plan + coaching + emergency response: turn “we know there is risk” into “the risk has been handled.” Goal: run compliant, face tax inspections with confidence, and lower back-tax exposure.',
+        bullets: [
+          'Fix missing supplier invoices so purchase costs can hit the books',
+          'Re-select export customs paths and document chains so rebates are workable',
+          'Reconcile tax vs books and align platform data with filing scope',
+          'Support tax-bureau inquiries and evidence packs',
+          'Deliverables: risk list, compliance plan, inspection file pack, implementation checklist, quarterly internal-audit reports, remediation ledger, annual companionship report',
+        ],
+        highlights: ['Flat fee, no sales tiers', 'First-year standard then lighter retainers', 'Inspection-ready documentation'],
+        audience:
+          'Firms stuck without supplier invoices, unsure about customs/rebate docs, or already seeing platform–filing mismatches and tax inquiries.',
+        pricing: '',
+        pricingTable: {
+          variant: 'pricing-tiers',
+          headers: ['Plan', 'When', 'Fee', 'Includes'],
+          rows: [
+            ['Year-1 Standard', 'First year', '¥68,000 / year', 'Plan design + year-1 coaching; 2 internal audits; 2 meetings; policy updates & inspection support'],
+            ['Standard coaching', 'From year 2', '¥49,800 / year', '2 audits; 1 full risk screen; 2 meetings; consulting / updates; inspection support'],
+            ['Light maintenance', 'From year 2', '¥29,800 / year', '1 audit; 1 full risk screen; 1 meeting; consulting / updates; inspection support'],
+          ],
+        },
+        pricingNote:
+          'Flat fee. Optional equity-structure design +¥88,000 / year. Shared with Finance Leap: dedicated WeChat group, unlimited day-to-day Q&A, reply within 4 hours, quarterly OKR review, annual companionship report. Fees are tax-inclusive; on-site meetings ¥5,000 / half-day and online meetings ¥1,200 / hour are billed separately. Overseas registration, audits, VAT/rebate agents are third-party extras. Can be bought alone or with Finance Leap.',
+        process: [
+          'Full tax-risk screen',
+          'Compliance solution',
+          'Inspection documentation pack',
+          'Implementation checklist',
+          'Quarterly internal audit',
+          'Remediation & close-out',
+        ],
+        faqs: [
+          { q: 'How is this different from the older compliance coaching SKU?', a: 'Compliance Guard is the flagship flat-fee product line (plan + coaching + emergency). The older tiered coaching SKU remains for teams that already have a plan and want visit/hour packages.' },
+          { q: 'Can we add equity-structure design?', a: 'Yes — optional add-on at ¥88,000 / year.' },
+        ],
+      }),
+    },
+    {
+      id: 'consult-finance-leap',
+      title: 'Finance Leap Program',
+      desc: 'Not enough · process, data, policies, and a finance management mid-platform.',
+      unit: ' from',
+      details: window.DAOITH_enServiceBlocks({
+        content:
+          'Digital finance management: accurate data, fast closes, analyzable results, and early warnings. Priced by company type and sales volume. We map processes, settle data definitions, write policies, and build a finance mid-platform (web).',
+        bullets: [
+          'Business-process mapping and finance data caliber handbook',
+          'Management-process redesign and written finance policies',
+          'Finance management mid-platform (website)',
+          'Management analysis reporting system',
+          'Tax/finance early-warning indicators and digital operating reports',
+        ],
+        highlights: ['Priced by trade vs manufacturing and sales band', 'Mid-platform included', 'Analysis + early warning'],
+        audience:
+          'Teams whose finance data is scattered, closes are slow/unreliable, or lack unified tax/finance KPI monitoring before problems surface.',
+        pricing: '',
+        pricingTable: {
+          variant: 'pricing-tiers',
+          headers: ['Tier', 'Fits', 'Fee', 'Focus'],
+          rows: [
+            ['Basic', 'Trading · sales ≤ ¥50M', '¥80,000', 'Process / data + policies / mid-platform'],
+            ['Advanced', 'Trading ¥50M–¥100M, or manufacturing ≤ ¥50M', '¥120,000', 'Basic + finance digitalization upgrade'],
+            ['Premium', 'Manufacturing · sales ¥50M–¥100M', '¥180,000', 'Advanced + deeper digital management'],
+          ],
+        },
+        pricingNote:
+          'Sales above ¥1B are custom-quoted. Shared with Compliance Guard: dedicated group, unlimited day-to-day Q&A, 4-hour response, quarterly OKR review, annual companionship report. Tax-inclusive list price; on-site ¥5,000 / half-day and online ¥1,200 / hour extra. Material changes in type/sales during the term can be re-scoped. Third-party registration/audit/VAT/rebate fees are separate. Can pair with Compliance Guard.',
+        process: [
+          'Business-process mapping',
+          'Finance data sedimentation',
+          'Optimize management processes',
+          'Establish management policies',
+          'Build the mid-platform',
+          'Analytics & early warning',
+        ],
+        faqs: [
+          { q: 'Is the mid-platform a custom product build?', a: 'It is delivered as a finance management mid-platform (web) within the agreed scope. Deep custom ERP replacement is out of scope unless quoted separately.' },
+          { q: 'Trade 8/12 vs manufacturing 12/18 — how do we pick?', a: 'Match company type and sales band to Basic / Advanced / Premium in the table; over ¥1B negotiate separately.' },
+        ],
+      }),
+    },
     {
       id: 'consult-1v1',
       title: 'Expert 1-on-1 advisory',
