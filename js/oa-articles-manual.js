@@ -1,6 +1,22 @@
 /* Manually curated WeChat OA article links for expert insights list. */
 window.DAOITH_OA_MANUAL_ARTICLES = [
   {
+    "id": "oa-manual-26",
+    "title": "9610新政征求意见：1%预缴，平台代办申报",
+    "digest": "跨境电商又出新政策，本次新政能解决小包出口合规痛点吗？",
+    "author": "Cheryl CHEN",
+    "date": "2026-11-20",
+    "url": "https://mp.weixin.qq.com/s/Rtrx5H2fLnTt7ej2kQiFUg"
+  },
+  {
+    "id": "oa-manual-27",
+    "title": "跨境电商欧洲进口清关主体，您用对了吗？",
+    "digest": "赛维模式2.0下，欧洲进口清关是用店铺公司还是香港公司？",
+    "author": "Cheryl CHEN",
+    "date": "2026-11-10",
+    "url": "https://mp.weixin.qq.com/s/bQD_bVo5Pn_KeoCThkuATA"
+  },
+  {
     "id": "oa-manual-23",
     "title": "11月1日起最新税务行政处罚裁量基准：税务处罚的0.5倍/1倍/4倍等都是怎么定的？",
     "digest": "税总2026年第20号全国裁量基准自11月1日施行；偷税罚款统一四档，看首次/金额门槛与是否配合补缴",
